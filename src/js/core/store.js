@@ -21,7 +21,8 @@ export function emptyDoc(name = t('Untitled board')) {
     pages: [],                     // [] = infinite canvas; [{w,h},…] = a strip of sheets
     camera: { x: 0, y: 0, z: 1 },
     objects: {},   // id -> object
-    order: []      // z-order, back to front
+    order: [],      // z-order, back to front
+    audioTracks: []
   };
 }
 
@@ -328,6 +329,7 @@ export class Store {
       origin: d.origin || undefined,
       pageDates: d.pageDates && d.pageDates.length ? d.pageDates.slice() : undefined,
       background: d.background, pages: d.pages.map((p) => ({ ...p })), page: d.pages[0] || null,
+      audioTracks: Array.isArray(d.audioTracks) && d.audioTracks.length ? d.audioTracks.map((a) => ({ ...a })) : undefined,
       camera: d.camera, objects: d.order.map((id) => d.objects[id]).filter(Boolean), ...extra };
   }
 
@@ -351,6 +353,9 @@ export class Store {
     // the days the sheets were started, kept while the board is an infinite canvas (see App.setPageSize)
     if (Array.isArray(data.pageDates)) d.pageDates = data.pageDates.map((x) => (typeof x === 'string' && DATE_RE.test(x) ? x : null));
     d.camera = data.camera || d.camera;
+    if (Array.isArray(data.audioTracks)) {
+      d.audioTracks = data.audioTracks.map((a) => ({ ...a }));
+    }
     const list = Array.isArray(data.objects) ? data.objects
       : Array.isArray(data.objectList) ? data.objectList
         : data.objects ? Object.values(data.objects) : [];

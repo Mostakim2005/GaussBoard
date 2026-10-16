@@ -5358,6 +5358,9 @@ class App {
       return out;
     };
     const next = { ...doc, objects: await fix(doc.objects) };
+    if (next.audioTracks) {
+      delete next.audioTracks;
+    }
     if (Array.isArray(doc.linkedBoards)) {
       next.linkedBoards = [];
       for (const d of doc.linkedBoards) next.linkedBoards.push(d && Array.isArray(d.objects) ? { ...d, objects: await fix(d.objects) } : d);

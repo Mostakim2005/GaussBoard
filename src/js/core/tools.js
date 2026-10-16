@@ -719,13 +719,15 @@ export class Interaction {
 
         // coalesced events give smoother ink on high-rate pens
         const evs = e && e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+        const rec = this.app.audioRecorder;
+        const curT = (rec && rec.state === 'recording' && a.obj.audioId) ? rec.currentOffsetMs() : null;
         if (evs && evs.length) {
           for (const ce of evs) {
             const csp = this.surface.screenPoint(ce);
             const cwp = this.surface.cam.toWorld(csp.x, csp.y);
-            offer({ ...cwp, p: this.pressure(ce) });
+            offer({ ...cwp, p: this.pressure(ce), ...(curT != null ? { t: curT } : {}) });
           }
-        } else offer({ ...wp, p: pressure });
+        } else offer({ ...wp, p: pressure, ...(curT != null ? { t: curT } : {}) });
 
         if (added) a.obj.bbox = bboxOfPoints(a.obj.points);
         this.sendInkTrail(e, a, wp, pressure);
@@ -1558,7 +1560,15 @@ export class Interaction {
     const startEdge = this.ruler.visible && this.ruler.snap ? this.rulerEdgeAt(wp) : null;
     const act = { type: 'draw', obj, snapAxis: null, sheet,
       ruled: startEdge !== null, ruledEdge: startEdge || 0 };
-    obj.points.push(this.snapToRuler({ ...wp, p: this.pressure(e) }, act));
+    const rec = this.app.audioRecorder;
+    const isRec = rec && rec.state === 'recording';
+    const t0 = isRec ? rec.currentOffsetMs() : null;
+    if (isRec) {
+      obj.audioId = rec.activeTrackId;
+      obj.t0 = t0;
+    }
+    const pt0 = this.snapToRuler({ ...wp, p: this.pressure(e), ...(t0 != null ? { t: t0 } : {}) }, act);
+    obj.points.push(pt0);
     this.surface.wet = obj;
     this.action = act;
   }
@@ -1717,6 +1727,9 @@ export class Interaction {
     const obj = a.obj;
     this.surface.wet = null;
     this.surface.wetPieces = null;
+    if (obj.audioId && this.app.audioRecorder) {
+      obj.t1 = this.app.audioRecorder.currentOffsetMs();
+    }
     /*
      * A line the ruler cut in two (or three). Each piece is real ink and they
      * go in together, as one entry in the history - and none of them is offered
@@ -1725,10 +1738,11 @@ export class Interaction {
     if (a.pieces && a.pieces.length) {
       const tidy = (o) => {
         o.points = o.points.map((q) => ({
-          x: +q.x.toFixed(2), y: +q.y.toFixed(2), p: +(q.p ?? 0.5).toFixed(2)
+          x: +q.x.toFixed(2), y: +q.y.toFixed(2), p: +(q.p ?? 0.5).toFixed(2), t: q.t != null ? Math.round(q.t) : undefined
         }));
         o.bbox = bboxOfPoints(o.points);
         o.attachedTo = this.lockedHostFor(o) || undefined;
+        if (obj.audioId) { o.audioId = obj.audioId; o.t0 = obj.t0; o.t1 = obj.t1; }
         return o;
       };
       const all = a.pieces.map(tidy);
@@ -1739,7 +1753,7 @@ export class Interaction {
     }
     if (obj.points.length < 2) {
       const p = obj.points[0];
-      obj.points = [p, { x: p.x + 0.6, y: p.y + 0.6, p: p.p }];
+      obj.points = [p, { x: p.x + 0.6, y: p.y + 0.6, p: p.p, ...(p.t != null ? { t: p.t } : {}) }];
     }
     // The ink is kept exactly as drawn.
     //
@@ -1752,7 +1766,7 @@ export class Interaction {
     // Nothing is lost by keeping them: points are only captured when the pen
     // has moved at least ~1.2px on screen, so the density is already bounded.
     obj.points = obj.points.map((p) => ({
-      x: +p.x.toFixed(2), y: +p.y.toFixed(2), p: +(p.p ?? 0.5).toFixed(2)
+      x: +p.x.toFixed(2), y: +p.y.toFixed(2), p: +(p.p ?? 0.5).toFixed(2), t: p.t != null ? Math.round(p.t) : undefined
     }));
     obj.bbox = bboxOfPoints(obj.points);
 
