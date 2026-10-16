@@ -153,6 +153,13 @@ function registerProtocol() {
   protocol.handle('app', (request) => {
     const url = new URL(request.url);
     let rel = decodeURIComponent(url.pathname);
+    // Asset streaming endpoint: supports HTTP 206 range requests for audio seeking
+    if (rel.startsWith('/asset/')) {
+      const id = rel.slice(7);
+      if (!ASSET_NAME.test(id)) return new Response('Bad Request', { status: 400 });
+      const filePath = path.join(assetsDir(), id);
+      return net.fetch(pathToFileURL(filePath).toString());
+    }
     if (rel === '/' || rel === '') rel = '/index.html';
     const target = path.normalize(path.join(SRC, rel));
     if (!target.startsWith(SRC)) return new Response('Forbidden', { status: 403 });
@@ -1323,6 +1330,53 @@ function ipc() {
     return out;
   });
 
+  const activeRecordings = new Map();
+
+  ipcMain.handle('recording:start', async (_e, sessionId) => {
+    const safeId = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeId) return false;
+    const tmpFile = path.join(app.getPath('userData'), 'temp', `${safeId}.tmp`);
+    await fsp.mkdir(path.dirname(tmpFile), { recursive: true });
+    const ws = fs.createWriteStream(tmpFile);
+    activeRecordings.set(safeId, { ws, tmpFile });
+    return true;
+  });
+
+  ipcMain.handle('recording:appendChunk', async (_e, { sessionId, chunk }) => {
+    const safeId = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const entry = activeRecordings.get(safeId);
+    if (entry && chunk) {
+      entry.ws.write(Buffer.from(chunk));
+    }
+    return true;
+  });
+
+  ipcMain.handle('recording:finish', async (_e, { sessionId, durationMs }) => withStorageWrite(async () => {
+    const safeId = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const entry = activeRecordings.get(safeId);
+    if (!entry) return null;
+    await new Promise((r) => entry.ws.end(r));
+    activeRecordings.delete(safeId);
+
+    const buf = await fsp.readFile(entry.tmpFile);
+    const hash = crypto.createHash('sha256').update(buf).digest('hex') + '.webm';
+    const dest = path.join(assetsDir(), hash);
+    await fsp.mkdir(assetsDir(), { recursive: true });
+    await fsp.rename(entry.tmpFile, dest).catch(async () => {
+      await fsp.copyFile(entry.tmpFile, dest);
+      await fsp.unlink(entry.tmpFile);
+    });
+    return { assetId: hash, durationMs };
+  }));
+
+  ipcMain.handle('assets:putBinaryDirect', async (_e, { assetId, buffer }) => withStorageWrite(async () => {
+    if (!ASSET_NAME.test(String(assetId || ''))) return false;
+    const dest = path.join(assetsDir(), assetId);
+    await fsp.mkdir(assetsDir(), { recursive: true });
+    await writeAtomic(dest, Buffer.from(buffer));
+    return true;
+  }));
+
   /* --- LAN sync. Every one of these is inert until sync:start is called. --- */
   ipcMain.handle('sync:state', () => (syncService ? syncService.state() : {
     running: false, deviceName: '', deviceId: '', port: 0, unusualPort: false,
@@ -1603,6 +1657,10 @@ if (!singleInstance) {
   app.on('open-file', (e, filePath) => { e.preventDefault(); openBoardPath(filePath); });   // macOS
 
   app.whenReady().then(async () => {
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+      const url = webContents.getURL();
+      callback(url.startsWith('app://board/') && permission === 'media');
+    });
     registerProtocol();
     ipc();
     await prepareConfiguredStorage();

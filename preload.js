@@ -223,7 +223,14 @@ contextBridge.exposeInMainWorld('board', {
   assets: {
     put: (dataUrl) => ipcRenderer.invoke('assets:put', dataUrl),
     get: (id) => ipcRenderer.invoke('assets:get', id),
-    have: (ids) => ipcRenderer.invoke('assets:have', ids)
+    have: (ids) => ipcRenderer.invoke('assets:have', ids),
+    putBinaryDirect: (assetId, buffer) => ipcRenderer.invoke('assets:putBinaryDirect', { assetId, buffer })
+  },
+
+  recording: {
+    start: (sessionId) => ipcRenderer.invoke('recording:start', sessionId),
+    appendChunk: (sessionId, chunk) => ipcRenderer.invoke('recording:appendChunk', { sessionId, chunk }),
+    finish: (sessionId, durationMs) => ipcRenderer.invoke('recording:finish', { sessionId, durationMs })
   },
 
   /*
