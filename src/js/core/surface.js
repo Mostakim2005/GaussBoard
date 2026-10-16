@@ -83,6 +83,34 @@ export class Surface {
 
   invalidate() { this.dirty = true; this._band = null; this._bandOnly = false; this._fullAsked = true; }
 
+  pulseHighlight(worldBox, duration = 600) {
+    if (!worldBox) return;
+    const startTime = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const fn = (ctx, surface) => {
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const elapsed = now - startTime;
+      if (elapsed > duration) {
+        surface.overlays = surface.overlays.filter((f) => f !== fn);
+        surface.invalidate();
+        return;
+      }
+      const t = elapsed / Math.max(1, duration);
+      const alpha = (1 - t) * 0.8;
+      const expand = t * 16;
+      const a = surface.cam.toScreen(worldBox.x, worldBox.y);
+      const b = surface.cam.toScreen(worldBox.x + (worldBox.w || 0), worldBox.y + (worldBox.h || 0));
+
+      ctx.save();
+      ctx.strokeStyle = `rgba(0, 120, 212, ${alpha})`;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(a.x - expand, a.y - expand, (b.x - a.x) + expand * 2, (b.y - a.y) + expand * 2);
+      ctx.restore();
+      surface.invalidate();
+    };
+    this.overlays.push(fn);
+    this.invalidate();
+  }
+
   /**
    * Repaint from scratch, frozen copy and all.
    *
@@ -130,7 +158,8 @@ export class Surface {
   freezeKey() {
     const cam = this.cam;
     const ed = this.editing ? `${this.editing.id}:${this.editing.cell || ''}` : '';
-    return `${this.store.rev}.${this._liveRev || 0}|${cam.x}|${cam.y}|${cam.z}|${this.width}|${this.height}|${this.dpr}|${ed}`;
+    const rep = this.app?.replayEngine?.active ? `|rep:${this.app.replayEngine.track?.id || ''}` : '';
+    return `${this.store.rev}.${this._liveRev || 0}|${cam.x}|${cam.y}|${cam.z}|${this.width}|${this.height}|${this.dpr}|${ed}${rep}`;
   }
 
   /**
