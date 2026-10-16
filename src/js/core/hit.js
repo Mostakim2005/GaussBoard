@@ -25,7 +25,7 @@ export function toLocal(o, p) {
  * very answer it was hiding. Ink written ON a cover leaves with it, and is
  * `hidden` for as long as the cover is lifted - gone from the pointer too.
  */
-export const ghost = (o) => !!o && (!!o.hidden || (o.type === 'curtain' && !!o.revealed));
+export const ghost = (o) => !!o && (!!o.hidden || (o.type === 'curtain' && o.subtype !== 'tape' && !!o.revealed));
 
 export function hitObject(o, p, tol = 6) {
   if (ghost(o)) return false;
