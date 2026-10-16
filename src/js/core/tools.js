@@ -1,6 +1,7 @@
 // Pointer interaction: one small state machine covering every tool.
 
 import { uid, bboxOfPoints, clamp, dist, simplify, unionBox } from './util.js';
+import { isScratchGesture } from './scratch.js';
 import { boundsOf, worldBounds, withAttached, withGroups} from './store.js';
 import { pick, pickAll, inBox, inLasso, strokesAlong, normalizeBox, curtainAt, toLocal } from './hit.js';
 import { handlePositions, HANDLE, HANDLES, drawShape, inkPaint, linkRectsOf, inQuad } from './render.js';
@@ -214,6 +215,7 @@ export class Interaction {
       return;
     }
     try { this.canvas.setPointerCapture?.(e.pointerId); } catch { /* synthetic or already-released pointer */ }
+    this.surface.cam.cancelGlide?.();
     this._lastDownType = e.pointerType;
     if (e.pointerType === 'pen') this._penAt = performance.now();
     // A button went down under a mouse, so the mouse is unambiguously in
@@ -946,7 +948,7 @@ export class Interaction {
       // A tap, not a drag: whatever the pointer nudged on its way down goes
       // back where it was, and the only change is the cover coming off.
       if (a.type === 'move') { this.store.restoreSnapshot(a.snap); a.type = 'tapped'; }
-      this.app.revealCurtain(a.cover.id);
+      this.app.toggleCurtain(a.cover.id);
     }
 
     switch (a.type) {
@@ -954,7 +956,10 @@ export class Interaction {
       case 'draw':
         // A tap can dismiss a selection, or pick something up with a finger.
         // Neither should become ink or an undo entry. See tappedAnObject().
-        if (!this.tappedAnObject(a, e)) this.finishStroke(a);
+        if (!this.tappedAnObject(a, e)) {
+          if (this.offerScratchOut(a, e)) break;
+          this.finishStroke(a);
+        }
         break;
       case 'erase': this.finishErase(a); break;
       case 'marquee': {
@@ -1604,7 +1609,7 @@ export class Interaction {
     const cover = curtainAt(this.store, p0, 8 / z);
     if (cover) {
       this.discardTapMark();
-      this.app.revealCurtain(cover.id);
+      this.app.toggleCurtain(cover.id);
       this.surface.invalidate();
       return true;
     }
@@ -1671,6 +1676,21 @@ export class Interaction {
     this.surface.wetPieces = null;
     this.action = null;
     this.actionId = null;
+  }
+
+  offerScratchOut(a, e) {
+    // Hardware stylus guard: only recognize scratch gestures drawn with a pen
+    if (a.pointerType !== 'pen' && e?.pointerType !== 'pen') return false;
+    if (!a.obj?.points || !isScratchGesture(a.obj.points)) return false;
+
+    const box = bboxOfPoints(a.obj.points);
+    const hits = inBox(this.store, box, false).filter((o) => !o.locked && o.id !== a.obj.id);
+    if (!hits.length) return false;
+
+    this.discardTapMark(); // Throw away the scribble mark without saving to store
+    this.store.remove(hits.map((o) => o.id), 'scratch-out');
+    this.surface.pulseHighlight(box, 400);
+    return true;
   }
 
   /**
@@ -2457,6 +2477,7 @@ export class Interaction {
 
   onWheel(e) {
     e.preventDefault();
+    this.surface.cam.cancelGlide?.();
     const sp = this.surface.screenPoint(e);
 
     // scrolling mid-gesture moves the canvas under the pen rather than zooming
@@ -2615,7 +2636,7 @@ export class Interaction {
     }
     // A cover lifts on a double-click whatever else is true of it. Locked
     // covers are the norm, since nobody wants one nudged mid-lesson.
-    if (hit.type === 'curtain') { this.app.revealCurtain(hit.id); return; }
+    if (hit.type === 'curtain') { this.app.toggleCurtain(hit.id); return; }
     // only the picking tools own selection chrome
     if (this.tool !== 'pen' && this.tool !== 'highlighter') this.app.setSelection([hit.id]);
     if (hit.locked) { this.app.setSelection([hit.id]); this.app.hintLocked(); return; }

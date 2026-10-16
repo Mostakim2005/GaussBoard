@@ -1954,6 +1954,28 @@ class App {
     return true;
   }
 
+  /**
+   * Toggle a curtain between revealed and concealed if it is a study tape strip.
+   * Standard curtains fall back to one-way reveal.
+   */
+  toggleCurtain(id) {
+    const o = this.store.get(id);
+    if (!o || o.type !== 'curtain') return false;
+    if (o.subtype === 'tape') {
+      const next = !o.revealed;
+      if (next) {
+        this.surface.fadeOut(o);
+        for (const w of this.onCovers([id])) this.surface.fadeOut(w);
+      }
+      this.setCovers([id], next, next ? 'reveal tape' : 'conceal tape');
+      this.dropHidden();
+      this.surface.invalidate();
+      this.syncUI();
+      return true;
+    }
+    return this.revealCurtain(id);
+  }
+
   /** Lift every cover in the selection, as one undo. */
   revealSelectedCurtains() {
     const ids = this.selected.filter((o) => o.type === 'curtain' && !o.revealed).map((o) => o.id);
