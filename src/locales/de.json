@@ -1129,4 +1129,6 @@
  "Search boards and folders": "Whiteboards und Ordner durchsuchen",
  "Nothing called “{words}”": "Nichts heißt „{words}“",
  "Keep typing to narrow it down": "Weiter tippen, um einzugrenzen"
+,
+ "Invalid .gazboard archive: missing board.json": "Invalid .gazboard archive: missing board.json"
 }

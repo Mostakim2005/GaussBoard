@@ -13,6 +13,7 @@ import { Surface } from './core/surface.js';
 import { t } from './i18n.js';
 import { mathEntry, mathPng, hasMaths, inlineFit } from './core/maths.js';
 import { connectorSvg } from './core/connectors.js';
+import { loadZip } from './board-export.js';
 
 /**
  * What a bitmap or vector export covers.
@@ -661,8 +662,20 @@ export async function saveBoardFile(app) {
     filters: [{ name: t('GazBoard file'), extensions: ['gazboard'] }, { name: 'JSON', extensions: ['json'] }]
   });
   if (!filePath) return null;
-  const json = JSON.stringify(exportable(app.store.toJSON({ app: 'GazBoard', version: 1 })), null, 0);
-  await window.board.writeFile(filePath, new TextEncoder().encode(json).buffer);
+
+  const doc = exportable(app.store.toJSON({ app: 'GazBoard', version: 1 }));
+  const hasAudio = Array.isArray(doc.audioTracks) && doc.audioTracks.length > 0;
+
+  if (hasAudio) {
+    const Zip = await loadZip();
+    const zip = new Zip();
+    zip.file('board.json', JSON.stringify(doc, null, 0));
+    const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 1 } });
+    await window.board.writeFile(filePath, bytes.buffer);
+  } else {
+    const json = JSON.stringify(doc, null, 0);
+    await window.board.writeFile(filePath, new TextEncoder().encode(json).buffer);
+  }
   app.toast(t('Saved {name}', { name: filePath.split(/[\\/]/).pop() }));
   return filePath;
 }
@@ -675,7 +688,19 @@ export async function openBoardFile(app) {
   });
   if (!paths.length) return;
   const buf = await window.board.readFile(paths[0]);
-  const data = JSON.parse(new TextDecoder().decode(buf));
+  const bytes = new Uint8Array(buf);
+  let data;
+
+  // Sniff PK\x03\x04 magic bytes for ZIP container
+  if (bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04) {
+    const Zip = await loadZip();
+    const zip = await Zip.loadAsync(buf);
+    const boardEntry = zip.file('board.json');
+    if (!boardEntry) throw new Error(t('Invalid .gazboard archive: missing board.json'));
+    data = JSON.parse(await boardEntry.async('text'));
+  } else {
+    data = JSON.parse(new TextDecoder().decode(buf));
+  }
   // Which file this is, so re-opening it returns to its own board instead of
   // asking again and making another copy. See claimLocalBoard().
   let origin = paths[0];

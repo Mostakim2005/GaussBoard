@@ -649,7 +649,17 @@ function boardFileFromArgv(argv) {
 async function openBoardPath(filePath) {
   if (!filePath) return;
   try {
-    const data = JSON.parse(await fsp.readFile(filePath, 'utf8'));
+    const buf = await fsp.readFile(filePath);
+    let data;
+    if (buf[0] === 0x50 && buf[1] === 0x4B && buf[2] === 0x03 && buf[3] === 0x04) {
+      const JSZip = require('jszip');
+      const zip = await JSZip.loadAsync(buf);
+      const entry = zip.file('board.json');
+      if (!entry) throw new Error('Invalid .gazboard archive: missing board.json');
+      data = JSON.parse(await entry.async('text'));
+    } else {
+      data = JSON.parse(buf.toString('utf8'));
+    }
     // Which file this is, not just what is in it. An exported board keeps the
     // id of the board it came from, so two different files can carry the same
     // id; the renderer needs the path to tell them apart. See claimLocalBoard().

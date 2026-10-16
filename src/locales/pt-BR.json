@@ -1129,4 +1129,6 @@
  "Search boards and folders": "Buscar quadros e pastas",
  "Nothing called “{words}”": "Nada se chama “{words}”",
  "Keep typing to narrow it down": "Continue digitando para filtrar"
+,
+ "Invalid .gazboard archive: missing board.json": "Invalid .gazboard archive: missing board.json"
 }

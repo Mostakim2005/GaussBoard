@@ -1129,4 +1129,6 @@
  "Search boards and folders": "Buscar pizarras y carpetas",
  "Nothing called “{words}”": "Nada se llama «{words}»",
  "Keep typing to narrow it down": "Sigue escribiendo para afinar"
+,
+ "Invalid .gazboard archive: missing board.json": "Invalid .gazboard archive: missing board.json"
 }

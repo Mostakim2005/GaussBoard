@@ -3,7 +3,7 @@ import { exportable, safeName } from './export.js';
 import { t } from './i18n.js';
 
 let zipLibrary;
-async function loadZip() {
+export async function loadZip() {
   if (window.JSZip) return window.JSZip;
   if (!zipLibrary) zipLibrary = new Promise((resolve, reject) => {
     const script = document.createElement('script');

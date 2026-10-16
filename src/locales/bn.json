@@ -1129,4 +1129,6 @@
  "Search boards and folders": "বোর্ড আর ফোল্ডার খুঁজুন",
  "Nothing called “{words}”": "“{words}” নামে কিছু নেই",
  "Keep typing to narrow it down": "আরও লিখুন, তালিকা ছোট হবে"
+,
+ "Invalid .gazboard archive: missing board.json": "Invalid .gazboard archive: missing board.json"
 }

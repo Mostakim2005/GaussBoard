@@ -1129,4 +1129,6 @@
  "Search boards and folders": "ابحث في اللوحات والمجلدات",
  "Nothing called “{words}”": "لا شيء باسم «{words}»",
  "Keep typing to narrow it down": "واصل الكتابة لتضييق النتائج"
+,
+ "Invalid .gazboard archive: missing board.json": "Invalid .gazboard archive: missing board.json"
 }

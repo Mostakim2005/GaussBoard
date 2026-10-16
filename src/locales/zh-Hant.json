@@ -1129,4 +1129,6 @@
  "Search boards and folders": "搜尋白板和資料夾",
  "Nothing called “{words}”": "沒有名為「{words}」的內容",
  "Keep typing to narrow it down": "繼續輸入以縮小範圍"
+,
+ "Invalid .gazboard archive: missing board.json": "Invalid .gazboard archive: missing board.json"
 }
