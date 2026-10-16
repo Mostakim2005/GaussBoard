@@ -990,7 +990,22 @@ export const CURTAIN_LABEL = t('Tap to reveal');
  * in the export. Undo, or "Cover answers again", brings it back.
  */
 export function drawCurtain(ctx, o) {
-  if (o.revealed) return;
+  if (o.revealed) {
+    if (o.subtype !== 'tape') return;
+    const { x, y, w, h } = o;
+    const r = Math.min(Math.abs(w), Math.abs(h)) * 0.13;
+    ctx.save();
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+    ctx.fillStyle = o.color ? o.color + '26' : 'rgba(255, 185, 0, 0.15)';
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = o.color || '#ffb900';
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
   const { x, y, w, h } = o;
   const aw = Math.abs(w), ah = Math.abs(h);
   /*
