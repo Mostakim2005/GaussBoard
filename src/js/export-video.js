@@ -157,22 +157,44 @@ export async function exportVideoFile(app, track = null) {
   if (!filePath) return null;
 
   const exporter = new VideoExporter(app);
-  app.toast(t('Exporting video...'));
+  let progress = null;
+  if (typeof app.showProgress === 'function') {
+    progress = app.showProgress(t('Export Video (WebM)'), t('Exporting replay video ({pct}%)...', { pct: 0 }));
+    const card = document.getElementById('overlayCard');
+    if (card) {
+      const btnCancel = document.createElement('button');
+      btnCancel.className = 'btn';
+      btnCancel.style.marginTop = '12px';
+      btnCancel.textContent = t('Cancel');
+      btnCancel.onclick = () => {
+        exporter.cancel();
+        progress.close();
+      };
+      card.appendChild(btnCancel);
+    }
+  }
 
   try {
     const { blob } = await exporter.exportReplayVideo({
       track: chosenTrack,
       onProgress: (pct) => {
-        // e.g. update status if needed
+        const rounded = Math.round(pct * 100);
+        progress?.update(pct, t('Exporting replay video ({pct}%)...', { pct: rounded }));
       }
     });
 
+    if (exporter.cancelled) return null;
+
     const buf = await blob.arrayBuffer();
     await window.board.writeFile(filePath, buf);
+    progress?.close();
     app.toast(t('Saved {name}', { name: filePath.split(/[\\/]/).pop() }));
     return filePath;
   } catch (err) {
-    app.toast(err.message || 'Export failed');
+    progress?.close();
+    if (!exporter.cancelled) {
+      app.toast(err.message || 'Export failed');
+    }
     return null;
   }
 }

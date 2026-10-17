@@ -37,6 +37,12 @@ import {
   pickAndInsertDocument, pickAndInsertImage, insertDocument,
   insertImagesFromPaths, insertImageFiles, clipboardFileName, dropOrigin, isImagePath, isDocPath
 } from './insert.js';
+import { AudioRecorder } from './core/audio-recorder.js';
+import { ReplayEngine } from './core/replay.js';
+import { AudioBar } from './ui/audio-bar.js';
+import { SplitWorkspace } from './ui/split-workspace.js';
+import { ReplayBar } from './ui/replay-bar.js';
+import { exportVideoFile } from './export-video.js';
 
 export const DEFAULT_SETTINGS = {
   penColor: '#201f1e', penWidth: 4, penEffect: 'none', activePen: 'black',
@@ -256,6 +262,11 @@ class App {
       box: this.settings.timerBox,
       onPlace: (box) => { this.settings.timerBox = box; this.saveSettings(); }
     });
+    this.audioRecorder = new AudioRecorder();
+    this.replayEngine = new ReplayEngine(this);
+    this.audioBar = new AudioBar(this);
+    this.splitWorkspace = new SplitWorkspace(this);
+    this.replayBar = new ReplayBar(this);
     this.wireGlobalEvents();
     this.initDismissal();
     this.wireStore();
@@ -1910,19 +1921,28 @@ class App {
   }
 
   /** Drop a cover in the middle of the view, selected, ready to be sized. */
-  addCurtain() {
+  addCurtain(kind = 'curtain') {
     const view = this.surface.cam.viewport(this.surface.width, this.surface.height);
-    const w = this.worldSize(360), hh = this.worldSize(110);
+    const isTape = kind === 'tape';
+    const w = this.worldSize(360), hh = this.worldSize(isTape ? 46 : 110);
     const o = {
-      id: uid('cv'), type: 'curtain', x: view.x + view.w / 2 - w / 2, y: view.y + view.h / 2 - hh / 2,
+      id: uid('cv'), type: 'curtain', subtype: isTape ? 'tape' : undefined,
+      color: isTape ? '#fef08a' : undefined,
+      x: view.x + view.w / 2 - w / 2, y: view.y + view.h / 2 - hh / 2,
       w, h: hh, rotation: 0, revealed: false
     };
-    this.store.add(o, 'answer cover');
+    this.store.add(o, isTape ? 'study tape' : 'answer cover');
     this.setSelection([o.id]);
     this.setTool('select');
-    this.showHint('curtain-placed',
-      t('Drag the cover over whatever the class should not see yet. A <b>tap</b> with the pen, a finger or the laser lifts it; <b>undo</b> puts it back.'));
+    this.showHint(isTape ? 'tape-placed' : 'curtain-placed',
+      isTape
+        ? t('Study tape placed! Tap it to toggle reveal on and off.')
+        : t('Drag the cover over whatever the class should not see yet. A <b>tap</b> with the pen, a finger or the laser lifts it; <b>undo</b> puts it back.'));
     return o;
+  }
+
+  addTape() {
+    return this.addCurtain('tape');
   }
 
   /**
@@ -2257,6 +2277,7 @@ class App {
       case 'insert.document': pickAndInsertDocument(this); break;
       case 'insert.table': this.addTable(); break;
       case 'insert.curtain': this.addCurtain(); break;
+      case 'insert.tape': this.addTape(); break;
       case 'insert.boardlink': this.pickBoardLink(); break;
       case 'board.back': this.goBack(); break;
       case 'curtain.reveal': this.revealSelectedCurtains(); break;
@@ -2267,6 +2288,7 @@ class App {
 
       case 'export.png': this.checkOffPageBeforeExport().then((go) => go && exportPng(this, { scale: 2 })); break;
       case 'export.pngSelection': exportPng(this, { scale: 2, selectionOnly: true }); break;
+      case 'export.video': exportVideoFile(this); break;
       case 'edit.copyPicture': this.copyAsPicture(); break;
       case 'edit.copyText': this.copyText(); break;
       case 'export.svg': this.exportSvgWithLinks(); break;

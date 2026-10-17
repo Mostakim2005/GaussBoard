@@ -1701,8 +1701,7 @@ export class Interaction {
   }
 
   offerScratchOut(a, e) {
-    // Hardware stylus guard: only recognize scratch gestures drawn with a pen
-    if (a.pointerType !== 'pen' && e?.pointerType !== 'pen') return false;
+    // Support stylus, mouse, and touch for scratch-out gesture
     if (!a.obj?.points || !isScratchGesture(a.obj.points)) return false;
 
     const box = bboxOfPoints(a.obj.points);

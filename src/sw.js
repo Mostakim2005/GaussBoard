@@ -90,6 +90,7 @@ const PRECACHE_ASSETS = [
   './js/ui/pdfdialog.js',
   './js/ui/popover.js',
   './js/ui/present.js',
+  './js/ui/replay-bar.js',
   './js/ui/split-workspace.js',
   './js/ui/subtitles.js',
   './js/ui/textedit.js',
