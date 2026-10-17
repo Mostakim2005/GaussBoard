@@ -26,20 +26,21 @@
 
 ## 2. On-Demand Subsystem Reading Matrix
 
-When the user asks you to modify, debug, or extend a feature, read **only** the corresponding files listed in this table:
+> **Fast Navigation Tip**: For a detailed feature-by-feature lookup chart, see [`docs/INDEX.md`](docs/INDEX.md).
+> Open **ONLY** the designated Tier 1 Layer Dossier corresponding to your task:
 
 | Subsystem | If working on... | Read ONLY these files before modifying code |
 | :--- | :--- | :--- |
-| **Audio & Replay** | Audio recording, replay animations, scrubber timeline, bookmarks, or audio cards | 1. `docs/DEVELOPER_HANDOVER.md` (§3.1 Document Store Schema)<br>2. `docs/BUG_FIX_LOG.md` (BUG-005, BUG-006, BUG-007)<br>3. `src/js/core/replay.js` & `src/js/ui/audio-bar.js` |
-| **Eraser & Gestures** | Gesture scratch-out eraser, scribble detection, or false-positive tuning | 1. `docs/BUG_FIX_LOG.md` (BUG-001 & BUG-002: Spatial Overlap Guard)<br>2. `src/js/core/scratch.js` |
-| **Inking & Pens** | Pen engines, Windows Ink Bézier smoothing, highlighter opacity, or color-pop | 1. `docs/FEATURE_RECORD.md` (F-111, F-114)<br>2. `src/js/core/ink.js` & `src/js/core/render.js` |
-| **Study Tools** | Active-recall study tape, flashcard reveals, or split-screen workspace | 1. `docs/FEATURE_RECORD.md` (F-102, F-108)<br>2. `docs/BUG_FIX_LOG.md` (BUG-008)<br>3. `src/js/ui/split-workspace.js` |
-| **PDF & Margins** | PDF import modes (background vs movable), margin adjustment dialog | 1. `docs/FEATURE_RECORD.md` (F-118, F-119)<br>2. `src/js/ui/pagemargin-dialog.js` & `src/js/insert.js` |
-| **Connectors & Arrows** | Arrowheads, straight lines, barbed geometry, or thickness scaling | 1. `docs/FEATURE_RECORD.md` (Round 4, Point 1)<br>2. `src/js/core/connectors.js` |
-| **Templates & Backgrounds**| Importing external image/PDF templates or snapshotting active board | 1. `docs/FEATURE_RECORD.md` (Round 4, Point 2)<br>2. `src/js/templates.js` & `src/js/ui/panels.js` |
-| **Images & Annotation** | Cropping images or writing pen annotations directly onto embedded images | 1. `docs/FEATURE_RECORD.md` (Round 3, Point 3)<br>2. `src/js/ui/contextmenu.js` & `src/js/core/tools.js` |
-| **Video Exporter** | Multi-session video stitching, WebM export, or camera framing | 1. `docs/FEATURE_RECORD.md` (F-110 & Round 3, Point 4)<br>2. `src/js/export-video.js` |
-| **Search & Organization** | OmniSearch (Ctrl+F), in-settings search, or board tags/aliases | 1. `docs/BUG_FIX_LOG.md` (BUG-004)<br>2. `src/js/ui/search-dialog.js` & `src/js/ui/properties-dialog.js` |
+| **Audio & Replay** | Audio recording, replay animations, scrubber timeline, bookmarks, or audio cards | 1. [`docs/layers/01-audio-and-replay.md`](docs/layers/01-audio-and-replay.md)<br>2. `src/js/core/replay.js` & `src/js/ui/audio-bar.js` |
+| **Eraser & Gestures** | Gesture scratch-out eraser, scribble detection, or false-positive tuning | 1. [`docs/layers/02-inking-and-gestures.md`](docs/layers/02-inking-and-gestures.md)<br>2. `src/js/core/scratch.js` |
+| **Inking & Pens** | Pen engines, Windows Ink Bézier smoothing, highlighter opacity, or color-pop | 1. [`docs/layers/02-inking-and-gestures.md`](docs/layers/02-inking-and-gestures.md)<br>2. `src/js/core/ink.js` & `src/js/core/render.js` |
+| **Study Tools** | Active-recall study tape, flashcard reveals, or canvas bloom decay | 1. [`docs/layers/03-canvas-and-study-tape.md`](docs/layers/03-canvas-and-study-tape.md)<br>2. `src/js/core/render.js` & `src/js/core/hit.js` |
+| **Images & Annotation** | Cropping images or writing pen annotations directly onto embedded images | 1. [`docs/layers/03-canvas-and-study-tape.md`](docs/layers/03-canvas-and-study-tape.md)<br>2. `src/js/ui/contextmenu.js` |
+| **Connectors & Arrows** | Arrowheads, straight lines, barbed geometry, or thickness scaling | 1. [`docs/layers/04-geometry-and-templates.md`](docs/layers/04-geometry-and-templates.md)<br>2. `src/js/core/connectors.js` |
+| **Templates & Zoom** | Importing external image/PDF templates, board snapshots, or zoom presets | 1. [`docs/layers/04-geometry-and-templates.md`](docs/layers/04-geometry-and-templates.md)<br>2. `src/js/templates.js` & `src/js/ui/toolbar.js` |
+| **PDF & Margins** | PDF import modes (background vs movable), margin adjustment dialog | 1. [`docs/layers/05-pdf-and-pagemargins.md`](docs/layers/05-pdf-and-pagemargins.md)<br>2. `src/js/ui/pagemargin-dialog.js` |
+| **Split View & UI** | Dual-pane study layout, OmniSearch (Ctrl+F), ribbon pinning, or tags | 1. [`docs/layers/06-workspace-and-ui.md`](docs/layers/06-workspace-and-ui.md)<br>2. `src/js/ui/split-workspace.js` & `src/js/ui/toolbar.js` |
+| **Video Exporter** | Multi-session video stitching, WebM export, or camera framing | 1. [`docs/layers/07-video-export.md`](docs/layers/07-video-export.md)<br>2. `src/js/export-video.js` |
 | **Layers (On Standby)** | Resuming the multi-layer system feature | 1. `docs/DEVELOPER_HANDOVER.md` (§6 On-Hold Features)<br>2. `docs/plan/04-quality.md` (Phase 4 Layer Architecture) |
 
 ---
