@@ -1674,6 +1674,9 @@ class App {
     if (!target) { this.toast(t('“{name}” is not on this computer', { name: ref.name || '?' })); return false; }
     if (target.id === this.store.doc.id) {
       if (ref.page > 0 && this.pageCount) this.goToPage(ref.page - 1);
+      if (ref.box && this.surface?.cam) {
+        this.surface.cam.glideTo(ref.box, this.surface.width, this.surface.height, { duration: 400 });
+      }
       return true;
     }
     this.textEditor.commit();
@@ -1686,7 +1689,12 @@ class App {
     this.backStack.push({ ...from, to: target.id });
     if (this.backStack.length > 30) this.backStack.shift();
     await this.loadBoard(data, { claimed: true });
-    if (ref.page > 0) requestAnimationFrame(() => { if (this.pageCount) this.goToPage(ref.page - 1); });
+    requestAnimationFrame(() => {
+      if (ref.page > 0 && this.pageCount) this.goToPage(ref.page - 1);
+      if (ref.box && this.surface?.cam) {
+        this.surface.cam.glideTo(ref.box, this.surface.width, this.surface.height, { duration: 400 });
+      }
+    });
     this.syncBackPill();
     return true;
   }
