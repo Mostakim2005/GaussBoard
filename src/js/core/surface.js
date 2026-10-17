@@ -22,6 +22,7 @@ export class Surface {
    */
   constructor(canvas, store, opts = {}) {
     this.canvas = canvas;
+    this.app = opts.app || null;
     this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: !!opts.lowLatency });
     this.store = store;
     this.cam = new Camera();
@@ -364,7 +365,7 @@ export class Surface {
   }
 
   /** Background and every object, in world space. No selection chrome. */
-  drawScene(ctx, w = this.width, h = this.height, onload = () => this.invalidate(), clip = null) {
+  drawScene(ctx, w = this.width, h = this.height, onload = () => this.invalidate(), clip = null, filter = null) {
     const cam = this.cam;
     this.screenTransform(ctx);
     const pages = this.store.doc.pages;
@@ -421,6 +422,7 @@ export class Surface {
     for (const id of this.store.doc.order) {
       const o = objs[id];
       if (!o) continue;
+      if (filter && !filter(o)) continue;
       const wb = worldBounds(o);
       if (!boxesIntersect(vbox, wb)) continue;
       // Outside the band being repainted: its pixels are already right.
@@ -485,7 +487,9 @@ export class Surface {
     g.clearRect(0, 0, bw, bh);
     // an image that finishes decoding mid-stroke has to invalidate the freeze,
     // or it would not appear until the pen lifted
-    this.drawScene(g, this.width, this.height, () => { this._ink = null; this.invalidate(); });
+    const activeTrackId = this.app?.replayEngine?.active ? this.app.replayEngine.track?.id : null;
+    const filter = activeTrackId ? (o) => o.audioId !== activeTrackId : null;
+    this.drawScene(g, this.width, this.height, () => { this._ink = null; this.invalidate(); }, null, filter);
     return { canvas: c, key };
   }
 
@@ -579,7 +583,14 @@ export class Surface {
      * second for a trail that is a dozen points long is what made the laser
      * crawl on a heavy board; it now blits the same frozen copy a stroke uses.
      */
-    if (this.wet || this.laser.length) {
+    if (this.app?.replayEngine?.active) {
+      const key = this.freezeKey();
+      if (!this._ink || this._ink.key !== key) this._ink = this._freezeScene(key);
+      this.screenTransform();
+      ctx.drawImage(this._ink.canvas, 0, 0, w, h);
+      this.drawReplaySession(ctx);
+      this._painted = true;
+    } else if (this.wet || this.laser.length) {
       const key = this.freezeKey();
       if (!this._ink || this._ink.key !== key) this._ink = this._freezeScene(key);
       this.screenTransform();
@@ -754,6 +765,48 @@ export class Surface {
     // The laser goes on last: it is a pointing device, so it belongs above
     // everything, selection handles included.
     this.drawLaser(ctx);
+  }
+
+  drawReplaySession(ctx) {
+    const replay = this.app?.replayEngine;
+    if (!replay || !replay.track) return;
+    const t = replay.currentTimeMs;
+    const trackId = replay.track.id;
+    const cam = this.cam;
+
+    ctx.save();
+    ctx.setTransform(this.dpr * cam.z, 0, 0, this.dpr * cam.z, this.dpr * cam.x, this.dpr * cam.y);
+
+    const objs = this.store.doc.objects;
+    for (const id of this.store.doc.order) {
+      const o = objs[id];
+      if (!o || o.audioId !== trackId) continue;
+
+      if (o.t1 != null && o.t1 <= t) {
+        drawObject(ctx, o, () => this.invalidate(), this.editing);
+      } else if (o.t0 != null && o.t0 <= t && (o.t1 == null || t < o.t1)) {
+        if (Array.isArray(o.points)) {
+          const sliceIndex = o.points.findIndex((p) => p.t != null && p.t > t);
+          const pts = sliceIndex >= 0 ? o.points.slice(0, sliceIndex) : o.points;
+          if (pts.length >= 2) {
+            drawObject(ctx, { ...o, points: pts }, () => this.invalidate(), this.editing);
+            const tip = pts[pts.length - 1];
+            ctx.fillStyle = '#0078d4';
+            ctx.beginPath();
+            ctx.arc(tip.x, tip.y, (o.width || 4) / 2 + 1, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      } else if (o.t0 != null && o.t0 > t) {
+        if (replay.ghostMode === 'translucent') {
+          ctx.save();
+          ctx.globalAlpha = 0.12;
+          drawObject(ctx, o, () => this.invalidate(), this.editing);
+          ctx.restore();
+        }
+      }
+    }
+    ctx.restore();
   }
 
   /** A selected arrow: a ring at each end (filled when it holds on to something) and a diamond in the middle. */
