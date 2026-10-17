@@ -1633,6 +1633,18 @@ export class Interaction {
         return true;
       }
     }
+    // F-301: Click-to-Seek (Audio Jump): tapping a synced stroke seeks audio and pulses highlight
+    if (this.app?.replayEngine?.active || this.app?.replayEngine?.track) {
+      const hit = pick(this.store, p0, 8 / z);
+      const activeTrackId = this.app.replayEngine.track?.id;
+      if (hit && activeTrackId && hit.audioId === activeTrackId && hit.t0 != null) {
+        this.discardTapMark();
+        this.app.replayEngine.seek(hit.t0);
+        const b = worldBounds(hit);
+        if (b) this.surface.pulseHighlight(b);
+        return true;
+      }
+    }
     if (!finger && !selected?.size) return false;
 
     const hit = pick(this.store, p0, 8 / z);
