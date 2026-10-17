@@ -33,8 +33,14 @@ export class ReplayEngine {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
             return ctx.decodeAudioData(buf).then((decoded) => {
               this.audioBuffer = decoded;
+              if (this.track && (!this.track.durationMs || this.track.durationMs <= 0)) {
+                this.track.durationMs = Math.round(decoded.duration * 1000);
+              }
               if (this.app?.audioBar?.setWaveformBuffer) {
                 this.app.audioBar.setWaveformBuffer(decoded);
+              }
+              if (this.app?.audioBar?.syncUI) {
+                this.app.audioBar.syncUI();
               }
               try { ctx.close(); } catch {}
             });
@@ -46,6 +52,10 @@ export class ReplayEngine {
   }
 
   play() {
+    const dur = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 0);
+    if ((dur > 0 && this.currentTimeMs >= dur - 150) || (this.audio && this.audio.ended)) {
+      this.seek(0);
+    }
     if (this.surface) {
       this.surface._ink = null;
       this.surface.invalidate();

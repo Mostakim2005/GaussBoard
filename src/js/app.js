@@ -1714,6 +1714,10 @@ class App {
     return true;
   }
 
+  openBoard(id) {
+    return this.openBoardRef({ id });
+  }
+
   /** Back to the board a link was followed from, looking where you were looking. */
   async goBack() {
     const b = this.backStack.pop();

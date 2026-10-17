@@ -55,9 +55,13 @@ export class DensityCanvas {
 
     const seekAt = (e) => {
       const rect = this.canvas.getBoundingClientRect();
+      if (!rect.width) return;
       const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-      const duration = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 1);
-      const t = (x / Math.max(1, rect.width)) * duration;
+      const duration = (this.track?.durationMs > 0 ? this.track.durationMs : null)
+        || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : null)
+        || 0;
+      if (duration <= 0) return;
+      const t = (x / rect.width) * duration;
       if (this.onSeek) this.onSeek(Math.round(t));
     };
 

@@ -451,7 +451,7 @@ export class Interaction {
         this.surface.laser = [{ x: wp.x, y: wp.y, t: performance.now() }];
         this.action = { type: 'laser' };
         break;
-      case 'pen': case 'highlighter':
+      case 'pen': case 'highlighter': case 'tape':
         this.startStroke(e, wp, tool);
         if (this.action) this.action.selectionAtDown = selectionAtDown;
         break;
@@ -516,14 +516,16 @@ export class Interaction {
       }
     }
     /*
-     * The laser, and a mouse or finger that is moving the board while a pen
-     * does the writing, have no way to leave a mark - so a tap from them on an
-     * answer cover can only mean "show me". Remember what they landed on;
-     * onUp decides whether it was a tap.
+     * The laser, mouse pointer, or tapping on study tape:
+     * a tap means "toggle reveal/conceal". Remember what they landed on;
+     * onUp decides whether it was a tap or a drag.
      */
-    if (this.action && (tool === 'laser' || tool === 'mousePointer') && !this.spaceDown && e.button === 0) {
-      this.action.cover = curtainAt(this.store, wp, 8 / this.surface.cam.z);
-      this.action.downSp = sp;
+    const hitCurtain = curtainAt(this.store, wp, 10 / this.surface.cam.z);
+    if (this.action && !this.spaceDown && e.button === 0) {
+      if (tool === 'laser' || tool === 'mousePointer' || (hitCurtain && hitCurtain.subtype === 'tape' && tool === 'select')) {
+        this.action.cover = hitCurtain;
+        this.action.downSp = sp;
+      }
       // while presenting, a tap on a link to another board follows it
       if (!this.action.cover && this.app.presenting) {
         const link = this.linkAt(wp);
@@ -951,6 +953,8 @@ export class Interaction {
       // back where it was, and the only change is the cover coming off.
       if (a.type === 'move') { this.store.restoreSnapshot(a.snap); a.type = 'tapped'; }
       this.app.toggleCurtain(a.cover.id);
+      this.surface.invalidate();
+      return;
     }
 
     switch (a.type) {
@@ -1541,8 +1545,16 @@ export class Interaction {
 
   startStroke(e, wp, tool) {
     const s = this.app.settings;
+    const isTape = tool === 'tape';
     const isHl = tool === 'highlighter';
-    const obj = {
+    const obj = isTape ? {
+      id: uid('cv'), type: 'curtain', subtype: 'tape', tool: 'tape',
+      color: '#a855f7',
+      neonColor: '#c084fc',
+      width: 34,
+      points: [], bbox: { x: wp.x, y: wp.y, w: 0, h: 0 }, rotation: 0,
+      revealed: false
+    } : {
       id: uid('s'), type: 'stroke', tool: isHl ? 'highlighter' : 'pen',
       color: isHl ? s.highlighterColor : s.penColor,
       width: isHl ? s.highlighterWidth : s.penWidth,
@@ -1701,6 +1713,7 @@ export class Interaction {
   }
 
   offerScratchOut(a, e) {
+    if (this.app?.settings?.scratchOut === false) return false;
     // Support stylus, mouse, and touch for scratch-out gesture
     if (!a.obj?.points || !isScratchGesture(a.obj.points)) return false;
 
@@ -1768,6 +1781,13 @@ export class Interaction {
     if (obj.points.length < 2) {
       const p = obj.points[0];
       obj.points = [p, { x: p.x + 0.6, y: p.y + 0.6, p: p.p, ...(p.t != null ? { t: p.t } : {}) }];
+    }
+    if (obj.subtype === 'tape') {
+      obj.points = obj.points.map((p) => ({ x: +p.x.toFixed(2), y: +p.y.toFixed(2) }));
+      obj.bbox = bboxOfPoints(obj.points);
+      this.store.add(obj, 'study tape');
+      this.surface.extendFreeze?.(obj);
+      return;
     }
     // The ink is kept exactly as drawn.
     //

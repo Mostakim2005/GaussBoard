@@ -322,6 +322,84 @@ function wireTopBar(app) {
     el.innerHTML = icon(ic, 18) + (labels[id] ? `<span>${labels[id]}</span>` : '');
     el.addEventListener('click', fn);
   }
+
+  // Properties Button (Obsidian-style tags & aliases)
+  const btnProps = document.getElementById('btnProperties');
+  if (btnProps) {
+    btnProps.addEventListener('click', () => {
+      if (!app.propertiesDialog) {
+        import('./properties-dialog.js').then((m) => {
+          app.propertiesDialog = new m.PropertiesDialog(app);
+          app.propertiesDialog.toggle();
+        });
+      } else {
+        app.propertiesDialog.toggle();
+      }
+    });
+  }
+
+  // Omni Search Button
+  const btnOmni = document.getElementById('btnOmniSearch');
+  if (btnOmni) {
+    btnOmni.addEventListener('click', () => {
+      if (typeof app.toggleSearchDialog === 'function') {
+        app.toggleSearchDialog();
+      }
+    });
+  }
+
+  // Top Bar Embedded Audio Record Button
+  const btnTopRec = document.getElementById('btnTopRecord');
+  const lblTopTime = document.getElementById('topRecTime');
+  if (btnTopRec) {
+    let recTimer = null;
+    let recStartTime = 0;
+
+    const updateRecState = (isRecording) => {
+      if (isRecording) {
+        btnTopRec.style.boxShadow = '0 0 10px #ff3344, inset 0 0 4px #ff3344';
+        btnTopRec.style.borderColor = '#ff3344';
+        btnTopRec.style.color = '#ff3344';
+        if (!recTimer) {
+          recStartTime = Date.now();
+          recTimer = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
+            const m = Math.floor(elapsed / 60);
+            const s = String(elapsed % 60).padStart(2, '0');
+            if (lblTopTime) lblTopTime.textContent = `${m}:${s}`;
+          }, 500);
+        }
+      } else {
+        btnTopRec.style.boxShadow = 'none';
+        btnTopRec.style.borderColor = 'var(--line,rgba(0,0,0,0.15))';
+        btnTopRec.style.color = 'inherit';
+        if (recTimer) {
+          clearInterval(recTimer);
+          recTimer = null;
+        }
+        if (lblTopTime) lblTopTime.textContent = t('Record');
+      }
+    };
+
+    btnTopRec.addEventListener('click', async () => {
+      if (!app.audioRecorder) {
+        const { AudioRecorder } = await import('../core/audio-recorder.js');
+        app.audioRecorder = new AudioRecorder(app);
+      }
+      if (app.audioRecorder.recording) {
+        await app.audioRecorder.stop();
+        updateRecState(false);
+        app.toast?.(t('Recording stopped and saved to board'));
+      } else {
+        const started = await app.audioRecorder.start();
+        if (started) {
+          updateRecState(true);
+          app.toast?.(t('Recording started... Speak while you write!'));
+        }
+      }
+    });
+  }
+
   document.getElementById('panelClose').innerHTML = icon('close', 18);
 
   for (const [sel, name] of [['[data-cmd="zoomOut"]', 'zoomOut'], ['[data-cmd="zoomIn"]', 'zoomIn'], ['[data-cmd="fit"]', 'fit']]) {

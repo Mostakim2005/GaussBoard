@@ -27,6 +27,8 @@ export class AudioBar {
     this.box = { x: 24, y: 72 };
     this.speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
     this.speedIdx = 2; // 1.0x
+    this.skipIntervals = [5, 10, 13, 15];
+    this.skipIdx = 1; // 10s default
     this._interval = null;
 
     this.density = new DensityCanvas({
@@ -104,6 +106,15 @@ export class AudioBar {
     this.syncUI();
   }
 
+  get skipSeconds() {
+    return this.skipIntervals[this.skipIdx];
+  }
+
+  cycleSkip() {
+    this.skipIdx = (this.skipIdx + 1) % this.skipIntervals.length;
+    this.syncUI();
+  }
+
   cycleSpeed() {
     this.speedIdx = (this.speedIdx + 1) % this.speeds.length;
     const spd = this.speeds[this.speedIdx];
@@ -156,15 +167,22 @@ export class AudioBar {
     if (typeof document === 'undefined') return;
 
     this.btnRewind10 = h('button', {
-      class: 'ab-btn ab-rw10',
-      title: 'Rewind 10 seconds',
+      class: 'ab-btn ab-rw',
+      title: `Rewind ${this.skipSeconds}s`,
       style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;color:inherit;',
       html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>'
     });
     this.btnRewind10.addEventListener('click', () => {
       const cur = this.app?.replayEngine?.currentTimeMs || 0;
-      this.seek(cur - 10000);
+      this.seek(cur - this.skipSeconds * 1000);
     });
+
+    this.btnSkipStep = h('button', {
+      class: 'ab-btn ab-skip-step',
+      title: 'Click to cycle skip duration (5s, 10s, 13s, 15s)',
+      style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:2px 6px;border-radius:10px;font-size:11px;font-weight:700;color:inherit;margin:0 2px;'
+    }, `${this.skipSeconds}s`);
+    this.btnSkipStep.addEventListener('click', () => this.cycleSkip());
 
     this.btnPlay = h('button', {
       class: 'ab-btn ab-play',
@@ -174,14 +192,14 @@ export class AudioBar {
     this.btnPlay.addEventListener('click', () => this.togglePlay());
 
     this.btnForward10 = h('button', {
-      class: 'ab-btn ab-ff10',
-      title: 'Forward 10 seconds',
+      class: 'ab-btn ab-ff',
+      title: `Forward ${this.skipSeconds}s`,
       style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;color:inherit;',
       html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 17l5-5-5-5M6 17l5-5-5-5"/></svg>'
     });
     this.btnForward10.addEventListener('click', () => {
       const cur = this.app?.replayEngine?.currentTimeMs || 0;
-      this.seek(cur + 10000);
+      this.seek(cur + this.skipSeconds * 1000);
     });
 
     this.lblTime = h('span', {
@@ -236,7 +254,7 @@ export class AudioBar {
       id: 'audioBar',
       class: 'audio-bar-hud',
       style: 'position:absolute;z-index:1000;display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.18);user-select:none;font-size:13px;font-family:inherit;'
-    }, dragHandle, this.btnRewind10, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnClose);
+    }, dragHandle, this.btnRewind10, this.btnSkipStep, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnClose);
 
     this.wireDragging(dragHandle);
   }
@@ -295,6 +313,9 @@ export class AudioBar {
     this.lblTime.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
     this.btnPlay.innerHTML = icon(replay?.active ? 'pause' : 'play', 18);
     this.btnSpeed.textContent = `${this.speeds[this.speedIdx]}×`;
+    if (this.btnSkipStep) this.btnSkipStep.textContent = `${this.skipSeconds}s`;
+    if (this.btnRewind10) this.btnRewind10.title = `Rewind ${this.skipSeconds}s`;
+    if (this.btnForward10) this.btnForward10.title = `Forward ${this.skipSeconds}s`;
 
     if (replay) {
       this.btnGhost.style.opacity = replay.ghostMode === 'translucent' ? '1.0' : '0.4';

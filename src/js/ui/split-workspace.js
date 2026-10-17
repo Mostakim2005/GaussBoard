@@ -262,10 +262,15 @@ export class SplitWorkspace {
     if (!id || !this.leftStore) return;
     try {
       let data = null;
-      if (window.board?.boards?.get) {
+      if (typeof window.board?.boards?.load === 'function') {
+        data = await window.board.boards.load(id);
+      } else if (typeof window.board?.boards?.get === 'function') {
         data = await window.board.boards.get(id);
       } else if (this.app?.storage?.load) {
         data = await this.app.storage.load(id);
+      }
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch {}
       }
       if (data) {
         this.leftStore.load(data);

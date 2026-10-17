@@ -199,7 +199,7 @@ export class Surface {
    * repaint, which is the safe direction.
    */
   extendFreeze(obj) {
-    if (!this._ink || !obj) return false;
+    if (!this._ink || !obj || obj.audioId) return false;
     const cam = this.cam;
     const g = this._ink.canvas.getContext('2d');
     g.setTransform(this.dpr * cam.z, 0, 0, this.dpr * cam.z, this.dpr * cam.x, this.dpr * cam.y);
@@ -803,7 +803,9 @@ export class Surface {
       } else if (o.t0 != null && o.t0 > t) {
         if (replay.ghostMode === 'translucent') {
           ctx.save();
-          ctx.globalAlpha = 0.12;
+          // Render unrendered future strokes in crisp light grey ink (Image 3)
+          ctx.globalAlpha = 0.38;
+          ctx.filter = 'grayscale(1) contrast(0.8)';
           drawObject(ctx, o, () => this.invalidate(), this.editing);
           ctx.restore();
         }

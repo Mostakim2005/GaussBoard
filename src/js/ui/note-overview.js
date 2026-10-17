@@ -193,13 +193,25 @@ export class NoteOverviewDrawer {
         )
       );
 
+      const openThisBoard = () => {
+        this.close();
+        if (!isCurrent) {
+          if (typeof this.app?.openBoardRef === 'function') {
+            this.app.openBoardRef({ id: b.id, name: b.name || b.title });
+          } else if (typeof this.app?.openBoard === 'function') {
+            this.app.openBoard(b.id);
+          }
+        }
+      };
+
       card.addEventListener('mouseenter', () => { card.style.background = 'var(--desk,#f8f8fa)'; });
       card.addEventListener('mouseleave', () => { card.style.background = 'transparent'; });
+      card.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        openThisBoard();
+      });
       card.addEventListener('click', () => {
-        this.close();
-        if (!isCurrent && this.app?.openBoard) {
-          this.app.openBoard(b.id);
-        }
+        openThisBoard();
       });
 
       this.cardsContainer.appendChild(card);
@@ -230,7 +242,11 @@ export class NoteOverviewDrawer {
 
     menu.appendChild(mkItem(t('Open Board'), () => {
       this.close();
-      this.app?.openBoard?.(board.id);
+      if (typeof this.app?.openBoardRef === 'function') {
+        this.app.openBoardRef({ id: board.id, name: board.name || board.title });
+      } else if (typeof this.app?.openBoard === 'function') {
+        this.app.openBoard(board.id);
+      }
     }));
 
     menu.appendChild(mkItem(t('Open in Split View'), async () => {
@@ -240,19 +256,37 @@ export class NoteOverviewDrawer {
         this.app.splitWorkspace.enable();
       }
       if (typeof this.app.splitWorkspace.loadLeftBoard === 'function') {
-        this.app.splitWorkspace.loadLeftBoard(board.id);
+        await this.app.splitWorkspace.loadLeftBoard(board.id);
       }
     }));
 
     menu.appendChild(mkItem(t('Add Tag...'), async () => {
-      const tag = prompt(t('Enter tag name (e.g. #study):'));
-      if (tag && window.board?.boards?.setProperties) {
-        const cleaned = tag.startsWith('#') ? tag : '#' + tag;
-        await window.board.boards.setProperties(board.id, {
-          tags: [...(board.tags || []), cleaned]
-        });
-        await this.loadBoards();
-        this.filter();
+      const tag = prompt(t('Enter tag name (e.g. #study or #ai/llm):'));
+      if (tag && window.board?.boards?.load && window.board?.boards?.save) {
+        const cleaned = tag.startsWith('#') ? tag.trim() : '#' + tag.trim();
+        try {
+          let raw = await window.board.boards.load(board.id);
+          if (typeof raw === 'string') raw = JSON.parse(raw);
+          if (!raw) return;
+          raw.properties = raw.properties || {};
+          raw.properties.tags = Array.isArray(raw.properties.tags) ? raw.properties.tags : [];
+          if (!raw.properties.tags.includes(cleaned)) {
+            raw.properties.tags.push(cleaned);
+          }
+          raw.tags = raw.properties.tags;
+          await window.board.boards.save({ id: board.id, json: JSON.stringify(raw), setLast: false });
+          if (this.app?.store?.doc?.id === board.id) {
+            this.app.store.doc.properties = this.app.store.doc.properties || {};
+            this.app.store.doc.properties.tags = raw.properties.tags;
+            this.app.store.doc.tags = raw.tags;
+            await this.app.persist();
+          }
+          await this.loadBoards();
+          this.filter();
+          this.app?.toast?.(t('Tag {tag} added', { tag: cleaned }));
+        } catch (err) {
+          this.app?.toast?.(t('Failed to add tag: {msg}', { msg: err.message }));
+        }
       }
     }));
 

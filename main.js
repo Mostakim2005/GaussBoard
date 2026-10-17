@@ -1252,7 +1252,17 @@ function ipc() {
         const st = await fsp.stat(path.join(dataDir(), f));
         const raw = JSON.parse(await fsp.readFile(path.join(dataDir(), f), 'utf8'));
         if (!StorageLocation.isBoardFile(raw)) continue;      // some other program's .json: not a board
-        out.push({ id: raw.id || path.basename(f, '.json'), name: raw.name || 'Untitled board', modified: st.mtimeMs, objects: (raw.objects || []).length, thumb: raw.thumb || null, origin: raw.origin || null });
+        out.push({
+          id: raw.id || path.basename(f, '.json'),
+          name: raw.name || 'Untitled board',
+          modified: st.mtimeMs,
+          objects: (raw.objects || []).length,
+          thumb: raw.thumb || null,
+          origin: raw.origin || null,
+          properties: raw.properties || null,
+          tags: raw.tags || raw.properties?.tags || null,
+          aliases: raw.aliases || raw.properties?.aliases || null
+        });
       } catch {}
     }
     return out.sort((a, b) => b.modified - a.modified);

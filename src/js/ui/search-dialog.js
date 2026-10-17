@@ -12,6 +12,10 @@ export class SearchDialog {
     this.input = null;
     this.boardsContainer = null;
     this.settingsContainer = null;
+    this.secBoards = null;
+    this.secSettings = null;
+    this.secDivider = null;
+    this.emptyNotice = null;
     this.visible = false;
     this.boardsList = [];
   }
@@ -32,7 +36,7 @@ export class SearchDialog {
     this.input = h('input', {
       type: 'text',
       class: 'omni-search-input',
-      placeholder: t('Search boards, settings, tags, aliases...'),
+      placeholder: t('Search boards, settings, pressure, tags, aliases...'),
       style: 'width:100%;box-sizing:border-box;padding:12px 16px 12px 42px;border:none;background:var(--desk,#f5f5f7);border-radius:12px;font-size:15px;color:var(--text,#111111);outline:none;'
     });
 
@@ -55,27 +59,43 @@ export class SearchDialog {
 
     // Section 1: Boards
     this.boardsContainer = h('div', { class: 'search-section-boards' });
-    const secBoards = h('div', { style: 'margin-top:14px;' },
+    this.secBoards = h('div', { style: 'margin-top:14px;' },
       h('div', { style: 'font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-2,rgba(128,128,128,0.85));margin-bottom:8px;' }, t('Board Name')),
       this.boardsContainer
     );
 
+    // Light-colored subtle separator between sections
+    this.secDivider = h('div', {
+      class: 'search-section-divider',
+      style: 'height:1px;background:var(--line,rgba(0,0,0,0.08));margin:16px 0;'
+    });
+
     // Section 2: Settings
     this.settingsContainer = h('div', { class: 'search-section-settings' });
-    const secSettings = h('div', { style: 'margin-top:18px;' },
+    this.secSettings = h('div', { style: 'margin-top:4px;' },
       h('div', { style: 'font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-2,rgba(128,128,128,0.85));margin-bottom:8px;' }, t('Setting Name')),
       this.settingsContainer
     );
 
+    // Empty state notice
+    this.emptyNotice = h('div', {
+      style: 'display:none;padding:32px 16px;text-align:center;font-size:13.5px;color:var(--text-2,rgba(128,128,128,0.8));font-style:italic;'
+    }, t('No matching boards or settings found'));
+
+    const scrollArea = h('div', {
+      class: 'omni-search-scroll',
+      style: 'overflow-y:auto;flex:1;padding-right:4px;margin-top:4px;display:flex;flex-direction:column;'
+    }, this.secBoards, this.secDivider, this.secSettings, this.emptyNotice);
+
     const card = h('div', {
       class: 'omni-search-card',
-      style: 'position:relative;width:560px;max-width:92vw;max-height:80vh;background:var(--surface,#ffffff);border-radius:20px;box-shadow:0 16px 40px rgba(0,0,0,0.22);border:1px solid var(--line,rgba(0,0,0,0.12));padding:18px 20px;display:flex;flex-direction:column;overflow:hidden;'
-    }, header, h('div', { style: 'overflow-y:auto;flex:1;padding-right:4px;margin-top:4px;' }, secBoards, secSettings));
+      style: 'position:relative;width:580px;max-width:92vw;max-height:80vh;background:var(--surface,#ffffff);border-radius:20px;box-shadow:0 16px 40px rgba(0,0,0,0.22);border:1px solid var(--line,rgba(0,0,0,0.12));padding:18px 20px;display:flex;flex-direction:column;overflow:hidden;'
+    }, header, scrollArea);
 
     this.el = h('div', {
       id: 'omniSearchModal',
       class: 'omni-search-backdrop',
-      style: 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.45);backdrop-filter:blur(6px);display:none;align-items:flex-start;justify-content:center;padding-top:12vh;'
+      style: 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.45);backdrop-filter:blur(6px);display:none;align-items:flex-start;justify-content:center;padding-top:10vh;'
     }, card);
 
     this.el.addEventListener('click', (e) => {
@@ -106,39 +126,45 @@ export class SearchDialog {
     if (this.el) this.el.style.display = 'none';
   }
 
-  toggle() {
+  toggle(initialQuery = '') {
     if (this.visible) this.close();
-    else this.open();
+    else this.open(initialQuery);
   }
 
   filter() {
     const q = (this.input.value || '').trim().toLowerCase();
-    this.renderBoards(q);
-    this.renderSettings(q);
+    const boardCount = this.renderBoards(q);
+    const settingCount = this.renderSettings(q);
+
+    if (boardCount === 0 && settingCount === 0) {
+      if (this.secBoards) this.secBoards.style.display = 'none';
+      if (this.secDivider) this.secDivider.style.display = 'none';
+      if (this.secSettings) this.secSettings.style.display = 'none';
+      if (this.emptyNotice) this.emptyNotice.style.display = 'block';
+    } else {
+      if (this.emptyNotice) this.emptyNotice.style.display = 'none';
+      if (this.secBoards) this.secBoards.style.display = boardCount > 0 ? 'block' : 'none';
+      if (this.secSettings) this.secSettings.style.display = settingCount > 0 ? 'block' : 'none';
+      if (this.secDivider) this.secDivider.style.display = (boardCount > 0 && settingCount > 0) ? 'block' : 'none';
+    }
   }
 
   renderBoards(q) {
-    if (!this.boardsContainer) return;
+    if (!this.boardsContainer) return 0;
     this.boardsContainer.innerHTML = '';
 
     const currentDoc = this.app?.store?.doc;
     const currentId = currentDoc?.id;
 
-    // Filter board list by title, tags, and aliases
     const matched = this.boardsList.filter((b) => {
       if (!q) return true;
       const titleMatch = (b.name || b.title || '').toLowerCase().includes(q);
       const aliasMatch = Array.isArray(b.aliases) && b.aliases.some((a) => a.toLowerCase().includes(q));
       const tagMatch = Array.isArray(b.tags) && b.tags.some((t) => t.toLowerCase().includes(q));
       return titleMatch || aliasMatch || tagMatch;
-    }).slice(0, 8); // top 8
+    }).slice(0, 8);
 
-    if (matched.length === 0) {
-      this.boardsContainer.appendChild(h('div', {
-        style: 'padding:8px 12px;font-size:13px;color:var(--text-2,rgba(128,128,128,0.8));font-style:italic;'
-      }, t('No matching boards')));
-      return;
-    }
+    if (matched.length === 0) return 0;
 
     for (const b of matched) {
       const isCurrent = b.id === currentId;
@@ -172,41 +198,205 @@ export class SearchDialog {
       row.addEventListener('mouseleave', () => { row.style.background = isCurrent ? 'rgba(0,120,212,0.08)' : 'transparent'; });
       row.addEventListener('click', () => {
         this.close();
-        if (!isCurrent && this.app?.openBoard) {
-          this.app.openBoard(b.id);
+        if (!isCurrent) {
+          if (typeof this.app?.openBoardRef === 'function') {
+            this.app.openBoardRef({ id: b.id, name: b.name || b.title });
+          } else if (typeof this.app?.openBoard === 'function') {
+            this.app.openBoard(b.id);
+          }
         }
       });
 
       this.boardsContainer.appendChild(row);
     }
+
+    return matched.length;
   }
 
   renderSettings(q) {
-    if (!this.settingsContainer) return;
+    if (!this.settingsContainer) return 0;
     this.settingsContainer.innerHTML = '';
 
     const app = this.app;
+    const s = app?.settings || {};
+
     const settings = [
+      {
+        id: 'pressure',
+        title: t('Pressure sensitivity'),
+        desc: t('Vary ink width with how hard you press - within a stroke, not just between strokes'),
+        type: 'toggle',
+        get: () => s.pressure !== false,
+        set: (v) => { s.pressure = v; app.saveSettings(); }
+      },
+      {
+        id: 'scratchOut',
+        title: t('Gesture Scratch-Out Eraser'),
+        desc: t('Scribble back and forth over ink to erase it'),
+        type: 'toggle',
+        get: () => s.scratchOut !== false,
+        set: (v) => {
+          s.scratchOut = v;
+          app.saveSettings();
+          if (app.replayBar?.updateScratchUI) app.replayBar.updateScratchUI();
+        }
+      },
       {
         id: 'smoothCamera',
         title: t('Smooth Camera Easing'),
         desc: t('Animates pan and zoom transitions smoothly'),
         type: 'toggle',
-        get: () => app?.surface?.cam?.glide !== false,
-        set: (v) => { if (app?.surface?.cam) app.surface.cam.glide = v; }
+        get: () => s.smoothCamera !== false && app?.surface?.cam?.glide !== false,
+        set: (v) => {
+          s.smoothCamera = v;
+          if (app?.surface?.cam) app.surface.cam.glide = v;
+          app.saveSettings();
+        }
       },
       {
-        id: 'scratchOut',
-        title: t('Scratch-Out Eraser Gesture'),
-        desc: t('Scribble back and forth to erase ink beneath'),
+        id: 'inkToShape',
+        title: t('Straighten shapes I draw'),
+        desc: t('Hand-drawn circle, box or arrow snaps to a clean shape when you lift pen'),
         type: 'toggle',
-        get: () => true,
-        set: () => { app?.toast(t('Scratch-Out Eraser is permanently active.')); }
+        get: () => !!s.inkToShape,
+        set: (v) => { s.inkToShape = v; app.saveSettings(); }
+      },
+      {
+        id: 'penButtonErases',
+        title: t('Pen side button rubs out'),
+        desc: t('Hold stylus side button while drawing to erase'),
+        type: 'toggle',
+        get: () => s.penButtonErases !== false,
+        set: (v) => { s.penButtonErases = v; app.saveSettings(); }
+      },
+      {
+        id: 'inkWithMouse',
+        title: t('Draw with the mouse'),
+        desc: t('Choose whether mouse inks or pans canvas (Auto / Always / Never)'),
+        type: 'choice',
+        options: [['auto', t('Auto')], ['yes', t('Always')], ['no', t('Never')]],
+        get: () => s.inkWithMouse || 'auto',
+        set: (v) => { s.inkWithMouse = v; app.saveSettings(); }
+      },
+      {
+        id: 'inkWithFinger',
+        title: t('Draw with a finger'),
+        desc: t('Choose whether finger inks or moves canvas (Auto / Always / Never)'),
+        type: 'choice',
+        options: [['auto', t('Auto')], ['yes', t('Always')], ['no', t('Never')]],
+        get: () => s.inkWithFinger || 'auto',
+        set: (v) => { s.inkWithFinger = v; app.saveSettings(); }
+      },
+      {
+        id: 'inkPointer',
+        title: t('Pointer while inking'),
+        desc: t('Pen nib, Arrow or Crosshair pointer style'),
+        type: 'choice',
+        options: [['nib', t('Pen nib')], ['arrow', t('Arrow')], ['crosshair', t('Crosshair')]],
+        get: () => s.inkPointer || 'nib',
+        set: (v) => { s.inkPointer = v; app.saveSettings(); app.surface?.invalidate(); }
+      },
+      {
+        id: 'rulerSnap',
+        title: t('Ruler snapping'),
+        desc: t('Snap drawn strokes and lines to the active ruler'),
+        type: 'toggle',
+        get: () => !!app?.ruler?.snap,
+        set: (v) => { if (app?.ruler) app.ruler.snap = v; }
+      },
+      {
+        id: 'theme',
+        title: t('Theme'),
+        desc: t('Application visual appearance (System / Light / Dark)'),
+        type: 'choice',
+        options: [['system', t('System')], ['light', t('Light')], ['dark', t('Dark')]],
+        get: () => s.theme || 'system',
+        set: (v) => { s.theme = v; app.saveSettings(); }
+      },
+      {
+        id: 'wheelZoom',
+        title: t('Mouse wheel zooms'),
+        desc: t('Off: wheel and trackpad pan; On: wheel zooms canvas'),
+        type: 'toggle',
+        get: () => !!s.wheelZoom,
+        set: (v) => { s.wheelZoom = v; app.saveSettings(); }
+      },
+      {
+        id: 'edgePan',
+        title: t('Auto-pan at the edges'),
+        desc: t('Scrolls canvas when pointer runs into window edge'),
+        type: 'toggle',
+        get: () => !!s.edgePan,
+        set: (v) => { s.edgePan = v; app.saveSettings(); }
+      },
+      {
+        id: 'returnToSelect',
+        title: t('Return to select after drawing'),
+        desc: t('Switches back to select tool immediately after lifting pen'),
+        type: 'toggle',
+        get: () => !!s.returnToSelect,
+        set: (v) => { s.returnToSelect = v; app.saveSettings(); }
+      },
+      {
+        id: 'showGroupOutlines',
+        title: t('Outline grouped objects'),
+        desc: t('Faint dashed ring around tied objects'),
+        type: 'toggle',
+        get: () => s.showGroupOutlines !== false,
+        set: (v) => { s.showGroupOutlines = v; app.saveSettings(); app.surface?.invalidate(); }
+      },
+      {
+        id: 'rightDragPans',
+        title: t('Right-drag pans the canvas'),
+        desc: t('Hold right mouse button and drag to pan canvas'),
+        type: 'toggle',
+        get: () => s.rightDragPans !== false,
+        set: (v) => { s.rightDragPans = v; app.saveSettings(); }
+      },
+      {
+        id: 'showToolKeys',
+        title: t('Shortcut letters on toolbar'),
+        desc: t('Shows key in corner of tool button (V, P, H, E)'),
+        type: 'toggle',
+        get: () => s.showToolKeys !== false,
+        set: (v) => { s.showToolKeys = v; app.saveSettings(); }
+      },
+      {
+        id: 'lowLatencyInk',
+        title: t('Low-latency inking'),
+        desc: t('Shaves lag off pen by skipping canvas buffering step'),
+        type: 'toggle',
+        get: () => !!s.lowLatencyInk,
+        set: (v) => { s.lowLatencyInk = v; app.saveSettings(); app.toast(t('Takes effect next time GazBoard opens')); }
+      },
+      {
+        id: 'inkTrail',
+        title: t('Windows Ink trail (experimental)'),
+        desc: t('Direct Windows Ink trail for low stylus latency'),
+        type: 'toggle',
+        get: () => !!s.inkTrail,
+        set: (v) => { s.inkTrail = v; app.saveSettings(); app.inkTrail?.setEnabled(v); }
+      },
+      {
+        id: 'boardsPage',
+        title: t('My boards as a full page'),
+        desc: t('Full page gallery with folder tiles vs simple list'),
+        type: 'toggle',
+        get: () => s.boardsPage !== false,
+        set: (v) => { s.boardsPage = v; app.saveSettings(); }
+      },
+      {
+        id: 'autosave',
+        title: t('Autosave'),
+        desc: t('Automatically save boards locally on this computer'),
+        type: 'toggle',
+        get: () => s.autosave !== false,
+        set: (v) => { s.autosave = v; app.saveSettings(); }
       },
       {
         id: 'splitWorkspace',
         title: t('Split Study Workspace'),
-        desc: t('Toggle dual side-by-side view for notes and reference'),
+        desc: t('Dual side-by-side view for PDF and active notes'),
         type: 'toggle',
         get: () => !!app?.splitWorkspace?.active,
         set: () => { app?.splitWorkspace?.toggle(); }
@@ -214,7 +404,7 @@ export class SearchDialog {
       {
         id: 'replayBarDock',
         title: t('Replay Bar Dock Position'),
-        desc: t('Dock floating toolbar to Top, Bottom, Left or Right'),
+        desc: t('Dock floating toolbar to Top, Right, Bottom, or Left'),
         type: 'action',
         actionLabel: t('Rotate Dock'),
         run: () => {
@@ -238,39 +428,53 @@ export class SearchDialog {
       }
     ];
 
-    const matched = settings.filter((s) => {
+    const matched = settings.filter((item) => {
       if (!q) return true;
-      return s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q);
+      return item.id.toLowerCase().includes(q) ||
+        item.title.toLowerCase().includes(q) ||
+        item.desc.toLowerCase().includes(q);
     });
 
-    if (matched.length === 0) {
-      this.settingsContainer.appendChild(h('div', {
-        style: 'padding:8px 12px;font-size:13px;color:var(--text-2,rgba(128,128,128,0.8));font-style:italic;'
-      }, t('No matching settings')));
-      return;
-    }
+    if (matched.length === 0) return 0;
 
-    for (const s of matched) {
+    for (const item of matched) {
       let control = null;
-      if (s.type === 'toggle') {
-        const checked = s.get();
+      if (item.type === 'toggle') {
+        const checked = item.get();
         const toggleBtn = h('button', {
-          style: `padding:4px 10px;border-radius:14px;border:none;cursor:pointer;font-size:11.5px;font-weight:600;background:${checked ? '#0078d4' : 'rgba(128,128,128,0.2)'};color:${checked ? '#ffffff' : 'inherit'};transition:background 0.15s;`
+          style: `padding:4px 12px;border-radius:14px;border:none;cursor:pointer;font-size:11.5px;font-weight:600;background:${checked ? '#0078d4' : 'rgba(128,128,128,0.2)'};color:${checked ? '#ffffff' : 'inherit'};transition:background 0.15s;`
         }, checked ? t('ON') : t('OFF'));
         toggleBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          const next = !s.get();
-          s.set(next);
+          const next = !item.get();
+          item.set(next);
           this.renderSettings(q);
         });
         control = toggleBtn;
-      } else if (s.type === 'action') {
+      } else if (item.type === 'choice') {
+        const curVal = item.get();
+        const select = h('select', {
+          style: 'padding:3px 8px;border-radius:10px;border:1px solid var(--line,rgba(0,0,0,0.15));background:var(--desk,#f0f0f4);font-size:11.5px;font-weight:500;color:inherit;outline:none;'
+        });
+        for (const [val, label] of item.options) {
+          const opt = document.createElement('option');
+          opt.value = val;
+          opt.textContent = label;
+          if (val === curVal) opt.selected = true;
+          select.appendChild(opt);
+        }
+        select.addEventListener('change', (e) => {
+          e.stopPropagation();
+          item.set(select.value);
+        });
+        control = select;
+      } else if (item.type === 'action') {
         const actBtn = h('button', {
           style: 'padding:4px 10px;border-radius:14px;border:1px solid var(--line,rgba(0,0,0,0.15));background:none;cursor:pointer;font-size:11.5px;font-weight:600;color:inherit;'
-        }, s.actionLabel);
+        }, item.actionLabel);
         actBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          s.run();
+          item.run();
         });
         control = actBtn;
       }
@@ -280,8 +484,8 @@ export class SearchDialog {
         style: 'display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:10px;margin-bottom:4px;transition:background 0.12s;'
       },
         h('div', { style: 'display:flex;flex-direction:column;gap:2px;' },
-          h('span', { style: 'font-weight:600;font-size:13px;' }, s.title),
-          h('span', { style: 'font-size:11px;color:var(--text-2,rgba(128,128,128,0.8));' }, s.desc)
+          h('span', { style: 'font-weight:600;font-size:13px;' }, item.title),
+          h('span', { style: 'font-size:11px;color:var(--text-2,rgba(128,128,128,0.8));' }, item.desc)
         ),
         control
       );
@@ -291,5 +495,7 @@ export class SearchDialog {
 
       this.settingsContainer.appendChild(row);
     }
+
+    return matched.length;
   }
 }

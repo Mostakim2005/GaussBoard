@@ -21,6 +21,18 @@
   <header id="topbar">
     <button class="tb-btn" id="btnBoards" title="My boards"></button>
     <input id="boardTitle" value="Untitled board" spellcheck="false" aria-label="Board name">
+    <button class="tb-btn tb-props-btn" id="btnProperties" title="Board Properties (Tags & Aliases)" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:12px;margin-left:4px;cursor:pointer;">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      <span>Properties</span>
+    </button>
+    <button class="tb-btn tb-audio-rec" id="btnTopRecord" title="Record Audio Replay" style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:14px;font-size:12px;font-weight:600;margin-left:6px;cursor:pointer;transition:all 0.2s;">
+      <span class="rec-dot" style="width:8px;height:8px;border-radius:50%;background:#e53e3e;display:inline-block;"></span>
+      <span id="topRecTime">Record</span>
+    </button>
+    <button class="tb-btn tb-omni-search" id="btnOmniSearch" title="Search Boards & Settings (Ctrl+K)" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:12px;margin-left:4px;cursor:pointer;">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span>Search</span>
+    </button>
     <span class="badge" id="savedBadge">Saved</span>
     <button class="badge" id="storageWarning" type="button" hidden></button>
     <!-- Shown when other boards link to this one: a click lists them. -->

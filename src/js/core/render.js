@@ -990,6 +990,81 @@ export const CURTAIN_LABEL = t('Tap to reveal');
  * in the export. Undo, or "Cover answers again", brings it back.
  */
 export function drawCurtain(ctx, o) {
+  // Freehand Marker Study Tape (drawn with points)
+  if (Array.isArray(o.points) && o.points.length >= 2) {
+    const pts = o.points;
+    const w = o.width || 34;
+    const tapeColor = o.color || '#a855f7'; // Violet default per user inspiration
+    const neonOutline = o.neonColor || '#c084fc';
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (o.revealed) {
+      // REVEALED (Image 5): Transparent fill + crisp faint neon outline so text beneath is crystal clear
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.lineWidth = w;
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+      ctx.stroke();
+
+      // Outer delicate neon border
+      ctx.lineWidth = w + 2;
+      ctx.strokeStyle = 'rgba(192, 132, 252, 0.55)';
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    // CONCEALED (Image 4): Solid base + diagonal hatched stripes pattern + neon outline
+    // 1. Create clipping mask along the thick stroke
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.lineWidth = w;
+    ctx.strokeStyle = tapeColor;
+    ctx.stroke();
+
+    // 2. Draw diagonal hatched stripes across the bounding box
+    const b = bboxOfPoints(pts);
+    const pad = w / 2;
+    const minX = b.x - pad, minY = b.y - pad, bw = b.w + pad * 2, bh = b.h + pad * 2;
+
+    ctx.save();
+    // Clip inside the stroke path
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.lineWidth = w - 1;
+    ctx.stroke();
+    // Use canvas clip with stroke if supported, or overlay 45-deg hatched stripes
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.lineWidth = 3.5;
+    const gap = 12;
+    ctx.beginPath();
+    for (let d = -bh; d < bw; d += gap) {
+      ctx.moveTo(minX + d, minY + bh);
+      ctx.lineTo(minX + d + bh, minY);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    // 3. Crisp neon outline along edge
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.lineWidth = w + 1.5;
+    ctx.strokeStyle = neonOutline;
+    ctx.globalAlpha = 0.85;
+    ctx.stroke();
+
+    ctx.restore();
+    return;
+  }
+
+  // Rectangular Curtain or Tape Card
   if (o.revealed) {
     if (o.subtype !== 'tape') return;
     const { x, y, w, h } = o;
@@ -997,42 +1072,50 @@ export function drawCurtain(ctx, o) {
     ctx.save();
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
-    ctx.fillStyle = o.color ? o.color + '26' : 'rgba(255, 185, 0, 0.15)';
+    ctx.fillStyle = 'rgba(168, 85, 247, 0.08)';
     ctx.fill();
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = o.color || '#ffb900';
-    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = o.color || '#a855f7';
     ctx.stroke();
     ctx.restore();
     return;
   }
+
   const { x, y, w, h } = o;
   const aw = Math.abs(w), ah = Math.abs(h);
-  /*
-   * Everything in proportion to the card itself: the corners, the stripes and
-   * the label all grow and shrink with it. They used to be fixed board sizes
-   * (a 40-unit label, 28-unit stripes), which is fine on a card made at 100%
-   * and hopeless on one made zoomed right out - that card is twenty times as
-   * many board units across, so its label came out a twentieth of the size,
-   * a speck in the middle of a big purple block. The same rule the sticky
-   * notes follow: the size of the card is where the zoom already went.
-   */
   const unit = Math.min(aw, ah);
   const r = unit * 0.13;
+  const isTape = o.subtype === 'tape';
+  const baseColor = o.color || (isTape ? '#a855f7' : CURTAIN_COLOR);
+
   ctx.save();
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
-  ctx.fillStyle = o.color || CURTAIN_COLOR;
+  ctx.fillStyle = baseColor;
   ctx.fill();
   ctx.clip();
-  // the stripes: light, wide, and at 45 degrees so they read as a pattern
-  // rather than as ruled lines somebody might try to write on
-  ctx.strokeStyle = 'rgba(255,255,255,0.09)';
-  ctx.lineWidth = unit * 0.09;
-  const gap = Math.max(1e-6, unit * 0.25);
+
+  // Diagonal hatched stripes
+  ctx.strokeStyle = isTape ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.09)';
+  ctx.lineWidth = isTape ? Math.max(3, unit * 0.08) : unit * 0.09;
+  const gap = isTape ? Math.max(8, unit * 0.2) : Math.max(1e-6, unit * 0.25);
   ctx.beginPath();
   for (let d = -ah; d < aw; d += gap) { ctx.moveTo(x + d, y + ah); ctx.lineTo(x + d + ah, y); }
   ctx.stroke();
+
+  // Neon contour outline for tape
+  if (isTape) {
+    ctx.restore();
+    ctx.save();
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#c084fc';
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
   const label = o.label ?? CURTAIN_LABEL;
   if (label) {
     const size = curtainLabelSize(ctx, o, label);

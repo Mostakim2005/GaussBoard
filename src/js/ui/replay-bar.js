@@ -195,17 +195,22 @@ export class ReplayBar {
     // 5. Masking / Study Tape Button
     this.btnTape = h('button', {
       class: 'rb-btn rb-tape',
-      title: 'Study Tape (Place permanent toggleable answer covers \u2014 tap to reveal/hide)',
-      style: 'display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:500;color:inherit;transition:background 0.15s;',
+      title: t('Study Tape (Draw freehand marker tape over notes \u2014 tap to reveal/hide)'),
+      style: 'display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:500;color:inherit;transition:all 0.15s;',
       html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="17" y1="7" x2="17" y2="17"/></svg><span>Tape</span>'
     });
     this.btnTape.addEventListener('click', () => {
-      if (typeof this.app.addTape === 'function') {
-        this.app.addTape();
-      } else if (typeof this.app.addCurtain === 'function') {
-        this.app.addCurtain('tape');
+      if (this.app.tool === 'tape') {
+        this.app.setTool('pen');
+        this.btnTape.style.background = 'none';
+        this.btnTape.style.color = 'inherit';
+        this.app.toast(t('Returned to Pen tool'));
+      } else {
+        this.app.setTool('tape');
+        this.btnTape.style.background = 'rgba(168, 85, 247, 0.2)';
+        this.btnTape.style.color = '#a855f7';
+        this.app.toast(t('Study Tape active! Draw over notes to conceal them. Tap any tape to toggle reveal.'));
       }
-      this.app.toast(t('Study Tape placed! Tap it to toggle reveal on and off.'));
     });
 
     // 6. Split Study Workspace Button
@@ -236,16 +241,26 @@ export class ReplayBar {
       exportVideoFile(this.app);
     });
 
-    // 8. Scratch-Out Info Button (Intuitive scribble icon)
+    // 8. Scratch-Out Toggle Button
     this.btnScratch = h('button', {
       class: 'rb-btn rb-scratch',
-      title: 'Gesture Scratch-Out Eraser (Scribble back-and-forth over ink to erase \u2014 works with Pen, Mouse & Touch)',
-      style: 'display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:18px;font-size:12px;color:var(--text-2,rgba(128,128,128,0.85));',
+      title: t('Gesture Scratch-Out Eraser (Click to toggle on/off)'),
+      style: 'display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:18px;font-size:12px;color:var(--text-2,rgba(128,128,128,0.85));transition:all 0.15s;',
       html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15l4-5 4 6 4-7 5 6"/><path d="M19 19l-4-4"/></svg>'
     });
+    const updateScratchUI = () => {
+      const active = this.app.settings?.scratchOut !== false;
+      this.btnScratch.style.background = active ? 'rgba(0,120,212,0.14)' : 'none';
+      this.btnScratch.style.color = active ? '#0078d4' : 'var(--text-2,rgba(128,128,128,0.45))';
+      this.btnScratch.title = active ? t('Scratch-Out Eraser: ON (Click to disable)') : t('Scratch-Out Eraser: OFF (Click to enable)');
+    };
     this.btnScratch.addEventListener('click', () => {
-      this.app.toast(t('Scratch-Out Eraser is active! Scribble zig-zag over any stroke with pen, mouse, or finger to erase it.'));
+      this.app.settings.scratchOut = !(this.app.settings?.scratchOut !== false);
+      this.app.saveSettings();
+      updateScratchUI();
+      this.app.toast(this.app.settings.scratchOut ? t('Scratch-Out Eraser enabled') : t('Scratch-Out Eraser disabled'));
     });
+    setTimeout(updateScratchUI, 100);
 
     // 9. Dock & Settings Cog Menu
     this.btnMenu = h('button', {

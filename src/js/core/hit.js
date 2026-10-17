@@ -37,9 +37,9 @@ export function hitObject(o, p, tol = 6) {
     return hitConnector(o, p, tol);
   }
 
-  if (o.type === 'stroke') {
+  if (o.type === 'stroke' || (o.type === 'curtain' && Array.isArray(o.points))) {
     if (!pointInBox(lp, { x: b.x - tol, y: b.y - tol, w: b.w + tol * 2, h: b.h + tol * 2 })) return false;
-    const r = Math.max(tol, (o.width || 4) / 2 + 2);
+    const r = Math.max(tol, (o.width || 32) / 2 + 2);
     const pts = o.points;
     if (pts.length === 1) return Math.hypot(pts[0].x - lp.x, pts[0].y - lp.y) <= r;
     for (let i = 1; i < pts.length; i++) if (distToSegment(lp, pts[i - 1], pts[i]) <= r) return true;
