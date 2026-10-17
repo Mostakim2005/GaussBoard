@@ -1567,7 +1567,8 @@ export class Interaction {
       width: isHl ? s.highlighterWidth : s.penWidth,
       effect: isHl ? 'none' : s.penEffect,
       hue: Math.random() * 360,
-      opacity: isHl ? 0.38 : (s.penOpacityEnabled ? (s.penOpacity ?? 1) : 1),
+      opacity: isHl ? (s.highlighterOpacity ?? 0.5) : (s.penOpacityEnabled ? (s.penOpacity ?? 1) : 1),
+      colorPop: isHl ? (s.highlighterColorPop !== false) : undefined,
       points: [], bbox: { x: wp.x, y: wp.y, w: 0, h: 0 }, rotation: 0
     };
     // starting in the gutter is drawing on the desk: nothing happens
@@ -1663,6 +1664,16 @@ export class Interaction {
         if (b) this.surface.pulseHighlight(b);
         return true;
       }
+    }
+    const hitAudio = pick(this.store, p0, 8 / z);
+    if (hitAudio && hitAudio.type === 'audio') {
+      this.discardTapMark();
+      const tr = (this.app.store?.doc?.audioTracks || []).find((t) => t.id === hitAudio.trackId);
+      if (tr) {
+        this.app.audioBar?.open(tr);
+        this.app.audioBar?.togglePlay();
+      }
+      return true;
     }
     if (!finger && !selected?.size) return false;
 
@@ -2708,6 +2719,14 @@ export class Interaction {
     // A cover lifts on a double-click whatever else is true of it. Locked
     // covers are the norm, since nobody wants one nudged mid-lesson.
     if (hit.type === 'curtain') { this.app.toggleCurtain(hit.id); return; }
+    if (hit.type === 'audio') {
+      const tr = (this.app.store?.doc?.audioTracks || []).find((t) => t.id === hit.trackId);
+      if (tr) {
+        this.app.audioBar?.open(tr);
+        this.app.audioBar?.togglePlay();
+      }
+      return;
+    }
     // only the picking tools own selection chrome
     if (this.tool !== 'pen' && this.tool !== 'highlighter') this.app.setSelection([hit.id]);
     if (hit.locked) { this.app.setSelection([hit.id]); this.app.hintLocked(); return; }

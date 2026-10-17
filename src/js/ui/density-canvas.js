@@ -86,11 +86,12 @@ export class DensityCanvas {
     const nameStr = bm.name ? ` · ${bm.name}` : '';
 
     this.tooltipEl.innerHTML = '';
+    this.tooltipEl.style.flexDirection = 'column';
+    this.tooltipEl.style.alignItems = 'flex-start';
 
     const label = document.createElement('span');
     label.style.cssText = 'display:flex;align-items:center;gap:4px;color:#ffb900;';
     label.innerHTML = `<span>🔖</span><span style="color:inherit;font-variant-numeric:tabular-nums;">${timeStr}${nameStr}</span>`;
-    this.tooltipEl.appendChild(label);
 
     const btnJump = document.createElement('button');
     btnJump.className = 'density-bm-jump-btn';
@@ -101,7 +102,56 @@ export class DensityCanvas {
       if (this.onSeek) this.onSeek(Math.round(bm.t));
       this.hideBookmarkCard(0);
     });
-    this.tooltipEl.appendChild(btnJump);
+
+    const btnName = document.createElement('button');
+    btnName.className = 'density-bm-name-btn';
+    btnName.style.cssText = 'background:none;border:none;color:inherit;opacity:0.8;cursor:pointer;padding:2px 4px;font-size:11px;display:inline-flex;align-items:center;';
+    btnName.innerHTML = '✏️';
+    btnName.title = 'Name bookmark';
+
+    const editWrap = document.createElement('div');
+    editWrap.className = 'density-bm-edit-wrap';
+    editWrap.style.cssText = 'display:none;align-items:center;gap:4px;margin-top:4px;';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = bm.name || '';
+    nameInput.placeholder = 'Bookmark name...';
+    nameInput.style.cssText = 'padding:2px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.3);color:inherit;font-size:11px;width:120px;outline:none;';
+    const btnSave = document.createElement('button');
+    btnSave.textContent = 'Save';
+    btnSave.style.cssText = 'background:#ffb900;color:#000;border:none;border-radius:6px;padding:2px 6px;font-size:10.5px;font-weight:700;cursor:pointer;';
+
+    const saveName = (ev) => {
+      ev.stopPropagation();
+      bm.name = nameInput.value.trim();
+      const updatedNameStr = bm.name ? ` · ${bm.name}` : '';
+      label.innerHTML = `<span>🔖</span><span style="color:inherit;font-variant-numeric:tabular-nums;">${timeStr}${updatedNameStr}</span>`;
+      editWrap.style.display = 'none';
+      if (this.onBookmarkRenamed) this.onBookmarkRenamed(bm);
+    };
+
+    btnSave.addEventListener('click', saveName);
+    nameInput.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') saveName(ev);
+    });
+
+    btnName.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const isHidden = editWrap.style.display === 'none';
+      editWrap.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) setTimeout(() => nameInput.focus(), 50);
+    });
+
+    const topRow = document.createElement('div');
+    topRow.style.cssText = 'display:flex;align-items:center;gap:6px;';
+    topRow.appendChild(label);
+    topRow.appendChild(btnJump);
+    topRow.appendChild(btnName);
+
+    this.tooltipEl.appendChild(topRow);
+    editWrap.appendChild(nameInput);
+    editWrap.appendChild(btnSave);
+    this.tooltipEl.appendChild(editWrap);
 
     this.tooltipEl.style.display = 'flex';
   }

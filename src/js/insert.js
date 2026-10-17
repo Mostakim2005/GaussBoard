@@ -267,7 +267,7 @@ export async function insertDocument(app, filePath, opts = {}) {
         if (!choice) { await doc.destroy(); app.toast(t('Import cancelled')); return null; }
         pages = choice.pages;
         layout = choice.layout;
-        opts = { ...opts, quality: choice.quality };
+        opts = { ...opts, quality: choice.quality, importMode: choice.importMode, fitMode: choice.fitMode };
       }
     }
     layout = layout || (pages.length > 6 ? 'grid' : 'row');
@@ -283,7 +283,11 @@ export async function insertDocument(app, filePath, opts = {}) {
     await doc.destroy();
     doc = null;
 
-    const { objs, pages: padPages, focus } = layoutPages(app, rendered, { name, layout, multiPage: total > 1 });
+    const { objs, pages: padPages, focus } = layoutPages(app, rendered, {
+      name, layout, multiPage: total > 1,
+      importMode: opts.importMode || 'objects',
+      fitMode: opts.fitMode || 'fitWidth'
+    });
     // growing the pad and filling it are one commit, so one undo removes both
     const ops = [];
     if (padPages) ops.push(app.store.pagesOp(padPages));
@@ -306,37 +310,68 @@ export async function insertDocument(app, filePath, opts = {}) {
 }
 
 /** Place rendered pages on the board without overlapping what is already there. */
-function layoutPages(app, rendered, { name, layout, multiPage }) {
-  const mk = (p, box) => ({
+function layoutPages(app, rendered, { name, layout, multiPage, importMode = 'objects', fitMode = 'fitWidth' }) {
+  const isBg = importMode === 'background';
+  const mk = (p, box, locked = isBg) => ({
     id: uid('pg'), type: 'image', kind: 'page',
     x: box.x, y: box.y, w: box.w, h: box.h,
     rotation: 0, src: p.dataUrl,
     name, label: multiPage ? t('{name} — page {page}', { name, page: p.page }) : name,
-    docSource: name, docPage: p.page
+    docSource: name, docPage: p.page,
+    locked: !!locked
   });
 
-  // On a pad, an imported document becomes pages of the pad - one sheet each,
-  // centred and scaled to fit. That is what importing a PDF into a notebook is
-  // supposed to mean, and it is why nothing has to be cropped.
-  const pad = app.pages;
+  // On a pad, or when importing as page backgrounds, create sheets
+  const pad = isBg && !app.pages.length
+    ? rendered.map((p) => {
+      const w = fitMode === 'fitHeight' ? Math.round(p.width * (1122 / p.height)) : 794;
+      const h = fitMode === 'fitWidth' ? Math.round(p.height * (794 / p.width)) : 1122;
+      return { w, h, date: todayStamp() };
+    })
+    : app.pages;
+
   if (pad.length) {
-    const margin = 24;
+    const margin = isBg ? 0 : 24;
     const occupied = new Set(app.store.objects.map((o) => pageIndexForBox(pad, boundsOf(o))));
     const here = app.currentPageIndex();
     const start = occupied.has(here) ? pad.length : here;
 
     const pages = pad.map((q) => ({ ...q }));
     const last = pad[pad.length - 1];
-    while (pages.length < start + rendered.length) pages.push({ w: last.w, h: last.h, date: todayStamp() });
+    while (pages.length < start + rendered.length) {
+      const idx = pages.length - start;
+      const refP = rendered[idx] || rendered[0];
+      const w = isBg && fitMode === 'fitHeight' ? Math.round(refP.width * (1122 / refP.height)) : (last ? last.w : 794);
+      const h = isBg && fitMode === 'fitWidth' ? Math.round(refP.height * (794 / refP.width)) : (last ? last.h : 1122);
+      pages.push({ w, h, date: todayStamp() });
+    }
     const rects = pageRects(pages);
 
     const objs = rendered.map((p, i) => {
       const r = rects[start + i];
-      const s = Math.min((r.w - margin * 2) / p.width, (r.h - margin * 2) / p.height);
-      const w = p.width * s, h = p.height * s;
-      return mk(p, { x: r.x + (r.w - w) / 2, y: r.y + (r.h - h) / 2, w, h });
+      let w, h, x, y;
+      if (isBg && fitMode === 'fitWidth') {
+        const s = r.w / p.width;
+        w = r.w;
+        h = p.height * s;
+        x = r.x;
+        y = r.y + Math.max(0, (r.h - h) / 2);
+      } else if (isBg && fitMode === 'fitHeight') {
+        const s = r.h / p.height;
+        h = r.h;
+        w = p.width * s;
+        y = r.y;
+        x = r.x + Math.max(0, (r.w - w) / 2);
+      } else {
+        const s = Math.min((r.w - margin * 2) / p.width, (r.h - margin * 2) / p.height);
+        w = p.width * s;
+        h = p.height * s;
+        x = r.x + (r.w - w) / 2;
+        y = r.y + (r.h - h) / 2;
+      }
+      return mk(p, { x, y, w, h }, isBg);
     });
-    return { objs, pages: pages.length > pad.length ? pages : null, focus: start };
+    return { objs, pages: pages.length > app.pages.length ? pages : null, focus: start };
   }
 
   const worldScale = 1.6;                       // 72dpi points -> comfortable board units

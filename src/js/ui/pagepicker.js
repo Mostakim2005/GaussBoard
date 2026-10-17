@@ -122,8 +122,44 @@ export function choosePages(app, doc) {
         t('Too many pages to preview — type the ones you want above.')));
     }
 
+    /* ---------------- mode ---------------- */
+    let importMode = 'objects';
+    let fitMode = 'fitWidth';
+
+    const modeRow = h('div', { class: 'pick-controls', style: 'margin-top:12px' },
+      h('span', { style: 'font-size:13px;color:var(--text-2)' }, t('Mode')),
+      ...[['objects', t('Movable objects')], ['background', t('Page background')]].map(([id, label]) => {
+        const b = h('button', { class: 'btn' + (importMode === id ? ' primary' : '') }, label);
+        b.dataset.mode = id;
+        b.addEventListener('click', () => {
+          importMode = id;
+          for (const el of modeRow.querySelectorAll('[data-mode]'))
+            el.classList.toggle('primary', el.dataset.mode === id);
+          fitRow.style.display = importMode === 'background' ? 'flex' : 'none';
+          layoutRow.style.display = importMode === 'background' ? 'none' : 'flex';
+        });
+        return b;
+      })
+    );
+    card.appendChild(modeRow);
+
+    const fitRow = h('div', { class: 'pick-controls', style: 'margin-top:10px;display:none;' },
+      h('span', { style: 'font-size:13px;color:var(--text-2)' }, t('Auto-align')),
+      ...[['fitWidth', t('Fit width')], ['fitHeight', t('Fit height')], ['fit', t('Fit page')]].map(([id, label]) => {
+        const b = h('button', { class: 'btn' + (fitMode === id ? ' primary' : '') }, label);
+        b.dataset.fit = id;
+        b.addEventListener('click', () => {
+          fitMode = id;
+          for (const el of fitRow.querySelectorAll('[data-fit]'))
+            el.classList.toggle('primary', el.dataset.fit === id);
+        });
+        return b;
+      })
+    );
+    card.appendChild(fitRow);
+
     /* ---------------- layout ---------------- */
-    const layoutRow = h('div', { class: 'pick-controls', style: 'margin-top:12px' },
+    const layoutRow = h('div', { class: 'pick-controls', style: 'margin-top:10px' },
       h('span', { style: 'font-size:13px;color:var(--text-2)' }, t('Arrange')),
       ...[['row', t('In a row')], ['grid', t('In a grid')], ['stack', t('Stacked')]].map(([id, label]) => {
         const b = h('button', { class: 'btn' + (layout === id ? ' primary' : '') }, label);
@@ -169,7 +205,7 @@ export function choosePages(app, doc) {
     function confirm() {
       const pages = [...chosen].sort((a, b) => a - b);
       if (!pages.length) return;
-      done({ pages, layout, quality });
+      done({ pages, layout, quality, importMode, fitMode });
     }
 
     /* ---------------- keeping the two inputs in step ---------------- */

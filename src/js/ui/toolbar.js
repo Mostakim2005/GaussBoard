@@ -841,11 +841,33 @@ export function openToolPopover(app, anchor, tool) {
         toggle(t('Ruler snapping'), app.ruler.snap, (v) => { app.ruler.snap = v; }))
     );
   } else if (tool === 'highlighter') {
-    body = h('div', {},
+    const curOpacity = Math.round(((s.highlighterOpacity ?? 0.5)) * 100);
+    const opacityVal = h('span', { style: 'font-size:12px;font-weight:600;min-width:36px;text-align:right;' }, `${curOpacity}%`);
+    const opacitySlider = h('input', {
+      type: 'range', min: '10', max: '100', step: '5', value: String(curOpacity),
+      style: 'flex:1;cursor:pointer;accent-color:var(--accent,#0078d4);'
+    });
+    opacitySlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      s.highlighterOpacity = val / 100;
+      opacityVal.textContent = `${val}%`;
+      app.saveSettings();
+      app.syncUI();
+    });
+
+    const popToggle = toggle(t('Text color-popping'), s.highlighterColorPop !== false, (v) => {
+      s.highlighterColorPop = v;
+      app.saveSettings();
+    });
+
+    body = h('div', { style: 'min-width:240px' },
       h('h4', {}, t('Highlighter')),
       swatchRow(HIGHLIGHTER_COLORS, s.highlighterColor, (c) => { s.highlighterColor = c; app.saveSettings(); app.syncUI(); closePopover(); }),
       h('h4', { style: 'margin-top:12px' }, t('Thickness')),
-      sizeRow([12, 20, 30, 44], s.highlighterWidth, (v) => { s.highlighterWidth = v; app.saveSettings(); app.syncUI(); }, s.highlighterColor)
+      sizeRow([12, 20, 30, 44], s.highlighterWidth, (v) => { s.highlighterWidth = v; app.saveSettings(); app.syncUI(); }, s.highlighterColor),
+      h('h4', { style: 'margin-top:12px' }, t('Opacity')),
+      h('div', { style: 'display:flex;align-items:center;gap:10px;margin-top:4px;' }, opacitySlider, opacityVal),
+      h('div', { style: 'margin-top:12px;' }, popToggle)
     );
   } else if (tool === 'eraser') {
     const mkMode = (id, label, hint) => {

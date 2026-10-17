@@ -70,7 +70,7 @@ export const DEFAULT_SETTINGS = {
   // write into the defaults themselves, where Reset could never clear it.
   // rememberPen() creates the map on first use; leaving it out is also what
   // makes Reset to defaults put every pen back to the colour it shipped with.
-  highlighterColor: '#fff100', highlighterWidth: 20,
+  highlighterColor: '#fff100', highlighterWidth: 20, highlighterOpacity: 0.5, highlighterColorPop: true,
   eraserSize: 30, eraserMode: 'partial',
   pdfPaper: 'a4', pdfOrientation: '', pdfMargin: 'narrow', pdfMode: 'fit', pdfQuality: 2,
   noteColor: '#ffd94a', noteSize: 200, noteFont: 'hand',
@@ -2579,6 +2579,12 @@ class App {
     }
     this.store.commit('arrow scale', objs.map((o) => o.id));
     this.surface.invalidate();
+  }
+
+  openPageMarginDialog() {
+    import('./ui/pagemargin-dialog.js').then((m) => {
+      new m.PageMarginDialog(this).open();
+    });
   }
 
   zoomTo(z) {

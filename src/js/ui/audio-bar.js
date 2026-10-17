@@ -27,7 +27,7 @@ export class AudioBar {
     this.box = { x: 24, y: 72 };
     this.speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
     this.speedIdx = 2; // 1.0x
-    this.skipIntervals = [5, 10, 13, 15, 30];
+    this.skipIntervals = [5, 10, 15, 30];
     this.skipIdx = 1; // 10s default
     this._interval = null;
     this._lastPlayActive = null;
@@ -36,7 +36,12 @@ export class AudioBar {
     this.density = new DensityCanvas({
       width: 220,
       height: 24,
-      onSeek: (ms) => this.seek(ms)
+      onSeek: (ms) => this.seek(ms),
+      onBookmarkRenamed: (bm) => {
+        if (this.app?.store) {
+          this.app.store.commit?.('rename bookmark', []);
+        }
+      }
     });
   }
 
@@ -177,6 +182,151 @@ export class AudioBar {
     }
   }
 
+  openSkipMenu() {
+    const existing = document.getElementById('abSkipMenu');
+    if (existing) { existing.remove(); return; }
+    const menu = h('div', {
+      id: 'abSkipMenu',
+      style: 'position:absolute;bottom:calc(100% + 8px);left:60px;z-index:1020;background:var(--surface,#1f2328);color:var(--text,#ffffff);border:1px solid var(--line,rgba(255,255,255,0.15));border-radius:12px;padding:6px;display:flex;gap:6px;box-shadow:0 6px 20px rgba(0,0,0,0.35);user-select:none;'
+    });
+    for (let i = 0; i < this.skipIntervals.length; i++) {
+      const sec = this.skipIntervals[i];
+      const isCur = i === this.skipIdx;
+      const b = h('button', {
+        style: `padding:4px 8px;border-radius:8px;border:none;cursor:pointer;font-size:11.5px;font-weight:700;background:${isCur ? 'var(--accent,#0078d4)' : 'rgba(128,128,128,0.15)'};color:${isCur ? '#ffffff' : 'inherit'};`,
+        onclick: (ev) => {
+          ev.stopPropagation();
+          this.skipIdx = i;
+          this.syncUI();
+          menu.remove();
+        }
+      }, `${sec}s`);
+      menu.appendChild(b);
+    }
+    const dismiss = (ev) => {
+      if (!menu.contains(ev.target)) {
+        menu.remove();
+        window.removeEventListener('pointerdown', dismiss);
+      }
+    };
+    window.addEventListener('pointerdown', dismiss);
+    this.el?.appendChild(menu);
+  }
+
+  insertTrackIntoNote(tr) {
+    if (!tr) return;
+    const cam = this.app?.surface?.cam;
+    const view = cam ? cam.viewport(this.app.surface.width, this.app.surface.height) : { x: 0, y: 0, w: 800, h: 600 };
+    const audioObj = {
+      id: 'aud_' + Date.now(),
+      type: 'audio',
+      trackId: tr.id,
+      assetId: tr.assetId,
+      name: tr.name || 'Audio Recording',
+      durationMs: tr.durationMs || 0,
+      x: Math.round(view.x + view.w / 2 - 130),
+      y: Math.round(view.y + view.h / 2 - 36),
+      w: 260,
+      h: 72,
+      rotation: 0
+    };
+    if (this.app?.store) {
+      this.app.store.addMany([audioObj], 'insert audio card');
+      this.app.setSelection([audioObj.id]);
+      this.app.toast(t('Recording inserted onto board'));
+    }
+    this.closeSessionMenu();
+  }
+
+  async exportTrackAudio(tr) {
+    if (!tr) return;
+    try {
+      const url = `app://board/asset/${tr.assetId}`;
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${tr.name || 'recording'}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      this.app.toast(t('Exported audio recording'));
+    } catch (e) {
+      this.app.toast(t('Export audio error: ') + e.message);
+    }
+    this.closeSessionMenu();
+  }
+
+  renameTrack(tr) {
+    if (!tr) return;
+    const newName = prompt(t('Rename recording:'), tr.name || '');
+    if (newName && newName.trim()) {
+      tr.name = newName.trim();
+      if (this.app?.store) this.app.store.commit('rename recording', []);
+      this.syncUI();
+      this.closeSessionMenu();
+      this.toggleSessionMenu();
+    }
+  }
+
+  deleteTrack(tr) {
+    if (!tr) return;
+    if (confirm(t('Delete recording "{name}"?', { name: tr.name || 'recording' }))) {
+      const list = this.app?.store?.doc?.audioTracks || [];
+      const idx = list.findIndex((t) => t.id === tr.id);
+      if (idx >= 0) {
+        list.splice(idx, 1);
+        if (this.track?.id === tr.id) {
+          this.close();
+          if (list.length > 0) this.open(list[0]);
+        }
+        if (this.app?.store) this.app.store.commit('delete recording', []);
+        this.syncUI();
+        this.closeSessionMenu();
+      }
+    }
+  }
+
+  showTrackContextMenu(tr, anchorEl) {
+    const existing = document.getElementById('abTrackMenu');
+    if (existing) existing.remove();
+
+    const rect = anchorEl.getBoundingClientRect();
+    const menu = h('div', {
+      id: 'abTrackMenu',
+      style: `position:fixed;top:${rect.bottom + 4}px;left:${Math.max(10, rect.right - 210)}px;z-index:9999;background:var(--surface,#1f2328);color:var(--text,#ffffff);border:1px solid var(--line,rgba(255,255,255,0.18));border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.38);padding:6px;min-width:210px;display:flex;flex-direction:column;gap:4px;user-select:none;`
+    });
+
+    const item = (label, iconStr, action, danger = false) => {
+      const row = h('div', {
+        style: `display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:500;color:${danger ? '#ff5252' : 'inherit'};`,
+        html: `<span>${iconStr}</span><span>${label}</span>`
+      });
+      row.addEventListener('mouseenter', () => { row.style.background = danger ? 'rgba(255,82,82,0.15)' : 'rgba(128,128,128,0.15)'; });
+      row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
+      row.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        menu.remove();
+        action();
+      });
+      return row;
+    };
+
+    menu.appendChild(item(t('Insert the recording into the note'), '🎙️➕', () => this.insertTrackIntoNote(tr)));
+    menu.appendChild(item(t('Export audio'), '🎧', () => this.exportTrackAudio(tr)));
+    menu.appendChild(item(t('Rename'), '✏️', () => this.renameTrack(tr)));
+    menu.appendChild(item(t('Delete'), '❌', () => this.deleteTrack(tr), true));
+
+    const dismiss = (ev) => {
+      if (!menu.contains(ev.target) && ev.target !== anchorEl) {
+        menu.remove();
+        window.removeEventListener('pointerdown', dismiss);
+      }
+    };
+    window.addEventListener('pointerdown', dismiss);
+    document.body.appendChild(menu);
+  }
+
   toggleSessionMenu() {
     if (this._sessionMenuEl) {
       this.closeSessionMenu();
@@ -185,37 +335,98 @@ export class AudioBar {
     const tracks = this.app?.store?.doc?.audioTracks || [];
     if (!tracks.length) return;
 
-    const menu = h('div', {
+    const panel = h('div', {
       class: 'ab-session-dropdown',
-      style: 'position:absolute;bottom:calc(100% + 8px);left:12px;z-index:1020;background:var(--surface,#1f2328);color:var(--text,#ffffff);border:1px solid var(--line,rgba(255,255,255,0.15));border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.35);padding:6px;min-width:180px;display:flex;flex-direction:column;gap:4px;user-select:none;'
+      style: 'position:absolute;bottom:calc(100% + 10px);left:12px;z-index:1020;background:var(--surface,#1f2328);color:var(--text,#ffffff);border:1px solid var(--line,rgba(255,255,255,0.15));border-radius:16px;box-shadow:0 10px 28px rgba(0,0,0,0.38);padding:14px;min-width:270px;display:flex;flex-direction:column;gap:10px;user-select:none;'
+    });
+
+    // Header matching Image 5
+    const headRow = h('div', {
+      style: 'display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line,rgba(255,255,255,0.1));padding-bottom:8px;'
+    },
+      h('span', { style: 'font-weight:700;font-size:14px;' }, t('Recording')),
+      h('button', {
+        style: 'background:none;border:none;color:inherit;opacity:0.7;cursor:pointer;padding:2px 6px;font-size:14px;font-weight:600;',
+        onclick: (e) => { e.stopPropagation(); this.closeSessionMenu(); }
+      }, '✕')
+    );
+    panel.appendChild(headRow);
+
+    // Audio-Ink Sync toggle
+    const syncSw = h('input', { type: 'checkbox', checked: this.app?.settings?.audioInkSync !== false });
+    syncSw.addEventListener('change', () => {
+      if (this.app?.settings) {
+        this.app.settings.audioInkSync = syncSw.checked;
+        this.app.saveSettings();
+      }
+    });
+    const syncRow = h('div', {
+      style: 'display:flex;align-items:center;justify-content:space-between;padding:4px 0;'
+    },
+      h('span', { style: 'font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;' },
+        t('Audio-Ink Sync'),
+        h('span', { title: t('Sync handwritten strokes with audio playback timestamps'), style: 'opacity:0.6;cursor:help;font-size:11px;' }, 'ⓘ')
+      ),
+      h('label', { class: 'toggle', style: 'margin:0;' }, syncSw)
+    );
+    panel.appendChild(syncRow);
+
+    // List of recordings
+    const listWrap = h('div', {
+      style: 'display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;'
     });
 
     for (const [idx, tr] of tracks.entries()) {
       const isCur = tr.id === this.track?.id;
       const durStr = formatTime(tr.durationMs || 0);
+      const dateStr = tr.created ? new Date(tr.created).toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+
+      const dotBtn = h('button', {
+        class: 'ab-row-menu-btn',
+        title: t('Recording options'),
+        style: 'background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;color:inherit;opacity:0.75;font-weight:700;font-size:13px;',
+        html: '•••'
+      });
+      dotBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showTrackContextMenu(tr, dotBtn);
+      });
+
       const row = h('div', {
         class: `ab-session-row ${isCur ? 'active' : ''}`,
-        style: `display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:${isCur ? '700' : '500'};background:${isCur ? 'rgba(0,229,255,0.15)' : 'transparent'};color:${isCur ? '#00e5ff' : 'inherit'};`,
-        html: `<span>${tr.name || `Session ${idx + 1}`}</span><span style="opacity:0.6;font-size:11px;font-variant-numeric:tabular-nums;">${durStr}</span>`
+        style: `display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:10px;cursor:pointer;background:${isCur ? 'rgba(0,229,255,0.12)' : 'rgba(128,128,128,0.06)'};border:1px solid ${isCur ? 'rgba(0,229,255,0.4)' : 'transparent'};`
       });
-      row.addEventListener('click', (e) => {
+
+      const infoCol = h('div', {
+        style: 'display:flex;flex-direction:column;gap:2px;flex:1;'
+      },
+        h('span', { style: `font-size:12.5px;font-weight:${isCur ? '700' : '600'};color:${isCur ? '#00e5ff' : 'inherit'};` }, tr.name || `Recording ${idx + 1}`),
+        h('span', { style: 'font-size:11px;opacity:0.6;font-variant-numeric:tabular-nums;' }, `${durStr}${dateStr ? '  ' + dateStr : ''}`)
+      );
+      infoCol.addEventListener('click', (e) => {
         e.stopPropagation();
         this.open(tr);
         this.closeSessionMenu();
       });
-      menu.appendChild(row);
+
+      row.appendChild(infoCol);
+      row.appendChild(dotBtn);
+      listWrap.appendChild(row);
     }
+    panel.appendChild(listWrap);
 
     const onDismiss = (e) => {
-      if (!menu.contains(e.target) && e.target !== this.btnSession) {
+      const trackMenu = document.getElementById('abTrackMenu');
+      if (trackMenu && trackMenu.contains(e.target)) return;
+      if (!panel.contains(e.target) && e.target !== this.btnSession) {
         this.closeSessionMenu();
         window.removeEventListener('pointerdown', onDismiss);
       }
     };
     window.addEventListener('pointerdown', onDismiss);
 
-    this.el.appendChild(menu);
-    this._sessionMenuEl = menu;
+    this.el.appendChild(panel);
+    this._sessionMenuEl = panel;
   }
 
   build() {
@@ -235,12 +446,17 @@ export class AudioBar {
 
     this.btnSkipStep = h('button', {
       class: 'ab-btn ab-skip-step',
-      title: 'Click to cycle skip duration (5s, 10s, 13s, 15s, 30s)',
+      title: 'Click to cycle skip duration (5s, 10s, 15s, 30s) — Right-click for options',
       style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:2px 6px;border-radius:10px;font-size:11px;font-weight:700;color:inherit;margin:0 2px;pointer-events:auto;'
     }, `${this.skipSeconds}s`);
     this.btnSkipStep.addEventListener('click', (e) => {
       e.stopPropagation();
       this.cycleSkip();
+    });
+    this.btnSkipStep.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.openSkipMenu();
     });
 
     this.btnPlay = h('button', {

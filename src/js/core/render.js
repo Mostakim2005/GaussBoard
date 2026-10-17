@@ -385,8 +385,8 @@ export function drawStroke(ctx, o) {
 
   ctx.save();
   if (highlighter) {
-    ctx.globalAlpha = o.opacity ?? 0.38;
-    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = o.opacity ?? 0.5;
+    ctx.globalCompositeOperation = (o.colorPop !== false) ? 'multiply' : 'source-over';
   } else if (o.opacity != null && o.opacity < 1) {
     ctx.globalAlpha = o.opacity;
   }
@@ -1199,6 +1199,7 @@ export function drawObject(ctx, o, onload, editing = null) {
     case 'curtain': drawCurtain(ctx, o); break;
     case 'connector': drawConnector(ctx, o, (c) => inkPaint(c)); break;
     case 'boardlink': drawBoardLink(ctx, o, onload); break;
+    case 'audio': drawAudioCard(ctx, o); break;
   }
   ctx.restore();
 }
@@ -1289,6 +1290,62 @@ export function drawBoardLink(ctx, o, onload) {
   }
   ctx.fillText(label, tx, ly);
   if (missing) ctx.fillRect(tx, ly, Math.min(room, ctx.measureText(label).width), Math.max(1, fs / 14));
+  ctx.restore();
+}
+
+/**
+ * A card for an audio recording inserted into the board: shows a play button,
+ * track title, and duration badge.
+ */
+export function drawAudioCard(ctx, o) {
+  const { x, y, w, h } = o;
+  const dark = darkBoard;
+  const r = Math.min(16, h * 0.35);
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.14)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 2;
+  ctx.fillStyle = dark ? '#22272e' : '#ffffff';
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = dark ? '#00e5ff' : '#0078d4';
+  ctx.stroke();
+
+  // Play button circle
+  const cx = x + 30, cy = y + h / 2, cr = 16;
+  ctx.fillStyle = dark ? '#00e5ff' : '#0078d4';
+  ctx.beginPath();
+  ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Play triangle
+  ctx.fillStyle = dark ? '#000000' : '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(cx - 3, cy - 7);
+  ctx.lineTo(cx + 7, cy);
+  ctx.lineTo(cx - 3, cy + 7);
+  ctx.closePath();
+  ctx.fill();
+
+  // Track title
+  ctx.fillStyle = dark ? '#f0f6fc' : '#1f2328';
+  ctx.font = `600 13px ${FONT}`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const name = o.name || 'Audio Recording';
+  ctx.fillText(name, x + 56, y + h / 2 - 8, Math.max(20, w - 66));
+
+  // Duration
+  ctx.fillStyle = dark ? '#8b949e' : '#656d76';
+  ctx.font = `500 11.5px ${FONT}`;
+  const totalSec = Math.floor((o.durationMs || 0) / 1000);
+  const m = Math.floor(totalSec / 60), s = totalSec % 60;
+  const timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  ctx.fillText(`🎙️ ${timeStr}`, x + 56, y + h / 2 + 10);
+
   ctx.restore();
 }
 

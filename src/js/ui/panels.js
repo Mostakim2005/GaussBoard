@@ -388,6 +388,12 @@ export function createPanels(app) {
         orientRow.appendChild(b);
       }
 
+      const btnMarginAdjust = h('button', {
+        class: 'btn',
+        style: 'margin-top:10px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;font-weight:600;',
+        onclick: () => app.openPageMarginDialog()
+      }, h('span', {}, '📐'), h('span', {}, t('Page margin adjustment…')));
+
       // when there is a page and work hangs off it, offer the one-click fix
       const off = app.offPageObjects();
       const fitRow = h('div', { class: 'bg-sizes' });
@@ -437,7 +443,7 @@ export function createPanels(app) {
       );
 
       return h('div', {},
-        h('div', { class: 'section' }, h('h5', {}, t('Canvas size')), sizeRow, orientRow, fitRow, sizeNote),
+        h('div', { class: 'section' }, h('h5', {}, t('Canvas size')), sizeRow, orientRow, btnMarginAdjust, fitRow, sizeNote),
         h('div', { class: 'section' }, h('h5', {}, t('Colour')), colors),
         h('div', { class: 'section' }, h('h5', {}, t('Custom colour')), custom),
         h('div', { class: 'section' }, h('h5', {}, t('Pattern')), pats),
