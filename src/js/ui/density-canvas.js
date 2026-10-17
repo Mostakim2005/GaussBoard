@@ -25,6 +25,28 @@ export class DensityCanvas {
       this.ctx = this.canvas.getContext('2d');
       this.wireEvents();
     }
+    this.audioBuffer = null;
+    this.waveformPeaks = null;
+  }
+
+  setAudioBuffer(buf) {
+    if (!buf) return;
+    this.audioBuffer = buf;
+    const channel = buf.getChannelData(0);
+    const numBars = 60;
+    const step = Math.floor(channel.length / numBars);
+    const peaks = new Float32Array(numBars);
+    for (let i = 0; i < numBars; i++) {
+      let max = 0;
+      const start = i * step;
+      for (let j = 0; j < step; j += 10) {
+        const val = Math.abs(channel[start + j] || 0);
+        if (val > max) max = val;
+      }
+      peaks[i] = max;
+    }
+    this.waveformPeaks = peaks;
+    this.render();
   }
 
   wireEvents() {
@@ -34,7 +56,7 @@ export class DensityCanvas {
     const seekAt = (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-      const duration = this.track?.durationMs || 1;
+      const duration = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 1);
       const t = (x / Math.max(1, rect.width)) * duration;
       if (this.onSeek) this.onSeek(Math.round(t));
     };
@@ -63,10 +85,11 @@ export class DensityCanvas {
     });
   }
 
-  update({ track = null, objects = null, currentTimeMs = null } = {}) {
+  update({ track = null, objects = null, currentTimeMs = null, audioBuffer = null } = {}) {
     if (track !== null) this.track = track;
     if (objects !== null) this.objects = objects;
     if (currentTimeMs !== null) this.currentTimeMs = currentTimeMs;
+    if (audioBuffer !== null && audioBuffer !== this.audioBuffer) this.setAudioBuffer(audioBuffer);
     this.render();
   }
 
@@ -78,54 +101,62 @@ export class DensityCanvas {
 
     ctx.clearRect(0, 0, w, h);
 
-    // Background track
-    ctx.fillStyle = 'rgba(128, 128, 128, 0.15)';
-    ctx.fillRect(0, 0, w, h);
+    const duration = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 0);
+    if (duration <= 0) {
+      // Empty placeholder track
+      ctx.fillStyle = 'rgba(128, 128, 128, 0.15)';
+      ctx.fillRect(0, h / 2 - 2, w, 4);
+      return;
+    }
 
-    const duration = this.track?.durationMs || 0;
-    if (duration <= 0) return;
+    const px = Math.max(0, Math.min(w, (this.currentTimeMs / duration) * w));
 
-    // Collect all timestamps for active track
-    const trackId = this.track.id;
-    const timestamps = [];
-    if (this.objects) {
-      const list = Array.isArray(this.objects) ? this.objects : Object.values(this.objects);
-      for (const o of list) {
-        if (o && o.audioId === trackId && o.t0 != null) {
-          timestamps.push(o.t0);
+    if (this.waveformPeaks && this.waveformPeaks.length > 0) {
+      // Render audio waveform bars
+      const numBars = this.waveformPeaks.length;
+      const barWidth = 2.5;
+      const spacing = (w - (numBars * barWidth)) / Math.max(1, numBars - 1);
+
+      for (let i = 0; i < numBars; i++) {
+        const bx = i * (barWidth + spacing);
+        const peak = Math.max(0.12, Math.min(1.0, this.waveformPeaks[i] * 1.8));
+        const barH = Math.max(4, Math.round(peak * (h - 4)));
+        const by = Math.round((h - barH) / 2);
+
+        // Pink for elapsed, light translucent gray for future
+        ctx.fillStyle = bx <= px ? '#e91e63' : 'rgba(128, 128, 128, 0.3)';
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(bx, by, barWidth, barH, 1.5);
+        } else {
+          ctx.rect(bx, by, barWidth, barH);
+        }
+        ctx.fill();
+      }
+    } else {
+      // Background track with pink elapsed progress
+      ctx.fillStyle = 'rgba(128, 128, 128, 0.2)';
+      ctx.fillRect(0, h / 2 - 2, w, 4);
+
+      ctx.fillStyle = '#e91e63';
+      ctx.fillRect(0, h / 2 - 2, px, 4);
+
+      // Collect all stroke timestamps for active track
+      const trackId = this.track?.id;
+      if (this.objects && trackId) {
+        const list = Array.isArray(this.objects) ? this.objects : Object.values(this.objects);
+        ctx.fillStyle = 'rgba(233, 30, 99, 0.55)';
+        for (const o of list) {
+          if (o && o.audioId === trackId && o.t0 != null) {
+            const x = Math.round((o.t0 / duration) * w);
+            ctx.fillRect(x - 0.5, 2, 1.5, h - 4);
+          }
         }
       }
     }
 
-    // Density visualization: ticks vs heatmap aggregation
-    if (timestamps.length > 500) {
-      const numBuckets = Math.min(100, Math.floor(w));
-      const buckets = new Uint16Array(numBuckets);
-      for (const t of timestamps) {
-        const b = Math.min(numBuckets - 1, Math.floor((t / duration) * numBuckets));
-        if (b >= 0) buckets[b]++;
-      }
-      let maxCount = 1;
-      for (let i = 0; i < numBuckets; i++) {
-        if (buckets[i] > maxCount) maxCount = buckets[i];
-      }
-      const bw = w / numBuckets;
-      for (let i = 0; i < numBuckets; i++) {
-        if (!buckets[i]) continue;
-        const alpha = 0.2 + (buckets[i] / maxCount) * 0.75;
-        ctx.fillStyle = `rgba(0, 120, 212, ${alpha.toFixed(2)})`;
-        ctx.fillRect(i * bw, 0, Math.ceil(bw), h);
-      }
-    } else if (timestamps.length > 0) {
-      ctx.fillStyle = 'rgba(0, 120, 212, 0.45)';
-      for (const t of timestamps) {
-        const x = Math.round((t / duration) * w);
-        ctx.fillRect(x - 0.5, 2, 1.5, h - 4);
-      }
-    }
-
     // Render bookmarks (gold diamonds)
-    if (Array.isArray(this.track.bookmarks)) {
+    if (Array.isArray(this.track?.bookmarks)) {
       ctx.fillStyle = '#ffb900';
       for (const bm of this.track.bookmarks) {
         if (bm.t != null) {
@@ -141,13 +172,13 @@ export class DensityCanvas {
       }
     }
 
-    // Render playhead scrubber needle and head
-    const px = Math.max(0, Math.min(w, (this.currentTimeMs / duration) * w));
-    ctx.fillStyle = '#0078d4';
-    ctx.fillRect(px - 1, 0, 2, h);
-
+    // Render playhead scrubber knob
+    ctx.fillStyle = '#e91e63';
+    ctx.shadowColor = 'rgba(233, 30, 99, 0.4)';
+    ctx.shadowBlur = 4;
     ctx.beginPath();
-    ctx.arc(px, h / 2, 4, 0, Math.PI * 2);
+    ctx.arc(px, h / 2, 5.5, 0, Math.PI * 2);
     ctx.fill();
+    ctx.shadowBlur = 0;
   }
 }

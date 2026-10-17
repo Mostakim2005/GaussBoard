@@ -106,15 +106,21 @@ export class VideoExporter {
       };
     });
 
-    rec.start(1000); // 1-second chunks
+    rec.start(250); // 250ms chunk slicing for reliable video data
     await audio.play();
 
     // Replay render loop driven by audio playback clock
     const frameInterval = 1000 / fps;
+    const ctx = canvas.getContext('2d');
+    const videoTrack = videoStream.getVideoTracks()[0];
+
     const renderLoop = async () => {
       if (this.cancelled || audio.ended || (audio.currentTime * 1000 >= durationMs)) {
         audio.pause();
-        if (rec.state !== 'inactive') rec.stop();
+        // Give recorder brief moment to finalize final chunk
+        setTimeout(() => {
+          if (rec.state !== 'inactive') rec.stop();
+        }, 150);
         return;
       }
 
@@ -123,7 +129,15 @@ export class VideoExporter {
       if (this.app.replayEngine) {
         this.app.replayEngine.currentTimeMs = curMs;
       }
-      sf.draw();
+
+      // Deterministically render scene and replay session
+      ctx.clearRect(0, 0, width, height);
+      sf.drawScene(ctx, width, height, () => {}, null, (o) => o.audioId !== track.id);
+      sf.drawReplaySession(ctx);
+
+      if (videoTrack?.requestFrame) {
+        try { videoTrack.requestFrame(); } catch {}
+      }
 
       if (onProgress) {
         onProgress(Math.min(1.0, curMs / durationMs));
@@ -186,7 +200,7 @@ export async function exportVideoFile(app, track = null) {
     if (exporter.cancelled) return null;
 
     const buf = await blob.arrayBuffer();
-    await window.board.writeFile(filePath, buf);
+    await window.board.writeFile(filePath, new Uint8Array(buf));
     progress?.close();
     app.toast(t('Saved {name}', { name: filePath.split(/[\\/]/).pop() }));
     return filePath;

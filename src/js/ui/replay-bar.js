@@ -18,7 +18,10 @@ export class ReplayBar {
     this.collapsed = false;
     this.pos = { x: 80, y: 16 };
     this.visibleTools = {
+      overview: true,
+      search: true,
       audio: true,
+      playbar: true,
       tape: true,
       split: true,
       video: true,
@@ -137,16 +140,59 @@ export class ReplayBar {
     this.wireDragging(handle);
 
     // 1. Audio Record / Replay Button
+    // 1. Note Overview Drawer Button (Image 2)
+    this.btnOverview = h('button', {
+      class: 'rb-btn rb-overview',
+      title: t('Note Overview (Browse document previews, tags, aliases)'),
+      style: 'display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:600;color:inherit;transition:background 0.15s;',
+      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span>Notes</span>'
+    });
+    this.btnOverview.addEventListener('click', () => {
+      this.app.toggleNoteOverview?.();
+    });
+
+    // 2. Search Dialog Button (Command Palette per sketch)
+    this.btnSearch = h('button', {
+      class: 'rb-btn rb-search',
+      title: t('Search (Boards & Settings Ctrl+F)'),
+      style: 'display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:18px;color:inherit;',
+      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
+    });
+    this.btnSearch.addEventListener('click', () => {
+      this.app.toggleSearchDialog?.();
+    });
+
+    // 3. Audio Record Button (with Red Neon Outline during recording)
     this.btnAudio = h('button', {
       class: 'rb-btn rb-audio',
-      title: 'Audio Record & Replay HUD (Click to record or playback notes)',
-      style: 'display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:600;color:inherit;transition:background 0.15s;'
-    }, h('span', { class: 'rb-dot', style: 'width:10px;height:10px;border-radius:50%;background:#e81123;display:inline-block;' }),
-       h('span', { class: 'rb-label' }, 'Audio'));
+      title: t('Record Audio (Click to start/stop syncing notes with voice)'),
+      style: 'display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:600;color:inherit;transition:all 0.2s;'
+    }, h('span', { class: 'rb-dot', style: 'width:9px;height:9px;border-radius:50%;background:#e81123;display:inline-block;' }),
+       h('span', { class: 'rb-label' }, t('Record')));
 
     this.btnAudio.addEventListener('click', () => this.handleAudioClick());
 
-    // 2. Masking / Study Tape Button
+    // 4. Audio Playback HUD Toggle
+    this.btnPlayBar = h('button', {
+      class: 'rb-btn rb-playbar',
+      title: t('Audio Playback Bar (Listen and scrub synced strokes)'),
+      style: 'display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:18px;font-size:12.5px;font-weight:500;color:inherit;',
+      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>Replay</span>'
+    });
+    this.btnPlayBar.addEventListener('click', () => {
+      const tracks = this.app.store?.doc?.audioTracks || [];
+      if (tracks.length > 0) {
+        if (this.app.audioBar?.visible) {
+          this.app.audioBar.close();
+        } else {
+          this.app.audioBar?.open(tracks[tracks.length - 1]);
+        }
+      } else {
+        this.app.toast(t('No recordings on this board. Click Record first!'));
+      }
+    });
+
+    // 5. Masking / Study Tape Button
     this.btnTape = h('button', {
       class: 'rb-btn rb-tape',
       title: 'Study Tape (Place permanent toggleable answer covers \u2014 tap to reveal/hide)',
@@ -162,7 +208,7 @@ export class ReplayBar {
       this.app.toast(t('Study Tape placed! Tap it to toggle reveal on and off.'));
     });
 
-    // 3. Split Study Workspace Button
+    // 6. Split Study Workspace Button
     this.btnSplit = h('button', {
       class: 'rb-btn rb-split',
       title: 'Split Study Workspace (Dual side-by-side view for PDF and active notes)',
@@ -179,7 +225,7 @@ export class ReplayBar {
       }
     });
 
-    // 4. Video Export Button
+    // 7. Video Export Button
     this.btnVideo = h('button', {
       class: 'rb-btn rb-video',
       title: 'Export Replay Video (WebM animated video export with progress & cancel)',
@@ -190,18 +236,18 @@ export class ReplayBar {
       exportVideoFile(this.app);
     });
 
-    // 5. Scratch-Out Info Button
+    // 8. Scratch-Out Info Button (Intuitive scribble icon)
     this.btnScratch = h('button', {
       class: 'rb-btn rb-scratch',
       title: 'Gesture Scratch-Out Eraser (Scribble back-and-forth over ink to erase \u2014 works with Pen, Mouse & Touch)',
       style: 'display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:18px;font-size:12px;color:var(--text-2,rgba(128,128,128,0.85));',
-      html: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15l4-5 4 6 4-7 5 6"/><path d="M19 19l-4-4"/></svg>'
     });
     this.btnScratch.addEventListener('click', () => {
       this.app.toast(t('Scratch-Out Eraser is active! Scribble zig-zag over any stroke with pen, mouse, or finger to erase it.'));
     });
 
-    // 6. Dock & Settings Cog Menu
+    // 9. Dock & Settings Cog Menu
     this.btnMenu = h('button', {
       class: 'rb-btn rb-menu',
       title: 'Replay Bar Settings (Docking, Orientation & Tool Visibility)',
@@ -215,13 +261,16 @@ export class ReplayBar {
       id: 'replayBar',
       class: 'replay-bar-hud',
       style: 'position:absolute;z-index:9000;display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.14));border-radius:30px;box-shadow:0 6px 20px rgba(0,0,0,0.18);font-family:inherit;font-size:13px;backdrop-filter:blur(8px);'
-    }, handle, this.btnAudio, this.btnTape, this.btnSplit, this.btnVideo, this.btnScratch, this.btnMenu);
+    }, handle, this.btnOverview, this.btnSearch, this.btnAudio, this.btnPlayBar, this.btnTape, this.btnSplit, this.btnVideo, this.btnScratch, this.btnMenu);
 
     this.updateVisibility();
   }
 
   updateVisibility() {
+    if (this.btnOverview) this.btnOverview.style.display = this.visibleTools.overview ? 'flex' : 'none';
+    if (this.btnSearch) this.btnSearch.style.display = this.visibleTools.search ? 'flex' : 'none';
     if (this.btnAudio) this.btnAudio.style.display = this.visibleTools.audio ? 'flex' : 'none';
+    if (this.btnPlayBar) this.btnPlayBar.style.display = this.visibleTools.playbar ? 'flex' : 'none';
     if (this.btnTape) this.btnTape.style.display = this.visibleTools.tape ? 'flex' : 'none';
     if (this.btnSplit) this.btnSplit.style.display = this.visibleTools.split ? 'flex' : 'none';
     if (this.btnVideo) this.btnVideo.style.display = this.visibleTools.video ? 'flex' : 'none';
@@ -230,7 +279,9 @@ export class ReplayBar {
 
   async handleAudioClick() {
     const rec = this.app.audioRecorder;
-    if (rec && rec.state === 'recording') {
+    if (!rec) return;
+
+    if (rec.state === 'recording') {
       // Currently recording: stop and add track
       this.app.toast(t('Saving audio recording...'));
       const res = await rec.stop();
@@ -253,27 +304,13 @@ export class ReplayBar {
       return;
     }
 
-    // Not recording: if board has audio tracks, open AudioBar with latest
-    const tracks = this.app.store.doc.audioTracks || [];
-    if (tracks.length > 0) {
-      if (this.app.audioBar?.visible) {
-        this.app.audioBar.close();
-      } else {
-        this.app.audioBar?.open(tracks[tracks.length - 1]);
-      }
-      return;
-    }
-
-    // No tracks on board: prompt to start recording
-    const startNow = confirm(t('No audio recordings on this board. Start recording audio now?'));
-    if (startNow && rec) {
-      try {
-        await rec.start();
-        this.app.toast(t('Recording audio... Write notes to sync them with your voice!'));
-        this.syncAudioState();
-      } catch (err) {
-        this.app.toast(t('Microphone access denied: ') + err.message);
-      }
+    // Not recording: start recording immediately
+    try {
+      await rec.start();
+      this.app.toast(t('Recording audio... Write notes to sync them with your voice!'));
+      this.syncAudioState();
+    } catch (err) {
+      this.app.toast(t('Microphone access denied: ') + err.message);
     }
   }
 
@@ -281,14 +318,40 @@ export class ReplayBar {
     const rec = this.app.audioRecorder;
     const isRec = rec && rec.state === 'recording';
     if (!this.btnAudio) return;
+
     const dot = this.btnAudio.querySelector('.rb-dot');
     const label = this.btnAudio.querySelector('.rb-label');
-    if (dot) {
-      dot.style.background = isRec ? '#e81123' : '#0078d4';
-      dot.style.animation = isRec ? 'pulse 1.2s infinite' : 'none';
-    }
-    if (label) {
-      label.textContent = isRec ? 'Stop Rec' : 'Audio';
+
+    if (isRec) {
+      this.btnAudio.style.cssText = 'display:flex;align-items:center;gap:6px;background:rgba(255,23,68,0.12);color:#ff1744;border:1.5px solid #ff1744;border-radius:20px;padding:4px 12px;font-family:monospace;font-weight:700;font-size:12.5px;box-shadow:0 0 12px rgba(255,23,68,0.75), inset 0 0 6px rgba(255,23,68,0.4);cursor:pointer;animation:pulse 1.4s infinite alternate;';
+      if (dot) {
+        dot.style.background = '#ff1744';
+        dot.style.animation = 'pulse 1s infinite';
+      }
+      if (!this._recTimer) {
+        this._recTimer = setInterval(() => {
+          if (rec.state === 'recording') {
+            const ms = rec.currentOffsetMs ? rec.currentOffsetMs() : 0;
+            const sec = Math.floor(ms / 1000);
+            const m = String(Math.floor(sec / 60)).padStart(2, '0');
+            const s = String(sec % 60).padStart(2, '0');
+            if (label) label.textContent = `${m}:${s}`;
+          }
+        }, 200);
+      }
+    } else {
+      if (this._recTimer) {
+        clearInterval(this._recTimer);
+        this._recTimer = null;
+      }
+      this.btnAudio.style.cssText = 'display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:600;color:inherit;transition:all 0.2s;';
+      if (dot) {
+        dot.style.background = '#e81123';
+        dot.style.animation = 'none';
+      }
+      if (label) {
+        label.textContent = t('Record');
+      }
     }
   }
 

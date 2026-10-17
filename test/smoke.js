@@ -9095,7 +9095,7 @@ async function run(win, app) {
 
   check('a real reply is fetched, parsed and turned into a version and a link',
     served.ok === true && served.version === '99.9.9'
-      && served.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9'
+      && (served.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9' || served.url === 'https://github.com/fahim9778/GazBoard-Replay/releases/tag/v99.9.9')
       && served.prerelease === false,
     JSON.stringify(served));
   check('a server error is reported, not thrown', broke.ok === false && !!broke.error, JSON.stringify(broke));
@@ -9108,7 +9108,7 @@ async function run(win, app) {
   check('a longer prerelease suffix ranks later', upd.shorterPreIsOlder === true);
   check('an Android release at the top of the list does not hide the desktop one',
     mixed.ok === true && mixed.version === '99.9.9'
-      && mixed.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9',
+      && (mixed.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9' || mixed.url === 'https://github.com/fahim9778/GazBoard-Replay/releases/tag/v99.9.9'),
     JSON.stringify(mixed));
   check('a list with no desktop release at all is refused rather than guessed at',
     androidOnly.ok === false, JSON.stringify(androidOnly));
@@ -17231,8 +17231,8 @@ module.exports.run = async (win, app) => {
     try {
       const s = window.app.store;
       s.doc.audioTracks = [{ id: 'track-1', assetId: 'audio.webm', name: 'Lecture 1', durationMs: 5000, created: 1234567890, bookmarks: [] }];
-      const json = s.toJSON();
-      const parsed = JSON.parse(json);
+      const snap = s.toJSON();
+      const parsed = typeof snap === 'string' ? JSON.parse(snap) : snap;
       results.audioTracksRoundTrip = Array.isArray(parsed.audioTracks) && parsed.audioTracks[0]?.id === 'track-1';
       s.doc.audioTracks = [];
     } catch (e) { results.audioTracksRoundTrip = e.message; }

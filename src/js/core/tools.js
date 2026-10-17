@@ -1705,12 +1705,15 @@ export class Interaction {
     if (!a.obj?.points || !isScratchGesture(a.obj.points)) return false;
 
     const box = bboxOfPoints(a.obj.points);
-    const hits = inBox(this.store, box, false).filter((o) => !o.locked && o.id !== a.obj.id);
+    const expand = 8;
+    const hitBox = { x: box.x - expand, y: box.y - expand, w: box.w + expand * 2, h: box.h + expand * 2 };
+    const hits = inBox(this.store, hitBox, false).filter((o) => !o.locked && o.id !== a.obj.id);
     if (!hits.length) return false;
 
     this.discardTapMark(); // Throw away the scribble mark without saving to store
     this.store.remove(hits.map((o) => o.id), 'scratch-out');
-    this.surface.pulseHighlight(box, 400);
+    this.surface.pulseHighlight(hitBox, 400);
+    this.surface.invalidate();
     return true;
   }
 

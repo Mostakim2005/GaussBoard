@@ -22,7 +22,8 @@ export function emptyDoc(name = t('Untitled board')) {
     camera: { x: 0, y: 0, z: 1 },
     objects: {},   // id -> object
     order: [],      // z-order, back to front
-    audioTracks: []
+    audioTracks: [],
+    properties: { tags: [], aliases: [] }
   };
 }
 
@@ -330,7 +331,9 @@ export class Store {
       pageDates: d.pageDates && d.pageDates.length ? d.pageDates.slice() : undefined,
       background: d.background, pages: d.pages.map((p) => ({ ...p })), page: d.pages[0] || null,
       audioTracks: Array.isArray(d.audioTracks) && d.audioTracks.length ? d.audioTracks.map((a) => ({ ...a })) : undefined,
-      camera: d.camera, objects: d.order.map((id) => d.objects[id]).filter(Boolean), ...extra };
+      camera: d.camera,
+      properties: d.properties ? { ...d.properties } : undefined,
+      objects: d.order.map((id) => d.objects[id]).filter(Boolean), ...extra };
   }
 
   /** Start a brand new empty document. */
@@ -355,6 +358,9 @@ export class Store {
     d.camera = data.camera || d.camera;
     if (Array.isArray(data.audioTracks)) {
       d.audioTracks = data.audioTracks.map((a) => ({ ...a }));
+    }
+    if (data.properties) {
+      d.properties = { ...data.properties };
     }
     const list = Array.isArray(data.objects) ? data.objects
       : Array.isArray(data.objectList) ? data.objectList

@@ -58,6 +58,12 @@ export class AudioBar {
     this.syncUI();
   }
 
+  setWaveformBuffer(buf) {
+    if (this.density) {
+      this.density.setAudioBuffer(buf);
+    }
+  }
+
   close() {
     if (this.app?.replayEngine?.active) {
       this.app.replayEngine.pause();
@@ -65,6 +71,10 @@ export class AudioBar {
     this.stopClock();
     if (this.el) {
       this.el.style.display = 'none';
+    }
+    if (this.app?.surface) {
+      this.app.surface._ink = null;
+      this.app.surface.invalidate();
     }
   }
 
@@ -145,6 +155,17 @@ export class AudioBar {
   build() {
     if (typeof document === 'undefined') return;
 
+    this.btnRewind10 = h('button', {
+      class: 'ab-btn ab-rw10',
+      title: 'Rewind 10 seconds',
+      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;color:inherit;',
+      html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>'
+    });
+    this.btnRewind10.addEventListener('click', () => {
+      const cur = this.app?.replayEngine?.currentTimeMs || 0;
+      this.seek(cur - 10000);
+    });
+
     this.btnPlay = h('button', {
       class: 'ab-btn ab-play',
       title: 'Play / Pause',
@@ -152,9 +173,20 @@ export class AudioBar {
     });
     this.btnPlay.addEventListener('click', () => this.togglePlay());
 
+    this.btnForward10 = h('button', {
+      class: 'ab-btn ab-ff10',
+      title: 'Forward 10 seconds',
+      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;color:inherit;',
+      html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 17l5-5-5-5M6 17l5-5-5-5"/></svg>'
+    });
+    this.btnForward10.addEventListener('click', () => {
+      const cur = this.app?.replayEngine?.currentTimeMs || 0;
+      this.seek(cur + 10000);
+    });
+
     this.lblTime = h('span', {
       class: 'ab-time',
-      style: 'font-variant-numeric:tabular-nums;font-size:12px;font-weight:500;min-width:88px;text-align:center;'
+      style: 'font-variant-numeric:tabular-nums;font-size:12px;font-weight:600;min-width:88px;text-align:center;'
     }, '00:00 / 00:00');
 
     this.btnSpeed = h('button', {
@@ -203,8 +235,8 @@ export class AudioBar {
     this.el = h('div', {
       id: 'audioBar',
       class: 'audio-bar-hud',
-      style: 'position:absolute;z-index:1000;display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.18);user-select:none;font-size:13px;font-family:inherit;'
-    }, dragHandle, this.btnPlay, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnClose);
+      style: 'position:absolute;z-index:1000;display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.18);user-select:none;font-size:13px;font-family:inherit;'
+    }, dragHandle, this.btnRewind10, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnClose);
 
     this.wireDragging(dragHandle);
   }
@@ -271,7 +303,8 @@ export class AudioBar {
     this.density.update({
       track: this.track,
       objects: this.app?.store?.doc?.objects,
-      currentTimeMs: cur
+      currentTimeMs: cur,
+      audioBuffer: replay?.audioBuffer
     });
   }
 }

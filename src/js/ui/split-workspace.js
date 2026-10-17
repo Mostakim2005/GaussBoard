@@ -66,29 +66,52 @@ export class SplitWorkspace {
     this.leftPane = h('div', {
       id: 'stageLeft',
       class: 'split-pane split-left',
-      style: `position:relative;flex:none;width:${(this.ratio * 100).toFixed(1)}%;height:100%;overflow:hidden;background:var(--desk,#f0f0f0);`
+      style: `position:relative;flex:none;width:${(this.ratio * 100).toFixed(1)}%;height:100%;overflow:hidden;background:var(--desk,#f0f0f0);display:flex;flex-direction:column;`
     });
 
-    // Vertical resizable divider
-    this.divider = h('div', {
-      id: 'splitDivider',
-      class: 'split-divider',
-      title: 'Drag to resize panes',
-      style: 'flex:none;width:6px;height:100%;cursor:col-resize;background:var(--line,rgba(0,0,0,0.18));z-index:50;touch-action:none;'
+    // Left pane top header
+    this.boardSelect = h('select', {
+      class: 'split-board-select',
+      style: 'flex:1;max-width:240px;padding:4px 8px;border-radius:8px;border:1px solid var(--line,rgba(0,0,0,0.15));background:var(--surface,#ffffff);color:inherit;font-size:12px;outline:none;'
+    }, h('option', { value: '' }, t('-- Select Board to Study --')));
+
+    this.boardSelect.addEventListener('change', (e) => {
+      const id = e.target.value;
+      if (id) this.loadLeftBoard(id);
     });
 
-    // Right pane (Primary note-taking canvas)
-    this.rightPane = h('div', {
-      id: 'stageRight',
-      class: 'split-pane split-right',
-      style: 'position:relative;flex:1;height:100%;overflow:hidden;'
+    const btnSwap = h('button', {
+      title: t('Swap left and right boards'),
+      style: 'background:none;border:none;cursor:pointer;padding:4px;color:inherit;display:flex;align-items:center;',
+      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16"/></svg>'
+    });
+    btnSwap.addEventListener('click', () => this.swapPanes());
+
+    const btnCloseSplit = h('button', {
+      title: t('Close split view'),
+      style: 'background:none;border:none;cursor:pointer;padding:4px;color:inherit;display:flex;align-items:center;',
+      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+    });
+    btnCloseSplit.addEventListener('click', () => this.disable());
+
+    const leftHeader = h('div', {
+      class: 'split-left-header',
+      style: 'height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;background:var(--surface,#ffffff);border-bottom:1px solid var(--line,rgba(0,0,0,0.1));z-index:10;'
+    }, this.boardSelect, h('div', { style: 'display:flex;gap:4px;' }, btnSwap, btnCloseSplit));
+
+    // Left canvas viewport wrapper
+    const canvasWrap = h('div', {
+      style: 'position:relative;flex:1;width:100%;height:100%;overflow:hidden;'
     });
 
     // Left secondary canvas
     const cLeft = document.createElement('canvas');
     cLeft.id = 'cLeft';
-    cLeft.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;';
-    this.leftPane.appendChild(cLeft);
+    cLeft.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;';
+    canvasWrap.appendChild(cLeft);
+
+    this.leftPane.appendChild(leftHeader);
+    this.leftPane.appendChild(canvasWrap);
 
     // Reparent primary canvas into right pane
     this.rightPane.appendChild(this.primaryCanvas);
@@ -108,6 +131,12 @@ export class SplitWorkspace {
 
     // Wire divider drag interaction
     this.wireDivider(this.divider);
+
+    // Wire pan and zoom navigation on left canvas
+    this.wireLeftCanvasNavigation(cLeft);
+
+    // Populate board list dropdown
+    this.populateBoardDropdown();
 
     // Update primary canvas surface size
     if (this.app?.surface) {
@@ -212,5 +241,88 @@ export class SplitWorkspace {
 
     if (this.leftSurface) this.leftSurface.repaintAll();
     if (this.app.surface) this.app.surface.repaintAll();
+  }
+
+  async populateBoardDropdown() {
+    if (!this.boardSelect) return;
+    try {
+      if (window.board?.boards?.list) {
+        const list = await window.board.boards.list();
+        for (const b of list) {
+          const opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = b.name || b.title || t('Untitled');
+          this.boardSelect.appendChild(opt);
+        }
+      }
+    } catch {}
+  }
+
+  async loadLeftBoard(id) {
+    if (!id || !this.leftStore) return;
+    try {
+      let data = null;
+      if (window.board?.boards?.get) {
+        data = await window.board.boards.get(id);
+      } else if (this.app?.storage?.load) {
+        data = await this.app.storage.load(id);
+      }
+      if (data) {
+        this.leftStore.load(data);
+        if (this.leftSurface) {
+          this.leftSurface.cam.reset?.();
+          this.leftSurface.repaintAll();
+        }
+        if (this.boardSelect) this.boardSelect.value = id;
+      }
+    } catch (err) {
+      this.app?.toast?.(t('Failed to load board: {msg}', { msg: err.message }));
+    }
+  }
+
+  wireLeftCanvasNavigation(cLeft) {
+    if (!cLeft) return;
+
+    cLeft.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (!this.leftSurface) return;
+      const cam = this.leftSurface.cam;
+      if (e.ctrlKey) {
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        cam.zoomAt?.(factor, e.clientX, e.clientY);
+      } else {
+        cam.pan?.(-e.deltaX, -e.deltaY);
+      }
+      this.leftSurface.repaintAll();
+    }, { passive: false });
+
+    let leftPanning = false, startX = 0, startY = 0;
+    cLeft.addEventListener('pointerdown', (e) => {
+      if (e.button === 0 || e.button === 1) {
+        leftPanning = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        try { cLeft.setPointerCapture(e.pointerId); } catch {}
+      }
+    });
+
+    cLeft.addEventListener('pointermove', (e) => {
+      if (!leftPanning || !this.leftSurface) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      startX = e.clientX;
+      startY = e.clientY;
+      this.leftSurface.cam.pan?.(dx, dy);
+      this.leftSurface.repaintAll();
+    });
+
+    const endLeftPan = (e) => {
+      if (leftPanning) {
+        leftPanning = false;
+        try { cLeft.releasePointerCapture(e.pointerId); } catch {}
+      }
+    };
+    cLeft.addEventListener('pointerup', endLeftPan);
+    cLeft.addEventListener('pointercancel', endLeftPan);
   }
 }

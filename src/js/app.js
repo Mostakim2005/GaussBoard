@@ -43,6 +43,8 @@ import { AudioBar } from './ui/audio-bar.js';
 import { SplitWorkspace } from './ui/split-workspace.js';
 import { ReplayBar } from './ui/replay-bar.js';
 import { exportVideoFile } from './export-video.js';
+import { SearchDialog } from './ui/search-dialog.js';
+import { NoteOverviewDrawer } from './ui/note-overview.js';
 
 export const DEFAULT_SETTINGS = {
   penColor: '#201f1e', penWidth: 4, penEffect: 'none', activePen: 'black',
@@ -266,6 +268,8 @@ class App {
     this.replayEngine = new ReplayEngine(this);
     this.audioBar = new AudioBar(this);
     this.splitWorkspace = new SplitWorkspace(this);
+    this.searchDialog = new SearchDialog(this);
+    this.noteOverview = new NoteOverviewDrawer(this);
     this.replayBar = new ReplayBar(this);
     this.wireGlobalEvents();
     this.initDismissal();
@@ -2339,6 +2343,16 @@ class App {
     this.surface.invalidate();
   }
 
+  toggleSearchDialog(q = '') {
+    if (!this.searchDialog) this.searchDialog = new SearchDialog(this);
+    this.searchDialog.toggle(q);
+  }
+
+  toggleNoteOverview() {
+    if (!this.noteOverview) this.noteOverview = new NoteOverviewDrawer(this);
+    this.noteOverview.toggle();
+  }
+
   /* ---------------- clipboard ---------------- */
 
   /**
@@ -4345,6 +4359,12 @@ class App {
     if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
 
     const mod = e.ctrlKey || e.metaKey;
+
+    if (mod && (e.key === 'f' || e.key === 'k')) {
+      e.preventDefault();
+      this.toggleSearchDialog();
+      return;
+    }
 
     if (e.code === 'Space') { this.interaction.spaceDown = true; e.preventDefault(); return; }
 

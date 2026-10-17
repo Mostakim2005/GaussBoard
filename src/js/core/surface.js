@@ -159,7 +159,8 @@ export class Surface {
   freezeKey() {
     const cam = this.cam;
     const ed = this.editing ? `${this.editing.id}:${this.editing.cell || ''}` : '';
-    const rep = this.app?.replayEngine?.active ? `|rep:${this.app.replayEngine.track?.id || ''}` : '';
+    const repTrackId = (this.app?.replayEngine?.active || this.app?.audioBar?.visible) ? (this.app?.replayEngine?.track?.id || '') : '';
+    const rep = repTrackId ? `|rep:${repTrackId}` : '';
     return `${this.store.rev}.${this._liveRev || 0}|${cam.x}|${cam.y}|${cam.z}|${this.width}|${this.height}|${this.dpr}|${ed}${rep}`;
   }
 
@@ -487,7 +488,8 @@ export class Surface {
     g.clearRect(0, 0, bw, bh);
     // an image that finishes decoding mid-stroke has to invalidate the freeze,
     // or it would not appear until the pen lifted
-    const activeTrackId = this.app?.replayEngine?.active ? this.app.replayEngine.track?.id : null;
+    const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
+    const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
     const filter = activeTrackId ? (o) => o.audioId !== activeTrackId : null;
     this.drawScene(g, this.width, this.height, () => { this._ink = null; this.invalidate(); }, null, filter);
     return { canvas: c, key };
@@ -583,7 +585,8 @@ export class Surface {
      * second for a trail that is a dozen points long is what made the laser
      * crawl on a heavy board; it now blits the same frozen copy a stroke uses.
      */
-    if (this.app?.replayEngine?.active) {
+    const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
+    if (isReplay) {
       const key = this.freezeKey();
       if (!this._ink || this._ink.key !== key) this._ink = this._freezeScene(key);
       this.screenTransform();

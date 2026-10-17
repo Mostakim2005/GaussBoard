@@ -20,15 +20,36 @@ export class ReplayEngine {
 
   loadTrack(track) {
     this.track = track;
+    this.audioBuffer = null;
     if (track?.assetId && this.audio) {
       this.audio.src = `app://board/asset/${track.assetId}`;
       this.audio.load();
+    }
+    if (track?.assetId && typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) {
+      try {
+        fetch(`app://board/asset/${track.assetId}`)
+          .then((r) => r.arrayBuffer())
+          .then((buf) => {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            return ctx.decodeAudioData(buf).then((decoded) => {
+              this.audioBuffer = decoded;
+              if (this.app?.audioBar?.setWaveformBuffer) {
+                this.app.audioBar.setWaveformBuffer(decoded);
+              }
+              try { ctx.close(); } catch {}
+            });
+          })
+          .catch(() => {});
+      } catch {}
     }
     this.seek(0);
   }
 
   play() {
-    if (this.surface) this.surface._ink = null;
+    if (this.surface) {
+      this.surface._ink = null;
+      this.surface.invalidate();
+    }
     if (this.audio) {
       this.audio.playbackRate = this.playbackRate;
       this.audio.preservesPitch = true;
@@ -43,15 +64,25 @@ export class ReplayEngine {
     this.active = false;
     if (this.rafToken) cancelAnimationFrame(this.rafToken);
     this.rafToken = null;
-    if (this.surface) this.surface.invalidate();
+    if (this.surface) {
+      this.surface._ink = null;
+      this.surface.invalidate();
+    }
   }
 
   seek(timeMs) {
-    const max = this.track?.durationMs || (this.audio?.duration ? this.audio.duration * 1000 : 0);
+    const max = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 0) || (this.audio?.duration ? this.audio.duration * 1000 : 0);
     const clamped = Math.min(Math.max(0, timeMs), max);
     this.currentTimeMs = clamped;
-    if (this.audio) this.audio.currentTime = this.currentTimeMs / 1000;
-    if (this.surface) this.surface.invalidate();
+    if (this.audio) {
+      try {
+        this.audio.currentTime = this.currentTimeMs / 1000;
+      } catch {}
+    }
+    if (this.surface) {
+      this.surface._ink = null;
+      this.surface.invalidate();
+    }
     if (this.autoFollow) this.followActiveStroke();
   }
 
