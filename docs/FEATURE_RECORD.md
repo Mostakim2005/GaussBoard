@@ -21,6 +21,12 @@ This document serves as the master registry of all features, enhancements, bug f
 | **F-111** | Pen Opacity Slider & Toggle | `src/js/core/render.js`<br>`src/js/core/tools.js`<br>`src/js/ui/panels.js` | Verified | Supports stroke opacity (10%–100%) with quick solid/translucent toggle for ballpoint/gel-pen effects. |
 | **F-112** | Laser Trail Duration Controller | `src/js/core/surface.js`<br>`src/js/core/tools.js`<br>`src/js/ui/panels.js` | Verified | Configurable trail duration (0ms/instant fade, 300ms, 520ms, 1.2s, 2.5s, 5.0s, 10s). Instant choice highlight (`.primary`) on click. |
 | **F-113** | Board Link Cards: Thumbnail Toggle | `src/js/core/render.js`<br>`src/js/ui/contextmenu.js` | Verified | Board link card can toggle between rich visual thumbnail preview and compact text/icon pill card. Fixed right-click context menu and selection toolbar overlap conflict. |
+| **F-114** | Highlighter Opacity (50% Default) & Color-Popping | `src/js/core/render.js`<br>`src/js/core/tools.js`<br>`src/js/ui/toolbar.js` | Verified | Default opacity 50% (0.50). Interactive slider (10%–100%) in popover. Color-Popping composite mode keeps underlying dark text crisp and distinct without clouding or washing out. |
+| **F-115** | Audio Skip Duration Customization | `src/js/ui/audio-bar.js` | Verified | Removed awkward 13s option. Skip durations strictly `[5s, 10s, 15s, 30s]`. Toggleable via click cycle or right-click options menu. |
+| **F-116** | Audio Recording 3-Dot Menu & Canvas Cards | `src/js/ui/audio-bar.js`<br>`src/js/core/render.js`<br>`src/js/core/tools.js` | Verified | Recording panel matching Image 5 with header, `Audio-Ink Sync` toggle, and 3-dot context menu: `Insert into note`, `Export audio`, `Rename`, `Delete`. Audio note card on board with direct tap-to-play. |
+| **F-117** | Named Bookmarks Inline Label Editor | `src/js/ui/density-canvas.js`<br>`src/js/ui/audio-bar.js` | Verified | Expanding inline rename field on bookmark pin tooltip card (hidden by default). Immediate persistence to `doc.audioTracks`. |
+| **F-118** | PDF Import Mode & Auto-Alignment | `src/js/ui/pagepicker.js`<br>`src/js/insert.js` | Verified | Choice between `Movable objects` (printouts) and `Page background` (locked native pad sheets). Auto-alignment presets (`Fit width`, `Fit height`, `Fit page`). |
+| **F-119** | Turnout Page Margin Adjustment Dialog | `src/js/ui/pagemargin-dialog.js`<br>`src/js/ui/panels.js`<br>`src/js/app.js` | Verified | Turnout-inspired modal with 8 draggable blue control handles, presets (Cornell wide left, wide right, top header, 2-col), background colors, and scope toggle (`Apply to entire note` vs `Apply to current page`). |
 
 ---
 
@@ -109,6 +115,38 @@ This document serves as the master registry of all features, enhancements, bug f
 5. **Quality & Test Verification**:
    - `node scripts/smoke.js`: verified 100% pass rate.
    - `node scripts/i18n-check.js`: 1320/1320 translated (100% complete) across all 7 locales.
+
+### Round 4 Enhancements & Media Workflow Delivery
+1. **Highlighter Opacity & Text Color-Popping** (`src/js/core/render.js`, `src/js/core/tools.js`, `src/js/ui/toolbar.js`, `src/js/app.js`):
+   - Set default adjustable highlight opacity to 50% (`0.50`).
+   - Integrated opacity slider (10%–100%) and live percentage indicator in the Highlighter palette.
+   - Added `Text color-popping` toggle: prevents dark ink/scans from washing out beneath highlighters by using high-contrast composite mode, keeping underlying black text razor-sharp and punchy.
+2. **Audio Skip Duration Reconfiguration** (`src/js/ui/audio-bar.js`):
+   - Removed awkward 13-second interval. Configured skip durations strictly to `[5s, 10s, 15s, 30s]`.
+   - Toggleable via left-click cycling or right-click / context menu dropdown for instantaneous interval selection.
+3. **Recording Panel, 3-Dot Menu & Canvas Audio Cards** (`src/js/ui/audio-bar.js`, `src/js/core/render.js`, `src/js/core/tools.js`):
+   - Upgraded session list into a full Recording Panel matching Image 5:
+     - Header with close button `✕` and `Audio-Ink Sync` toggle with info tooltip.
+     - Each recording item features title, duration, date/time, and a `•••` three-dot context menu.
+     - Context menu actions:
+       1. `Insert the recording into the note`: drops an interactive `type: 'audio'` player card directly onto the canvas with play/pause circle, duration, and track title. Tapping or double-clicking the card immediately opens playback.
+       2. `Export audio`: prompts file download/save for `.webm` audio stream.
+       3. `Rename`: in-place prompt to rename recording.
+       4. `Delete`: removes track from `doc.audioTracks` and syncs UI.
+4. **Named Audio Bookmarks** (`src/js/ui/density-canvas.js`):
+   - Floating bookmark tooltip on the density scrubber timeline features an expandable edit toggle (hidden by default).
+   - Clicking `✏️` reveals a name input field and `Save` button, updating `bm.name` and committing to `doc.audioTracks`.
+5. **PDF Import Mode & Turnout Page Margin Adjustment** (`src/js/ui/pagepicker.js`, `src/js/insert.js`, `src/js/ui/pagemargin-dialog.js`, `src/js/ui/panels.js`, `src/js/app.js`):
+   - Added PDF import mode selection in `choosePages`: `[Movable objects]` (standard printouts) vs `[Page background]` (locks imported PDF pages as native pad sheets, perfectly centered and scaled).
+   - Auto-alignment presets: `[Fit width]`, `[Fit height]`, `[Fit page]`.
+   - Implemented Turnout-inspired `PageMarginDialog`:
+     - Visual canvas preview with **8 draggable blue circle control handles** (`nw, n, ne, e, se, s, sw, w`) allowing users to visually drag and expand/shrink margins with live dimension feedback.
+     - 5 layout presets: Standard (uniform), Cornell Notes (wide left column for keywords/cues), Wide Right (annotation space), Top Header, and Two Columns.
+     - Scope radio selector: `(●) Apply to the entire note` vs `( ) Apply to current page only`.
+     - Accessible directly via `[📐 Page margin adjustment…]` in Canvas size settings.
+6. **Quality & Test Verification**:
+   - `node scripts/smoke.js`: 1240/1240 passed (100% pass rate).
+   - `node scripts/i18n-check.js`: 1349/1349 translated (100% complete) across all 7 locales.
 
 ---
 
