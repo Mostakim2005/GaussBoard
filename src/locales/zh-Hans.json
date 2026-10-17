@@ -1230,5 +1230,18 @@
   "Recording started... Speak while you write!": "Recording started... Speak while you write!",
   "Board Properties (Tags & Aliases)": "Board Properties (Tags & Aliases)",
   "Record Audio Replay": "Record Audio Replay",
-  "Search Boards & Settings (Ctrl+K)": "Search Boards & Settings (Ctrl+K)"
+  "Search Boards & Settings (Ctrl+K)": "Search Boards & Settings (Ctrl+K)",
+  "Hide thumbnail": "隐藏缩略图",
+  "Show thumbnail": "显示缩略图",
+  "Search settings…": "搜索设置…",
+  "Gesture scratch-out eraser": "手势涂抹橡皮擦",
+  "Scribble rapidly back and forth across strokes or text to erase them (StarNote style).": "在笔画或文字上来回快速涂画即可将其擦除（StarNote 风格）。",
+  "Pen opacity": "笔触不透明度",
+  "Allow drawing translucent pen strokes for layering effects.": "允许绘制半透明笔触以实现层次效果。",
+  "Laser trail duration": "激光轨迹停留时间",
+  "Instant": "立即消失",
+  "520ms": "520毫秒",
+  "How long the laser pointer trail lingers on screen before melting away.": "激光笔轨迹在屏幕上停留多久后渐渐淡出。",
+  "Board link thumbnails": "白板链接缩略图",
+  "Show thumbnail picture previews on board link cards by default.": "默认在白板链接卡片上显示预览图片。"
 }

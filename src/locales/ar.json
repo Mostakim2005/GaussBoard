@@ -1230,5 +1230,18 @@
   "Recording started... Speak while you write!": "Recording started... Speak while you write!",
   "Board Properties (Tags & Aliases)": "Board Properties (Tags & Aliases)",
   "Record Audio Replay": "Record Audio Replay",
-  "Search Boards & Settings (Ctrl+K)": "Search Boards & Settings (Ctrl+K)"
+  "Search Boards & Settings (Ctrl+K)": "Search Boards & Settings (Ctrl+K)",
+  "Hide thumbnail": "إخفاء الصورة المصغرة",
+  "Show thumbnail": "إظهار الصورة المصغرة",
+  "Search settings…": "البحث في الإعدادات…",
+  "Gesture scratch-out eraser": "ممحاة إيماءة الشطب",
+  "Scribble rapidly back and forth across strokes or text to erase them (StarNote style).": "قم بالخربشة بسرعة ذهابًا وإيابًا فوق الخطوط أو النصوص لمسحها (بأسلوب StarNote).",
+  "Pen opacity": "شفافية القلم",
+  "Allow drawing translucent pen strokes for layering effects.": "السماح برسم خطوط قلم شبه شفافة لتأثيرات الطبقات.",
+  "Laser trail duration": "مدة أثر الليزر",
+  "Instant": "فوري",
+  "520ms": "520 مللي ثانية",
+  "How long the laser pointer trail lingers on screen before melting away.": "المدة التي يستمر فيها أثر مؤشر الليزر على الشاشة قبل أن يتلاشى.",
+  "Board link thumbnails": "الصور المصغرة لروابط اللوحات",
+  "Show thumbnail picture previews on board link cards by default.": "إظهار معاينات الصور المصغرة على بطاقات روابط اللوحات افتراضيًا."
 }

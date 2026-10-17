@@ -3,6 +3,9 @@
 
 import { Surface } from './core/surface.js';
 import { t } from './i18n.js';
+import { isDarkBoard } from './core/render.js';
+import { boundsOf } from './core/store.js';
+import { boxesIntersect } from './core/util.js';
 
 export class VideoExporter {
   constructor(app) {
@@ -41,6 +44,37 @@ export class VideoExporter {
     const sf = new Surface(canvas, this.app.store, { app: this.app });
     sf.resize(width, height);
 
+    if (this.app?.replayEngine) {
+      this.app.replayEngine.loadTrack(track);
+    }
+
+    // Auto-frame offscreen camera to encompass all notes recorded with this audio track
+    const objs = this.app?.store?.doc?.objects || {};
+    const trackStrokes = Object.values(objs).filter((o) => o && o.audioId === track.id);
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const s of trackStrokes) {
+      const b = s.bbox || boundsOf(s);
+      if (b) {
+        minX = Math.min(minX, b.x);
+        minY = Math.min(minY, b.y);
+        maxX = Math.max(maxX, b.x + b.w);
+        maxY = Math.max(maxY, b.y + b.h);
+      }
+    }
+    if (minX < maxX) {
+      const bw = Math.max(10, maxX - minX), bh = Math.max(10, maxY - minY);
+      const pad = Math.max(48, Math.max(bw, bh) * 0.15);
+      const box = { x: minX - pad, y: minY - pad, w: bw + pad * 2, h: bh + pad * 2 };
+      const scale = Math.min(width / box.w, height / box.h);
+      sf.cam.z = Math.max(0.3, Math.min(scale, 2.0));
+      sf.cam.x = (width - box.w * sf.cam.z) / 2 - box.x * sf.cam.z;
+      sf.cam.y = (height - box.h * sf.cam.z) / 2 - box.y * sf.cam.z;
+    } else if (this.app?.surface?.cam) {
+      sf.cam.x = this.app.surface.cam.x;
+      sf.cam.y = this.app.surface.cam.y;
+      sf.cam.z = this.app.surface.cam.z;
+    }
+
     // Audio element
     const audio = new Audio();
     audio.src = `app://board/asset/${track.assetId}`;
@@ -52,7 +86,9 @@ export class VideoExporter {
       audio.load();
     });
 
-    const durationMs = track.durationMs || (audio.duration * 1000) || 1000;
+    const durationMs = (isFinite(track.durationMs) && track.durationMs > 0)
+      ? track.durationMs
+      : ((isFinite(audio.duration) && audio.duration > 0) ? audio.duration * 1000 : 5000);
 
     // Setup Web Audio routing to capture audio stream without microphone bleed
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -117,6 +153,7 @@ export class VideoExporter {
     const renderLoop = async () => {
       if (this.cancelled || audio.ended || (audio.currentTime * 1000 >= durationMs)) {
         audio.pause();
+        try { rec.requestData(); } catch {}
         // Give recorder brief moment to finalize final chunk
         setTimeout(() => {
           if (rec.state !== 'inactive') rec.stop();
@@ -130,10 +167,13 @@ export class VideoExporter {
         this.app.replayEngine.currentTimeMs = curMs;
       }
 
-      // Deterministically render scene and replay session
-      ctx.clearRect(0, 0, width, height);
+      // Deterministically render solid background, base scene, and synchronized replay session
+      ctx.save();
+      ctx.fillStyle = isDarkBoard() ? '#1f1e1d' : '#f5f4f2';
+      ctx.fillRect(0, 0, width, height);
       sf.drawScene(ctx, width, height, () => {}, null, (o) => o.audioId !== track.id);
       sf.drawReplaySession(ctx);
+      ctx.restore();
 
       if (videoTrack?.requestFrame) {
         try { videoTrack.requestFrame(); } catch {}

@@ -1119,7 +1119,7 @@ export function createPanels(app) {
   function settings() {
     open('settings', t('Settings'), () => {
       const s = app.settings;
-      const row = (label, control, hint) => h('div', { style: 'margin-bottom:16px' },
+      const row = (label, control, hint) => h('div', { class: 'setting-row', style: 'margin-bottom:16px' },
         h('div', { style: 'display:flex;align-items:center;justify-content:space-between;gap:12px' },
           h('span', { style: 'font-size:13.5px' }, label), control),
         hint ? h('div', { style: 'font-size:12px;color:var(--text-2);margin-top:4px' }, hint) : null);
@@ -1249,7 +1249,14 @@ export function createPanels(app) {
           platformLines;
       });
 
-      return h('div', {},
+      const searchBox = h('input', {
+        type: 'search',
+        placeholder: t('Search settings…'),
+        style: 'width:100%;box-sizing:border-box;padding:8px 12px;margin-bottom:14px;border-radius:8px;border:1px solid var(--line,rgba(0,0,0,0.15));background:var(--surface-2,rgba(128,128,128,0.08));color:inherit;font-size:13px;outline:none;'
+      });
+
+      const content = h('div', {},
+        searchBox,
         h('div', { class: 'section' },
           h('h5', {}, t('Appearance')),
           row(t('Language'), languagePicker(),
@@ -1311,12 +1318,23 @@ export function createPanels(app) {
                   app.interaction.hideInkPointer(); }),
                 t('Off (default): drawing with a finger shows no pen nib, because your fingertip is already on the spot and the nib only hides under your hand. A stylus or a mouse on this machine still gets one. Switch on if you are on a Surface or another touchscreen PC and want the nib under your finger too.'))
             : null,
+          row(t('Gesture scratch-out eraser'), mkToggle(() => s.scratchOut !== false, (v) => (s.scratchOut = v)),
+            t('Scribble rapidly back and forth across strokes or text to erase them (StarNote style).')),
+          row(t('Pen opacity'), mkToggle(() => s.penOpacityEnabled === true, (v) => (s.penOpacityEnabled = v)),
+            t('Allow drawing translucent pen strokes for layering effects.')),
+          row(t('Laser trail duration'), mkChoice(
+            [[0, t('Instant')], [300, '300ms'], [520, t('520ms')], [1200, '1.2s']],
+            () => s.laserTrailDuration ?? 520,
+            (v) => { s.laserTrailDuration = v; app.saveSettings(); }
+          ), t('How long the laser pointer trail lingers on screen before melting away.')),
           row(t('Ruler snapping'), mkToggle(() => app.ruler.snap, (v) => (app.ruler.snap = v)))
         ),
         storage ? h('div', { class: 'section' }, h('h5', {}, t('Storage')), storage) : null,
         backup ? h('div', { class: 'section' }, h('h5', {}, t('Storage')), backup) : null,
         h('div', { class: 'section' },
           h('h5', {}, t('Canvas')),
+          row(t('Board link thumbnails'), mkToggle(() => s.boardLinkThumb !== false, (v) => { s.boardLinkThumb = v; app.saveSettings(); app.surface.invalidate(); }),
+            t('Show thumbnail picture previews on board link cards by default.')),
           row(t('Mouse wheel zooms'), mkToggle(() => s.wheelZoom, (v) => (s.wheelZoom = v)), t('Off: wheel and trackpad pan, Ctrl+wheel zooms.')),
           row(t('Auto-pan at the edges'), mkToggle(() => s.edgePan, (v) => (s.edgePan = v)),
             t('While drawing or dragging, running the pointer into the edge of the window scrolls the canvas. A mouse button held down during a pen stroke drags the canvas too.')),
@@ -1435,6 +1453,22 @@ export function createPanels(app) {
           h('p', { style: 'font-size:12px;color:var(--text-2);margin-top:10px;line-height:1.6' },
             t('Boards save automatically on this device. Use My boards to reopen them, or Save a copy to keep a board file in a folder you choose. There is no sign-in, no account and no cloud. The one thing that ever leaves this device is a board you hand to another GazBoard yourself, over your own network, and even then it goes straight from here to there, never through anybody\'s server.')))
       );
+
+      searchBox.addEventListener('input', () => {
+        const q = searchBox.value.toLowerCase().trim();
+        const rows = content.querySelectorAll('.setting-row');
+        const sections = content.querySelectorAll('.section');
+        for (const r of rows) {
+          const match = !q || r.textContent.toLowerCase().includes(q);
+          r.style.display = match ? '' : 'none';
+        }
+        for (const sec of sections) {
+          const visibleRows = sec.querySelectorAll('.setting-row:not([style*="display: none"])');
+          sec.style.display = (visibleRows.length > 0 || !q) ? '' : 'none';
+        }
+      });
+
+      return content;
     });
   }
 

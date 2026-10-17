@@ -95,13 +95,17 @@ export class AudioBar {
     this.syncUI();
   }
 
-  togglePlay() {
+  async togglePlay() {
     const replay = this.app?.replayEngine;
     if (!replay) return;
-    if (replay.active) {
-      replay.pause();
-    } else {
-      replay.play();
+    try {
+      if (replay.active) {
+        replay.pause();
+      } else {
+        await replay.play();
+      }
+    } catch (e) {
+      console.warn('Playback error:', e);
     }
     this.syncUI();
   }
@@ -250,11 +254,22 @@ export class AudioBar {
       style: 'display:flex;align-items:center;position:relative;'
     }, this.density.canvas || '');
 
+    this.selectSession = h('select', {
+      class: 'ab-session-select',
+      title: 'Select Recording Session',
+      style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:2px 6px;border-radius:12px;font-size:11.5px;font-weight:600;color:inherit;outline:none;max-width:140px;'
+    });
+    this.selectSession.addEventListener('change', () => {
+      const tracks = this.app?.store?.doc?.audioTracks || [];
+      const sel = tracks.find((t) => t.id === this.selectSession.value);
+      if (sel) this.open(sel);
+    });
+
     this.el = h('div', {
       id: 'audioBar',
       class: 'audio-bar-hud',
       style: 'position:absolute;z-index:1000;display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.18);user-select:none;font-size:13px;font-family:inherit;'
-    }, dragHandle, this.btnRewind10, this.btnSkipStep, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnClose);
+    }, dragHandle, this.selectSession, this.btnRewind10, this.btnSkipStep, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnClose);
 
     this.wireDragging(dragHandle);
   }
@@ -316,6 +331,30 @@ export class AudioBar {
     if (this.btnSkipStep) this.btnSkipStep.textContent = `${this.skipSeconds}s`;
     if (this.btnRewind10) this.btnRewind10.title = `Rewind ${this.skipSeconds}s`;
     if (this.btnForward10) this.btnForward10.title = `Forward ${this.skipSeconds}s`;
+
+    const tracks = this.app?.store?.doc?.audioTracks || [];
+    if (this.selectSession) {
+      if (tracks.length > 1) {
+        this.selectSession.style.display = '';
+        const currentVal = this.track?.id;
+        const optValues = Array.from(this.selectSession.options).map((o) => o.value).join(',');
+        const trackValues = tracks.map((t) => t.id).join(',');
+        if (optValues !== trackValues) {
+          this.selectSession.innerHTML = '';
+          tracks.forEach((tr, idx) => {
+            const opt = document.createElement('option');
+            opt.value = tr.id;
+            const durStr = formatTime(tr.durationMs || 0);
+            const timeStr = tr.created ? new Date(tr.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            opt.textContent = `${tr.name || `Audio ${idx + 1}`} (${durStr})${timeStr ? ` · ${timeStr}` : ''}`;
+            this.selectSession.appendChild(opt);
+          });
+        }
+        if (currentVal) this.selectSession.value = currentVal;
+      } else {
+        this.selectSession.style.display = 'none';
+      }
+    }
 
     if (replay) {
       this.btnGhost.style.opacity = replay.ghostMode === 'translucent' ? '1.0' : '0.4';

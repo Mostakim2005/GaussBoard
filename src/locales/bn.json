@@ -1230,5 +1230,18 @@
   "Recording started... Speak while you write!": "Recording started... Speak while you write!",
   "Board Properties (Tags & Aliases)": "Board Properties (Tags & Aliases)",
   "Record Audio Replay": "Record Audio Replay",
-  "Search Boards & Settings (Ctrl+K)": "Search Boards & Settings (Ctrl+K)"
+  "Search Boards & Settings (Ctrl+K)": "Search Boards & Settings (Ctrl+K)",
+  "Hide thumbnail": "থাম্বনেইল লুকান",
+  "Show thumbnail": "থাম্বনেইল দেখান",
+  "Search settings…": "সেটিংস খুঁজুন…",
+  "Gesture scratch-out eraser": "জেসচার স্ক্র্যাচ-আউট ইরেজার",
+  "Scribble rapidly back and forth across strokes or text to erase them (StarNote style).": "মুছে ফেলতে স্ট্রোক বা লেখার ওপর দ্রুত আঁকিবুঁকি করুন (StarNote স্টাইল)।",
+  "Pen opacity": "পেনের অস্বচ্ছতা",
+  "Allow drawing translucent pen strokes for layering effects.": "লেয়ারিং এফেক্টের জন্য স্বচ্ছ পেন স্ট্রোক আঁকার সুবিধা।",
+  "Laser trail duration": "লেজার ট্রেইল সময়কাল",
+  "Instant": "তাৎক্ষণিক",
+  "520ms": "৫২০ মিলি",
+  "How long the laser pointer trail lingers on screen before melting away.": "লেজার পয়েন্টারের ট্রেইল মিলিয়ে যাওয়ার আগে কতক্ষণ পর্দায় থাকবে।",
+  "Board link thumbnails": "বোর্ড লিংক থাম্বনেইল",
+  "Show thumbnail picture previews on board link cards by default.": "ডিফল্টভাবে বোর্ড লিংক কার্ডে থাম্বনেইল প্রিভিউ দেখান।"
 }

@@ -49,6 +49,22 @@ export class DensityCanvas {
     this.render();
   }
 
+  bookmarkAt(clientX) {
+    if (!this.canvas || !Array.isArray(this.track?.bookmarks)) return null;
+    const rect = this.canvas.getBoundingClientRect();
+    if (!rect.width) return null;
+    const duration = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 0);
+    if (duration <= 0) return null;
+    const x = clientX - rect.left;
+    for (const bm of this.track.bookmarks) {
+      if (bm.t != null) {
+        const bx = (bm.t / duration) * rect.width;
+        if (Math.abs(x - bx) <= 7) return bm;
+      }
+    }
+    return null;
+  }
+
   wireEvents() {
     if (!this.canvas) return;
     let dragging = false;
@@ -65,7 +81,26 @@ export class DensityCanvas {
       if (this.onSeek) this.onSeek(Math.round(t));
     };
 
+    this.canvas.addEventListener('pointermove', (e) => {
+      if (dragging) return;
+      const bm = this.bookmarkAt(e.clientX);
+      if (bm) {
+        this.canvas.style.cursor = 'pointer';
+        const sec = Math.floor(bm.t / 1000);
+        const m = Math.floor(sec / 60), s = sec % 60;
+        this.canvas.title = `Bookmark: ${bm.name || `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`} (Click to jump)`;
+      } else {
+        this.canvas.style.cursor = 'ew-resize';
+        this.canvas.title = '';
+      }
+    });
+
     this.canvas.addEventListener('pointerdown', (e) => {
+      const bm = this.bookmarkAt(e.clientX);
+      if (bm) {
+        if (this.onSeek) this.onSeek(Math.round(bm.t));
+        return;
+      }
       dragging = true;
       try { this.canvas.setPointerCapture(e.pointerId); } catch {}
       seekAt(e);

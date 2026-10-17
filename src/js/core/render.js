@@ -387,6 +387,8 @@ export function drawStroke(ctx, o) {
   if (highlighter) {
     ctx.globalAlpha = o.opacity ?? 0.38;
     ctx.globalCompositeOperation = 'multiply';
+  } else if (o.opacity != null && o.opacity < 1) {
+    ctx.globalAlpha = o.opacity;
   }
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -1205,7 +1207,8 @@ export function drawBoardLink(ctx, o, onload) {
   const { x, y, w, h } = o;
   const r = Math.min(12, w * 0.06, h * 0.06);
   const pad = Math.max(4, Math.min(w, h) * 0.04);
-  const labelH = Math.max(18, Math.min(h * 0.24, 44));
+  const showThumb = o.showThumb !== false;
+  const labelH = showThumb ? Math.max(18, Math.min(h * 0.24, 44)) : (h - pad * 2);
   ctx.save();
   // the card
   ctx.shadowColor = 'rgba(0,0,0,0.16)';
@@ -1220,37 +1223,39 @@ export function drawBoardLink(ctx, o, onload) {
   if (missing) ctx.setLineDash([6, 4]);
   ctx.stroke();
   ctx.setLineDash([]);
-  // the picture
-  const px = x + pad, py = y + pad, pw = Math.max(1, w - pad * 2), ph = Math.max(1, h - pad * 2 - labelH);
-  ctx.save();
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(px, py, pw, ph, Math.max(2, r - pad / 2)); else ctx.rect(px, py, pw, ph);
-  ctx.clip();
-  ctx.fillStyle = missing ? (dark ? '#3b3a39' : '#edebe9') : '#f3f2f1';
-  ctx.fillRect(px, py, pw, ph);
-  const img = !missing && b && b.thumb ? getImage(b.thumb, onload) : null;
-  if (img) {
-    // fill the frame, cropping what does not fit, as the gallery does
-    const k = Math.max(pw / img.width, ph / img.height);
-    const dw = img.width * k, dh = img.height * k;
-    ctx.drawImage(img, px + (pw - dw) / 2, py + (ph - dh) / 2, dw, dh);
-  } else {
-    ctx.fillStyle = missing ? (dark ? '#a19f9d' : '#8a8886') : '#a19f9d';
-    const fs = Math.max(8, Math.min(ph * 0.14, pw * 0.07));
-    ctx.font = `400 ${fs}px ${FONT}`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(missing ? t('Not on this computer') : t('No picture yet'), px + pw / 2, py + ph / 2, pw - 8);
+  // the picture (if thumbnail enabled)
+  if (showThumb) {
+    const px = x + pad, py = y + pad, pw = Math.max(1, w - pad * 2), ph = Math.max(1, h - pad * 2 - labelH);
+    ctx.save();
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(px, py, pw, ph, Math.max(2, r - pad / 2)); else ctx.rect(px, py, pw, ph);
+    ctx.clip();
+    ctx.fillStyle = missing ? (dark ? '#3b3a39' : '#edebe9') : '#f3f2f1';
+    ctx.fillRect(px, py, pw, ph);
+    const img = !missing && b && b.thumb ? getImage(b.thumb, onload) : null;
+    if (img) {
+      // fill the frame, cropping what does not fit, as the gallery does
+      const k = Math.max(pw / img.width, ph / img.height);
+      const dw = img.width * k, dh = img.height * k;
+      ctx.drawImage(img, px + (pw - dw) / 2, py + (ph - dh) / 2, dw, dh);
+    } else {
+      ctx.fillStyle = missing ? (dark ? '#a19f9d' : '#8a8886') : '#a19f9d';
+      const fs = Math.max(8, Math.min(ph * 0.14, pw * 0.07));
+      ctx.font = `400 ${fs}px ${FONT}`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(missing ? t('Not on this computer') : t('No picture yet'), px + pw / 2, py + ph / 2, pw - 8);
+    }
+    ctx.restore();
+    // a hairline round the picture, so a white page still reads as a page
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(px + 0.5, py + 0.5, pw - 1, ph - 1, Math.max(2, r - pad / 2)); else ctx.rect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+    ctx.stroke();
   }
-  ctx.restore();
-  // a hairline round the picture, so a white page still reads as a page
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)';
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(px + 0.5, py + 0.5, pw - 1, ph - 1, Math.max(2, r - pad / 2)); else ctx.rect(px + 0.5, py + 0.5, pw - 1, ph - 1);
-  ctx.stroke();
   // the name, with a little arrow saying it goes somewhere
-  const fs = Math.max(8, labelH * 0.46);
-  const ly = y + h - pad - labelH / 2;
+  const fs = Math.max(8, Math.min(labelH * 0.46, 16));
+  const ly = showThumb ? (y + h - pad - labelH / 2) : (y + h / 2);
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   const ink = missing ? (dark ? '#a19f9d' : '#8a8886') : (dark ? '#8ccbff' : '#0f6cbd');

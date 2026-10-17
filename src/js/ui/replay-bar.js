@@ -131,7 +131,7 @@ export class ReplayBar {
     const handle = h('div', {
       class: 'rb-handle',
       title: 'Drag to move \u2014 Double-click to rotate',
-      style: 'cursor:grab;display:flex;align-items:center;justify-content:center;padding:4px 6px;color:var(--text-2,rgba(128,128,128,0.8));user-select:none;',
+      style: 'cursor:grab;display:flex;align-items:center;justify-content:center;padding:4px 6px;color:var(--text-2,rgba(128,128,128,0.8));user-select:none;touch-action:none;',
       html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>'
     });
     handle.addEventListener('dblclick', () => {
@@ -449,27 +449,40 @@ export class ReplayBar {
     if (!handle) return;
     let startX = 0, startY = 0, initialX = 0, initialY = 0;
     let dragging = false;
+    let movedPastThreshold = false;
 
     const onPointerMove = (e) => {
-      if (!dragging) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
+      if (!movedPastThreshold) {
+        if (Math.hypot(dx, dy) < 6) return;
+        movedPastThreshold = true;
+        dragging = true;
+        this.dock = 'free';
+      }
       this.pos.x = Math.max(10, Math.min(window.innerWidth - 60, initialX + dx));
       this.pos.y = Math.max(10, Math.min(window.innerHeight - 60, initialY + dy));
-      this.dock = 'free';
       this.applyPosition();
     };
 
-    const onPointerUp = () => {
-      if (!dragging) return;
-      dragging = false;
-      this.saveState();
+    const onPointerUp = (e) => {
+      try { handle.releasePointerCapture(e.pointerId); } catch {}
+      if (dragging) {
+        dragging = false;
+        this.saveState();
+      }
+      movedPastThreshold = false;
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
     };
 
     handle.addEventListener('pointerdown', (e) => {
-      dragging = true;
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      try { handle.setPointerCapture(e.pointerId); } catch {}
+      dragging = false;
+      movedPastThreshold = false;
       startX = e.clientX;
       startY = e.clientY;
       const rect = this.el.getBoundingClientRect();
@@ -479,6 +492,7 @@ export class ReplayBar {
       initialY = this.pos.y;
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerUp);
     });
   }
 }

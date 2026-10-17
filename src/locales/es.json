@@ -1230,5 +1230,18 @@
   "Recording started... Speak while you write!": "Recording started... Speak while you write!",
   "Board Properties (Tags & Aliases)": "Board Properties (Tags & Aliases)",
   "Record Audio Replay": "Record Audio Replay",
-  "Search Boards & Settings (Ctrl+K)": "Search Boards & Settings (Ctrl+K)"
+  "Search Boards & Settings (Ctrl+K)": "Search Boards & Settings (Ctrl+K)",
+  "Hide thumbnail": "Ocultar miniatura",
+  "Show thumbnail": "Mostrar miniatura",
+  "Search settings…": "Buscar ajustes…",
+  "Gesture scratch-out eraser": "Borrador de gestos de tachado",
+  "Scribble rapidly back and forth across strokes or text to erase them (StarNote style).": "Garabatea rápidamente de un lado a otro sobre trazos o texto para borrarlos (estilo StarNote).",
+  "Pen opacity": "Opacidad del lápiz",
+  "Allow drawing translucent pen strokes for layering effects.": "Permite dibujar trazos de lápiz translúcidos para efectos de capas.",
+  "Laser trail duration": "Duración del rastro del láser",
+  "Instant": "Instantáneo",
+  "520ms": "520 ms",
+  "How long the laser pointer trail lingers on screen before melting away.": "Cuánto tiempo permanece el rastro del puntero láser en la pantalla antes de desaparecer.",
+  "Board link thumbnails": "Miniaturas de enlaces de pizarra",
+  "Show thumbnail picture previews on board link cards by default.": "Mostrar imágenes de vista previa en tarjetas de enlace de pizarra por defecto."
 }

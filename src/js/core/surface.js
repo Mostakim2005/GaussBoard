@@ -294,7 +294,9 @@ export class Surface {
   /** Drop trail points that have faded out. */
   pruneLaser() {
     if (!this.laser.length) return;
-    const cut = performance.now() - Surface.LASER_LIFE;
+    const life = this.app?.settings?.laserTrailDuration != null ? this.app.settings.laserTrailDuration : Surface.LASER_LIFE;
+    if (life <= 0) { this.laser.length = 0; return; }
+    const cut = performance.now() - life;
     let i = 0;
     while (i < this.laser.length && this.laser[i].t < cut) i++;
     if (i) this.laser.splice(0, i);
@@ -609,7 +611,10 @@ export class Surface {
        * that is already correct, so the very first paint after a resize, a
        * board load or a camera move is always the full one.
        */
-      this.drawScene(ctx, w, h, () => this.invalidate(), this._band);
+      const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
+      const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
+      const replayFilter = activeTrackId ? (o) => o.audioId !== activeTrackId : null;
+      this.drawScene(ctx, w, h, () => this.invalidate(), this._band, replayFilter);
     } else if (this._ink && this._ink.key === this.freezeKey()) {
       /*
        * Nothing has changed since the copy was taken, so blit it.
@@ -636,7 +641,10 @@ export class Surface {
        * image arriving is not a document change - and blit the copy that was
        * taken before the picture existed, so it would never appear.
        */
-      this.drawScene(ctx, w, h, () => { this._ink = null; this.invalidate(); });
+      const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
+      const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
+      const replayFilter = activeTrackId ? (o) => o.audioId !== activeTrackId : null;
+      this.drawScene(ctx, w, h, () => { this._ink = null; this.invalidate(); }, null, replayFilter);
       this._painted = true;
     }
 
@@ -794,10 +802,14 @@ export class Surface {
           if (pts.length >= 2) {
             drawObject(ctx, { ...o, points: pts }, () => this.invalidate(), this.editing);
             const tip = pts[pts.length - 1];
-            ctx.fillStyle = '#0078d4';
+            ctx.save();
+            ctx.fillStyle = '#00d2ff';
+            ctx.shadowColor = '#00d2ff';
+            ctx.shadowBlur = 8;
             ctx.beginPath();
-            ctx.arc(tip.x, tip.y, (o.width || 4) / 2 + 1, 0, Math.PI * 2);
+            ctx.arc(tip.x, tip.y, (o.width || 4) / 2 + 1.5, 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
           }
         }
       } else if (o.t0 != null && o.t0 > t) {

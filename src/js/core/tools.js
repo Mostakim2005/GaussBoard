@@ -958,7 +958,14 @@ export class Interaction {
     }
 
     switch (a.type) {
-      case 'laser': break;            // the trail fades on its own
+      case 'laser': {
+        const dur = this.app?.settings?.laserTrailDuration;
+        if (dur === 0) {
+          this.surface.laser.length = 0;
+          this.surface.invalidate();
+        }
+        break;
+      }
       case 'draw':
         // A tap can dismiss a selection, or pick something up with a finger.
         // Neither should become ink or an undo entry. See tappedAnObject().
@@ -1560,7 +1567,7 @@ export class Interaction {
       width: isHl ? s.highlighterWidth : s.penWidth,
       effect: isHl ? 'none' : s.penEffect,
       hue: Math.random() * 360,
-      opacity: isHl ? 0.38 : 1,
+      opacity: isHl ? 0.38 : (s.penOpacityEnabled ? (s.penOpacity ?? 1) : 1),
       points: [], bbox: { x: wp.x, y: wp.y, w: 0, h: 0 }, rotation: 0
     };
     // starting in the gutter is drawing on the desk: nothing happens
