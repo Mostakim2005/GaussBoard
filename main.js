@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, Menu, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, Menu, screen, session } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
