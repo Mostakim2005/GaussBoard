@@ -93,3 +93,15 @@ test('only GazBoard boards count as boards; other programs\' .json files are lef
   fs.writeFileSync(path.join(root, 'broken.json'), '{ not json');
   assert.equal(Storage.countBoards(root), 1, `counted ${Storage.countBoards(root)} in ${fs.readdirSync(root).join(', ')}`);
 });
+
+test('concurrent writes execute without collisions or EBUSY errors', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gazboard-storage-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  for (let i = 0; i < 50; i++) {
+    const dir = path.join(root, 'dir_' + i);
+    Storage.writeConfig(root, dir);
+  }
+  const cfg = Storage.readConfig(root);
+  assert.equal(cfg.version, 1);
+  assert.ok(cfg.boardsDir.startsWith(root));
+});

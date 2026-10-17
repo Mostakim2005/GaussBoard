@@ -17189,6 +17189,75 @@ module.exports.run = async (win, app) => {
       && !/\bnull\b/.test(storageSettings.text),
     JSON.stringify(storageSettings));
 
+  /* ---- GazBoard Replay Features (Milestones 1-4) ---- */
+  const replaySuite = await js(`
+    const results = {};
+    try {
+      const { detectScratchOut } = await import('app://board/js/core/scratch.js');
+      const zigZagPts = [];
+      for (let i = 0; i < 20; i++) {
+        zigZagPts.push({ x: (i % 2 === 0 ? 0 : 50), y: i * 5 });
+      }
+      const isScratch = detectScratchOut(zigZagPts);
+      results.scratchOut = !!isScratch;
+    } catch (e) { results.scratchOut = e.message; }
+
+    try {
+      const a = window.app;
+      a.store.add({
+        id: 'curtain-tape-test',
+        type: 'curtain',
+        subtype: 'tape',
+        x: 100, y: 100, w: 200, h: 50,
+        revealed: false,
+        color: '#ffeb3b'
+      }, 'test');
+      const toggled = a.toggleCurtain('curtain-tape-test');
+      const revealedState = a.store.get('curtain-tape-test')?.revealed;
+      results.studyTape = toggled && (revealedState === true);
+    } catch (e) { results.studyTape = e.message; }
+
+    try {
+      const cam = window.app.surface.cam;
+      results.cameraGlide = typeof cam.glideTo === 'function';
+    } catch (e) { results.cameraGlide = e.message; }
+
+    try {
+      const { ReplayEngine } = await import('app://board/js/core/replay.js');
+      const engine = new ReplayEngine(window.app);
+      results.replayEngine = typeof engine.loadTrack === 'function' && typeof engine.syncClock === 'function';
+    } catch (e) { results.replayEngine = e.message; }
+
+    try {
+      const s = window.app.store;
+      s.doc.audioTracks = [{ id: 'track-1', assetId: 'audio.webm', name: 'Lecture 1', durationMs: 5000, created: 1234567890, bookmarks: [] }];
+      const json = s.toJSON();
+      const parsed = JSON.parse(json);
+      results.audioTracksRoundTrip = Array.isArray(parsed.audioTracks) && parsed.audioTracks[0]?.id === 'track-1';
+      s.doc.audioTracks = [];
+    } catch (e) { results.audioTracksRoundTrip = e.message; }
+
+    try {
+      const { SplitWorkspace } = await import('app://board/js/ui/split-workspace.js');
+      results.splitWorkspace = typeof SplitWorkspace === 'function';
+    } catch (e) { results.splitWorkspace = e.message; }
+
+    try {
+      const { VideoExporter } = await import('app://board/js/export-video.js');
+      results.videoExporter = typeof VideoExporter === 'function';
+    } catch (e) { results.videoExporter = e.message; }
+
+    return results;
+  `);
+
+  check('scratch-out gesture detection works', replaySuite.scratchOut === true, JSON.stringify(replaySuite.scratchOut));
+  check('study tape curtain toggles and reveals', replaySuite.studyTape === true, JSON.stringify(replaySuite.studyTape));
+  check('camera glideTo easing exists on camera', replaySuite.cameraGlide === true, JSON.stringify(replaySuite.cameraGlide));
+  check('ReplayEngine initializes with loadTrack and syncClock', replaySuite.replayEngine === true, JSON.stringify(replaySuite.replayEngine));
+  check('Store serializes and restores audioTracks in doc schema', replaySuite.audioTracksRoundTrip === true, JSON.stringify(replaySuite.audioTracksRoundTrip));
+  check('SplitWorkspace dual layout manager exists', replaySuite.splitWorkspace === true, JSON.stringify(replaySuite.splitWorkspace));
+  check('VideoExporter pipeline engine exists', replaySuite.videoExporter === true, JSON.stringify(replaySuite.videoExporter));
+
   /* ---- errors ---- */
   const errs = await js(`return window.__errors || [];`);
   check('no uncaught renderer errors', errs.length === 0, errs.slice(0, 3).join(' | '));

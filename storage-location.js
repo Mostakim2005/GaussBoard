@@ -16,10 +16,16 @@ function readConfig(userDataDir) {
   } catch { return null; }
 }
 
+let configWriteSequence = 0;
 function writeConfig(userDataDir, boardsDir) {
-  const file = configFile(userDataDir), tmp = file + '.' + process.pid + '.tmp';
+  const file = configFile(userDataDir), tmp = `${file}.${process.pid}.${Date.now()}.${++configWriteSequence}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify({ version: 1, boardsDir: path.resolve(boardsDir) }, null, 2));
-  fs.renameSync(tmp, file);
+  try {
+    fs.renameSync(tmp, file);
+  } catch {
+    fs.writeFileSync(file, JSON.stringify({ version: 1, boardsDir: path.resolve(boardsDir) }, null, 2));
+    try { fs.unlinkSync(tmp); } catch {}
+  }
 }
 
 /*
