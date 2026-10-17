@@ -193,15 +193,55 @@ export function updateSelectionBar(app, targetObj = null) {
 
   if (covers.length) bar.appendChild(revealBtn());
 
-  // arrows: straight, elbow or curved
-  if (types.size === 1 && types.has('connector')) {
-    const now = sel.every((o) => o.route === sel[0].route) ? (sel[0].route || 'straight') : null;
-    for (const [route, label, ic] of [['straight', t('Straight arrow'), 'arrowStraight'], ['elbow', t('Elbow arrow'), 'arrowElbow'], ['curved', t('Curved arrow'), 'arrowCurved']]) {
-      const b = mk(label, ic, () => { app.command('arrow.' + route); updateSelectionBar(app); });
-      b.dataset.route = route;
-      if (now === route) b.classList.add('on');
+  // arrows & lines: straight, elbow or curved, heads (none, end, both), thickness, and arrowhead size
+  const isLinearShape = (o) => o.type === 'shape' && ['line', 'arrow', 'doubleArrow'].includes(o.kind);
+  const isConnector = (o) => o.type === 'connector';
+  const allLinear = sel.length > 0 && sel.every((o) => isConnector(o) || isLinearShape(o));
+
+  if (allLinear) {
+    if (sel.every(isConnector)) {
+      const now = sel.every((o) => o.route === sel[0].route) ? (sel[0].route || 'straight') : null;
+      for (const [route, label, ic] of [['straight', t('Straight arrow'), 'arrowStraight'], ['elbow', t('Elbow arrow'), 'arrowElbow'], ['curved', t('Curved arrow'), 'arrowCurved']]) {
+        const b = mk(label, ic, () => { app.command('arrow.' + route); updateSelectionBar(app); });
+        b.dataset.route = route;
+        if (now === route) b.classList.add('on');
+        bar.appendChild(b);
+      }
+      bar.appendChild(h('span', { class: 'bar-sep' }));
+    }
+
+    // Heads: Plain line, Single arrow, Both ways arrow
+    const currentHeads = sel[0].heads || (sel[0].kind === 'line' ? 'none' : sel[0].kind === 'doubleArrow' ? 'both' : 'end');
+    const headsList = [
+      ['none', t('Plain line'), 'line'],
+      ['end', t('Single arrow'), 'arrowRight'],
+      ['both', t('Both ways arrow'), 'arrowBoth']
+    ];
+    for (const [hVal, label, ic] of headsList) {
+      const b = mk(label, ic, () => {
+        app.setArrowHeads(hVal);
+        updateSelectionBar(app);
+      });
+      if (currentHeads === hVal) b.classList.add('on');
       bar.appendChild(b);
     }
+    bar.appendChild(h('span', { class: 'bar-sep' }));
+
+    // Body thickness controls
+    bar.appendChild(mk(t('Decrease thickness'), 'minus', () => {
+      app.stepLineWidth(-1.5);
+      updateSelectionBar(app);
+    }));
+    bar.appendChild(mk(t('Increase thickness'), 'plus', () => {
+      app.stepLineWidth(1.5);
+      updateSelectionBar(app);
+    }));
+
+    // Arrowhead size scale
+    bar.appendChild(mk(t('Arrowhead size'), 'arrowSize', () => {
+      app.cycleArrowScale();
+      updateSelectionBar(app);
+    }));
     bar.appendChild(h('span', { class: 'bar-sep' }));
   }
 

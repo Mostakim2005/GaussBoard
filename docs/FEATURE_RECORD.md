@@ -84,6 +84,32 @@ This document serves as the master registry of all features, enhancements, bug f
    - `node scripts/smoke.js`: 1240 passed, 0 failed.
    - `node scripts/i18n-check.js`: 1295/1295 translated across all 7 languages.
 
+### Round 4 Enhancements (Arrow & Line Geometry, Custom Templates, Pluggable Inking, Zoom Presets Popover)
+1. **Arrow & Line Geometry Customization** (`src/js/core/connectors.js`, `src/js/core/render.js`, `src/js/ui/contextmenu.js`, `src/js/app.js`):
+   - Redesigned arrowhead geometry with elongated proportions (`lengthMul = 1.4`), barbed indentation, and prominent styling ("Bigger & clearer").
+   - Added `o.arrowScale` support to scale arrowheads (`1.0x`, `1.5x`, `2.2x`) via the selection bar.
+   - Added stroke thickness stepping (`app.stepLineWidth(+/- 1.5)`) for both lines, arrows, and shapes.
+   - Added flexible heads converter supporting Plain line (`heads: 'none'`), Single arrow (`heads: 'end'`), and Bi-directional arrow (`heads: 'both'`), allowing instant conversion between straight lines and arrows.
+2. **Custom Template System** (`src/js/ui/panels.js`, `src/js/templates.js`, `src/js/app.js`, `src/index.html`):
+   - Added `#panelActions` container in panel header with two dedicated buttons when viewing Templates:
+     - `[➕ Add template from outside]`: file picker for external images (`.png`, `.jpg`, `.webp`, `.svg`) or `.pdf` to import as background templates.
+     - `[📋 Set current board as template]`: snapshots the active board's background, pages, and non-audio objects into a reusable custom template with promptable name.
+   - Rendered "Custom templates" section in the Templates grid with live canvas/image previews and delete buttons (`[✕]`).
+   - Extended `app.applyTemplate()` to restore custom layouts, background styling, pages, and imported template images.
+3. **Pluggable Inking Architecture & Windows Ink Velocity Bézier Smoothing** (`src/js/core/ink.js`, `src/js/app.js`, `src/js/ui/panels.js`):
+   - Created modular `InkEngine` pipeline: `GazBoard Default`, `Windows Ink (Velocity & Bezier)`, and `Perfect Freehand`.
+   - Implemented velocity-weighted cubic Bézier spline interpolation inspired by Windows DirectInk / Snip & Sketch, dynamically adjusting stroke curvature based on pen velocity.
+   - Added `Inking engine` choice dropdown in Settings under Low-latency inking options.
+4. **Zoom Preset Popover & Fit Viewport Controls** (`src/js/ui/toolbar.js`, `src/js/core/camera.js`, `src/js/app.js`, `src/css/app.css`):
+   - Added hover/click popover on `#zoomLabel` (`100%`) displaying presets: `900%`, `400%`, `200%`, `100%`, `50%`, `25%`.
+   - Added interactive star buttons (`★` / `☆`) to favorite and visually highlight specific zoom presets.
+   - Highlighted active zoom level matching the camera scale.
+   - Added viewport fit options: `Fit width` (`↔`), `Fit height` (`↕`), `Fit to page` (`⛶`), and `Fit to board` (`⊡`).
+   - Implemented `camera.fitWidth()` and `camera.fitHeight()` with smooth bounds clamping and aspect scaling.
+5. **Quality & Test Verification**:
+   - `node scripts/smoke.js`: verified 100% pass rate.
+   - `node scripts/i18n-check.js`: 1320/1320 translated (100% complete) across all 7 locales.
+
 ---
 
 ## 3. Critical Architectural Rules & Anti-Regression Guardrails

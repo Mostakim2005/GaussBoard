@@ -499,9 +499,73 @@ function wireTopBar(app) {
     el.innerHTML = icon(name, 18);
     el.addEventListener('click', () => app.command(name));
   }
-  document.getElementById('zoomLabel').addEventListener('click', () => app.command('zoomReset'));
+  const zoomLabel = document.getElementById('zoomLabel');
+  let zoomHoverTimer = null;
+  const showZoomMenu = () => openZoomPresetPopover(app, zoomLabel);
+  zoomLabel.addEventListener('mouseenter', () => {
+    zoomHoverTimer = setTimeout(showZoomMenu, 240);
+  });
+  zoomLabel.addEventListener('mouseleave', () => clearTimeout(zoomHoverTimer));
+  zoomLabel.addEventListener('click', () => {
+    clearTimeout(zoomHoverTimer);
+    showZoomMenu();
+  });
 
   initPagebar(app);
+}
+
+const ZOOM_PRESETS = [900, 400, 200, 100, 50, 25];
+function loadStarredZooms() {
+  try {
+    return JSON.parse(localStorage.getItem('gazboard:starred_zooms') || '[100, 200, 50]');
+  } catch { return [100, 200, 50]; }
+}
+function saveStarredZooms(list) {
+  localStorage.setItem('gazboard:starred_zooms', JSON.stringify(list));
+}
+
+function openZoomPresetPopover(app, anchor) {
+  const currentPct = Math.round((app.surface?.cam?.z || 1) * 100);
+  let starred = loadStarredZooms();
+  const wrap = h('div', { class: 'menu zoom-presets-menu' });
+
+  const list = h('div', { class: 'zoom-preset-list' });
+  for (const pct of ZOOM_PRESETS) {
+    const isStarred = starred.includes(pct);
+    const isCurrent = Math.abs(currentPct - pct) < 3;
+    const item = h('div', { class: `zoom-preset-item${isStarred ? ' starred' : ''}${isCurrent ? ' active' : ''}` });
+
+    const starBtn = h('button', {
+      class: 'zoom-star-btn',
+      title: isStarred ? t('Remove from favorites') : t('Add to favorites')
+    }, isStarred ? '★' : '☆');
+
+    starBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      starred = isStarred ? starred.filter((p) => p !== pct) : [...starred, pct];
+      saveStarredZooms(starred);
+      openZoomPresetPopover(app, anchor);
+    });
+
+    const labelBtn = h('button', { class: 'zoom-val-btn' }, `${pct}%`);
+    labelBtn.addEventListener('click', () => {
+      app.zoomTo(pct / 100);
+      closePopover();
+    });
+
+    item.appendChild(starBtn);
+    item.appendChild(labelBtn);
+    list.appendChild(item);
+  }
+  wrap.appendChild(list);
+  wrap.appendChild(h('div', { class: 'menu-sep' }));
+
+  wrap.appendChild(menuItem(t('Fit width'), 'fitWidth', () => { app.fitWidth(); closePopover(); }));
+  wrap.appendChild(menuItem(t('Fit height'), 'fitHeight', () => { app.fitHeight(); closePopover(); }));
+  wrap.appendChild(menuItem(t('Fit to page'), 'fitPage', () => { app.command('view.fitPage'); closePopover(); }));
+  wrap.appendChild(menuItem(t('Fit to board'), 'fit', () => { app.command('fit'); closePopover(); }));
+
+  openPopover(anchor, wrap, { align: 'above-center' });
 }
 
 /* ------------------------------------------------------------------ *

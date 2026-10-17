@@ -301,14 +301,16 @@ export function bendThrough(o, p) {
 
 /* ---------- drawing ---------- */
 /** Arrowheads a little bolder than the plain arrow shape's, so a thin arrow still reads. */
-export const headSize = (lw) => lw * 3.4 + 4;
+export const headSize = (lw, scale = 1.0) => (lw * 3.6 + 5) * scale;
 
-function arrowHead(ctx, from, to, size) {
+function arrowHead(ctx, from, to, size, lengthMul = 1.4) {
   const a = Math.atan2(to.y - from.y, to.x - from.x);
+  const len = size * lengthMul;
   ctx.beginPath();
   ctx.moveTo(to.x, to.y);
-  ctx.lineTo(to.x - Math.cos(a - 0.42) * size, to.y - Math.sin(a - 0.42) * size);
-  ctx.lineTo(to.x - Math.cos(a + 0.42) * size, to.y - Math.sin(a + 0.42) * size);
+  ctx.lineTo(to.x - Math.cos(a - 0.38) * len, to.y - Math.sin(a - 0.38) * len);
+  ctx.lineTo(to.x - Math.cos(a) * (size * 0.45), to.y - Math.sin(a) * (size * 0.45));
+  ctx.lineTo(to.x - Math.cos(a + 0.38) * len, to.y - Math.sin(a + 0.38) * len);
   ctx.closePath();
   ctx.fill();
 }
@@ -318,7 +320,8 @@ export function drawConnector(ctx, o, paint = (c) => c) {
   const r = route(o);
   const colour = paint(o.stroke || '#201f1e');
   const lw = o.lineWidth || 3;
-  const size = headSize(lw);
+  const scale = o.arrowScale || 1.0;
+  const size = headSize(lw, scale);
   const heads = o.heads || 'end';
   ctx.save();
   ctx.strokeStyle = colour;
@@ -332,7 +335,7 @@ export function drawConnector(ctx, o, paint = (c) => c) {
   const trim = (end, from) => {
     const d = Math.hypot(end.x - from.x, end.y - from.y);
     if (d < 1) return;
-    const k = Math.min(size * 0.6, d * 0.9) / d;
+    const k = Math.min(size * 0.7, d * 0.9) / d;
     end.x -= (end.x - from.x) * k; end.y -= (end.y - from.y) * k;
   };
   if ((heads === 'end' || heads === 'both') && pts.length > 1) trim(pts[pts.length - 1], r.headFrom);
@@ -359,10 +362,12 @@ export function connectorSvg(o) {
     : r.pts.map((p, i) => `${i ? 'L' : 'M'}${f(p.x)} ${f(p.y)}`).join(' ');
   const dash = o.dash ? ` stroke-dasharray="${o.dash === 'dot' ? `1 ${lw * 2.2}` : `${lw * 3} ${lw * 2.2}`}"` : '';
   const head = (from, to) => {
-    const a = Math.atan2(to.y - from.y, to.x - from.x), s = headSize(lw);
-    const p1 = { x: to.x - Math.cos(a - 0.42) * s, y: to.y - Math.sin(a - 0.42) * s };
-    const p2 = { x: to.x - Math.cos(a + 0.42) * s, y: to.y - Math.sin(a + 0.42) * s };
-    return `<polygon points="${f(to.x)},${f(to.y)} ${f(p1.x)},${f(p1.y)} ${f(p2.x)},${f(p2.y)}" fill="${colour}"/>`;
+    const a = Math.atan2(to.y - from.y, to.x - from.x), s = headSize(lw, o.arrowScale || 1.0);
+    const len = s * 1.4;
+    const p1 = { x: to.x - Math.cos(a - 0.38) * len, y: to.y - Math.sin(a - 0.38) * len };
+    const pMid = { x: to.x - Math.cos(a) * (s * 0.45), y: to.y - Math.sin(a) * (s * 0.45) };
+    const p2 = { x: to.x - Math.cos(a + 0.38) * len, y: to.y - Math.sin(a + 0.38) * len };
+    return `<polygon points="${f(to.x)},${f(to.y)} ${f(p1.x)},${f(p1.y)} ${f(pMid.x)},${f(pMid.y)} ${f(p2.x)},${f(p2.y)}" fill="${colour}"/>`;
   };
   const heads = o.heads || 'end';
   return `<path d="${d}" fill="none" stroke="${colour}" stroke-width="${lw}" stroke-linecap="round" stroke-linejoin="round"${dash}/>` +

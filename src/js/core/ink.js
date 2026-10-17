@@ -146,7 +146,21 @@ export function preparePoints(points, size) {
   return smoothPath(dedupe(points, Math.max(0.35, size * 0.08)), 1);
 }
 
-export function centrelinePath(points, size) {
+export const INK_ENGINES = {
+  default: { id: 'default', label: 'GazBoard Default' },
+  windowsInk: { id: 'windowsInk', label: 'Windows Ink (Velocity & Bezier)' },
+  perfectFreehand: { id: 'perfectFreehand', label: 'Perfect Freehand' }
+};
+
+let activeInkEngine = 'default';
+export function setInkEngine(engine) {
+  if (INK_ENGINES[engine]) activeInkEngine = engine;
+}
+export function getInkEngine() {
+  return activeInkEngine;
+}
+
+export function centrelinePath(points, size, engine = activeInkEngine) {
   const path = new Path2D();
   if (!points || !points.length) return path;
 
@@ -161,6 +175,34 @@ export function centrelinePath(points, size) {
   path.moveTo(pts[0].x, pts[0].y);
   if (pts.length === 2) { path.lineTo(pts[1].x, pts[1].y); return path; }
 
+  if (engine === 'windowsInk') {
+    // Windows Ink-style cubic Bezier spline with velocity-adaptive curvature
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(pts.length - 1, i + 2)];
+
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      path.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+    }
+    return path;
+  }
+
+  if (engine === 'perfectFreehand') {
+    for (let i = 1; i < pts.length - 1; i++) {
+      const mx = pts[i].x * 0.45 + pts[i + 1].x * 0.55;
+      const my = pts[i].y * 0.45 + pts[i + 1].y * 0.55;
+      path.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+    }
+    path.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+    return path;
+  }
+
   for (let i = 1; i < pts.length - 1; i++) {
     const mx = (pts[i].x + pts[i + 1].x) / 2;
     const my = (pts[i].y + pts[i + 1].y) / 2;
@@ -171,12 +213,30 @@ export function centrelinePath(points, size) {
 }
 
 /** One run's path, built exactly the way centrelinePath builds the whole one. */
-function runPath(pts) {
+function runPath(pts, engine = activeInkEngine) {
   const path = new Path2D();
   if (!pts.length) return path;
   path.moveTo(pts[0].x, pts[0].y);
   if (pts.length === 1) { path.lineTo(pts[0].x + 0.01, pts[0].y); return path; }
   if (pts.length === 2) { path.lineTo(pts[1].x, pts[1].y); return path; }
+
+  if (engine === 'windowsInk') {
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(pts.length - 1, i + 2)];
+
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      path.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+    }
+    return path;
+  }
+
   for (let i = 1; i < pts.length - 1; i++) {
     const mx = (pts[i].x + pts[i + 1].x) / 2;
     const my = (pts[i].y + pts[i + 1].y) / 2;

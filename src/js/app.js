@@ -12,6 +12,7 @@ import { scaleObject, translateObject } from './core/transform.js';
 import { Surface } from './core/surface.js';
 import { Interaction } from './core/tools.js';
 import { InkTrail } from './core/inktrail.js';
+import { setInkEngine } from './core/ink.js';
 import { pick, ghost } from './core/hit.js';
 import { uid, debounce, clamp, unionBox } from './core/util.js';
 import { pageRects, stripBounds, pageIndexForBox, nearestPageIndex, offsetIntoRect, PAGE_GAP, todayStamp } from './core/pages.js';
@@ -231,6 +232,7 @@ class App {
     // by default while it is an experiment; see inktrail.js.
     this.inkTrail = new InkTrail(this.surface.canvas);
     this.inkTrail.setEnabled(!!this.settings.inkTrail);
+    setInkEngine(this.settings.inkEngine || 'default');
     this.tool = 'pen';
     this.clipboard = [];
     this.clipStamp = null;
@@ -2195,9 +2197,40 @@ class App {
   }
 
   applyTemplate(tpl) {
+    if (tpl.custom) {
+      if (tpl.background) {
+        this.store.setBackground(tpl.background);
+      }
+      if (tpl.pages && tpl.pages.length) {
+        this.store.doc.pages = JSON.parse(JSON.stringify(tpl.pages));
+      }
+      if (tpl.objects && tpl.objects.length) {
+        const fresh = tpl.objects.map((o) => ({ ...o, id: uid(o.type?.[0] || 'o') }));
+        this.store.addMany(fresh, 'template: ' + tpl.name);
+      }
+      if (tpl.path) {
+        if (tpl.type === 'pdf') {
+          pickAndInsertDocument ? pickAndInsertDocument(this, [tpl.path]) : null;
+        } else {
+          insertImagesFromPaths(this, [tpl.path]);
+        }
+      } else if (tpl.dataUrl) {
+        fetch(tpl.dataUrl)
+          .then((r) => r.blob())
+          .then((blob) => {
+            const file = new File([blob], (tpl.fileName || tpl.name || 'template') + '.png', { type: blob.type || 'image/png' });
+            insertImageFiles(this, [file], this.pastePoint ? this.pastePoint() : null);
+          })
+          .catch((e) => console.error('Failed to insert custom template dataUrl', e));
+      }
+      this.surface.invalidate();
+      this.syncUI();
+      this.toast(t('{name} added', { name: tpl.name }));
+      return;
+    }
     // a canvas-size template only sets the page; it adds nothing to the board
     if (tpl.page) { this.setPageSize(tpl.page.paper, tpl.page.orientation); return; }
-    const objs = tpl.build();
+    const objs = tpl.build ? tpl.build() : (tpl.objects || []);
     if (!objs.length) { this.toast(t('Blank board')); return; }
     if (this.store.count) {
       let box = null;
@@ -2504,6 +2537,98 @@ class App {
       this.surface.invalidate();
     }
     this.syncUI();
+  }
+
+  setArrowHeads(heads) {
+    const objs = this.selected.filter((o) => (o.type === 'connector' || (o.type === 'shape' && ['line', 'arrow', 'doubleArrow'].includes(o.kind))) && !o.locked);
+    if (!objs.length) return;
+    const kindFor = (h) => h === 'none' ? 'line' : h === 'both' ? 'doubleArrow' : 'arrow';
+    for (const o of objs) {
+      if (o.type === 'connector') {
+        this.store.update(o.id, { heads });
+      } else if (o.type === 'shape') {
+        this.store.update(o.id, { kind: kindFor(heads) });
+      }
+    }
+    this.store.commit('arrow heads', objs.map((o) => o.id));
+    this.surface.invalidate();
+    this.syncUI();
+  }
+
+  stepLineWidth(delta) {
+    const objs = this.selected.filter((o) => (o.type === 'connector' || o.type === 'shape' || o.type === 'stroke') && !o.locked);
+    if (!objs.length) return;
+    for (const o of objs) {
+      const cur = o.lineWidth || (o.type === 'connector' ? 3 : 2.5);
+      const next = Math.max(1, Math.min(24, Math.round((cur + delta) * 2) / 2));
+      this.store.update(o.id, { lineWidth: next });
+    }
+    this.store.commit('stroke width', objs.map((o) => o.id));
+    this.surface.invalidate();
+  }
+
+  cycleArrowScale() {
+    const objs = this.selected.filter((o) => (o.type === 'connector' || (o.type === 'shape' && ['line', 'arrow', 'doubleArrow'].includes(o.kind))) && !o.locked);
+    if (!objs.length) return;
+    const scales = [1.0, 1.5, 2.2];
+    for (const o of objs) {
+      const cur = o.arrowScale || 1.0;
+      const idx = scales.findIndex((s) => Math.abs(s - cur) < 0.1);
+      const next = scales[(idx + 1) % scales.length];
+      this.store.update(o.id, { arrowScale: next });
+    }
+    this.store.commit('arrow scale', objs.map((o) => o.id));
+    this.surface.invalidate();
+  }
+
+  zoomTo(z) {
+    const sf = this.surface;
+    sf.cam.setZoom(z, sf.width / 2, sf.height / 2);
+    this.afterCamera();
+  }
+
+  fitWidth() {
+    const sf = this.surface;
+    let box = null;
+    if (this.pageCount) {
+      const rects = this.pageRects ? this.pageRects() : null;
+      if (rects && rects.length) {
+        const r = rects[Math.min(this.currentPageIndex(), rects.length - 1)];
+        if (r) box = { x: r.x, y: r.y, w: r.w, h: r.h };
+      }
+    }
+    if (!box) {
+      const b = this.contentBounds();
+      if (b) box = b;
+    }
+    if (box && sf.width && sf.height) {
+      sf.cam.fitWidth(box, sf.width, sf.height);
+      sf.clampCamera();
+      this.syncZoom();
+      sf.invalidate();
+    }
+  }
+
+  fitHeight() {
+    const sf = this.surface;
+    let box = null;
+    if (this.pageCount) {
+      const rects = this.pageRects ? this.pageRects() : null;
+      if (rects && rects.length) {
+        const r = rects[Math.min(this.currentPageIndex(), rects.length - 1)];
+        if (r) box = { x: r.x, y: r.y, w: r.w, h: r.h };
+      }
+    }
+    if (!box) {
+      const b = this.contentBounds();
+      if (b) box = b;
+    }
+    if (box && sf.width && sf.height) {
+      sf.cam.fitHeight(box, sf.width, sf.height);
+      sf.clampCamera();
+      this.syncZoom();
+      sf.invalidate();
+    }
   }
 
   cloneBatch(objs, dx, dy) {

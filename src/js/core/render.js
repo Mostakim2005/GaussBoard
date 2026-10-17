@@ -562,14 +562,16 @@ function polygon(ctx, cx, cy, rx, ry, n, rot) {
   ctx.closePath();
 }
 
-function arrowHead(ctx, from, to, size, color) {
+function arrowHead(ctx, from, to, size, color, lengthMul = 1.4) {
   const a = Math.atan2(to.y - from.y, to.x - from.x);
+  const len = size * lengthMul;
   ctx.save();
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(to.x, to.y);
-  ctx.lineTo(to.x - Math.cos(a - 0.42) * size, to.y - Math.sin(a - 0.42) * size);
-  ctx.lineTo(to.x - Math.cos(a + 0.42) * size, to.y - Math.sin(a + 0.42) * size);
+  ctx.lineTo(to.x - Math.cos(a - 0.38) * len, to.y - Math.sin(a - 0.38) * len);
+  ctx.lineTo(to.x - Math.cos(a) * (size * 0.45), to.y - Math.sin(a) * (size * 0.45));
+  ctx.lineTo(to.x - Math.cos(a + 0.38) * len, to.y - Math.sin(a + 0.38) * len);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -598,7 +600,8 @@ export function drawShape(ctx, o, hideText = false) {
     ctx.stroke();
     ctx.setLineDash([]);
     if (o.kind === 'arrow' || o.kind === 'doubleArrow') {
-      const size = (o.lineWidth || 3) * 3.4;
+      const scale = o.arrowScale || 1.0;
+      const size = (o.lineWidth || 3) * 3.6 * scale;
       arrowHead(ctx, { x, y }, { x: x + w, y: y + h }, size, outline);
       if (o.kind === 'doubleArrow') arrowHead(ctx, { x: x + w, y: y + h }, { x, y }, size, outline);
     }

@@ -204,11 +204,12 @@ export const TEMPLATES = [
 
 /** Small canvas preview for the templates gallery. */
 export function templateThumb(tpl, w = 150, h = 88) {
-  const objs = tpl.build();
+  if (tpl.custom && tpl.dataUrl) return tpl.dataUrl;
+  const objs = tpl.objects || (tpl.build ? tpl.build() : []);
   const c = document.createElement('canvas');
   c.width = w * 2; c.height = h * 2;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = tpl.background?.color || '#ffffff';
   ctx.fillRect(0, 0, c.width, c.height);
   // a page template draws the sheet it would give you, not an empty frame
   if (tpl.page) {

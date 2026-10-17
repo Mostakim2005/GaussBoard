@@ -9,6 +9,7 @@ import { PAPER, paperForPage } from './pdfdialog.js';
 import { exportBoards } from '../board-export.js';
 import { BOARD_COLORS, PATTERNS } from './palettes.js';
 import { inkTrailSupported } from '../core/inktrail.js';
+import { setInkEngine } from '../core/ink.js';
 import { PATTERN_SPACINGS } from '../core/render.js';
 import { todayStamp } from '../core/pages.js';
 import * as F from '../core/folders.js';
@@ -52,6 +53,8 @@ export function createPanels(app) {
   function close() {
     panel.classList.remove('open');
     currentKey = null; currentRender = null;
+    const actionsEl = document.getElementById('panelActions');
+    if (actionsEl) actionsEl.innerHTML = '';
 
     if (app._savedHudState) {
       if (app._savedHudState.replayBar) app.replayBar?.show();
@@ -89,6 +92,24 @@ export function createPanels(app) {
     currentRender = render;
     title.textContent = label;
     body.innerHTML = '';
+
+    const actionsEl = document.getElementById('panelActions');
+    if (actionsEl) {
+      actionsEl.innerHTML = '';
+      if (key === 'templates') {
+        const btnSetCurrent = h('button', { class: 'icon-btn', id: 'btnTplSetCurrent', title: t('Set current board as template') });
+        btnSetCurrent.innerHTML = icon('board', 18);
+        btnSetCurrent.addEventListener('click', () => saveCurrentBoardAsTemplate());
+
+        const btnImport = h('button', { class: 'icon-btn', id: 'btnTplImport', title: t('Add template from outside (+)') });
+        btnImport.innerHTML = icon('plus', 18);
+        btnImport.addEventListener('click', () => importTemplateFromOutside());
+
+        actionsEl.appendChild(btnSetCurrent);
+        actionsEl.appendChild(btnImport);
+      }
+    }
+
     body.appendChild(render());
     // My boards is a whole page, not a strip down the side (see boards()).
     panel.classList.toggle('page', key === 'boards' && app.settings.boardsPage !== false);
@@ -103,13 +124,85 @@ export function createPanels(app) {
   }
 
   /* ---------------- templates ---------------- */
+  function loadCustomTemplates() {
+    try {
+      return JSON.parse(localStorage.getItem('gazboard:custom_templates') || '[]');
+    } catch { return []; }
+  }
+
+  function saveCustomTemplates(tpls) {
+    localStorage.setItem('gazboard:custom_templates', JSON.stringify(tpls));
+  }
+
+  async function saveCurrentBoardAsTemplate() {
+    const defaultName = app.store?.doc?.title || t('My Board Template');
+    const name = await app.prompt(t('Save as template'), t('Enter a name for this custom template:'), defaultName);
+    if (!name || !name.trim()) return;
+    const bg = app.store?.doc?.background ? { ...app.store.doc.background } : null;
+    const pages = app.store?.doc?.pages ? JSON.parse(JSON.stringify(app.store.doc.pages)) : [];
+    const nonAudioObjs = (app.store?.doc?.order || [])
+      .map((id) => app.store.doc.objects[id])
+      .filter((o) => o && o.type !== 'audio' && !o.audioId)
+      .map((o) => JSON.parse(JSON.stringify(o)));
+
+    const tpl = {
+      id: 'cust_tpl_' + Date.now(),
+      name: name.trim(),
+      group: t('Custom templates'),
+      custom: true,
+      background: bg,
+      pages,
+      objects: nonAudioObjs,
+      createdAt: Date.now()
+    };
+    const list = loadCustomTemplates();
+    list.unshift(tpl);
+    saveCustomTemplates(list);
+    app.toast(t('Template saved: {name}', { name: tpl.name }));
+    rerender();
+  }
+
+  function importTemplateFromOutside() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,.pdf';
+    input.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+      const name = file.name.replace(/\.[^.]+$/, '');
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        const tpl = {
+          id: 'cust_file_' + Date.now(),
+          name,
+          group: t('Custom templates'),
+          custom: true,
+          type: isPdf ? 'pdf' : 'image',
+          dataUrl: typeof dataUrl === 'string' ? dataUrl : null,
+          fileName: file.name
+        };
+        const list = loadCustomTemplates();
+        list.unshift(tpl);
+        saveCustomTemplates(list);
+        app.toast(t('Template imported: {name}', { name }));
+        rerender();
+      };
+      reader.readAsDataURL(file);
+    });
+    input.click();
+  }
+
   const thumbCache = new Map();
   function templates() {
     open('templates', t('Templates'), () => {
+      const customList = loadCustomTemplates();
+      const allTemplates = [...customList, ...TEMPLATES];
       const groups = new Map();
-      for (const t of TEMPLATES) {
-        if (!groups.has(t.group)) groups.set(t.group, []);
-        groups.get(t.group).push(t);
+      for (const tpl of allTemplates) {
+        if (!groups.has(tpl.group)) groups.set(tpl.group, []);
+        groups.get(tpl.group).push(tpl);
       }
       const wrap = h('div', {});
       wrap.appendChild(h('p', { style: 'margin:0 0 14px;color:var(--text-2);font-size:13px' },
@@ -117,13 +210,28 @@ export function createPanels(app) {
       for (const [group, list] of groups) {
         const sec = h('div', { class: 'section' }, h('h5', {}, group));
         const grid = h('div', { class: 'tpl-grid' });
-        for (const t of list) {
-          if (!thumbCache.has(t.id)) thumbCache.set(t.id, templateThumb(t));
-          const btn = h('button', { class: 'tpl', title: t.name });
-          const img = h('img', { class: 'thumb', src: thumbCache.get(t.id), alt: '' });
+        for (const tpl of list) {
+          if (!thumbCache.has(tpl.id)) thumbCache.set(tpl.id, templateThumb(tpl));
+          const btn = h('button', { class: 'tpl', title: tpl.name, style: 'position:relative' });
+          const img = h('img', { class: 'thumb', src: thumbCache.get(tpl.id), alt: '' });
           btn.appendChild(img);
-          btn.appendChild(h('span', { class: 'name' }, t.name));
-          btn.addEventListener('click', () => { app.applyTemplate(t); close(); });
+          btn.appendChild(h('span', { class: 'name' }, tpl.name));
+          btn.addEventListener('click', () => { app.applyTemplate(tpl); close(); });
+          if (tpl.custom) {
+            const delBtn = h('button', {
+              class: 'icon-btn',
+              title: t('Delete template'),
+              style: 'position:absolute;top:4px;right:4px;width:24px;height:24px;background:rgba(0,0,0,0.55);color:#fff;border-radius:4px;font-size:12px'
+            }, '✕');
+            delBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const updated = loadCustomTemplates().filter((c) => c.id !== tpl.id);
+              saveCustomTemplates(updated);
+              thumbCache.delete(tpl.id);
+              rerender();
+            });
+            btn.appendChild(delBtn);
+          }
           grid.appendChild(btn);
         }
         sec.appendChild(grid);
@@ -1389,6 +1497,16 @@ export function createPanels(app) {
           // Windows only: elsewhere the switch would do nothing, so it is not offered.
           inkTrailSupported() ? row(t('Windows Ink trail (experimental)'), mkToggle(() => s.inkTrail === true, (v) => { s.inkTrail = v; app.inkTrail?.setEnabled(v); }),
             t('Lets Windows paint the newest bit of a pen stroke straight to the screen, so the ink stays closer to the nib — the way Microsoft Whiteboard does it. Only the plain pen uses it; the highlighter, rainbow and galaxy inks and the ruler draw as before. Nothing about your boards changes.')) : null,
+          row(t('Inking engine'), mkChoice([
+            ['default', t('GazBoard Default')],
+            ['windowsInk', t('Windows Ink (Velocity & Bezier)')],
+            ['perfectFreehand', t('Perfect Freehand')]
+          ], () => s.inkEngine || 'default', (v) => {
+            s.inkEngine = v;
+            app.saveSettings();
+            setInkEngine(v);
+            app.surface.invalidate();
+          }), t('Choose how pen and handwriting strokes are smoothed and rendered. Windows Ink adjusts stroke curvature dynamically based on pen velocity, matching the feel of Snip & Sketch.')),
           // where GazBoard prepares the deck itself (the desktop app); the phone app always uses the final look
           window.board?.importTakesBytes ? row(t('Animated slides come in after the last click'), mkToggle(() => s.slidesFinalLook !== false, (v) => { s.slidesFinalLook = v; app.saveSettings(); }),
             t('On (default): each slide comes in the way it looks once every click is done — what fades out is gone, what moves is where it stops, what grows is full size. Off: the slide as it is before the first click, with everything on it at once.'))

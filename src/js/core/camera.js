@@ -36,6 +36,24 @@ export class Camera {
     this.y = vh / 2 - (box.y + box.h / 2) * z;
   }
 
+  fitWidth(box, vw, vh, pad = 60) {
+    this.cancelGlide();
+    if (!box || box.w <= 0) { this.x = vw / 2; this.y = vh / 2; this.z = 1; return; }
+    const z = clamp((vw - pad * 2) / box.w, MIN_Z, 9);
+    this.z = z;
+    this.x = vw / 2 - (box.x + box.w / 2) * z;
+    this.y = vh / 2 - (box.y + box.h / 2) * z;
+  }
+
+  fitHeight(box, vw, vh, pad = 60) {
+    this.cancelGlide();
+    if (!box || box.h <= 0) { this.x = vw / 2; this.y = vh / 2; this.z = 1; return; }
+    const z = clamp((vh - pad * 2) / box.h, MIN_Z, 9);
+    this.z = z;
+    this.x = vw / 2 - (box.x + box.w / 2) * z;
+    this.y = vh / 2 - (box.y + box.h / 2) * z;
+  }
+
   centerOn(pt, vw, vh) { this.x = vw / 2 - pt.x * this.z; this.y = vh / 2 - pt.y * this.z; }
 
   toJSON() { return { x: this.x, y: this.y, z: this.z }; }
