@@ -925,10 +925,17 @@ export function createPanels(app) {
 
       const mkChoice = (options, get, set) => {
         const wrap = h('div', { style: 'display:flex;gap:4px' });
+        const buttons = [];
         for (const [value, label] of options) {
           const b = h('button', { class: 'btn' + (get() === value ? ' primary' : '') }, label);
           b.style.cssText += 'padding:4px 10px;font-size:12.5px';
-          b.addEventListener('click', () => set(value));
+          buttons.push({ b, value });
+          b.addEventListener('click', () => {
+            set(value);
+            for (const item of buttons) {
+              item.b.classList.toggle('primary', item.value === value);
+            }
+          });
           wrap.appendChild(b);
         }
         return wrap;
@@ -1126,10 +1133,17 @@ export function createPanels(app) {
 
       const mkChoice = (options, get, set) => {
         const wrap = h('div', { style: 'display:flex;gap:4px' });
+        const buttons = [];
         for (const [value, label] of options) {
           const b = h('button', { class: 'btn' + (get() === value ? ' primary' : '') }, label);
           b.style.cssText += 'padding:4px 10px;font-size:12.5px';
-          b.addEventListener('click', () => set(value));
+          buttons.push({ b, value });
+          b.addEventListener('click', () => {
+            set(value);
+            for (const item of buttons) {
+              item.b.classList.toggle('primary', item.value === value);
+            }
+          });
           wrap.appendChild(b);
         }
         return wrap;
@@ -1323,7 +1337,7 @@ export function createPanels(app) {
           row(t('Pen opacity'), mkToggle(() => s.penOpacityEnabled === true, (v) => (s.penOpacityEnabled = v)),
             t('Allow drawing translucent pen strokes for layering effects.')),
           row(t('Laser trail duration'), mkChoice(
-            [[0, t('Instant')], [300, '300ms'], [520, t('520ms')], [1200, '1.2s']],
+            [[0, t('Instant')], [300, '300ms'], [520, t('520ms')], [1200, '1.2s'], [2500, '2.5s'], [5000, '5.0s'], [10000, '10s']],
             () => s.laserTrailDuration ?? 520,
             (v) => { s.laserTrailDuration = v; app.saveSettings(); }
           ), t('How long the laser pointer trail lingers on screen before melting away.')),
@@ -1456,10 +1470,12 @@ export function createPanels(app) {
 
       searchBox.addEventListener('input', () => {
         const q = searchBox.value.toLowerCase().trim();
+        const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
         const rows = content.querySelectorAll('.setting-row');
         const sections = content.querySelectorAll('.section');
         for (const r of rows) {
-          const match = !q || r.textContent.toLowerCase().includes(q);
+          const text = r.textContent.toLowerCase();
+          const match = !tokens.length || tokens.every((tok) => text.includes(tok));
           r.style.display = match ? '' : 'none';
         }
         for (const sec of sections) {

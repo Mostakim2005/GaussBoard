@@ -1152,7 +1152,6 @@
   "Create quick note": "Create quick note",
   "No notes found": "No notes found",
   "Untitled": "Untitled",
-  "Open Board": "Open Board",
   "Open in Split View": "Open in Split View",
   "Add Tag...": "Add Tag...",
   "Note Overview (Browse document previews, tags, aliases)": "Note Overview (Browse document previews, tags, aliases)",
@@ -1243,5 +1242,17 @@
   "520ms": "520 مللي ثانية",
   "How long the laser pointer trail lingers on screen before melting away.": "المدة التي يستمر فيها أثر مؤشر الليزر على الشاشة قبل أن يتلاشى.",
   "Board link thumbnails": "الصور المصغرة لروابط اللوحات",
-  "Show thumbnail picture previews on board link cards by default.": "إظهار معاينات الصور المصغرة على بطاقات روابط اللوحات افتراضيًا."
+  "Show thumbnail picture previews on board link cards by default.": "إظهار معاينات الصور المصغرة على بطاقات روابط اللوحات افتراضيًا.",
+  "Add Alias...": "إضافة اسم مستعار...",
+  "Double-click to open board": "انقر نقرًا مزدوجًا لفتح اللوحة",
+  "Enter alias for board (e.g. Lecture 4 Notes):": "أدخل اسمًا مستعارًا للوحة (مثال: ملاحظات المحاضرة 4):",
+  "Alias “{alias}” added": "تمت إضافة الاسم المستعار “{alias}”",
+  "Failed to add alias: {msg}": "فشلت إضافة الاسم المستعار: {msg}",
+  "How long the laser pointer trail lingers on screen (Instant, 300ms, 520ms, 1.2s, 2.5s, 5.0s, 10s)": "مدة بقاء مسار مؤشر الليزر على الشاشة (فوري، 300 مللي ثانية، 520 مللي ثانية، 1.2 ثانية، 2.5 ثانية، 5.0 ثوانٍ، 10 ثوانٍ)",
+  "Allow drawing translucent pen strokes for layering effects": "السماح برسم ضربات قلم شبه شفافة لتأثيرات الطبقات",
+  "Show thumbnail picture previews on board link cards by default": "إظهار معاينات الصور المصغرة على بطاقات روابط اللوحة افتراضيًا",
+  "Board alias (Click to edit)": "الاسم المستعار للوحة (انقر للتعديل)",
+  "Board tag (Click to edit)": "وسم اللوحة (انقر للتعديل)",
+  "Gesture scratch-out": "إيماءة الشطب للمحو",
+  "Scribble over ink to erase": "خربش فوق الحبر للمحو"
 }

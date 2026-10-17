@@ -49,6 +49,75 @@ export class DensityCanvas {
     this.render();
   }
 
+  showBookmarkCard(bm, clientX) {
+    if (!bm || !this.canvas) return;
+    if (this._hideTimeout) {
+      clearTimeout(this._hideTimeout);
+      this._hideTimeout = null;
+    }
+    const host = this.canvas.parentElement || (typeof document !== 'undefined' ? document.body : null);
+    if (!host) return;
+
+    if (!this.tooltipEl) {
+      this.tooltipEl = document.createElement('div');
+      this.tooltipEl.className = 'density-bm-tooltip';
+      this.tooltipEl.style.cssText = 'position:absolute;z-index:1020;bottom:calc(100% + 6px);transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--surface,#1f2328);color:var(--text,#ffffff);border:1px solid rgba(255,185,0,0.55);border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,0.35);font-size:11.5px;font-weight:600;white-space:nowrap;user-select:none;pointer-events:auto;';
+
+      this.tooltipEl.addEventListener('mouseenter', () => {
+        if (this._hideTimeout) {
+          clearTimeout(this._hideTimeout);
+          this._hideTimeout = null;
+        }
+      });
+      this.tooltipEl.addEventListener('mouseleave', () => {
+        this.hideBookmarkCard(200);
+      });
+      host.appendChild(this.tooltipEl);
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const duration = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 0);
+    const bx = duration > 0 ? (bm.t / duration) * rect.width : (clientX - rect.left);
+    this.tooltipEl.style.left = `${Math.round(bx)}px`;
+
+    const sec = Math.floor(bm.t / 1000);
+    const m = Math.floor(sec / 60), s = sec % 60;
+    const timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    const nameStr = bm.name ? ` · ${bm.name}` : '';
+
+    this.tooltipEl.innerHTML = '';
+
+    const label = document.createElement('span');
+    label.style.cssText = 'display:flex;align-items:center;gap:4px;color:#ffb900;';
+    label.innerHTML = `<span>🔖</span><span style="color:inherit;font-variant-numeric:tabular-nums;">${timeStr}${nameStr}</span>`;
+    this.tooltipEl.appendChild(label);
+
+    const btnJump = document.createElement('button');
+    btnJump.className = 'density-bm-jump-btn';
+    btnJump.style.cssText = 'background:#ffb900;color:#000000;border:none;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;';
+    btnJump.textContent = 'Jump';
+    btnJump.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      if (this.onSeek) this.onSeek(Math.round(bm.t));
+      this.hideBookmarkCard(0);
+    });
+    this.tooltipEl.appendChild(btnJump);
+
+    this.tooltipEl.style.display = 'flex';
+  }
+
+  hideBookmarkCard(delay = 250) {
+    if (this._hideTimeout) clearTimeout(this._hideTimeout);
+    if (delay <= 0) {
+      if (this.tooltipEl) this.tooltipEl.style.display = 'none';
+      return;
+    }
+    this._hideTimeout = setTimeout(() => {
+      if (this.tooltipEl) this.tooltipEl.style.display = 'none';
+      this._hideTimeout = null;
+    }, delay);
+  }
+
   bookmarkAt(clientX) {
     if (!this.canvas || !Array.isArray(this.track?.bookmarks)) return null;
     const rect = this.canvas.getBoundingClientRect();
@@ -86,19 +155,23 @@ export class DensityCanvas {
       const bm = this.bookmarkAt(e.clientX);
       if (bm) {
         this.canvas.style.cursor = 'pointer';
-        const sec = Math.floor(bm.t / 1000);
-        const m = Math.floor(sec / 60), s = sec % 60;
-        this.canvas.title = `Bookmark: ${bm.name || `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`} (Click to jump)`;
+        this.showBookmarkCard(bm, e.clientX);
       } else {
         this.canvas.style.cursor = 'ew-resize';
-        this.canvas.title = '';
+        this.hideBookmarkCard(250);
       }
     });
 
+    this.canvas.addEventListener('pointerleave', () => {
+      if (!dragging) this.hideBookmarkCard(300);
+    });
+
     this.canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
       const bm = this.bookmarkAt(e.clientX);
       if (bm) {
         if (this.onSeek) this.onSeek(Math.round(bm.t));
+        this.hideBookmarkCard(0);
         return;
       }
       dragging = true;
@@ -107,6 +180,7 @@ export class DensityCanvas {
 
       const onMove = (ev) => {
         if (!dragging) return;
+        ev.preventDefault();
         seekAt(ev);
       };
 

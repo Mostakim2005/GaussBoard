@@ -386,19 +386,78 @@ function wireTopBar(app) {
         const { AudioRecorder } = await import('../core/audio-recorder.js');
         app.audioRecorder = new AudioRecorder(app);
       }
-      if (app.audioRecorder.recording) {
-        await app.audioRecorder.stop();
+      if (app.audioRecorder.state === 'recording') {
+        const track = await app.audioRecorder.stop();
+        if (track && track.assetId) {
+          if (!Array.isArray(app.store.doc.audioTracks)) app.store.doc.audioTracks = [];
+          app.store.doc.audioTracks.push(track);
+          if (typeof app.persist === 'function') await app.persist();
+          if (app.replayBar?.updateAudioUI) app.replayBar.updateAudioUI();
+          if (app.audioBar?.syncUI) app.audioBar.syncUI();
+        }
         updateRecState(false);
         app.toast?.(t('Recording stopped and saved to board'));
       } else {
-        const started = await app.audioRecorder.start();
-        if (started) {
+        await app.audioRecorder.start();
+        if (app.audioRecorder.state === 'recording') {
           updateRecState(true);
           app.toast?.(t('Recording started... Speak while you write!'));
         }
       }
     });
   }
+
+  // Live top-bar chips for board tags & aliases (Image 3)
+  app.updateTopProperties = () => {
+    const container = document.getElementById('topPropertiesChips');
+    if (!container) return;
+    container.innerHTML = '';
+    const doc = app.store?.doc;
+    if (!doc) return;
+    const tags = Array.isArray(doc.properties?.tags) ? doc.properties.tags : (Array.isArray(doc.tags) ? doc.tags : []);
+    const aliases = Array.isArray(doc.properties?.aliases) ? doc.properties.aliases : (Array.isArray(doc.aliases) ? doc.aliases : []);
+
+    if (aliases.length > 0) {
+      const al = aliases[0];
+      const chip = h('span', {
+        class: 'prop-chip top-alias-chip',
+        title: t('Board alias (Click to edit)'),
+        style: 'cursor:pointer;font-size:11px;padding:2px 7px;border-radius:10px;background:rgba(168,85,247,0.12);color:#9333ea;font-weight:600;display:inline-flex;align-items:center;gap:3px;'
+      }, h('span', { style: 'opacity:0.75;font-weight:400;' }, 'alias:'), al + (aliases.length > 1 ? ` (+${aliases.length - 1})` : ''));
+      chip.addEventListener('click', () => {
+        if (!app.propertiesDialog) {
+          import('./properties-dialog.js').then((m) => {
+            app.propertiesDialog = new m.PropertiesDialog(app);
+            app.propertiesDialog.open();
+          });
+        } else {
+          app.propertiesDialog.open();
+        }
+      });
+      container.appendChild(chip);
+    }
+
+    if (tags.length > 0) {
+      const tg = tags[0];
+      const chip = h('span', {
+        class: 'prop-chip top-tag-chip',
+        title: t('Board tag (Click to edit)'),
+        style: 'cursor:pointer;font-size:11px;padding:2px 7px;border-radius:10px;background:rgba(0,120,212,0.1);color:#0078d4;font-weight:600;display:inline-flex;align-items:center;gap:3px;'
+      }, h('span', { style: 'opacity:0.75;font-weight:400;' }, 'tag:'), tg + (tags.length > 1 ? ` (+${tags.length - 1})` : ''));
+      chip.addEventListener('click', () => {
+        if (!app.propertiesDialog) {
+          import('./properties-dialog.js').then((m) => {
+            app.propertiesDialog = new m.PropertiesDialog(app);
+            app.propertiesDialog.open();
+          });
+        } else {
+          app.propertiesDialog.open();
+        }
+      });
+      container.appendChild(chip);
+    }
+  };
+  setTimeout(() => app.updateTopProperties?.(), 100);
 
   document.getElementById('panelClose').innerHTML = icon('close', 18);
 
@@ -712,7 +771,25 @@ export function openToolPopover(app, anchor, tool) {
       h('div', { class: 'menu', style: 'padding:0' },
         mkMode('partial', t('Erase parts of ink'), t('Rubs strokes out where you drag')),
         mkMode('object', t('Erase whole strokes'), t('Removes a whole stroke in one touch')),
-        mkMode('all', t('Erase everything'), t('Clears the canvas')))
+        mkMode('all', t('Erase everything'), t('Clears the canvas'))),
+      h('h4', { style: 'margin-top:14px' }, t('Gesture scratch-out')),
+      h('div', { style: 'display:flex;align-items:center;justify-content:space-between;padding:4px 0;' },
+        h('span', { style: 'font-size:12.5px;' }, t('Scribble over ink to erase')),
+        (() => {
+          const active = s.scratchOut !== false;
+          const toggleBtn = h('button', {
+            class: 'btn' + (active ? ' primary' : ''),
+            style: 'padding:3px 10px;font-size:11.5px;font-weight:600;'
+          }, active ? t('ON') : t('OFF'));
+          toggleBtn.addEventListener('click', () => {
+            s.scratchOut = !(s.scratchOut !== false);
+            app.saveSettings();
+            if (app.replayBar?.updateScratchUI) app.replayBar.updateScratchUI();
+            openToolPopover(app, anchor, 'eraser');
+          });
+          return toggleBtn;
+        })()
+      )
     );
   } else if (tool === 'note') {
     body = h('div', {},

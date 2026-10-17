@@ -20,6 +20,9 @@ function item(label, iconName, onClick, opts = {}) {
 }
 
 export function showContextMenu(app, e, fromSelectionBar = false) {
+  const ctxbar = document.getElementById('ctxbar');
+  if (ctxbar) ctxbar.classList.remove('show');
+
   const sel = app.surface.selection;
   const wp = app.surface.toWorld(e);
 
@@ -30,6 +33,15 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
   const has = app.surface.selection.size > 0;
   const one = app.surface.selection.size === 1 ? app.store.get([...app.surface.selection][0]) : null;
   const editable = one && ['note', 'text', 'shape', 'table'].includes(one.type);
+
+  const popOpts = {
+    key: 'ctx',
+    onClose: () => {
+      if (app.surface.selection.size > 0 && !app.textEditor?.active) {
+        updateSelectionBar(app);
+      }
+    }
+  };
 
   const menu = h('div', { class: 'menu' });
   const allLocked = has && app.selected.every((o) => o.locked);
@@ -45,7 +57,7 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(item(t('Copy'), 'copy', () => app.command('edit.copy'), { key: 'Ctrl+C' }));
     menu.appendChild(item(t('Copy as picture'), 'image', () => app.command('edit.copyPicture')));
     menu.appendChild(item(t('Export selection as PNG…'), 'image', () => app.command('export.pngSelection')));
-    openPopover({ x: e.clientX, y: e.clientY }, menu, { key: 'ctx' });
+    openPopover({ x: e.clientX, y: e.clientY }, menu, popOpts);
     return;
   }
 
@@ -99,7 +111,7 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(item(t('Canvas…'), 'palette', () => app.panels.background()));
     menu.appendChild(item(t('Clear canvas'), 'trash', () => app.command('edit.clear'), { danger: true }));
   }
-  openPopover({ x: e.clientX, y: e.clientY }, menu, { key: 'ctx' });
+  openPopover({ x: e.clientX, y: e.clientY }, menu, popOpts);
 }
 
 /* ------------------------------------------------------------------ *

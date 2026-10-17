@@ -794,20 +794,35 @@ export class Surface {
       if (!o || o.audioId !== trackId) continue;
 
       if (o.t1 != null && o.t1 <= t) {
+        if (t - o.t1 < 450) {
+          const decay = 1 - ((t - o.t1) / 450);
+          ctx.save();
+          ctx.shadowColor = '#00e5ff';
+          ctx.shadowBlur = 12 * decay;
+          drawObject(ctx, { ...o, width: (o.width || 4) + 4 * decay, color: '#00e5ff', opacity: 0.6 * decay }, () => this.invalidate(), this.editing);
+          ctx.restore();
+        }
         drawObject(ctx, o, () => this.invalidate(), this.editing);
       } else if (o.t0 != null && o.t0 <= t && (o.t1 == null || t < o.t1)) {
         if (Array.isArray(o.points)) {
           const sliceIndex = o.points.findIndex((p) => p.t != null && p.t > t);
           const pts = sliceIndex >= 0 ? o.points.slice(0, sliceIndex) : o.points;
           if (pts.length >= 2) {
+            // Neon cyan glow outline under active stroke
+            ctx.save();
+            ctx.shadowColor = '#00e5ff';
+            ctx.shadowBlur = 14;
+            drawObject(ctx, { ...o, points: pts, width: (o.width || 4) + 5, color: '#00e5ff', opacity: 0.7 }, () => this.invalidate(), this.editing);
+            ctx.restore();
+
             drawObject(ctx, { ...o, points: pts }, () => this.invalidate(), this.editing);
             const tip = pts[pts.length - 1];
             ctx.save();
-            ctx.fillStyle = '#00d2ff';
-            ctx.shadowColor = '#00d2ff';
-            ctx.shadowBlur = 8;
+            ctx.fillStyle = '#00e5ff';
+            ctx.shadowColor = '#00e5ff';
+            ctx.shadowBlur = 10;
             ctx.beginPath();
-            ctx.arc(tip.x, tip.y, (o.width || 4) / 2 + 1.5, 0, Math.PI * 2);
+            ctx.arc(tip.x, tip.y, (o.width || 4) / 2 + 2, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
           }

@@ -1152,7 +1152,6 @@
   "Create quick note": "Create quick note",
   "No notes found": "No notes found",
   "Untitled": "Untitled",
-  "Open Board": "Open Board",
   "Open in Split View": "Open in Split View",
   "Add Tag...": "Add Tag...",
   "Note Overview (Browse document previews, tags, aliases)": "Note Overview (Browse document previews, tags, aliases)",
@@ -1243,5 +1242,17 @@
   "520ms": "520毫秒",
   "How long the laser pointer trail lingers on screen before melting away.": "雷射筆軌跡在螢幕上停留多久後淡出消失。",
   "Board link thumbnails": "白板連結縮圖",
-  "Show thumbnail picture previews on board link cards by default.": "預設在白板連結卡片上顯示預覽圖片。"
+  "Show thumbnail picture previews on board link cards by default.": "預設在白板連結卡片上顯示預覽圖片。",
+  "Add Alias...": "新增別名...",
+  "Double-click to open board": "按兩下開啟白板",
+  "Enter alias for board (e.g. Lecture 4 Notes):": "輸入白板別名（例如：第4講筆記）：",
+  "Alias “{alias}” added": "已新增別名「{alias}」",
+  "Failed to add alias: {msg}": "新增別名失敗：{msg}",
+  "How long the laser pointer trail lingers on screen (Instant, 300ms, 520ms, 1.2s, 2.5s, 5.0s, 10s)": "雷射筆軌跡在螢幕上停留的時間（即時、300毫秒、520毫秒、1.2秒、2.5秒、5.0秒、10秒）",
+  "Allow drawing translucent pen strokes for layering effects": "允許繪製半透明筆跡以實現圖層疊加效果",
+  "Show thumbnail picture previews on board link cards by default": "預設在白板連結卡片上顯示縮圖預覽",
+  "Board alias (Click to edit)": "白板別名（按一下編輯）",
+  "Board tag (Click to edit)": "白板標籤（按一下編輯）",
+  "Gesture scratch-out": "劃除手勢擦除",
+  "Scribble over ink to erase": "在墨跡上塗抹以擦除"
 }

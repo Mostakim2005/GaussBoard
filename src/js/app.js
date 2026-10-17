@@ -979,6 +979,7 @@ class App {
     // which boards link here: every other board is looked inside, so not while the app is still starting
     clearTimeout(this._linkedTimer);
     this._linkedTimer = setTimeout(() => this.syncLinkedFrom(), opts.startup ? 2500 : 250);
+    this.updateTopProperties?.();
   }
 
   /**

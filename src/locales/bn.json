@@ -1152,7 +1152,6 @@
   "Create quick note": "Create quick note",
   "No notes found": "No notes found",
   "Untitled": "Untitled",
-  "Open Board": "Open Board",
   "Open in Split View": "Open in Split View",
   "Add Tag...": "Add Tag...",
   "Note Overview (Browse document previews, tags, aliases)": "Note Overview (Browse document previews, tags, aliases)",
@@ -1243,5 +1242,17 @@
   "520ms": "৫২০ মিলি",
   "How long the laser pointer trail lingers on screen before melting away.": "লেজার পয়েন্টারের ট্রেইল মিলিয়ে যাওয়ার আগে কতক্ষণ পর্দায় থাকবে।",
   "Board link thumbnails": "বোর্ড লিংক থাম্বনেইল",
-  "Show thumbnail picture previews on board link cards by default.": "ডিফল্টভাবে বোর্ড লিংক কার্ডে থাম্বনেইল প্রিভিউ দেখান।"
+  "Show thumbnail picture previews on board link cards by default.": "ডিফল্টভাবে বোর্ড লিংক কার্ডে থাম্বনেইল প্রিভিউ দেখান।",
+  "Add Alias...": "উপনাম যোগ করুন...",
+  "Double-click to open board": "বোর্ড খুলতে ডাবল ক্লিক করুন",
+  "Enter alias for board (e.g. Lecture 4 Notes):": "বোর্ডের উপনাম দিন (যেমন: লেকচার ৪ নোট):",
+  "Alias “{alias}” added": "উপনাম “{alias}” যোগ করা হয়েছে",
+  "Failed to add alias: {msg}": "উপনাম যোগ করতে ব্যর্থ: {msg}",
+  "How long the laser pointer trail lingers on screen (Instant, 300ms, 520ms, 1.2s, 2.5s, 5.0s, 10s)": "লেজার পয়েন্টারের ট্রেইল স্ক্রিনে কতক্ষণ থাকবে (তাৎক্ষণিক, ৩০০মি.সে., ৫২০মি.সে., ১.২সে., ২.৫সে., ৫.০সে., ১০সে.)",
+  "Allow drawing translucent pen strokes for layering effects": "লেয়ারিং প্রভাবের জন্য স্বচ্ছ পেন স্ট্রোক আঁকার অনুমতি দিন",
+  "Show thumbnail picture previews on board link cards by default": "বোর্ড লিংক কার্ডে ডিফল্টভাবে থাম্বনেইল ছবি পূর্বরূপ দেখান",
+  "Board alias (Click to edit)": "বোর্ড উপনাম (সম্পাদনা করতে ক্লিক করুন)",
+  "Board tag (Click to edit)": "বোর্ড ট্যাগ (সম্পাদনা করতে ক্লিক করুন)",
+  "Gesture scratch-out": "স্ক্র্যাচ-আউট অঙ্গভঙ্গি",
+  "Scribble over ink to erase": "মুছতে কালির উপর স্ক্রিবল করুন"
 }

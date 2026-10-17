@@ -113,6 +113,19 @@ export class SplitWorkspace {
     this.leftPane.appendChild(leftHeader);
     this.leftPane.appendChild(canvasWrap);
 
+    // Divider
+    this.divider = h('div', {
+      class: 'split-divider',
+      style: 'width:6px;background:var(--line,rgba(0,0,0,0.15));cursor:col-resize;user-select:none;touch-action:none;position:relative;z-index:10;'
+    });
+
+    // Right pane (Primary canvas)
+    this.rightPane = h('div', {
+      id: 'stageRight',
+      class: 'split-pane split-right',
+      style: 'position:relative;flex:1;height:100%;overflow:hidden;'
+    });
+
     // Reparent primary canvas into right pane
     this.rightPane.appendChild(this.primaryCanvas);
 

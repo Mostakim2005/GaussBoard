@@ -27,9 +27,11 @@ export class AudioBar {
     this.box = { x: 24, y: 72 };
     this.speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
     this.speedIdx = 2; // 1.0x
-    this.skipIntervals = [5, 10, 13, 15];
+    this.skipIntervals = [5, 10, 13, 15, 30];
     this.skipIdx = 1; // 10s default
     this._interval = null;
+    this._lastPlayActive = null;
+    this._sessionMenuEl = null;
 
     this.density = new DensityCanvas({
       width: 220,
@@ -71,6 +73,7 @@ export class AudioBar {
       this.app.replayEngine.pause();
     }
     this.stopClock();
+    this.closeSessionMenu();
     if (this.el) {
       this.el.style.display = 'none';
     }
@@ -167,41 +170,97 @@ export class AudioBar {
     }
   }
 
+  closeSessionMenu() {
+    if (this._sessionMenuEl) {
+      this._sessionMenuEl.remove();
+      this._sessionMenuEl = null;
+    }
+  }
+
+  toggleSessionMenu() {
+    if (this._sessionMenuEl) {
+      this.closeSessionMenu();
+      return;
+    }
+    const tracks = this.app?.store?.doc?.audioTracks || [];
+    if (!tracks.length) return;
+
+    const menu = h('div', {
+      class: 'ab-session-dropdown',
+      style: 'position:absolute;bottom:calc(100% + 8px);left:12px;z-index:1020;background:var(--surface,#1f2328);color:var(--text,#ffffff);border:1px solid var(--line,rgba(255,255,255,0.15));border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.35);padding:6px;min-width:180px;display:flex;flex-direction:column;gap:4px;user-select:none;'
+    });
+
+    for (const [idx, tr] of tracks.entries()) {
+      const isCur = tr.id === this.track?.id;
+      const durStr = formatTime(tr.durationMs || 0);
+      const row = h('div', {
+        class: `ab-session-row ${isCur ? 'active' : ''}`,
+        style: `display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:${isCur ? '700' : '500'};background:${isCur ? 'rgba(0,229,255,0.15)' : 'transparent'};color:${isCur ? '#00e5ff' : 'inherit'};`,
+        html: `<span>${tr.name || `Session ${idx + 1}`}</span><span style="opacity:0.6;font-size:11px;font-variant-numeric:tabular-nums;">${durStr}</span>`
+      });
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.open(tr);
+        this.closeSessionMenu();
+      });
+      menu.appendChild(row);
+    }
+
+    const onDismiss = (e) => {
+      if (!menu.contains(e.target) && e.target !== this.btnSession) {
+        this.closeSessionMenu();
+        window.removeEventListener('pointerdown', onDismiss);
+      }
+    };
+    window.addEventListener('pointerdown', onDismiss);
+
+    this.el.appendChild(menu);
+    this._sessionMenuEl = menu;
+  }
+
   build() {
     if (typeof document === 'undefined') return;
 
     this.btnRewind10 = h('button', {
       class: 'ab-btn ab-rw',
       title: `Rewind ${this.skipSeconds}s`,
-      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;color:inherit;',
-      html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>'
+      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;color:inherit;pointer-events:auto;',
+      html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>'
     });
-    this.btnRewind10.addEventListener('click', () => {
+    this.btnRewind10.addEventListener('click', (e) => {
+      e.stopPropagation();
       const cur = this.app?.replayEngine?.currentTimeMs || 0;
       this.seek(cur - this.skipSeconds * 1000);
     });
 
     this.btnSkipStep = h('button', {
       class: 'ab-btn ab-skip-step',
-      title: 'Click to cycle skip duration (5s, 10s, 13s, 15s)',
-      style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:2px 6px;border-radius:10px;font-size:11px;font-weight:700;color:inherit;margin:0 2px;'
+      title: 'Click to cycle skip duration (5s, 10s, 13s, 15s, 30s)',
+      style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:2px 6px;border-radius:10px;font-size:11px;font-weight:700;color:inherit;margin:0 2px;pointer-events:auto;'
     }, `${this.skipSeconds}s`);
-    this.btnSkipStep.addEventListener('click', () => this.cycleSkip());
+    this.btnSkipStep.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.cycleSkip();
+    });
 
     this.btnPlay = h('button', {
       class: 'ab-btn ab-play',
       title: 'Play / Pause',
-      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;color:inherit;'
+      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;color:inherit;pointer-events:auto;'
     });
-    this.btnPlay.addEventListener('click', () => this.togglePlay());
+    this.btnPlay.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.togglePlay();
+    });
 
     this.btnForward10 = h('button', {
       class: 'ab-btn ab-ff',
       title: `Forward ${this.skipSeconds}s`,
-      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;color:inherit;',
-      html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 17l5-5-5-5M6 17l5-5-5-5"/></svg>'
+      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;color:inherit;pointer-events:auto;',
+      html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M13 17l5-5-5-5M6 17l5-5-5-5"/></svg>'
     });
-    this.btnForward10.addEventListener('click', () => {
+    this.btnForward10.addEventListener('click', (e) => {
+      e.stopPropagation();
       const cur = this.app?.replayEngine?.currentTimeMs || 0;
       this.seek(cur + this.skipSeconds * 1000);
     });
@@ -214,33 +273,45 @@ export class AudioBar {
     this.btnSpeed = h('button', {
       class: 'ab-btn ab-speed',
       title: 'Speed',
-      style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;color:inherit;'
+      style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;color:inherit;pointer-events:auto;'
     }, '1.0×');
-    this.btnSpeed.addEventListener('click', () => this.cycleSpeed());
+    this.btnSpeed.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.cycleSpeed();
+    });
 
     this.btnBookmark = h('button', {
       class: 'ab-btn ab-bm',
       title: 'Bookmark',
-      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:4px;color:inherit;',
-      html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>'
+      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:4px;color:inherit;pointer-events:auto;',
+      html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>'
     });
-    this.btnBookmark.addEventListener('click', () => this.addBookmark());
+    this.btnBookmark.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.addBookmark();
+    });
 
     this.btnGhost = h('button', {
       class: 'ab-btn ab-ghost',
       title: 'Ghost / Hidden Preview',
-      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:4px;color:inherit;',
+      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:4px;color:inherit;pointer-events:auto;',
       html: icon('eye', 18)
     });
-    this.btnGhost.addEventListener('click', () => this.toggleGhostMode());
+    this.btnGhost.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleGhostMode();
+    });
 
     this.btnClose = h('button', {
       class: 'ab-btn ab-close',
       title: t('Close'),
-      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:4px;color:inherit;',
+      style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:4px;color:inherit;pointer-events:auto;',
       html: icon('close', 18)
     });
-    this.btnClose.addEventListener('click', () => this.close());
+    this.btnClose.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.close();
+    });
 
     const dragHandle = h('span', {
       class: 'ab-drag',
@@ -254,22 +325,24 @@ export class AudioBar {
       style: 'display:flex;align-items:center;position:relative;'
     }, this.density.canvas || '');
 
-    this.selectSession = h('select', {
-      class: 'ab-session-select',
-      title: 'Select Recording Session',
-      style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:2px 6px;border-radius:12px;font-size:11.5px;font-weight:600;color:inherit;outline:none;max-width:140px;'
+    this.btnSession = h('button', {
+      class: 'ab-session-btn',
+      title: 'Switch Recording Session',
+      style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:3px 8px;border-radius:12px;font-size:11.5px;font-weight:600;color:inherit;outline:none;display:none;align-items:center;gap:4px;max-width:140px;pointer-events:auto;',
+      html: '<span>🎙️</span><span class="ab-session-label">Session</span><span style="font-size:9px;opacity:0.6;">▼</span>'
     });
-    this.selectSession.addEventListener('change', () => {
-      const tracks = this.app?.store?.doc?.audioTracks || [];
-      const sel = tracks.find((t) => t.id === this.selectSession.value);
-      if (sel) this.open(sel);
+    this.btnSession.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleSessionMenu();
     });
 
     this.el = h('div', {
       id: 'audioBar',
       class: 'audio-bar-hud',
       style: 'position:absolute;z-index:1000;display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.18);user-select:none;font-size:13px;font-family:inherit;'
-    }, dragHandle, this.selectSession, this.btnRewind10, this.btnSkipStep, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnClose);
+    }, dragHandle, this.btnSession, this.btnRewind10, this.btnSkipStep, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnClose);
+
+    this.wireDragging(dragHandle);
 
     this.wireDragging(dragHandle);
   }
@@ -325,34 +398,43 @@ export class AudioBar {
     const cur = replay?.currentTimeMs || 0;
     const dur = this.track?.durationMs || 0;
 
-    this.lblTime.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
-    this.btnPlay.innerHTML = icon(replay?.active ? 'pause' : 'play', 18);
-    this.btnSpeed.textContent = `${this.speeds[this.speedIdx]}×`;
-    if (this.btnSkipStep) this.btnSkipStep.textContent = `${this.skipSeconds}s`;
-    if (this.btnRewind10) this.btnRewind10.title = `Rewind ${this.skipSeconds}s`;
-    if (this.btnForward10) this.btnForward10.title = `Forward ${this.skipSeconds}s`;
+    const timeText = `${formatTime(cur)} / ${formatTime(dur)}`;
+    if (this.lblTime.textContent !== timeText) {
+      this.lblTime.textContent = timeText;
+    }
+
+    const isPlaying = !!replay?.active;
+    if (this._lastPlayActive !== isPlaying) {
+      this._lastPlayActive = isPlaying;
+      this.btnPlay.innerHTML = icon(isPlaying ? 'pause' : 'play', 18);
+      const svg = this.btnPlay.querySelector('svg');
+      if (svg) svg.style.pointerEvents = 'none';
+    }
+
+    const speedText = `${this.speeds[this.speedIdx]}×`;
+    if (this.btnSpeed.textContent !== speedText) {
+      this.btnSpeed.textContent = speedText;
+    }
+
+    const skipText = `${this.skipSeconds}s`;
+    if (this.btnSkipStep && this.btnSkipStep.textContent !== skipText) {
+      this.btnSkipStep.textContent = skipText;
+      if (this.btnRewind10) this.btnRewind10.title = `Rewind ${this.skipSeconds}s`;
+      if (this.btnForward10) this.btnForward10.title = `Forward ${this.skipSeconds}s`;
+    }
 
     const tracks = this.app?.store?.doc?.audioTracks || [];
-    if (this.selectSession) {
+    if (this.btnSession) {
       if (tracks.length > 1) {
-        this.selectSession.style.display = '';
-        const currentVal = this.track?.id;
-        const optValues = Array.from(this.selectSession.options).map((o) => o.value).join(',');
-        const trackValues = tracks.map((t) => t.id).join(',');
-        if (optValues !== trackValues) {
-          this.selectSession.innerHTML = '';
-          tracks.forEach((tr, idx) => {
-            const opt = document.createElement('option');
-            opt.value = tr.id;
-            const durStr = formatTime(tr.durationMs || 0);
-            const timeStr = tr.created ? new Date(tr.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-            opt.textContent = `${tr.name || `Audio ${idx + 1}`} (${durStr})${timeStr ? ` · ${timeStr}` : ''}`;
-            this.selectSession.appendChild(opt);
-          });
+        this.btnSession.style.display = 'inline-flex';
+        const curIdx = tracks.findIndex((t) => t.id === this.track?.id);
+        const name = this.track?.name || `Session ${curIdx >= 0 ? curIdx + 1 : 1}`;
+        const lbl = this.btnSession.querySelector('.ab-session-label');
+        if (lbl && lbl.textContent !== name) {
+          lbl.textContent = name;
         }
-        if (currentVal) this.selectSession.value = currentVal;
       } else {
-        this.selectSession.style.display = 'none';
+        this.btnSession.style.display = 'none';
       }
     }
 
@@ -368,3 +450,4 @@ export class AudioBar {
     });
   }
 }
+

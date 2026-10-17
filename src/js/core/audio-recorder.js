@@ -15,6 +15,10 @@ export class AudioRecorder {
     this.segmentStartMs = 0;
   }
 
+  get recording() {
+    return this.state === 'recording';
+  }
+
   async start() {
     if (this.state !== 'idle') return;
     this.stream = await navigator.mediaDevices.getUserMedia({

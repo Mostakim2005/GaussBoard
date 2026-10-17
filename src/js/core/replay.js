@@ -60,6 +60,8 @@ export class ReplayEngine {
       this.surface._ink = null;
       this.surface.invalidate();
     }
+    this.playStartPerfMs = performance.now();
+    this.playStartTimeMs = this.currentTimeMs;
     if (this.audio) {
       this.audio.playbackRate = this.playbackRate;
       this.audio.preservesPitch = true;
@@ -70,7 +72,9 @@ export class ReplayEngine {
   }
 
   pause() {
-    if (this.audio) this.audio.pause();
+    if (this.audio) {
+      try { this.audio.pause(); } catch {}
+    }
     this.active = false;
     if (this.rafToken) cancelAnimationFrame(this.rafToken);
     this.rafToken = null;
@@ -84,6 +88,8 @@ export class ReplayEngine {
     const max = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 0) || (this.audio?.duration ? this.audio.duration * 1000 : 0);
     const clamped = Math.min(Math.max(0, timeMs), max);
     this.currentTimeMs = clamped;
+    this.playStartPerfMs = performance.now();
+    this.playStartTimeMs = clamped;
     if (this.audio) {
       try {
         this.audio.currentTime = this.currentTimeMs / 1000;
@@ -98,6 +104,8 @@ export class ReplayEngine {
 
   setSpeed(speed) {
     this.playbackRate = speed;
+    this.playStartPerfMs = performance.now();
+    this.playStartTimeMs = this.currentTimeMs;
     if (this.audio) {
       this.audio.playbackRate = speed;
       this.audio.preservesPitch = true;
@@ -111,7 +119,11 @@ export class ReplayEngine {
   }
 
   syncClock() {
-    if (this.audio) this.currentTimeMs = this.audio.currentTime * 1000;
+    if (this.audio && !this.audio.paused && this.audio.currentTime > 0) {
+      this.currentTimeMs = this.audio.currentTime * 1000;
+      this.playStartPerfMs = performance.now();
+      this.playStartTimeMs = this.currentTimeMs;
+    }
     if (this.surface) this.surface.invalidate();
   }
 
@@ -123,7 +135,22 @@ export class ReplayEngine {
 
   loop() {
     if (!this.active) return;
-    if (this.audio) this.currentTimeMs = this.audio.currentTime * 1000;
+    const dur = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 0);
+    if (this.audio && !this.audio.paused && this.audio.currentTime > 0) {
+      this.currentTimeMs = this.audio.currentTime * 1000;
+      this.playStartPerfMs = performance.now();
+      this.playStartTimeMs = this.currentTimeMs;
+    } else {
+      const elapsed = (performance.now() - (this.playStartPerfMs || performance.now())) * this.playbackRate;
+      this.currentTimeMs = (this.playStartTimeMs || 0) + elapsed;
+    }
+
+    if (dur > 0 && this.currentTimeMs >= dur) {
+      this.currentTimeMs = dur;
+      this.onEnded();
+      return;
+    }
+
     if (this.surface) this.surface.invalidate();
     if (this.autoFollow) this.followActiveStroke();
     this.rafToken = requestAnimationFrame(() => this.loop());

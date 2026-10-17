@@ -155,14 +155,16 @@ export class SearchDialog {
 
     const currentDoc = this.app?.store?.doc;
     const currentId = currentDoc?.id;
+    const tokens = q ? q.toLowerCase().split(/\s+/).filter(Boolean) : [];
 
     const matched = this.boardsList.filter((b) => {
-      if (!q) return true;
-      const titleMatch = (b.name || b.title || '').toLowerCase().includes(q);
-      const aliasMatch = Array.isArray(b.aliases) && b.aliases.some((a) => a.toLowerCase().includes(q));
-      const tagMatch = Array.isArray(b.tags) && b.tags.some((t) => t.toLowerCase().includes(q));
-      return titleMatch || aliasMatch || tagMatch;
-    }).slice(0, 8);
+      if (!tokens.length) return true;
+      const titleStr = (b.name || b.title || '').toLowerCase();
+      const aliasStr = Array.isArray(b.aliases) ? b.aliases.join(' ').toLowerCase() : '';
+      const tagStr = Array.isArray(b.tags) ? b.tags.join(' ').toLowerCase() : '';
+      const haystack = `${titleStr} ${aliasStr} ${tagStr}`;
+      return tokens.every((tok) => haystack.includes(tok));
+    }).slice(0, 10);
 
     if (matched.length === 0) return 0;
 
@@ -175,8 +177,15 @@ export class SearchDialog {
       if (Array.isArray(b.tags)) {
         for (const tg of b.tags) {
           tagPills.push(h('span', {
-            style: 'background:rgba(0,120,212,0.1);color:#0078d4;font-size:11px;font-weight:600;padding:2px 6px;border-radius:10px;margin-right:4px;'
+            style: 'background:rgba(0,120,212,0.1);color:#0078d4;font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;margin-right:4px;'
           }, tg));
+        }
+      }
+      if (Array.isArray(b.aliases)) {
+        for (const al of b.aliases) {
+          tagPills.push(h('span', {
+            style: 'background:rgba(168,85,247,0.12);color:#9333ea;font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;margin-right:4px;'
+          }, al));
         }
       }
 
@@ -425,14 +434,47 @@ export class SearchDialog {
           this.close();
           import('../export-video.js').then((m) => m.exportVideoFile(app));
         }
+      },
+      {
+        id: 'laserTrailDuration',
+        title: t('Laser trail duration'),
+        desc: t('How long the laser pointer trail lingers on screen (Instant, 300ms, 520ms, 1.2s, 2.5s, 5.0s, 10s)'),
+        type: 'choice',
+        options: [
+          [0, t('Instant')],
+          [300, '300ms'],
+          [520, '520ms'],
+          [1200, '1.2s'],
+          [2500, '2.5s'],
+          [5000, '5.0s'],
+          [10000, '10s']
+        ],
+        get: () => s.laserTrailDuration ?? 520,
+        set: (v) => { s.laserTrailDuration = v; app.saveSettings(); }
+      },
+      {
+        id: 'penOpacity',
+        title: t('Pen opacity'),
+        desc: t('Allow drawing translucent pen strokes for layering effects'),
+        type: 'toggle',
+        get: () => s.penOpacityEnabled === true,
+        set: (v) => { s.penOpacityEnabled = v; app.saveSettings(); }
+      },
+      {
+        id: 'boardLinkThumb',
+        title: t('Board link thumbnails'),
+        desc: t('Show thumbnail picture previews on board link cards by default'),
+        type: 'toggle',
+        get: () => s.boardLinkThumb !== false,
+        set: (v) => { s.boardLinkThumb = v; app.saveSettings(); app.surface?.invalidate(); }
       }
     ];
 
+    const tokens = q ? q.toLowerCase().split(/\s+/).filter(Boolean) : [];
     const matched = settings.filter((item) => {
-      if (!q) return true;
-      return item.id.toLowerCase().includes(q) ||
-        item.title.toLowerCase().includes(q) ||
-        item.desc.toLowerCase().includes(q);
+      if (!tokens.length) return true;
+      const haystack = `${item.id} ${item.title} ${item.desc}`.toLowerCase();
+      return tokens.every((tok) => haystack.includes(tok));
     });
 
     if (matched.length === 0) return 0;

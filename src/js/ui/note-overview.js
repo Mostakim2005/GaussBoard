@@ -166,31 +166,88 @@ export class NoteOverviewDrawer {
         }
       }
 
-      // Context menu (...) button
-      const btnMore = h('button', {
-        class: 'btn-note-more',
-        style: 'background:none;border:none;cursor:pointer;padding:4px;color:var(--text-2,rgba(128,128,128,0.7));',
-        html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="12" r="2"/></svg>'
+      // Alias pills
+      const aliasPills = [];
+      if (Array.isArray(b.aliases)) {
+        for (const al of b.aliases) {
+          aliasPills.push(h('span', {
+            style: 'background:rgba(168,85,247,0.12);color:#9333ea;font-size:10.5px;font-weight:600;padding:2px 6px;border-radius:8px;margin-right:4px;'
+          }, al));
+        }
+      }
+
+      // Action buttons: Split View, Add Tag, Add Alias
+      const btnSplit = h('button', {
+        class: 'btn-note-split',
+        title: t('Open in Split View'),
+        style: 'background:var(--desk,#f0f0f4);border:1px solid var(--line,rgba(0,0,0,0.1));cursor:pointer;padding:3px 6px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:var(--text,inherit);transition:background 0.15s;',
+        html: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>'
+      });
+      btnSplit.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        this.close();
+        if (!this.app.splitWorkspace) return;
+        if (!this.app.splitWorkspace.enabled) {
+          this.app.splitWorkspace.enable();
+        }
+        if (typeof this.app.splitWorkspace.loadLeftBoard === 'function') {
+          await this.app.splitWorkspace.loadLeftBoard(b.id);
+        }
       });
 
-      btnMore.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.openContextMenu(e, b);
+      const btnTag = h('button', {
+        class: 'btn-note-tag',
+        title: t('Add Tag...'),
+        style: 'background:rgba(0,120,212,0.1);border:1px solid rgba(0,120,212,0.25);cursor:pointer;padding:3px 6px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:#0078d4;font-size:11px;font-weight:700;transition:background 0.15s;',
+        html: '<span style="font-size:12px;font-weight:800;line-height:1;">#</span>'
       });
+      btnTag.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.addTagToBoard(b);
+      });
+
+      const btnAlias = h('button', {
+        class: 'btn-note-alias',
+        title: t('Add Alias...'),
+        style: 'background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.25);cursor:pointer;padding:3px 6px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:#9333ea;font-size:11px;font-weight:700;transition:background 0.15s;',
+        html: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>'
+      });
+      btnAlias.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.addAliasToBoard(b);
+      });
+
+      const actionsWrap = h('div', {
+        class: 'note-card-actions',
+        style: 'display:flex;align-items:center;gap:4px;'
+      }, btnSplit, btnTag, btnAlias);
+
+      const isLongName = (title || '').length > 18;
+      const titleRow = isLongName
+        ? h('div', { style: 'margin-top:8px;display:flex;flex-direction:column;gap:4px;' },
+            h('div', { style: 'display:flex;align-items:center;justify-content:space-between;' },
+              h('span', { style: 'font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;', title }, title),
+              actionsWrap
+            ),
+            h('div', { style: 'display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:2px;' }, ...tagPills, ...aliasPills),
+            h('span', { style: 'font-size:11px;color:var(--text-2,rgba(128,128,128,0.8));margin-top:2px;' }, dateStr)
+          )
+        : h('div', { style: 'margin-top:8px;display:flex;align-items:flex-start;justify-content:space-between;' },
+            h('div', { style: 'display:flex;flex-direction:column;gap:2px;overflow:hidden;' },
+              h('span', { style: 'font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;', title }, title),
+              h('div', { style: 'display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:2px;' }, ...tagPills, ...aliasPills),
+              h('span', { style: 'font-size:11px;color:var(--text-2,rgba(128,128,128,0.8));margin-top:2px;' }, dateStr)
+            ),
+            actionsWrap
+          );
 
       const card = h('div', {
         class: 'note-overview-card',
+        title: t('Double-click to open board'),
         style: `margin-bottom:16px;cursor:pointer;padding:8px;border-radius:12px;border:1.5px solid ${isCurrent ? '#0078d4' : 'transparent'};transition:background 0.15s, border-color 0.15s;`
       },
         thumb,
-        h('div', { style: 'margin-top:8px;display:flex;align-items:flex-start;justify-content:space-between;' },
-          h('div', { style: 'display:flex;flex-direction:column;gap:2px;overflow:hidden;' },
-            h('span', { style: 'font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' }, title),
-            h('div', { style: 'display:flex;align-items:center;margin-top:2px;' }, ...tagPills),
-            h('span', { style: 'font-size:11px;color:var(--text-2,rgba(128,128,128,0.8));margin-top:2px;' }, dateStr)
-          ),
-          btnMore
-        )
+        titleRow
       );
 
       const openThisBoard = () => {
@@ -210,93 +267,84 @@ export class NoteOverviewDrawer {
         e.stopPropagation();
         openThisBoard();
       });
-      card.addEventListener('click', () => {
-        openThisBoard();
-      });
 
       this.cardsContainer.appendChild(card);
     }
   }
 
-  openContextMenu(e, board) {
-    const existing = document.getElementById('noteOverviewMenu');
-    if (existing) existing.remove();
+  async addTagToBoard(board) {
+    const tag = prompt(t('Enter tag name (e.g. #study or #ai/llm):'));
+    if (!tag || !tag.trim()) return;
+    const cleaned = tag.trim().startsWith('#') ? tag.trim() : '#' + tag.trim();
 
-    const menu = h('div', {
-      id: 'noteOverviewMenu',
-      style: `position:fixed;left:${e.clientX}px;top:${e.clientY}px;background:var(--surface,#ffffff);border:1px solid var(--line,rgba(0,0,0,0.12));border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.18);z-index:99999;padding:6px;min-width:160px;font-size:13px;`
-    });
-
-    const mkItem = (label, action) => {
-      const it = h('div', {
-        style: 'padding:8px 12px;cursor:pointer;border-radius:8px;font-weight:500;'
-      }, label);
-      it.addEventListener('mouseenter', () => { it.style.background = 'var(--desk,#f0f0f4)'; });
-      it.addEventListener('mouseleave', () => { it.style.background = 'transparent'; });
-      it.addEventListener('click', () => {
-        menu.remove();
-        action();
-      });
-      return it;
-    };
-
-    menu.appendChild(mkItem(t('Open Board'), () => {
-      this.close();
-      if (typeof this.app?.openBoardRef === 'function') {
-        this.app.openBoardRef({ id: board.id, name: board.name || board.title });
-      } else if (typeof this.app?.openBoard === 'function') {
-        this.app.openBoard(board.id);
+    try {
+      let raw = null;
+      if (window.board?.boards?.load) {
+        raw = await window.board.boards.load(board.id);
       }
-    }));
+      if (typeof raw === 'string') raw = JSON.parse(raw);
+      if (!raw) return;
 
-    menu.appendChild(mkItem(t('Open in Split View'), async () => {
-      this.close();
-      if (!this.app.splitWorkspace) return;
-      if (!this.app.splitWorkspace.active) {
-        this.app.splitWorkspace.enable();
+      raw.properties = raw.properties || {};
+      raw.properties.tags = Array.isArray(raw.properties.tags) ? raw.properties.tags : [];
+      if (!raw.properties.tags.includes(cleaned)) {
+        raw.properties.tags.push(cleaned);
       }
-      if (typeof this.app.splitWorkspace.loadLeftBoard === 'function') {
-        await this.app.splitWorkspace.loadLeftBoard(board.id);
-      }
-    }));
+      raw.tags = raw.properties.tags;
 
-    menu.appendChild(mkItem(t('Add Tag...'), async () => {
-      const tag = prompt(t('Enter tag name (e.g. #study or #ai/llm):'));
-      if (tag && window.board?.boards?.load && window.board?.boards?.save) {
-        const cleaned = tag.startsWith('#') ? tag.trim() : '#' + tag.trim();
-        try {
-          let raw = await window.board.boards.load(board.id);
-          if (typeof raw === 'string') raw = JSON.parse(raw);
-          if (!raw) return;
-          raw.properties = raw.properties || {};
-          raw.properties.tags = Array.isArray(raw.properties.tags) ? raw.properties.tags : [];
-          if (!raw.properties.tags.includes(cleaned)) {
-            raw.properties.tags.push(cleaned);
-          }
-          raw.tags = raw.properties.tags;
-          await window.board.boards.save({ id: board.id, json: JSON.stringify(raw), setLast: false });
-          if (this.app?.store?.doc?.id === board.id) {
-            this.app.store.doc.properties = this.app.store.doc.properties || {};
-            this.app.store.doc.properties.tags = raw.properties.tags;
-            this.app.store.doc.tags = raw.tags;
-            await this.app.persist();
-          }
-          await this.loadBoards();
-          this.filter();
-          this.app?.toast?.(t('Tag {tag} added', { tag: cleaned }));
-        } catch (err) {
-          this.app?.toast?.(t('Failed to add tag: {msg}', { msg: err.message }));
-        }
+      if (window.board?.boards?.save) {
+        await window.board.boards.save({ id: board.id, json: JSON.stringify(raw) });
       }
-    }));
+      if (this.app?.store?.doc?.id === board.id) {
+        this.app.store.doc.properties = this.app.store.doc.properties || {};
+        this.app.store.doc.properties.tags = raw.properties.tags;
+        this.app.store.doc.tags = raw.tags;
+        if (typeof this.app.persist === 'function') await this.app.persist();
+        if (typeof this.app.updateTopProperties === 'function') this.app.updateTopProperties();
+      }
+      await this.loadBoards();
+      this.filter();
+      this.app?.toast?.(t('Tag {tag} added', { tag: cleaned }));
+    } catch (err) {
+      this.app?.toast?.(t('Failed to add tag: {msg}', { msg: err.message }));
+    }
+  }
 
-    document.body.appendChild(menu);
-    const closeMenu = (ev) => {
-      if (!menu.contains(ev.target)) {
-        menu.remove();
-        window.removeEventListener('pointerdown', closeMenu);
+  async addAliasToBoard(board) {
+    const alias = prompt(t('Enter alias for board (e.g. Lecture 4 Notes):'));
+    if (!alias || !alias.trim()) return;
+    const cleaned = alias.trim();
+
+    try {
+      let raw = null;
+      if (window.board?.boards?.load) {
+        raw = await window.board.boards.load(board.id);
       }
-    };
-    setTimeout(() => window.addEventListener('pointerdown', closeMenu), 50);
+      if (typeof raw === 'string') raw = JSON.parse(raw);
+      if (!raw) return;
+
+      raw.properties = raw.properties || {};
+      raw.properties.aliases = Array.isArray(raw.properties.aliases) ? raw.properties.aliases : [];
+      if (!raw.properties.aliases.includes(cleaned)) {
+        raw.properties.aliases.push(cleaned);
+      }
+      raw.aliases = raw.properties.aliases;
+
+      if (window.board?.boards?.save) {
+        await window.board.boards.save({ id: board.id, json: JSON.stringify(raw) });
+      }
+      if (this.app?.store?.doc?.id === board.id) {
+        this.app.store.doc.properties = this.app.store.doc.properties || {};
+        this.app.store.doc.properties.aliases = raw.properties.aliases;
+        this.app.store.doc.aliases = raw.aliases;
+        if (typeof this.app.persist === 'function') await this.app.persist();
+        if (typeof this.app.updateTopProperties === 'function') this.app.updateTopProperties();
+      }
+      await this.loadBoards();
+      this.filter();
+      this.app?.toast?.(t('Alias “{alias}” added', { alias: cleaned }));
+    } catch (err) {
+      this.app?.toast?.(t('Failed to add alias: {msg}', { msg: err.message }));
+    }
   }
 }

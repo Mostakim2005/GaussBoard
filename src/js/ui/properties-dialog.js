@@ -30,9 +30,17 @@ export class PropertiesDialog {
       style: 'display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid var(--line,rgba(0,0,0,0.08));'
     }, title, btnClose);
 
+    this.allTags = [];
+    this.allAliases = [];
+
     // Section 1: Tags
     this.tagListEl = h('div', {
       style: 'display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;'
+    });
+
+    this.tagSuggestionsEl = h('div', {
+      class: 'tag-suggestions',
+      style: 'display:none;position:absolute;top:100%;left:0;right:0;z-index:1000;background:var(--surface,#ffffff);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.18);max-height:140px;overflow-y:auto;padding:4px;margin-top:2px;'
     });
 
     this.inputTag = h('input', {
@@ -40,18 +48,59 @@ export class PropertiesDialog {
       placeholder: t('Add tag (e.g. #study, #AI/ML)...'),
       style: 'width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:10px;font-size:13px;background:var(--desk,#f5f5f7);color:inherit;outline:none;'
     });
+
+    const updateTagSuggestions = () => {
+      const q = (this.inputTag.value || '').trim().toLowerCase().replace(/^#/, '');
+      this.tagSuggestionsEl.innerHTML = '';
+      if (!q) {
+        this.tagSuggestionsEl.style.display = 'none';
+        return;
+      }
+      const matches = this.allTags.filter((t) => t.toLowerCase().replace(/^#/, '').includes(q));
+      if (!matches.length) {
+        this.tagSuggestionsEl.style.display = 'none';
+        return;
+      }
+      for (const m of matches.slice(0, 8)) {
+        const item = h('div', {
+          style: 'padding:6px 10px;cursor:pointer;border-radius:6px;font-size:12.5px;font-weight:600;color:#0078d4;'
+        }, m);
+        item.addEventListener('mouseenter', () => { item.style.background = 'rgba(0,120,212,0.1)'; });
+        item.addEventListener('mouseleave', () => { item.style.background = 'transparent'; });
+        item.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          this.addTag(m);
+          this.inputTag.value = '';
+          this.tagSuggestionsEl.style.display = 'none';
+        });
+        this.tagSuggestionsEl.appendChild(item);
+      }
+      this.tagSuggestionsEl.style.display = 'block';
+    };
+
+    this.inputTag.addEventListener('input', updateTagSuggestions);
+    this.inputTag.addEventListener('focus', updateTagSuggestions);
+    this.inputTag.addEventListener('blur', () => {
+      setTimeout(() => { if (this.tagSuggestionsEl) this.tagSuggestionsEl.style.display = 'none'; }, 200);
+    });
+
     this.inputTag.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        this.addTag(this.inputTag.value);
+        const firstMatch = this.tagSuggestionsEl.firstChild?.textContent;
+        const val = this.inputTag.value.trim();
+        this.addTag(val || firstMatch);
         this.inputTag.value = '';
+        this.tagSuggestionsEl.style.display = 'none';
       }
     });
+
+    const tagInputWrap = h('div', { style: 'position:relative;' }, this.inputTag, this.tagSuggestionsEl);
 
     const secTags = h('div', { style: 'margin-top:14px;' },
       h('div', { style: 'font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-2,rgba(128,128,128,0.85));' }, t('Tags')),
       this.tagListEl,
-      this.inputTag
+      tagInputWrap
     );
 
     // Section 2: Aliases
@@ -59,23 +108,69 @@ export class PropertiesDialog {
       style: 'display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;'
     });
 
+    this.aliasSuggestionsEl = h('div', {
+      class: 'alias-suggestions',
+      style: 'display:none;position:absolute;top:100%;left:0;right:0;z-index:1000;background:var(--surface,#ffffff);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.18);max-height:140px;overflow-y:auto;padding:4px;margin-top:2px;'
+    });
+
     this.inputAlias = h('input', {
       type: 'text',
       placeholder: t('Add alias (e.g. Lecture 4 Notes)...'),
       style: 'width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:10px;font-size:13px;background:var(--desk,#f5f5f7);color:inherit;outline:none;'
     });
+
+    const updateAliasSuggestions = () => {
+      const q = (this.inputAlias.value || '').trim().toLowerCase();
+      this.aliasSuggestionsEl.innerHTML = '';
+      if (!q) {
+        this.aliasSuggestionsEl.style.display = 'none';
+        return;
+      }
+      const matches = this.allAliases.filter((a) => a.toLowerCase().includes(q));
+      if (!matches.length) {
+        this.aliasSuggestionsEl.style.display = 'none';
+        return;
+      }
+      for (const m of matches.slice(0, 8)) {
+        const item = h('div', {
+          style: 'padding:6px 10px;cursor:pointer;border-radius:6px;font-size:12.5px;font-weight:600;color:#9333ea;'
+        }, m);
+        item.addEventListener('mouseenter', () => { item.style.background = 'rgba(168,85,247,0.12)'; });
+        item.addEventListener('mouseleave', () => { item.style.background = 'transparent'; });
+        item.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          this.addAlias(m);
+          this.inputAlias.value = '';
+          this.aliasSuggestionsEl.style.display = 'none';
+        });
+        this.aliasSuggestionsEl.appendChild(item);
+      }
+      this.aliasSuggestionsEl.style.display = 'block';
+    };
+
+    this.inputAlias.addEventListener('input', updateAliasSuggestions);
+    this.inputAlias.addEventListener('focus', updateAliasSuggestions);
+    this.inputAlias.addEventListener('blur', () => {
+      setTimeout(() => { if (this.aliasSuggestionsEl) this.aliasSuggestionsEl.style.display = 'none'; }, 200);
+    });
+
     this.inputAlias.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        this.addAlias(this.inputAlias.value);
+        const firstMatch = this.aliasSuggestionsEl.firstChild?.textContent;
+        const val = this.inputAlias.value.trim();
+        this.addAlias(val || firstMatch);
         this.inputAlias.value = '';
+        this.aliasSuggestionsEl.style.display = 'none';
       }
     });
+
+    const aliasInputWrap = h('div', { style: 'position:relative;' }, this.inputAlias, this.aliasSuggestionsEl);
 
     const secAliases = h('div', { style: 'margin-top:16px;' },
       h('div', { style: 'font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-2,rgba(128,128,128,0.85));' }, t('Aliases')),
       this.aliasListEl,
-      this.inputAlias
+      aliasInputWrap
     );
 
     // Section 3: Metadata Info
@@ -207,11 +302,30 @@ export class PropertiesDialog {
     await this.save();
   }
 
+  async loadWorkspaceSuggestions() {
+    try {
+      if (window.board?.boards?.list) {
+        const list = await window.board.boards.list();
+        const tagSet = new Set();
+        const aliasSet = new Set();
+        for (const b of list) {
+          if (Array.isArray(b.tags)) b.tags.forEach((t) => tagSet.add(t));
+          if (Array.isArray(b.aliases)) b.aliases.forEach((a) => aliasSet.add(a));
+        }
+        this.allTags = Array.from(tagSet);
+        this.allAliases = Array.from(aliasSet);
+      }
+    } catch {}
+  }
+
   async save() {
     this.sync();
     try {
       if (typeof this.app?.persist === 'function') {
         await this.app.persist();
+      }
+      if (typeof this.app?.updateTopProperties === 'function') {
+        this.app.updateTopProperties();
       }
       this.app?.toast?.(t('Properties saved'));
     } catch (err) {
@@ -219,9 +333,10 @@ export class PropertiesDialog {
     }
   }
 
-  open() {
+  async open() {
     this.build();
     this.sync();
+    await this.loadWorkspaceSuggestions();
     this.visible = true;
     this.el.style.display = 'flex';
     setTimeout(() => this.inputTag?.focus(), 50);

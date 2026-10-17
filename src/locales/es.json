@@ -1152,7 +1152,6 @@
   "Create quick note": "Create quick note",
   "No notes found": "No notes found",
   "Untitled": "Untitled",
-  "Open Board": "Open Board",
   "Open in Split View": "Open in Split View",
   "Add Tag...": "Add Tag...",
   "Note Overview (Browse document previews, tags, aliases)": "Note Overview (Browse document previews, tags, aliases)",
@@ -1243,5 +1242,17 @@
   "520ms": "520 ms",
   "How long the laser pointer trail lingers on screen before melting away.": "Cuánto tiempo permanece el rastro del puntero láser en la pantalla antes de desaparecer.",
   "Board link thumbnails": "Miniaturas de enlaces de pizarra",
-  "Show thumbnail picture previews on board link cards by default.": "Mostrar imágenes de vista previa en tarjetas de enlace de pizarra por defecto."
+  "Show thumbnail picture previews on board link cards by default.": "Mostrar imágenes de vista previa en tarjetas de enlace de pizarra por defecto.",
+  "Add Alias...": "Agregar alias...",
+  "Double-click to open board": "Doble clic para abrir la pizarra",
+  "Enter alias for board (e.g. Lecture 4 Notes):": "Ingresa el alias para la pizarra (ej. Notas clase 4):",
+  "Alias “{alias}” added": "Alias “{alias}” agregado",
+  "Failed to add alias: {msg}": "Error al agregar alias: {msg}",
+  "How long the laser pointer trail lingers on screen (Instant, 300ms, 520ms, 1.2s, 2.5s, 5.0s, 10s)": "Cuánto tiempo permanece el rastro del puntero láser en la pantalla (Instantáneo, 300ms, 520ms, 1.2s, 2.5s, 5.0s, 10s)",
+  "Allow drawing translucent pen strokes for layering effects": "Permitir trazos de pluma translúcidos para efectos de capas",
+  "Show thumbnail picture previews on board link cards by default": "Mostrar vistas previas en miniatura en tarjetas de enlace por defecto",
+  "Board alias (Click to edit)": "Alias de pizarra (Clic para editar)",
+  "Board tag (Click to edit)": "Etiqueta de pizarra (Clic para editar)",
+  "Gesture scratch-out": "Gesto de tachar para borrar",
+  "Scribble over ink to erase": "Garabatea sobre la tinta para borrar"
 }
