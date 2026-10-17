@@ -283,6 +283,10 @@ export class Surface {
 
   selectionScreenBox(pad = 6) {
     const b = this.selectionBounds();
+    return this.screenBoxFor(b, pad);
+  }
+
+  screenBoxFor(b, pad = 6) {
     if (!b) return null;
     const p = this.cam.toScreen(b.x, b.y);
     return { x: p.x - pad, y: p.y - pad, w: b.w * this.cam.z + pad * 2, h: b.h * this.cam.z + pad * 2 };

@@ -61,6 +61,29 @@ This document serves as the master registry of all features, enhancements, bug f
    - `node scripts/smoke.js`: 1240 passed, 0 failed.
    - `node scripts/i18n-check.js`: 1256/1256 translated, 0 left over, 0 problems across all 7 languages.
 
+### Round 3 Hardening & Enhancements (Gallery Filter, Ribbon Customization, Crop/Annotate, Multi-Video Stitch)
+1. **Gallery View Auto-Hide & Tag Filtering** (`src/js/ui/panels.js`, `src/js/app.js`, `src/js/ui/replay-bar.js`):
+   - Auto-hides `ReplayBar` and `AudioBar` when entering "My boards" gallery, restoring on board open/close.
+   - Added a `#tags` section in the left sidebar below "Folders" to filter boards by tag with counts.
+   - Rendered glassmorphic tag badges (`#tag`) on board cards below titles without overlap.
+   - Included board tags and aliases in `searchFind()` scoring.
+2. **Ribbon Customization & Audio Import** (`src/js/ui/toolbar.js`, `src/js/insert.js`, `src/css/app.css`):
+   - Widened ribbon with `overflow-x: auto` and thin scrollbar support.
+   - Added `Audio / Recording…` (`insert.audio`) file import in the `+` menu (`.mp3`, `.wav`, `.m4a`, `.webm`, `.ogg`, `.aac`, `.flac`) calculating SHA-256 asset hash and duration.
+   - Added selectable pin/unpin toggles (📌 / 📍) beside each insert menu item to move items to the ribbon or back to the menu. Right-clicking pinned tools on the ribbon instantly unpins them.
+3. **Image / PDF Printout Hover Menu, Non-Destructive Crop & Direct Annotation Grouping** (`src/js/ui/contextmenu.js`, `src/js/core/render.js`, `src/js/core/tools.js`, `src/js/core/surface.js`):
+   - Floating toolbar appears on pointer hover over items in `select` mode via `Surface.screenBoxFor()`.
+   - Added `[✂️ Crop image]` with interactive edge sliders (`Top`, `Bottom`, `Left`, `Right`), non-destructive `o.crop = { sx, sy, sw, sh }` in `render.js:drawImage()`, and Reset/Apply buttons.
+   - Added `[✏️ Annotate image]` mode: strokes drawn directly over an image receive `attachedTo: image.id`.
+   - On `[Done Annotating]`, the image and all annotations are grouped together and locked (`locked: true`), moving as one unit and protected from eraser until unlocked.
+4. **Multi-Session Stitched Video Export** (`src/js/export-video.js`):
+   - Interactive session picker modal with checkboxes, up/down (▲/▼) reordering, and a stitch toggle.
+   - Implemented sequential multi-track stitching: Web Audio multiplexes tracks sequentially into a single `MediaRecorder` stream, outputting a unified WebM video with synchronized audio and stroke replays.
+   - Optional separate export mode saves each track individually.
+5. **Quality & Test Verification**:
+   - `node scripts/smoke.js`: 1240 passed, 0 failed.
+   - `node scripts/i18n-check.js`: 1295/1295 translated across all 7 languages.
+
 ---
 
 ## 3. Critical Architectural Rules & Anti-Regression Guardrails

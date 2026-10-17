@@ -433,3 +433,67 @@ export function createExcerptCard(app, { boardId, page = 1, box = null, imageAss
   app.surface?.invalidate();
   return card;
 }
+
+export async function insertAudioFromPath(app, p) {
+  const ext = (p.split('.').pop() || '').toLowerCase();
+  const name = p.split(/[\\/]/).pop() || 'Audio Track';
+  const ab = await window.board.readFile(p);
+  const hashBuf = await crypto.subtle.digest('SHA-256', ab);
+  const hashHex = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  const assetId = `${hashHex}.${ext}`;
+  await window.board.assets.putBinaryDirect(assetId, new Uint8Array(ab));
+
+  let durationMs = 0;
+  try {
+    const blob = new Blob([ab]);
+    const blobUrl = URL.createObjectURL(blob);
+    const audio = new Audio();
+    durationMs = await new Promise((resolve) => {
+      audio.onloadedmetadata = () => {
+        const d = isFinite(audio.duration) ? Math.round(audio.duration * 1000) : 0;
+        URL.revokeObjectURL(blobUrl);
+        resolve(d);
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        resolve(0);
+      };
+      audio.src = blobUrl;
+    });
+  } catch (err) {
+    console.warn('Could not determine audio duration:', err);
+  }
+
+  const track = {
+    id: 'aud_' + Date.now(),
+    assetId,
+    name,
+    durationMs: durationMs || 60000,
+    t0: Date.now(),
+    t1: Date.now() + (durationMs || 60000)
+  };
+
+  if (!Array.isArray(app.store.doc.audioTracks)) app.store.doc.audioTracks = [];
+  app.store.doc.audioTracks.push(track);
+  if (typeof app.persist === 'function') await app.persist();
+  if (app.replayBar?.updateAudioUI) app.replayBar.updateAudioUI();
+  if (app.audioBar?.open) app.audioBar.open(track);
+  app.toast?.(t('Audio imported: {name}', { name }));
+  return track;
+}
+
+export async function pickAndInsertAudio(app) {
+  const paths = await window.board.openDialog({
+    title: t('Insert Audio / Recording'),
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: t('Audio files'), extensions: ['mp3', 'wav', 'm4a', 'webm', 'ogg', 'aac', 'flac'] },
+      { name: t('All files'), extensions: ['*'] }
+    ]
+  });
+  if (!paths || !paths.length) return;
+  for (const p of paths) {
+    await insertAudioFromPath(app, p);
+  }
+}
+

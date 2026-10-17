@@ -5,6 +5,7 @@ import { icon } from './icons.js';
 import { t } from '../i18n.js';
 import { PEN_COLORS, NOTE_COLORS, TEXT_COLORS, SHAPE_STROKES, SHAPE_FILLS } from './palettes.js';
 import { inkPaint } from '../core/render.js';
+import { boundsOf } from '../core/store.js';
 
 // kinds whose default ink the board draws light on a dark theme (notes and tables keep their own dark ink)
 const FOLLOWS_BOARD = new Set(['stroke', 'shape', 'text', 'math', 'connector']);
@@ -117,14 +118,21 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
 /* ------------------------------------------------------------------ *
  *  Floating toolbar above the current selection
  * ------------------------------------------------------------------ */
-export function updateSelectionBar(app) {
+export function updateSelectionBar(app, targetObj = null) {
   const bar = document.getElementById('ctxbar');
-  if (app.textEditor.active) { formatBar(app, bar); return; }
+  if (!bar) return;
+  if (app.textEditor?.active) { formatBar(app, bar); return; }
   if (bar.dataset.mode === 'format') { bar.dataset.mode = ''; bar.onmousedown = null; bar.innerHTML = ''; }
-  const sel = [...app.surface.selection].map((id) => app.store.get(id)).filter(Boolean);
+  const sel = targetObj ? [targetObj] : [...app.surface.selection].map((id) => app.store.get(id)).filter(Boolean);
   if (!sel.length) { bar.classList.remove('show'); return; }
 
-  const box = app.surface.selectionScreenBox(10);
+  let box = null;
+  if (targetObj) {
+    const obox = boundsOf(targetObj) || targetObj;
+    box = app.surface.screenBoxFor(obox, 10);
+  } else {
+    box = app.surface.selectionScreenBox(10);
+  }
   if (!box) { bar.classList.remove('show'); return; }
 
   bar.innerHTML = '';
@@ -211,6 +219,12 @@ export function updateSelectionBar(app) {
       app.store.commit('toggle thumbnail', [card.id]);
       app.surface.invalidate();
     }));
+  }
+
+  if (sel.length === 1 && sel[0].type === 'image') {
+    const imgObj = sel[0];
+    bar.appendChild(mk(t('Crop image'), 'crop', () => startImageCrop(app, imgObj)));
+    bar.appendChild(mk(t('Annotate image'), 'pen', () => startImageAnnotate(app, imgObj)));
   }
 
   // a table gets its own row and column controls
@@ -392,3 +406,137 @@ function formatBar(app, bar) {
 function syncFormat(app, bar) {
   for (const b of bar.querySelectorAll('[data-fmt]')) b.classList.toggle('on', app.textEditor.state(b.dataset.fmt));
 }
+
+export function startImageCrop(app, imgObj) {
+  closePopover();
+  document.getElementById('cropOverlay')?.remove();
+
+  const cropModal = h('div', {
+    id: 'cropOverlay',
+    style: 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--surface);border:1px solid var(--stroke);border-radius:12px;padding:14px 18px;box-shadow:var(--shadow-3);display:flex;flex-direction:column;gap:10px;min-width:320px;'
+  });
+
+  const title = h('div', { style: 'font-weight:700;font-size:14px;color:var(--text);display:flex;align-items:center;justify-content:space-between;' },
+    h('span', {}, t('Crop image')),
+    h('button', {
+      style: 'background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-2);',
+      onclick: () => cropModal.remove()
+    }, '✕')
+  );
+
+  const curCrop = imgObj.crop || { sx: 0, sy: 0, sw: 1, sh: 1 };
+  let topPct = Math.round(curCrop.sy * 100);
+  let leftPct = Math.round(curCrop.sx * 100);
+  let rightPct = Math.round((1 - (curCrop.sx + curCrop.sw)) * 100);
+  let bottomPct = Math.round((1 - (curCrop.sy + curCrop.sh)) * 100);
+
+  const makeSlider = (label, val, onChange) => {
+    return h('div', { style: 'display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;' },
+      h('span', { style: 'width:60px;' }, label),
+      h('input', {
+        type: 'range', min: '0', max: '45', value: String(val), style: 'flex:1;cursor:pointer;',
+        oninput: (e) => onChange(Number(e.target.value))
+      })
+    );
+  };
+
+  const previewCrop = () => {
+    const sx = leftPct / 100;
+    const sy = topPct / 100;
+    const sw = Math.max(0.1, 1 - (leftPct + rightPct) / 100);
+    const sh = Math.max(0.1, 1 - (topPct + bottomPct) / 100);
+    imgObj.crop = { sx, sy, sw, sh };
+    app.surface.invalidate();
+  };
+
+  const sliderT = makeSlider(t('Top'), topPct, (v) => { topPct = v; previewCrop(); });
+  const sliderB = makeSlider(t('Bottom'), bottomPct, (v) => { bottomPct = v; previewCrop(); });
+  const sliderL = makeSlider(t('Left'), leftPct, (v) => { leftPct = v; previewCrop(); });
+  const sliderR = makeSlider(t('Right'), rightPct, (v) => { rightPct = v; previewCrop(); });
+
+  const btnRow = h('div', { style: 'display:flex;gap:8px;justify-content:flex-end;margin-top:4px;' });
+  const btnReset = h('button', { class: 'btn', style: 'padding:4px 10px;font-size:12px;' }, t('Reset'));
+  btnReset.onclick = () => {
+    delete imgObj.crop;
+    app.store.update(imgObj.id, { crop: null });
+    app.store.commit('reset crop', [imgObj.id]);
+    app.surface.invalidate();
+    cropModal.remove();
+    app.toast(t('Crop reset'));
+  };
+
+  const btnApply = h('button', { class: 'btn primary', style: 'padding:4px 12px;font-size:12px;' }, t('Apply'));
+  btnApply.onclick = () => {
+    const sx = leftPct / 100;
+    const sy = topPct / 100;
+    const sw = Math.max(0.1, 1 - (leftPct + rightPct) / 100);
+    const sh = Math.max(0.1, 1 - (topPct + bottomPct) / 100);
+    app.store.update(imgObj.id, { crop: { sx, sy, sw, sh } });
+    app.store.commit('crop image', [imgObj.id]);
+    app.surface.invalidate();
+    cropModal.remove();
+    app.toast(t('Image cropped'));
+  };
+
+  btnRow.appendChild(btnReset);
+  btnRow.appendChild(btnApply);
+
+  cropModal.appendChild(title);
+  cropModal.appendChild(sliderT);
+  cropModal.appendChild(sliderB);
+  cropModal.appendChild(sliderL);
+  cropModal.appendChild(sliderR);
+  cropModal.appendChild(btnRow);
+
+  document.body.appendChild(cropModal);
+}
+
+export function startImageAnnotate(app, imgObj) {
+  closePopover();
+  app._annotatingImage = imgObj.id;
+  app.setTool('pen');
+  app.syncUI();
+
+  document.getElementById('annotateHud')?.remove();
+
+  const hud = h('div', {
+    id: 'annotateHud',
+    style: 'position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--accent,#0078d4);color:#ffffff;border-radius:20px;padding:6px 16px;box-shadow:var(--shadow-3);display:flex;align-items:center;gap:12px;font-size:13px;font-weight:600;'
+  });
+
+  hud.appendChild(h('span', {}, t('Annotating "{name}" — write directly on image', { name: imgObj.name || t('Image') })));
+
+  const btnDone = h('button', {
+    class: 'btn',
+    style: 'background:#ffffff;color:var(--accent,#0078d4);border:none;border-radius:14px;padding:3px 10px;font-size:12px;font-weight:700;cursor:pointer;'
+  }, t('Done Annotating'));
+
+  btnDone.onclick = () => finishImageAnnotate(app, imgObj);
+  hud.appendChild(btnDone);
+  document.body.appendChild(hud);
+
+  app.toast(t('Annotate mode active: pen ink will become part of the image'));
+}
+
+export function finishImageAnnotate(app, imgObj) {
+  document.getElementById('annotateHud')?.remove();
+  const hostId = app._annotatingImage || imgObj?.id;
+  app._annotatingImage = null;
+  if (!hostId) return;
+
+  const target = app.store.get(hostId);
+  if (!target) return;
+
+  const annotations = app.store.objects.filter((o) => o.attachedTo === hostId);
+  if (annotations.length > 0) {
+    const gid = target.groupId || ('g_' + Date.now());
+    const gName = target.name ? t('Annotated {name}', { name: target.name }) : t('Annotated Image');
+    const allIds = [target.id, ...annotations.map((a) => a.id)];
+    app.store.updateMany(allIds, { groupId: gid, groupName: gName, locked: true }, 'annotate image');
+    app.surface.invalidate();
+    app.toast(t('Image and {n} annotations grouped & locked together', { n: annotations.length }));
+  } else {
+    app.toast(t('Annotation mode finished'));
+  }
+}
+

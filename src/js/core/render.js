@@ -905,7 +905,17 @@ export function drawImage(ctx, o, onload) {
     ctx.shadowColor = 'transparent';
   }
   if (img) {
-    ctx.drawImage(img, o.x, o.y, o.w, o.h);
+    if (o.crop && typeof o.crop.sw === 'number' && typeof o.crop.sh === 'number') {
+      const iw = img.naturalWidth || img.width || o.w;
+      const ih = img.naturalHeight || img.height || o.h;
+      const sx = (o.crop.sx <= 1 && o.crop.sw <= 1) ? o.crop.sx * iw : o.crop.sx;
+      const sy = (o.crop.sy <= 1 && o.crop.sh <= 1) ? o.crop.sy * ih : o.crop.sy;
+      const sw = (o.crop.sw <= 1) ? o.crop.sw * iw : o.crop.sw;
+      const sh = (o.crop.sh <= 1) ? o.crop.sh * ih : o.crop.sh;
+      ctx.drawImage(img, sx, sy, sw, sh, o.x, o.y, o.w, o.h);
+    } else {
+      ctx.drawImage(img, o.x, o.y, o.w, o.h);
+    }
   } else if (o.missing) {
     // The board points at a picture whose file is not there - most likely the
     // board travelled without the assets folder beside it. Say so, and hold the

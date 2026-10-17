@@ -131,7 +131,40 @@ export function initToolbar(app) {
    */
   iconTool({ tool: 'emoji', icon: 'emoji', title: t('Emoji \u2014 pick one to stamp on the board'),
     onClick: (e, b) => { app.setTool('emoji'); app.syncUI(); openToolPopover(app, b, 'emoji'); } });
-  iconTool({ cmd: 'insert.image', icon: 'image', title: t('Insert image'), onClick: () => app.command('insert.image') });
+  // Pinned tools from the insert menu
+  if (!Array.isArray(app.settings.pinnedTools)) {
+    app.settings.pinnedTools = ['insert.image'];
+  }
+  const PIN_METADATA = {
+    'insert.image': { icon: 'image', title: t('Insert image'), onClick: () => app.command('insert.image') },
+    'insert.audio': { icon: 'audio', title: t('Insert audio or recording'), onClick: () => app.command('insert.audio') },
+    'insert.document': { icon: 'doc', title: t('Insert document'), onClick: () => app.command('insert.document') },
+    'insert.table': { icon: 'table', title: t('Insert table'), onClick: () => app.command('insert.table') },
+    'insert.math': { icon: 'maths', title: t('Insert maths formula'), onClick: () => app.command('insert.math') },
+    'insert.curtain': { icon: 'curtain', title: t('Answer cover'), onClick: () => app.command('insert.curtain') },
+    'insert.boardlink': { icon: 'link', title: t('Link to a board'), onClick: () => app.command('insert.boardlink') },
+    'panels.templates': { icon: 'template', title: t('Templates'), onClick: () => app.panels.templates() }
+  };
+
+  for (const pid of app.settings.pinnedTools) {
+    const meta = PIN_METADATA[pid];
+    if (!meta) continue;
+    const btn = iconTool({
+      cmd: pid,
+      icon: meta.icon,
+      title: `${meta.title} — ${t('Right-click to unpin')}`,
+      onClick: meta.onClick
+    });
+    btn.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      app.settings.pinnedTools = app.settings.pinnedTools.filter((id) => id !== pid);
+      app.saveSettings();
+      initToolbar(app);
+      app.toast(t('Unpinned from ribbon'));
+    });
+  }
+
   iconTool({ cmd: 'insert', icon: 'insert', pop: 'insert', title: t('Insert document, table or template'),
     onClick: (e, b) => openInsertPopover(app, b) });
   sep();
@@ -850,13 +883,29 @@ export function openToolPopover(app, anchor, tool) {
 
 /* ------------------------------------------------------------------ */
 function menuItem(label, iconName, onClick, opts = {}) {
+  const pinBtn = opts.pinKey ? h('span', {
+    class: 'menu-pin' + (opts.isPinned ? ' pinned' : ''),
+    title: opts.isPinned ? t('Unpin from ribbon') : t('Pin to ribbon'),
+    style: `margin-left:auto;padding:2px 6px;cursor:pointer;opacity:${opts.isPinned ? '1' : '0.35'};font-size:13px;display:flex;align-items:center;transition:opacity .15s;`,
+    onclick: (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      opts.onTogglePin?.();
+    }
+  }, opts.isPinned ? '📌' : '📍') : null;
+
   const b = h('button', { class: 'menu-item' + (opts.danger ? ' danger' : '') },
     h('span', { html: icon(iconName, 17), style: 'display:flex' }),
     h('span', {}, label),
-    opts.key ? h('span', { class: 'k' }, opts.key) : null
+    opts.key ? h('span', { class: 'k' }, opts.key) : null,
+    pinBtn
   );
   if (opts.disabled) b.setAttribute('disabled', '');
-  b.addEventListener('click', () => { closePopover(); onClick(); });
+  b.addEventListener('click', (e) => {
+    if (e.target.closest('.menu-pin')) return;
+    closePopover();
+    onClick();
+  });
   return b;
 }
 
@@ -871,16 +920,45 @@ function teachingItems(app) {
 }
 
 export function openInsertPopover(app, anchor) {
+  if (!Array.isArray(app.settings.pinnedTools)) {
+    app.settings.pinnedTools = ['insert.image'];
+  }
+  const pinned = new Set(app.settings.pinnedTools);
+
+  const togglePin = (id) => {
+    if (pinned.has(id)) {
+      pinned.delete(id);
+      app.settings.pinnedTools = [...pinned];
+    } else {
+      pinned.add(id);
+      app.settings.pinnedTools = [...pinned];
+    }
+    app.saveSettings();
+    initToolbar(app);
+    openInsertPopover(app, anchor);
+  };
+
+  const pinnableItem = (label, iconName, onClick, id, key = null) => {
+    const isPinned = pinned.has(id);
+    return menuItem(label, iconName, onClick, {
+      key,
+      pinKey: id,
+      isPinned,
+      onTogglePin: () => togglePin(id)
+    });
+  };
+
   const body = h('div', { class: 'menu' },
-    menuItem(t('Image…'), 'image', () => app.command('insert.image')),
-    menuItem(t('Document (Word, PowerPoint, PDF)…'), 'doc', () => app.command('insert.document')),
-    menuItem(t('Table'), 'table', () => app.command('insert.table')),
-    menuItem(t('Maths'), 'maths', () => app.command('insert.math')),
-    menuItem(t('Answer cover'), 'curtain', () => app.command('insert.curtain')),
-    menuItem(t('Link to a board…'), 'link', () => app.command('insert.boardlink'), { key: '@' }),
+    pinnableItem(t('Image…'), 'image', () => app.command('insert.image'), 'insert.image'),
+    pinnableItem(t('Audio / Recording…'), 'audio', () => app.command('insert.audio'), 'insert.audio'),
+    pinnableItem(t('Document (Word, PowerPoint, PDF)…'), 'doc', () => app.command('insert.document'), 'insert.document'),
+    pinnableItem(t('Table'), 'table', () => app.command('insert.table'), 'insert.table'),
+    pinnableItem(t('Maths'), 'maths', () => app.command('insert.math'), 'insert.math'),
+    pinnableItem(t('Answer cover'), 'curtain', () => app.command('insert.curtain'), 'insert.curtain'),
+    pinnableItem(t('Link to a board…'), 'link', () => app.command('insert.boardlink'), 'insert.boardlink', '@'),
     h('div', { class: 'menu-sep' }),
     menuItem(t('Paste from clipboard'), 'copy', () => app.command('edit.paste'), { key: 'Ctrl+V' }),
-    menuItem(t('Templates…'), 'template', () => app.panels.templates())
+    pinnableItem(t('Templates…'), 'template', () => app.panels.templates(), 'panels.templates')
   );
   openPopover(anchor, body, { key: 'insert' });
 }

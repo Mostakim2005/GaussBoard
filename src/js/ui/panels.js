@@ -52,6 +52,15 @@ export function createPanels(app) {
   function close() {
     panel.classList.remove('open');
     currentKey = null; currentRender = null;
+
+    if (app._savedHudState) {
+      if (app._savedHudState.replayBar) app.replayBar?.show();
+      if (app._savedHudState.audioBar && app.store?.doc?.audioTracks?.length) {
+        app.audioBar?.open(app.store.doc.audioTracks[0]);
+      }
+      app._savedHudState = null;
+    }
+
     // The page fades rather than sliding away; it stops being a page once it has gone.
     // Becoming the side panel again happens with no animation at all: otherwise
     // the faded page turned back into a fully visible side panel and slid off
@@ -68,6 +77,14 @@ export function createPanels(app) {
 
   function open(key, label, render) {
     if (currentKey === key) { close(); return; }
+    if (key === 'boards') {
+      app._savedHudState = {
+        replayBar: app.replayBar?.visible,
+        audioBar: app.audioBar?.visible
+      };
+      if (app.replayBar) app.replayBar.hide();
+      if (app.audioBar) app.audioBar.close();
+    }
     currentKey = key;
     currentRender = render;
     title.textContent = label;
@@ -1670,7 +1687,11 @@ export function createPanels(app) {
       .sort((a, b) => b.s - a.s).slice(0, 12).map((x) => x.f);
     const boards = all.map((b) => {
       const own = scoreBoard(b.name || t('Untitled board'), q);
-      if (own) return { b, s: own + 1000 };
+      const tagText = Array.isArray(b.tags) ? b.tags.join(' ') : '';
+      const aliasText = Array.isArray(b.aliases) ? b.aliases.join(' ') : '';
+      const tagScore = (tagText ? scoreBoard(tagText, q) : 0) + (aliasText ? scoreBoard(aliasText, q) : 0);
+      if (own) return { b, s: own + 1000 + tagScore };
+      if (tagScore) return { b, s: tagScore + 500 };
       return { b, s: scoreBoard(F.folderPath(app.settings, F.folderOf(app.settings, b.id)).map((f) => f.name).join(' '), q) };
     }).filter((x) => x.s > 0).sort((a, b) => b.s - a.s || (b.b.modified || 0) - (a.b.modified || 0)).map((x) => x.b);
     return { folders, boards };
@@ -1752,6 +1773,7 @@ export function createPanels(app) {
     return h('section', { class: 'recent', 'aria-label': t('Recent') }, h('div', { class: 'recent-title' }, t('Recent')), row);
   }
 
+  const activeTagFilters = new Set();
   async function boardsGallery(opts = {}) {
     // Re-drawing in place (after a move, a new folder, a step into a folder)
     // must not go through open(), which treats a second open as "close". And
@@ -1759,21 +1781,29 @@ export function createPanels(app) {
     // covers the whole window, so there is no button behind it to toggle.
     if (!(currentKey === 'boards' && document.getElementById('boardList'))) {
       searchWords = '';          // a fresh look at My boards starts with no search
+      if (!opts.stay) activeTagFilters.clear();
       open('boards', t('My boards'), () => h('div', { id: 'boardList' }, h('p', { style: 'color:var(--text-2)' }, t('Loading…'))));
     }
     const all = await window.board.boards.list();
     if (!all.some((b) => b.id === app.store.doc.id)) all.unshift({
-      id: app.store.doc.id, name: app.store.doc.name, objects: app.store.count, modified: app.store.doc.modified
+      id: app.store.doc.id, name: app.store.doc.name, objects: app.store.count, modified: app.store.doc.modified,
+      tags: app.store.doc.tags || app.store.doc.properties?.tags || []
     });
     // The board in front is shown as it is right now, not as it was at its last save.
-    for (const b of all) if (b.id === app.store.doc.id) b.thumb = app.boardPictureFor?.() || b.thumb || null;
+    for (const b of all) if (b.id === app.store.doc.id) {
+      b.thumb = app.boardPictureFor?.() || b.thumb || null;
+      b.tags = app.store.doc.tags || app.store.doc.properties?.tags || b.tags || [];
+    }
     const host = document.getElementById('boardList');
     if (!host) return;
     // only in the usual folder, once that is known: while another is in use, boards filed from there are not "gone"
     if (app.storageElsewhere === false && F.pruneBoards(app.settings, all)) app.saveSettings();
     const here = app.boardFolder && F.folderPath(app.settings, app.boardFolder).length ? app.boardFolder : null;
     app.boardFolder = here;
-    const list = F.boardsIn(app.settings, all, here);
+    let list = F.boardsIn(app.settings, all, here);
+    if (activeTagFilters.size > 0) {
+      list = list.filter((b) => Array.isArray(b.tags) && [...activeTagFilters].every((t) => b.tags.includes(t)));
+    }
     const go = (id) => { app.boardFolder = id || null; boards({ stay: true }); };
     const keep = () => { try { localStorage.setItem('gazboard.settings', JSON.stringify(app.settings)); } catch { /* storage refused */ } app.syncBoardPath?.(); };
 
@@ -1808,6 +1838,36 @@ export function createPanels(app) {
       }
     };
     tree(null, 1);
+
+    // Collect all tags across all boards in the workspace
+    const allTags = new Map();
+    for (const b of all) {
+      if (Array.isArray(b.tags)) {
+        for (const t of b.tags) if (t) allTags.set(t, (allTags.get(t) || 0) + 1);
+      }
+    }
+    if (allTags.size > 0) {
+      side.appendChild(h('div', { class: 'side-title', style: 'margin-top:20px;' }, t('Tags')));
+      for (const [tag, count] of [...allTags.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+        const isSelected = activeTagFilters.has(tag);
+        const tagBtn = h('button', {
+          class: 'side-item' + (isSelected ? ' here' : ''),
+          style: 'padding-inline-start:12px;display:flex;align-items:center;justify-content:space-between;'
+        },
+          h('span', { style: 'display:flex;align-items:center;gap:6px;' },
+            h('span', { style: `font-weight:700;color:${isSelected ? 'var(--accent,#0078d4)' : '#e91e63'};` }, '#'),
+            h('span', { class: 'side-name' }, tag)
+          ),
+          h('span', { class: 'side-count' }, String(count))
+        );
+        tagBtn.addEventListener('click', () => {
+          if (activeTagFilters.has(tag)) activeTagFilters.delete(tag);
+          else activeTagFilters.add(tag);
+          boards({ stay: true });
+        });
+        side.appendChild(tagBtn);
+      }
+    }
 
     const actions = h('div', { class: 'gal-actions' });
     actions.appendChild(h('button', { class: 'btn primary', onclick: () => {
@@ -2034,6 +2094,14 @@ export function createPanels(app) {
           ? h('img', { src: b.thumb, alt: '', draggable: 'false', loading: 'lazy' })
           : h('span', { class: 'bt-blank', html: icon('board', 30) })),
         h('b', { class: 'bt-name rt-name' }, q ? markText(name, q) : name),
+        ...(Array.isArray(b.tags) && b.tags.length ? [
+          h('div', { class: 'bt-tags', style: 'display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 4px;' },
+            ...b.tags.slice(0, 4).map(t => h('span', {
+              class: 'tag-chip',
+              style: 'background:rgba(0,120,212,0.12);color:var(--accent,#0078d4);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;'
+            }, `#${t}`))
+          )
+        ] : []),
         ...(lines || [h('small', { class: 'bt-date' }, when)]),
         h('span', { class: 'bt-actions' },
           h('span', { class: 'icon-btn', title: t('Move to…'), html: icon('folderMove', 15), 'data-move': b.id, onclick: async (e) => {

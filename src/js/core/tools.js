@@ -1775,7 +1775,12 @@ export class Interaction {
           x: +q.x.toFixed(2), y: +q.y.toFixed(2), p: +(q.p ?? 0.5).toFixed(2), t: q.t != null ? Math.round(q.t) : undefined
         }));
         o.bbox = bboxOfPoints(o.points);
-        o.attachedTo = this.lockedHostFor(o) || undefined;
+        if (this.app?._annotatingImage) {
+          o.attachedTo = this.app._annotatingImage;
+          o.imageAnnotation = true;
+        } else {
+          o.attachedTo = this.lockedHostFor(o) || undefined;
+        }
         if (obj.audioId) { o.audioId = obj.audioId; o.t0 = obj.t0; o.t1 = obj.t1; }
         return o;
       };
@@ -1811,7 +1816,12 @@ export class Interaction {
     }));
     obj.bbox = bboxOfPoints(obj.points);
 
-    obj.attachedTo = this.lockedHostFor(obj) || undefined;
+    if (this.app?._annotatingImage) {
+      obj.attachedTo = this.app._annotatingImage;
+      obj.imageAnnotation = true;
+    } else {
+      obj.attachedTo = this.lockedHostFor(obj) || undefined;
+    }
 
     // The ink is always committed first, even when it is about to be replaced.
     // Straightening is then a SECOND transaction, so one undo gives you your
@@ -2466,7 +2476,13 @@ export class Interaction {
     } else this.surface.hoverId = null;
     // Moving onto or off a grouped object changes what the chrome should show,
     // and nothing else on a plain hover would ask for a repaint.
-    if (this.surface.hoverId !== hoverWas) this.surface.invalidate();
+    if (this.surface.hoverId !== hoverWas) {
+      this.surface.invalidate();
+      if (t === 'select' && !this.surface.selection.size) {
+        const hit = this.surface.hoverId ? this.store.get(this.surface.hoverId) : null;
+        this.app?.showHoverToolbar?.(hit);
+      }
+    }
 
     if (this.ruler.visible) {
       const zone = this.rulerZone(sp);

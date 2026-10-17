@@ -34,7 +34,7 @@ import { PENS, penById, rememberPen, heldPenId, FONTS } from './ui/palettes.js';
 import { exportPng, exportSvg, exportPdf, saveBoardFile, openBoardFile, exportable } from './export.js';
 import { boardThumb, boardPicture } from './ui/thumb.js';
 import {
-  pickAndInsertDocument, pickAndInsertImage, insertDocument,
+  pickAndInsertDocument, pickAndInsertImage, pickAndInsertAudio, insertDocument,
   insertImagesFromPaths, insertImageFiles, clipboardFileName, dropOrigin, isImagePath, isDocPath
 } from './insert.js';
 import { AudioRecorder } from './core/audio-recorder.js';
@@ -980,6 +980,13 @@ class App {
     clearTimeout(this._linkedTimer);
     this._linkedTimer = setTimeout(() => this.syncLinkedFrom(), opts.startup ? 2500 : 250);
     this.updateTopProperties?.();
+    if (this._savedHudState) {
+      if (this._savedHudState.replayBar) this.replayBar?.show();
+      if (this._savedHudState.audioBar && this.store?.doc?.audioTracks?.length) {
+        this.audioBar?.open(this.store.doc.audioTracks[0]);
+      }
+      this._savedHudState = null;
+    }
   }
 
   /**
@@ -2283,6 +2290,7 @@ class App {
       case 'view.background': this.panels.background(); break;
 
       case 'insert.image': pickAndInsertImage(this); break;
+      case 'insert.audio': pickAndInsertAudio(this); break;
       case 'insert.math': this.beginMathEdit(null); break;
       case 'insert.document': pickAndInsertDocument(this); break;
       case 'insert.table': this.addTable(); break;
@@ -2771,6 +2779,15 @@ class App {
     updateSelectionBar(this);
     this.syncZoom();
     this.interaction?.refreshInkCursor?.();
+  }
+
+  showHoverToolbar(obj) {
+    if (obj) {
+      updateSelectionBar(this, obj);
+    } else if (!this.surface?.selection?.size) {
+      const bar = document.getElementById('ctxbar');
+      if (bar) bar.classList.remove('show');
+    }
   }
 
   syncZoom() {

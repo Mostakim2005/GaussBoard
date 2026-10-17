@@ -59,6 +59,18 @@ export class ReplayBar {
     } catch {}
   }
 
+  get visible() {
+    return !!(this.el && this.el.style.display !== 'none');
+  }
+
+  hide() {
+    if (this.el) this.el.style.display = 'none';
+  }
+
+  show() {
+    if (this.el) this.el.style.display = 'flex';
+  }
+
   mount() {
     if (typeof document === 'undefined') return;
     const stage = document.getElementById('stage') || document.body;
