@@ -1,0 +1,60 @@
+# Agent Operating Instructions — GazBoard Replay
+
+> **MANDATORY INSTRUCTION FOR ALL AI CODING AGENTS (Antigravity, Cursor, Claude Code, Windsurf, Copilot)**:
+> This repository is strictly structured using a **Progressive Information Architecture (PIA)** to prevent context-window exhaustion and regression errors.
+> You MUST follow this multi-step protocol on EVERY turn before writing code or modifying files.
+
+---
+
+## 1. Mandatory Entrypoint & Context Routing Protocol
+
+1. **Do NOT Read the Entire `docs/` Folder**:
+   * Ingesting all documentation will consume over 100,000 tokens of your context and degrade reasoning.
+2. **First Step — Read `AI_BOOTSTRAP.md`**:
+   * Read [`AI_BOOTSTRAP.md`](AI_BOOTSTRAP.md) at the root to understand the core stack, data schemas (`Store`, `doc`), and the 6 Golden Invariants.
+3. **Second Step — Locate Feature in `docs/INDEX.md`**:
+   * Open [`docs/INDEX.md`](docs/INDEX.md) (Master Table of Contents).
+   * Find the row corresponding to the user's requested feature or task.
+4. **Third Step — Read ONLY the Designated Layer Dossier**:
+   * Open **ONLY** the single relevant file in `docs/layers/`:
+     * Audio, Replay, Bookmarks $\rightarrow$ [`docs/layers/01-audio-and-replay.md`](docs/layers/01-audio-and-replay.md)
+     * Inking, Pens, Scratch-out Eraser $\rightarrow$ [`docs/layers/02-inking-and-gestures.md`](docs/layers/02-inking-and-gestures.md)
+     * Canvas, Study Tape, Image Annotation $\rightarrow$ [`docs/layers/03-canvas-and-study-tape.md`](docs/layers/03-canvas-and-study-tape.md)
+     * Arrowheads, Lines, Custom Templates $\rightarrow$ [`docs/layers/04-geometry-and-templates.md`](docs/layers/04-geometry-and-templates.md)
+     * PDF Background Mode, Page Margins $\rightarrow$ [`docs/layers/05-pdf-and-pagemargins.md`](docs/layers/05-pdf-and-pagemargins.md)
+     * Split Workspace, OmniSearch, UI $\rightarrow$ [`docs/layers/06-workspace-and-ui.md`](docs/layers/06-workspace-and-ui.md)
+     * Video Export & Audio Stitching $\rightarrow$ [`docs/layers/07-video-export.md`](docs/layers/07-video-export.md)
+     * Multi-Layer System (On Standby) $\rightarrow$ [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md) (§6)
+5. **Fourth Step — Edit ONLY the Specified Files**:
+   * Touch only the 1–2 files listed in Section 2 of that layer dossier.
+
+---
+
+## 2. The 6 Non-Negotiable Invariants (Never Break)
+
+1. **Scene Partitioning During Audio Replay**:
+   * Base canvas drawing passes MUST exclude active audio session strokes: `(o) => o.audioId !== activeTrackId`. Replay strokes render exclusively in the dynamic overlay pass (`Surface.drawReplaySession()`).
+2. **Stroke Point Timestamp Preservation (`p.t`)**:
+   * Point generators, smoothing passes, and curve fitters in `tools.js` and `ink.js` must preserve `p.t`. Stripping `p.t` breaks audio synchronization.
+3. **Finite Audio Duration Safeguard**:
+   * Never rely on `audio.duration` without checking `isFinite()`. Always fall back to `track.durationMs = Date.now() - startTime`.
+4. **100% Internationalization (i18n) Parity**:
+   * Every user-facing UI string must be wrapped in `t('...')` and present across all 7 locale dictionaries (`ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, `zh-Hant.json`).
+5. **Zero Extra Native Dependencies**:
+   * Do not introduce npm packages that require C/C++ compilation (`node-gyp`). All algorithms must remain pure portable JavaScript.
+6. **Study Tape vs Curtain Discrimination**:
+   * Study tape (`subtype: 'tape'`) must toggle between concealed and revealed on a single click or tap. Standard curtains (`subtype !== 'tape'`) must remain selectable for the reveal toolbar.
+
+---
+
+## 3. Mandatory Verification Checklist
+
+Before reporting completion to the user, run these verification commands in PowerShell:
+
+```powershell
+# 1. Full regression smoke test suite (Must pass 1,240 / 1,240):
+node scripts/smoke.js
+
+# 2. Strict 100% translation coverage check (Must pass 1,349 / 1,349):
+node scripts/i18n-check.js
+```
