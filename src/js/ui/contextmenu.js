@@ -263,6 +263,17 @@ export function updateSelectionBar(app, targetObj = null) {
     }
     bar.appendChild(h('span', { class: 'bar-sep' }));
 
+    const currentHeadStyle = sel.every((o) => (o.headStyle || 'filled') === (sel[0].headStyle || 'filled')) ? (sel[0].headStyle || 'filled') : null;
+    for (const [style, label] of [['filled', t('Filled')], ['open', t('Open')], ['stealth', t('Stealth')], ['diamond', t('Diamond')]]) {
+      const b = mk(t('Arrowhead: {style}', { style: label }), 'arrowSize', () => {
+        app.setArrowHeadStyle(style);
+        updateSelectionBar(app);
+      });
+      if (currentHeadStyle === style) b.classList.add('on');
+      bar.appendChild(b);
+    }
+    bar.appendChild(h('span', { class: 'bar-sep' }));
+
     // Body thickness controls
     bar.appendChild(mk(t('Decrease thickness'), 'minus', () => {
       app.stepLineWidth(-1.5);
@@ -486,6 +497,16 @@ function syncFormat(app, bar) {
 export function startImageCrop(app, imgObj) {
   closePopover();
   document.getElementById('cropOverlay')?.remove();
+  const snap = app.store.snapshot([imgObj.id]);
+  const origCrop = imgObj.crop ? { ...imgObj.crop } : null;
+
+  const dismiss = (revert = false) => {
+    if (revert) {
+      app.store.restoreSnapshot(snap);
+      app.surface.invalidate();
+    }
+    cropModal.remove();
+  };
 
   const cropModal = h('div', {
     id: 'cropOverlay',
@@ -496,15 +517,16 @@ export function startImageCrop(app, imgObj) {
     h('span', {}, t('Crop image')),
     h('button', {
       style: 'background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-2);',
-      onclick: () => cropModal.remove()
+      onclick: () => dismiss(true)
     }, '✕')
   );
 
-  const curCrop = imgObj.crop || { sx: 0, sy: 0, sw: 1, sh: 1 };
-  let topPct = Math.round(curCrop.sy * 100);
-  let leftPct = Math.round(curCrop.sx * 100);
-  let rightPct = Math.round((1 - (curCrop.sx + curCrop.sw)) * 100);
-  let bottomPct = Math.round((1 - (curCrop.sy + curCrop.sh)) * 100);
+  const curCrop = origCrop || { sx: 0, sy: 0, sw: 1, sh: 1 };
+  const clampInset = (v) => Math.max(0, Math.min(45, v));
+  let topPct = clampInset(Math.round((curCrop.sy || 0) * 100));
+  let leftPct = clampInset(Math.round((curCrop.sx || 0) * 100));
+  let rightPct = clampInset(Math.round((1 - ((curCrop.sx || 0) + (curCrop.sw || 1))) * 100));
+  let bottomPct = clampInset(Math.round((1 - ((curCrop.sy || 0) + (curCrop.sh || 1))) * 100));
 
   const makeSlider = (label, val, onChange) => {
     return h('div', { style: 'display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;' },
@@ -534,8 +556,7 @@ export function startImageCrop(app, imgObj) {
   const btnReset = h('button', { class: 'btn', style: 'padding:4px 10px;font-size:12px;' }, t('Reset'));
   btnReset.onclick = () => {
     delete imgObj.crop;
-    app.store.update(imgObj.id, { crop: null });
-    app.store.commit('reset crop', [imgObj.id]);
+    app.store.commitSnapshot('reset crop', snap);
     app.surface.invalidate();
     cropModal.remove();
     app.toast(t('Crop reset'));
@@ -543,12 +564,8 @@ export function startImageCrop(app, imgObj) {
 
   const btnApply = h('button', { class: 'btn primary', style: 'padding:4px 12px;font-size:12px;' }, t('Apply'));
   btnApply.onclick = () => {
-    const sx = leftPct / 100;
-    const sy = topPct / 100;
-    const sw = Math.max(0.1, 1 - (leftPct + rightPct) / 100);
-    const sh = Math.max(0.1, 1 - (topPct + bottomPct) / 100);
-    app.store.update(imgObj.id, { crop: { sx, sy, sw, sh } });
-    app.store.commit('crop image', [imgObj.id]);
+    previewCrop();
+    app.store.commitSnapshot('crop image', snap);
     app.surface.invalidate();
     cropModal.remove();
     app.toast(t('Image cropped'));

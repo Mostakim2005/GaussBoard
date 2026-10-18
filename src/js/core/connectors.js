@@ -24,6 +24,7 @@ import { worldBounds } from './store.js';
 import { distToSegment, bboxOfPoints, clamp } from './util.js';
 
 export const ROUTES = ['straight', 'elbow', 'curved'];
+export const HEAD_STYLES = ['filled', 'open', 'stealth', 'diamond'];
 const GAP = 6;            // world units between an object's edge and the arrow's end
 const STUB = 24;          // how far an elbow leaves an edge before it turns
 const CURVE_STEPS = 24;   // segments a curve is measured with for hits and bounds
@@ -303,14 +304,33 @@ export function bendThrough(o, p) {
 /** Arrowheads a little bolder than the plain arrow shape's, so a thin arrow still reads. */
 export const headSize = (lw, scale = 1.0) => (lw * 3.6 + 5) * scale;
 
-function arrowHead(ctx, from, to, size, lengthMul = 1.4) {
+export function drawArrowhead(ctx, from, to, size, style = 'filled', lengthMul = 1.4) {
   const a = Math.atan2(to.y - from.y, to.x - from.x);
   const len = size * lengthMul;
+  const wing = (sign) => ({
+    x: to.x - Math.cos(a + sign * 0.38) * len,
+    y: to.y - Math.sin(a + sign * 0.38) * len
+  });
+  const left = wing(-1), right = wing(1);
+  const back = (factor) => ({ x: to.x - Math.cos(a) * size * factor, y: to.y - Math.sin(a) * size * factor });
   ctx.beginPath();
   ctx.moveTo(to.x, to.y);
-  ctx.lineTo(to.x - Math.cos(a - 0.38) * len, to.y - Math.sin(a - 0.38) * len);
-  ctx.lineTo(to.x - Math.cos(a) * (size * 0.45), to.y - Math.sin(a) * (size * 0.45));
-  ctx.lineTo(to.x - Math.cos(a + 0.38) * len, to.y - Math.sin(a + 0.38) * len);
+  ctx.lineTo(left.x, left.y);
+  if (style === 'open') {
+    ctx.lineTo(to.x, to.y);
+    ctx.lineTo(right.x, right.y);
+    ctx.stroke();
+    return;
+  }
+  if (style === 'diamond') {
+    const tail = back(lengthMul * 1.65), l = { x: tail.x + Math.cos(a + Math.PI / 2) * size * 0.58, y: tail.y + Math.sin(a + Math.PI / 2) * size * 0.58 };
+    const r = { x: tail.x - Math.cos(a + Math.PI / 2) * size * 0.58, y: tail.y - Math.sin(a + Math.PI / 2) * size * 0.58 };
+    ctx.lineTo(l.x, l.y); ctx.lineTo(tail.x, tail.y); ctx.lineTo(r.x, r.y);
+  } else {
+    const notch = back(style === 'stealth' ? 1.25 : 0.45);
+    ctx.lineTo(notch.x, notch.y);
+    ctx.lineTo(right.x, right.y);
+  }
   ctx.closePath();
   ctx.fill();
 }
@@ -346,8 +366,9 @@ export function drawConnector(ctx, o, paint = (c) => c) {
   else for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
   ctx.stroke();
   ctx.setLineDash([]);
-  if (heads === 'end' || heads === 'both') arrowHead(ctx, r.headFrom, r.b, size);
-  if (heads === 'both') arrowHead(ctx, r.tailFrom, r.a, size);
+  const style = HEAD_STYLES.includes(o.headStyle) ? o.headStyle : 'filled';
+  if (heads === 'end' || heads === 'both') drawArrowhead(ctx, r.headFrom, r.b, size, style);
+  if (heads === 'both') drawArrowhead(ctx, r.tailFrom, r.a, size, style);
   ctx.restore();
 }
 
@@ -365,9 +386,15 @@ export function connectorSvg(o) {
     const a = Math.atan2(to.y - from.y, to.x - from.x), s = headSize(lw, o.arrowScale || 1.0);
     const len = s * 1.4;
     const p1 = { x: to.x - Math.cos(a - 0.38) * len, y: to.y - Math.sin(a - 0.38) * len };
-    const pMid = { x: to.x - Math.cos(a) * (s * 0.45), y: to.y - Math.sin(a) * (s * 0.45) };
     const p2 = { x: to.x - Math.cos(a + 0.38) * len, y: to.y - Math.sin(a + 0.38) * len };
-    return `<polygon points="${f(to.x)},${f(to.y)} ${f(p1.x)},${f(p1.y)} ${f(pMid.x)},${f(pMid.y)} ${f(p2.x)},${f(p2.y)}" fill="${colour}"/>`;
+    const point = (p) => `${f(p.x)} ${f(p.y)}`;
+    if (o.headStyle === 'open') return `<path d="M${point(p1)} L${point(to)} L${point(p2)}" fill="none" stroke="${colour}" stroke-width="${lw}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    if (o.headStyle === 'diamond') {
+      const tail = { x: to.x - Math.cos(a) * len * 1.65, y: to.y - Math.sin(a) * len * 1.65 };
+      return `<polygon points="${point(to)} ${point(p1)} ${point(tail)} ${point(p2)}" fill="${colour}"/>`;
+    }
+    const notch = { x: to.x - Math.cos(a) * s * (o.headStyle === 'stealth' ? 1.25 : 0.45), y: to.y - Math.sin(a) * s * (o.headStyle === 'stealth' ? 1.25 : 0.45) };
+    return `<polygon points="${point(to)} ${point(p1)} ${point(notch)} ${point(p2)}" fill="${colour}"/>`;
   };
   const heads = o.heads || 'end';
   return `<path d="${d}" fill="none" stroke="${colour}" stroke-width="${lw}" stroke-linecap="round" stroke-linejoin="round"${dash}/>` +

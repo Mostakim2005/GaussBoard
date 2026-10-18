@@ -1355,5 +1355,16 @@
   "Pinned to ribbon": "An Menüband angeheftet",
   "Insert objects": "Objekte einfügen",
   "Ribbon tools": "Menüband-Werkzeuge",
-  "Pan canvas": "Leinwand verschieben"
+  "Pan canvas": "Leinwand verschieben",
+  "Catmull–Rom Bézier": "Catmull–Rom-Bézier",
+  "Could not save template: {msg}": "Vorlage konnte nicht gespeichert werden: {msg}",
+  "Edit template tags": "Vorlagen-Tags bearbeiten",
+  "Template tags, separated by commas": "Vorlagen-Tags, durch Kommas getrennt",
+  "Clear filters": "Filter löschen",
+  "No templates match these tags.": "Keine Vorlagen passen zu diesen Tags.",
+  "Video quality": "Videoqualität",
+  "Filled": "Gefüllt",
+  "Open": "Offen",
+  "Stealth": "Stealth",
+  "Arrowhead: {style}": "Pfeilspitze: {style}"
 }

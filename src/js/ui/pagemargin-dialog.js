@@ -61,10 +61,13 @@ export class PageMarginDialog {
     });
 
     if (this.app.store) {
-      this.app.store.commit('page margin adjustment', [this.app.store.pagesOp(pages)]);
+      const ops = [this.app.store.pagesOp(pages)];
       if (this.color && this.app.store.doc.background) {
-        this.app.store.doc.background.color = this.color;
+        const before = { ...this.app.store.doc.background };
+        ops.push({ t: 'doc', before: { background: before },
+          after: { background: { ...before, color: this.color } } });
       }
+      this.app.store.commit('page margin adjustment', ops);
     }
 
     this.app.surface?.invalidate?.();

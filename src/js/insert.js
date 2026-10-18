@@ -476,36 +476,47 @@ export async function insertAudioFromPath(app, p) {
   const hashBuf = await crypto.subtle.digest('SHA-256', ab);
   const hashHex = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, '0')).join('');
   const assetId = `${hashHex}.${ext}`;
-  await window.board.assets.putBinaryDirect(assetId, new Uint8Array(ab));
-
   let durationMs = 0;
   try {
     const blob = new Blob([ab]);
     const blobUrl = URL.createObjectURL(blob);
     const audio = new Audio();
     durationMs = await new Promise((resolve) => {
-      audio.onloadedmetadata = () => {
-        const d = isFinite(audio.duration) ? Math.round(audio.duration * 1000) : 0;
+      let finished = false;
+      const finish = (duration) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        audio.removeEventListener('loadedmetadata', loaded);
+        audio.removeEventListener('error', failed);
         URL.revokeObjectURL(blobUrl);
-        resolve(d);
+        audio.removeAttribute('src');
+        resolve(duration);
       };
-      audio.onerror = () => {
-        URL.revokeObjectURL(blobUrl);
-        resolve(0);
-      };
+      const loaded = () => finish(Number.isFinite(audio.duration) && audio.duration > 0 ? Math.round(audio.duration * 1000) : 0);
+      const failed = () => finish(0);
+      const timer = setTimeout(() => finish(0), 10000);
+      audio.addEventListener('loadedmetadata', loaded, { once: true });
+      audio.addEventListener('error', failed, { once: true });
       audio.src = blobUrl;
+      audio.load();
     });
   } catch (err) {
     console.warn('Could not determine audio duration:', err);
   }
 
+  await window.board.assets.putBinaryDirect(assetId, new Uint8Array(ab));
+
   const track = {
     id: 'aud_' + Date.now(),
     assetId,
     name,
-    durationMs: durationMs || 60000,
+    // Unknown is represented as zero. ReplayEngine resolves metadata when it
+    // decodes the asset; inventing a duration here makes skip/export timelines
+    // wrong for any file the browser could not inspect during import.
+    durationMs,
     t0: Date.now(),
-    t1: Date.now() + (durationMs || 60000)
+    t1: durationMs ? Date.now() + durationMs : 0
   };
 
   if (!Array.isArray(app.store.doc.audioTracks)) app.store.doc.audioTracks = [];

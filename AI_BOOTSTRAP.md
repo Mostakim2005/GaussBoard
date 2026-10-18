@@ -84,7 +84,7 @@ Always run these verification commands before presenting completed code to the u
 # 1. Full Regression Test Suite (1,240 tests)
 node scripts/smoke.js
 
-# 2. Strict 100% Translation Coverage Check (1,349 strings)
+# 2. Strict 100% Translation Coverage Check (1,368 strings)
 node scripts/i18n-check.js
 
 # 3. Production Windows Executable Compilation (Portable & Setup EXE)

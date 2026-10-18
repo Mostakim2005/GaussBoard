@@ -2140,6 +2140,7 @@ export class Interaction {
     }
     const obj = {
       id: uid('sh'), type: 'shape', kind, ...geo, rotation: 0,
+      ...(['line', 'arrow', 'doubleArrow'].includes(kind) ? { headStyle: s.arrowHeadStyle || 'filled' } : {}),
       stroke: s.shapeStroke, fill: s.shapeFill, lineWidth: s.shapeLineWidth, dash: s.shapeDash, text: ''
     };
     this.store.add(this.placeOnPaper(obj), 'shape');

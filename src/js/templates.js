@@ -4,6 +4,16 @@ import { uid } from './core/util.js';
 import { drawObject } from './core/render.js';
 import { t } from './i18n.js';
 
+export function templateTags(template) {
+  return [...new Set([...(Array.isArray(template?.tags) ? template.tags : []), template?.group].filter(Boolean))];
+}
+
+export function filterTemplatesByTags(templates, filters = []) {
+  const selected = [...filters];
+  if (!selected.length) return [...templates];
+  return templates.filter((template) => selected.every((tag) => templateTags(template).includes(tag)));
+}
+
 const T = (text, x, y, w, size = 34, align = 'left') => ({
   id: uid('t'), type: 'text', x, y, w, h: size * 1.5, text, fontSize: size,
   color: '#201f1e', align, valign: 'middle', rotation: 0, bold: true, font: 'ui'

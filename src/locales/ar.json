@@ -1355,5 +1355,16 @@
   "Pinned to ribbon": "تم التثبيت على الشريط",
   "Insert objects": "إدراج كائنات",
   "Ribbon tools": "أدوات الشريط",
-  "Pan canvas": "تحريك اللوحة"
+  "Pan canvas": "تحريك اللوحة",
+  "Catmull–Rom Bézier": "كاتمول-روم بيزييه",
+  "Could not save template: {msg}": "تعذر حفظ القالب: {msg}",
+  "Edit template tags": "تعديل وسوم القالب",
+  "Template tags, separated by commas": "وسوم القالب، مفصولة بفواصل",
+  "Clear filters": "مسح عوامل التصفية",
+  "No templates match these tags.": "لا توجد قوالب تطابق هذه الوسوم.",
+  "Video quality": "جودة الفيديو",
+  "Filled": "ممتلئ",
+  "Open": "مفتوح",
+  "Stealth": "خفي",
+  "Arrowhead: {style}": "رأس السهم: {style}"
 }

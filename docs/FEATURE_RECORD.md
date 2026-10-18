@@ -114,7 +114,7 @@ This document serves as the master registry of all features, enhancements, bug f
    - Implemented `camera.fitWidth()` and `camera.fitHeight()` with smooth bounds clamping and aspect scaling.
 5. **Quality & Test Verification**:
    - `node scripts/smoke.js`: verified 100% pass rate.
-   - `node scripts/i18n-check.js`: 1320/1320 translated (100% complete) across all 7 locales.
+   - `node scripts/i18n-check.js`: 1,357/1,357 translated (100% complete) across all 7 locales.
 
 ### Round 4 Enhancements & Media Workflow Delivery
 1. **Highlighter Opacity & Text Color-Popping** (`src/js/core/render.js`, `src/js/core/tools.js`, `src/js/ui/toolbar.js`, `src/js/app.js`):
@@ -146,7 +146,7 @@ This document serves as the master registry of all features, enhancements, bug f
      - Accessible directly via `[📐 Page margin adjustment…]` in Canvas size settings.
 6. **Quality & Test Verification**:
    - `node scripts/smoke.js`: 1240/1240 passed (100% pass rate).
-   - `node scripts/i18n-check.js`: 1349/1349 translated (100% complete) across all 7 locales.
+   - `node scripts/i18n-check.js`: 1,357/1,357 translated (100% complete) across all 7 locales.
 
 ### 2.6 Milestone 5 Feedback Hardening: Navigation, Plus Menu Hot-Pinning, Ribbon Customization & Hover Persistence
 1. **Mouse Wheel Dual Mode & Arrow Key Navigation** (`src/js/core/tools.js`, `src/js/app.js`, `src/js/ui/panels.js`, `src/js/ui/search-dialog.js`):
@@ -178,6 +178,20 @@ This document serves as the master registry of all features, enhancements, bug f
 ---
 
 ## 3. Critical Architectural Rules & Anti-Regression Guardrails
+
+### V 4.8.8 Consolidated Audit Release
+
+- Consolidates the intended additions from v4.8.2–v4.8.7 on the latest source tree.
+- Adds a separate Catmull–Rom/Bézier inking engine; existing engines remain selectable. Point timestamps and metadata remain attached to samples.
+- Adds settings opacity range, template tag filtering, video export presets, visible page margin guides, and arrowhead style selection; see `docs/releases/RELEASE-4.8.8.md` for behavior boundaries and known limitations.
+- Adds custom feature checks separately from the mandatory regression suite: `npm run smoke:custom` and `npm run smoke:features:4.8.8`.
+- Initial audit: Codex 4.6 Medium in Cursor. Secondary audit and fixes: GPT-6 Luna High using Codex.
+
+### V 4.8.4.1 — Audit Follow-up
+
+- Based on v4.8.4 commit `e6a2caf`; includes crop undo/cancel fixes, crop source-bound clamping, and isolated video export lifecycle/clock/audio-load fixes.
+- Initial audit attribution: **Codex 4.6 Medium in Cursor**. Secondary audit and fixes attribution: **GPT-6 Luna High using Codex**. Both attributions are provided by the project owner.
+- The v4.8.5, v4.8.6 and v4.8.7 changes are compared in `docs/releases/RELEASE-4.8.4.1.md` and are not included in this build.
 
 1. **Cover Selection vs Study Tape Tap**:
    - `hitCurtain.subtype === 'tape'` toggles immediately on tap.

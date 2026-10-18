@@ -28,6 +28,20 @@ export function pageRects(pages) {
   return out;
 }
 
+/** Inner writing-area rectangles for pages that have margin settings. */
+export function pageMarginRects(pages) {
+  const rects = pageRects(pages);
+  return rects.map((rect, i) => {
+    const m = pages[i]?.margins;
+    if (!m) return null;
+    const left = Math.max(0, Math.min(rect.w, Number(m.left) || 0));
+    const right = Math.max(0, Math.min(rect.w - left, Number(m.right) || 0));
+    const top = Math.max(0, Math.min(rect.h, Number(m.top) || 0));
+    const bottom = Math.max(0, Math.min(rect.h - top, Number(m.bottom) || 0));
+    return { x: rect.x + left, y: rect.y + top, w: rect.w - left - right, h: rect.h - top - bottom };
+  });
+}
+
 /** The rectangle of one sheet, or null. */
 export function pageRectAt(pages, i) {
   const r = pageRects(pages);
@@ -151,9 +165,17 @@ export function todayStamp(d = pageClock.now()) {
   return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 }
 
-/** A sheet reduced to what is kept on disk: its size, and its date when it has one. */
+/** A sheet reduced to its supported, serializable page properties. */
 export function cleanPage(p) {
   const out = { w: p.w, h: p.h };
   if (typeof p.date === 'string' && DATE_RE.test(p.date)) out.date = p.date;
+  if (p.margins && typeof p.margins === 'object') {
+    const margins = {};
+    for (const side of ['left', 'right', 'top', 'bottom']) {
+      if (Number.isFinite(p.margins[side]) && p.margins[side] >= 0) margins[side] = p.margins[side];
+    }
+    if (Object.keys(margins).length === 4) out.margins = margins;
+  }
+  if (typeof p.bg === 'string' && /^#[\da-f]{6}$/i.test(p.bg)) out.bg = p.bg;
   return out;
 }

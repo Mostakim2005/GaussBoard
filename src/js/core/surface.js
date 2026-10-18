@@ -3,7 +3,7 @@
 import { Camera } from './camera.js';
 import { drawBackground, drawRuling, drawObject, drawSelection, drawMemberOutline, drawLockBadge, drawGroupHint, drawLockedOutline, FONT, setDarkBoard, isDarkBoard, faceOf, inkPaint } from './render.js';
 import { worldBounds, boundsOf } from './store.js';
-import { pageRects, pageIndexForBox, pageIndexForBoxIn, stripBounds } from './pages.js';
+import { pageRects, pageMarginRects, pageIndexForBox, pageIndexForBoxIn, stripBounds } from './pages.js';
 import { boxesIntersect } from './util.js';
 import { currentLanguage } from '../i18n.js';
 import { route as connectorRoute, midPoint } from './connectors.js';
@@ -23,10 +23,11 @@ export class Surface {
   constructor(canvas, store, opts = {}) {
     this.canvas = canvas;
     this.app = opts.app || null;
+    this._ephemeral = !!opts.ephemeral;
     this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: !!opts.lowLatency });
     this.store = store;
     this.cam = new Camera();
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    this.dpr = this._ephemeral ? 1 : Math.min(window.devicePixelRatio || 1, 2.5);
     this.width = 0; this.height = 0;
     this.dirty = true;
     this.overlays = [];        // fn(ctx, surface) drawn in screen space
@@ -56,17 +57,35 @@ export class Surface {
     this._warming = null;      // handle of a queued idle rebuild, see warmFreeze()
     this._onFrame = this._onFrame.bind(this);
 
-    const ro = new ResizeObserver(() => this.resize());
-    ro.observe(canvas);
-    if (canvas.parentElement) ro.observe(canvas.parentElement);
-    window.addEventListener('resize', () => this.resize());
-    // a move between monitors changes devicePixelRatio without a resize event
-    this._watchPixelRatio();
-    this.resize(true);
-    this.start();
+    if (!this._ephemeral) {
+      this._ro = new ResizeObserver(() => this.resize());
+      this._ro.observe(canvas);
+      if (canvas.parentElement) this._ro.observe(canvas.parentElement);
+      this._onWinResize = () => this.resize();
+      window.addEventListener('resize', this._onWinResize);
+      // a move between monitors changes devicePixelRatio without a resize event
+      this._watchPixelRatio();
+      this.resize(true);
+      this.start();
+    }
   }
 
   start() { if (!this._raf) this._raf = requestAnimationFrame(this._onFrame); }
+
+  destroy() {
+    if (this._raf != null) cancelAnimationFrame(this._raf);
+    this._raf = null;
+    this._ro?.disconnect();
+    this._ro = null;
+    if (this._onWinResize) window.removeEventListener('resize', this._onWinResize);
+    this._onWinResize = null;
+    if (this._warming != null) {
+      if (typeof cancelIdleCallback === 'function') cancelIdleCallback(this._warming);
+      clearTimeout(this._warming);
+      this._warming = null;
+    }
+    this._ink = null;
+  }
 
   _watchPixelRatio() {
     const arm = () => {
@@ -231,7 +250,7 @@ export class Surface {
   resize(force = false) {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     if (!w || !h) return false;
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const dpr = this._ephemeral ? 1 : Math.min(window.devicePixelRatio || 1, 3);
     if (!force && w === this.width && h === this.height && dpr === this.dpr) return false;
 
     this.width = w; this.height = h; this.dpr = dpr;
@@ -466,6 +485,18 @@ export class Surface {
       for (const o of buckets[i]) drawObject(ctx, o, onload, this.editing);
       ctx.restore();
     }
+    // Page margins are a visual writing-area guide. They stay on the screen
+    // canvas and are deliberately omitted by renderTo(), so they do not get
+    // baked into PNG/PDF exports or into the document's ink layer.
+    const marginRects = pageMarginRects(pages);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,120,212,.52)';
+    ctx.lineWidth = 1 / Math.max(0.05, cam.z);
+    ctx.setLineDash([5 / Math.max(0.05, cam.z), 4 / Math.max(0.05, cam.z)]);
+    for (const margin of marginRects) {
+      if (margin && margin.w > 0 && margin.h > 0) ctx.strokeRect(margin.x, margin.y, margin.w, margin.h);
+    }
+    ctx.restore();
     if (clip) ctx.restore();
   }
 
@@ -666,7 +697,7 @@ export class Surface {
 
     // The board is drawn and nothing is in flight: a good moment to have the
     // frozen copy ready for whatever comes next. See warmFreeze().
-    if (!this.wet && !this.laser.length
+    if (!this._ephemeral && !this.wet && !this.laser.length
         && (!this._ink || this._ink.key !== this.freezeKey())) this.warmFreeze();
 
     // ---- screen-space overlays (CSS pixels) ----
@@ -782,8 +813,7 @@ export class Surface {
     this.drawLaser(ctx);
   }
 
-  drawReplaySession(ctx) {
-    const replay = this.app?.replayEngine;
+  drawReplaySession(ctx, replay = this.app?.replayEngine) {
     if (!replay || !replay.track) return;
     const t = replay.currentTimeMs;
     const trackId = replay.track.id;

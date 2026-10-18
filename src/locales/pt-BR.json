@@ -1355,5 +1355,16 @@
   "Pinned to ribbon": "Fixado na faixa",
   "Insert objects": "Inserir objetos",
   "Ribbon tools": "Ferramentas da faixa",
-  "Pan canvas": "Mover tela"
+  "Pan canvas": "Mover tela",
+  "Catmull–Rom Bézier": "Bézier Catmull–Rom",
+  "Could not save template: {msg}": "Não foi possível salvar o modelo: {msg}",
+  "Edit template tags": "Editar etiquetas do modelo",
+  "Template tags, separated by commas": "Etiquetas do modelo, separadas por vírgulas",
+  "Clear filters": "Limpar filtros",
+  "No templates match these tags.": "Nenhum modelo corresponde a estas etiquetas.",
+  "Video quality": "Qualidade do vídeo",
+  "Filled": "Preenchido",
+  "Open": "Aberto",
+  "Stealth": "Discreto",
+  "Arrowhead: {style}": "Ponta da seta: {style}"
 }

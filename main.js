@@ -8,6 +8,7 @@ const { spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const crypto = require('node:crypto');
 const StorageLocation = require('./storage-location.js');
+const { isPathWithin } = require('./src/js/platform/path-security.cjs');
 
 const SRC = path.join(__dirname, 'src');
 const isDev = process.argv.includes('--dev');
@@ -152,7 +153,9 @@ protocol.registerSchemesAsPrivileged([
 function registerProtocol() {
   protocol.handle('app', (request) => {
     const url = new URL(request.url);
-    let rel = decodeURIComponent(url.pathname);
+    let rel;
+    try { rel = decodeURIComponent(url.pathname); }
+    catch { return new Response('Bad Request', { status: 400 }); }
     // Asset streaming endpoint: supports HTTP 206 range requests for audio seeking
     if (rel.startsWith('/asset/')) {
       const id = rel.slice(7);
@@ -161,8 +164,8 @@ function registerProtocol() {
       return net.fetch(pathToFileURL(filePath).toString());
     }
     if (rel === '/' || rel === '') rel = '/index.html';
-    const target = path.normalize(path.join(SRC, rel));
-    if (!target.startsWith(SRC)) return new Response('Forbidden', { status: 403 });
+    const target = path.resolve(SRC, `.${rel}`);
+    if (!isPathWithin(SRC, target)) return new Response('Forbidden', { status: 403 });
     return net.fetch(pathToFileURL(target).toString());
   });
 }

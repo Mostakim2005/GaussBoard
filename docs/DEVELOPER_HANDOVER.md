@@ -146,7 +146,7 @@ Before creating any release or commit, verify the entire test suite passes:
 # 1. Run the full smoke test suite (1,240 tests)
 node scripts/smoke.js
 
-# 2. Verify all 7 translation dictionaries are 100% complete (1,349 strings)
+# 2. Verify all 7 translation dictionaries are 100% complete (1,368 strings)
 node scripts/i18n-check.js
 
 # 3. Build Windows Executables (NSIS installer, portable exe, unpacked directory)

@@ -8,6 +8,37 @@ import { boundsOf } from './core/store.js';
 import { boxesIntersect } from './core/util.js';
 import { h } from './ui/popover.js';
 
+export const VIDEO_EXPORT_PRESETS = Object.freeze({
+  '720p30': Object.freeze({ width: 1280, height: 720, fps: 30 }),
+  '1080p30': Object.freeze({ width: 1920, height: 1080, fps: 30 }),
+  '1080p60': Object.freeze({ width: 1920, height: 1080, fps: 60 })
+});
+
+function waitForAudioReady(audio, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timer);
+      audio.removeEventListener('canplaythrough', ready);
+      audio.removeEventListener('error', failed);
+    };
+    const ready = () => { cleanup(); resolve(); };
+    const failed = () => { cleanup(); reject(audio.error || new Error('Audio could not be loaded')); };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Audio load timeout'));
+    }, timeoutMs);
+    audio.addEventListener('canplaythrough', ready, { once: true });
+    audio.addEventListener('error', failed, { once: true });
+    audio.load();
+  });
+}
+
+function durationForTrack(track, audio) {
+  if (Number.isFinite(track.durationMs) && track.durationMs > 0) return track.durationMs;
+  if (Number.isFinite(audio.duration) && audio.duration > 0) return audio.duration * 1000;
+  return 0;
+}
+
 export class VideoExporter {
   constructor(app) {
     this.app = app;
@@ -42,12 +73,9 @@ export class VideoExporter {
     canvas.height = height;
 
     // Dedicated offscreen surface instance
-    const sf = new Surface(canvas, this.app.store, { app: this.app });
+    const sf = new Surface(canvas, this.app.store, { app: this.app, ephemeral: true });
     sf.resize(width, height);
-
-    if (this.app?.replayEngine) {
-      this.app.replayEngine.loadTrack(track);
-    }
+    const replayClock = { track, currentTimeMs: 0, ghostMode: 'none' };
 
     // Auto-frame offscreen camera to encompass all notes recorded with this audio track
     const objs = this.app?.store?.doc?.objects || {};
@@ -80,28 +108,25 @@ export class VideoExporter {
     const audio = new Audio();
     audio.src = `app://board/asset/${track.assetId}`;
     audio.crossOrigin = 'anonymous';
-
-    await new Promise((res, rej) => {
-      audio.oncanplaythrough = res;
-      audio.onerror = rej;
-      audio.load();
-    });
-
-    const durationMs = (isFinite(track.durationMs) && track.durationMs > 0)
-      ? track.durationMs
-      : ((isFinite(audio.duration) && audio.duration > 0) ? audio.duration * 1000 : 5000);
+    let audioCtx = null;
+    let source = null;
+    let videoStream = null;
+    let rec = null;
+    try {
+    await waitForAudioReady(audio);
+    const durationMs = durationForTrack(track, audio);
+    if (!durationMs) throw new Error('Could not determine audio duration');
 
     // Setup Web Audio routing to capture audio stream without microphone bleed
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContextClass();
-    const source = audioCtx.createMediaElementSource(audio);
+    audioCtx = new AudioContextClass();
+    source = audioCtx.createMediaElementSource(audio);
     const dest = audioCtx.createMediaStreamDestination();
     source.connect(dest);
 
     // Capture canvas video stream
-    const videoStream = canvas.captureStream ? canvas.captureStream(fps) : null;
+    videoStream = canvas.captureStream ? canvas.captureStream(fps) : null;
     if (!videoStream) {
-      audioCtx.close().catch(() => {});
       throw new Error('Canvas captureStream not supported in this environment');
     }
 
@@ -118,7 +143,7 @@ export class VideoExporter {
     }
 
     const chunks = [];
-    const rec = new MediaRecorder(combinedStream, {
+    rec = new MediaRecorder(combinedStream, {
       mimeType,
       videoBitsPerSecond: 4000000 // 4 Mbps high-definition target
     });
@@ -164,16 +189,14 @@ export class VideoExporter {
 
       // Synchronize clock and redraw offscreen canvas
       const curMs = audio.currentTime * 1000;
-      if (this.app.replayEngine) {
-        this.app.replayEngine.currentTimeMs = curMs;
-      }
+      replayClock.currentTimeMs = curMs;
 
       // Deterministically render solid background, base scene, and synchronized replay session
       ctx.save();
       ctx.fillStyle = isDarkBoard() ? '#1f1e1d' : '#f5f4f2';
       ctx.fillRect(0, 0, width, height);
       sf.drawScene(ctx, width, height, () => {}, null, (o) => o.audioId !== track.id);
-      sf.drawReplaySession(ctx);
+      sf.drawReplaySession(ctx, replayClock);
       ctx.restore();
 
       if (videoTrack?.requestFrame) {
@@ -191,6 +214,16 @@ export class VideoExporter {
 
     const blob = await completionPromise;
     return { blob, durationMs };
+    } finally {
+      if (rec && rec.state !== 'inactive') { try { rec.stop(); } catch {} }
+      try { source?.disconnect(); } catch {}
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      videoStream?.getTracks().forEach((streamTrack) => streamTrack.stop());
+      sf.destroy();
+      audioCtx?.close().catch(() => {});
+    }
   }
 
   /**
@@ -205,14 +238,20 @@ export class VideoExporter {
     canvas.width = width;
     canvas.height = height;
 
-    const sf = new Surface(canvas, this.app.store, { app: this.app });
+    const sf = new Surface(canvas, this.app.store, { app: this.app, ephemeral: true });
     sf.resize(width, height);
-
-    const videoStream = canvas.captureStream ? canvas.captureStream(fps) : null;
+    let videoStream = null;
+    let audioCtx = null;
+    let rec = null;
+    let activeAudio = null;
+    let activeSource = null;
+    const replayClock = { track: null, currentTimeMs: 0, ghostMode: 'none' };
+    try {
+    videoStream = canvas.captureStream ? canvas.captureStream(fps) : null;
     if (!videoStream) throw new Error('Canvas captureStream not supported in this environment');
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AudioContextClass();
+    audioCtx = new AudioContextClass();
     const dest = audioCtx.createMediaStreamDestination();
 
     const combinedTracks = [
@@ -225,7 +264,7 @@ export class VideoExporter {
     if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
 
     const chunks = [];
-    const rec = new MediaRecorder(combinedStream, {
+    rec = new MediaRecorder(combinedStream, {
       mimeType,
       videoBitsPerSecond: 4000000
     });
@@ -249,7 +288,7 @@ export class VideoExporter {
 
     rec.start(250);
 
-    const totalDurationMs = tracks.reduce((sum, tr) => sum + (tr.durationMs || 5000), 0);
+    const totalDurationMs = tracks.reduce((sum, tr) => sum + (Number.isFinite(tr.durationMs) && tr.durationMs > 0 ? tr.durationMs : 0), 0);
     let cumulativeElapsedMs = 0;
     const frameInterval = 1000 / fps;
     const ctx = canvas.getContext('2d');
@@ -282,26 +321,22 @@ export class VideoExporter {
     for (let i = 0; i < tracks.length; i++) {
       if (this.cancelled) break;
       const track = tracks[i];
-      if (this.app?.replayEngine) {
-        this.app.replayEngine.loadTrack(track);
-      }
+      replayClock.track = track;
+      replayClock.currentTimeMs = 0;
       frameTrack(track);
 
       const audio = new Audio();
+      activeAudio = audio;
       audio.src = `app://board/asset/${track.assetId}`;
       audio.crossOrigin = 'anonymous';
 
-      await new Promise((res, rej) => {
-        audio.oncanplaythrough = res;
-        audio.onerror = rej;
-        audio.load();
-      });
+      await waitForAudioReady(audio);
 
-      const trackDur = (isFinite(track.durationMs) && track.durationMs > 0)
-        ? track.durationMs
-        : ((isFinite(audio.duration) && audio.duration > 0) ? audio.duration * 1000 : 5000);
+      const trackDur = durationForTrack(track, audio);
+      if (!trackDur) throw new Error('Could not determine audio duration');
 
       const source = audioCtx.createMediaElementSource(audio);
+      activeSource = source;
       source.connect(dest);
       await audio.play();
 
@@ -311,20 +346,22 @@ export class VideoExporter {
             audio.pause();
             try { source.disconnect(); } catch {}
             cumulativeElapsedMs += trackDur;
+            audio.removeAttribute('src');
+            audio.load();
+            activeAudio = null;
+            activeSource = null;
             done();
             return;
           }
 
           const curMs = audio.currentTime * 1000;
-          if (this.app?.replayEngine) {
-            this.app.replayEngine.currentTimeMs = curMs;
-          }
+          replayClock.currentTimeMs = curMs;
 
           ctx.save();
           ctx.fillStyle = isDarkBoard() ? '#1f1e1d' : '#f5f4f2';
           ctx.fillRect(0, 0, width, height);
           sf.drawScene(ctx, width, height, () => {}, null, (o) => o.audioId !== track.id);
-          sf.drawReplaySession(ctx);
+          sf.drawReplaySession(ctx, replayClock);
           ctx.restore();
 
           if (videoTrack?.requestFrame) {
@@ -332,7 +369,7 @@ export class VideoExporter {
           }
 
           if (onProgress) {
-            onProgress(Math.min(1.0, (cumulativeElapsedMs + curMs) / totalDurationMs));
+            onProgress(totalDurationMs > 0 ? Math.min(1.0, (cumulativeElapsedMs + curMs) / totalDurationMs) : 0);
           }
 
           setTimeout(checkDone, frameInterval);
@@ -348,11 +385,23 @@ export class VideoExporter {
 
     const blob = await completionPromise;
     return { blob, durationMs: cumulativeElapsedMs };
+    } finally {
+      if (rec && rec.state !== 'inactive') { try { rec.stop(); } catch {} }
+      try { activeSource?.disconnect(); } catch {}
+      if (activeAudio) {
+        activeAudio.pause();
+        activeAudio.removeAttribute('src');
+        activeAudio.load();
+      }
+      videoStream?.getTracks().forEach((streamTrack) => streamTrack.stop());
+      sf.destroy();
+      audioCtx?.close().catch(() => {});
+    }
   }
 }
 
-export async function pickRecordingsForVideoExport(app) {
-  const tracks = (app.store?.doc?.audioTracks || []).map((t, idx) => ({ ...t, originalIndex: idx }));
+export async function pickRecordingsForVideoExport(app, trackOverride = null) {
+  const tracks = (trackOverride || app.store?.doc?.audioTracks || []).map((t, idx) => ({ ...t, originalIndex: idx }));
   if (!tracks.length) {
     app.toast(t('No audio track to export'));
     return null;
@@ -361,7 +410,7 @@ export async function pickRecordingsForVideoExport(app) {
   return new Promise((resolve) => {
     let items = [...tracks];
     const selectedIds = new Set(tracks.map((t) => t.id));
-    let stitchTogether = true;
+    let stitchTogether = tracks.length > 1;
 
     const overlay = h('div', {
       id: 'videoExportModal',
@@ -383,6 +432,12 @@ export async function pickRecordingsForVideoExport(app) {
     const desc = h('p', { style: 'margin:0;font-size:12.5px;color:var(--text-2);' },
       t('Choose which recordings to export. Use ▲ and ▼ to set the playback order.')
     );
+
+    const preset = h('select', { 'aria-label': t('Video quality'), style: 'padding:7px 9px;border-radius:7px;background:var(--surface-2);color:var(--text);border:1px solid var(--stroke)' },
+      h('option', { value: '720p30' }, '720p · 30 fps'),
+      h('option', { value: '1080p30' }, '1080p · 30 fps'),
+      h('option', { value: '1080p60' }, '1080p · 60 fps'));
+    preset.value = '1080p30';
 
     const listContainer = h('div', {
       style: 'display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;border:1px solid var(--stroke);border-radius:8px;padding:8px;'
@@ -462,7 +517,7 @@ export async function pickRecordingsForVideoExport(app) {
         return;
       }
       overlay.remove();
-      resolve({ tracks: chosen, stitch: stitchTogether });
+      resolve({ tracks: chosen, stitch: stitchTogether, video: { ...VIDEO_EXPORT_PRESETS[preset.value] } });
     };
 
     actionRow.appendChild(btnCancel);
@@ -470,8 +525,10 @@ export async function pickRecordingsForVideoExport(app) {
 
     card.appendChild(titleRow);
     card.appendChild(desc);
+    card.appendChild(h('label', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px' },
+      t('Video quality'), preset));
     card.appendChild(listContainer);
-    card.appendChild(stitchRow);
+    if (tracks.length > 1) card.appendChild(stitchRow);
     card.appendChild(actionRow);
 
     overlay.appendChild(card);
@@ -485,16 +542,13 @@ export async function pickRecordingsForVideoExport(app) {
 export async function exportVideoFile(app, track = null) {
   let selectedTracks = [];
   let shouldStitch = true;
+  let video = VIDEO_EXPORT_PRESETS['1080p30'];
 
-  if (track) {
-    selectedTracks = [track];
-    shouldStitch = false;
-  } else {
-    const picked = await pickRecordingsForVideoExport(app);
-    if (!picked) return null;
-    selectedTracks = picked.tracks;
-    shouldStitch = picked.stitch;
-  }
+  const picked = await pickRecordingsForVideoExport(app, track ? [track] : null);
+  if (!picked) return null;
+  selectedTracks = picked.tracks;
+  shouldStitch = track ? false : picked.stitch;
+  video = picked.video || video;
 
   if (!selectedTracks.length) return null;
 
@@ -527,6 +581,7 @@ export async function exportVideoFile(app, track = null) {
     try {
       const { blob } = await exporter.exportStitchedReplayVideo({
         tracks: selectedTracks,
+        ...video,
         onProgress: (pct) => {
           const rounded = Math.round(pct * 100);
           progress?.update(pct, t('Exporting replay video ({pct}%)...', { pct: rounded }));
@@ -568,6 +623,7 @@ export async function exportVideoFile(app, track = null) {
       try {
         const { blob } = await exporter.exportReplayVideo({
           track: tr,
+          ...video,
           onProgress: (pct) => {
             const rounded = Math.round(pct * 100);
             progress?.update(pct, t('Exporting {name} ({pct}%)...', { name: tr.name || '', pct: rounded }));

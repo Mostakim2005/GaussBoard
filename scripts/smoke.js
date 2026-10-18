@@ -20,7 +20,9 @@ const electron = require('electron');            // the binary, not the module
 const argv = process.argv.slice(2);
 const env = { ...process.env };
 if (argv.includes('--builtin')) env.GAZBOARD_DISABLE_LIBREOFFICE = '1';
-const extra = argv.filter((a) => a !== '--builtin');
+if (argv.includes('--features-4.8.4.1')) env.GAZBOARD_TEST = './test/smoke-features-4.8.4.1.js';
+if (argv.includes('--features-4.8.8')) env.GAZBOARD_TEST = './test/smoke-features-4.8.8.js';
+const extra = argv.filter((a) => !['--builtin', '--features-4.8.4.1', '--features-4.8.8'].includes(a));
 
 const onLinux = process.platform === 'linux';
 const headless = onLinux && !process.env.DISPLAY;   // a build machine, or a bare shell

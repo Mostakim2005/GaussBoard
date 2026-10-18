@@ -6,7 +6,7 @@ import { hexToRgba, readableText, wrapText, fitFontSize, clamp } from './util.js
 import { inkPath, inkRuns, strokeWeight, hasPressureVariation } from './ink.js';
 import { objectRuns, layoutRich, fitRichSize, drawRichLines, needsRich, watchChips } from './richtext.js';
 import { mathEntry, hasMaths } from './maths.js';
-import { drawConnector } from './connectors.js';
+import { drawArrowhead, drawConnector } from './connectors.js';
 import { lookupBoard, refLabel, refMissing } from './boardrefs.js';
 
 import { fontStack } from '../ui/palettes.js';
@@ -562,21 +562,6 @@ function polygon(ctx, cx, cy, rx, ry, n, rot) {
   ctx.closePath();
 }
 
-function arrowHead(ctx, from, to, size, color, lengthMul = 1.4) {
-  const a = Math.atan2(to.y - from.y, to.x - from.x);
-  const len = size * lengthMul;
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(to.x, to.y);
-  ctx.lineTo(to.x - Math.cos(a - 0.38) * len, to.y - Math.sin(a - 0.38) * len);
-  ctx.lineTo(to.x - Math.cos(a) * (size * 0.45), to.y - Math.sin(a) * (size * 0.45));
-  ctx.lineTo(to.x - Math.cos(a + 0.38) * len, to.y - Math.sin(a + 0.38) * len);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
 export function drawShape(ctx, o, hideText = false) {
   const { x, y, w, h } = o;
   ctx.save();
@@ -602,8 +587,10 @@ export function drawShape(ctx, o, hideText = false) {
     if (o.kind === 'arrow' || o.kind === 'doubleArrow') {
       const scale = o.arrowScale || 1.0;
       const size = (o.lineWidth || 3) * 3.6 * scale;
-      arrowHead(ctx, { x, y }, { x: x + w, y: y + h }, size, outline);
-      if (o.kind === 'doubleArrow') arrowHead(ctx, { x: x + w, y: y + h }, { x, y }, size, outline);
+      ctx.fillStyle = outline;
+      ctx.strokeStyle = outline;
+      drawArrowhead(ctx, { x, y }, { x: x + w, y: y + h }, size, o.headStyle || 'filled');
+      if (o.kind === 'doubleArrow') drawArrowhead(ctx, { x: x + w, y: y + h }, { x, y }, size, o.headStyle || 'filled');
     }
   }
   if (o.text && !hideText) {
@@ -896,6 +883,19 @@ export function drawMath(ctx, o, onload) {
   ctx.restore();
 }
 
+export function clampImageCrop(crop, iw, ih) {
+  const norm = crop.sx <= 1 && crop.sy <= 1 && crop.sw <= 1 && crop.sh <= 1;
+  let sx = norm ? crop.sx * iw : crop.sx;
+  let sy = norm ? crop.sy * ih : crop.sy;
+  let sw = norm ? crop.sw * iw : crop.sw;
+  let sh = norm ? crop.sh * ih : crop.sh;
+  sx = Math.max(0, Math.min(iw - 1, sx));
+  sy = Math.max(0, Math.min(ih - 1, sy));
+  sw = Math.max(1, Math.min(iw - sx, sw));
+  sh = Math.max(1, Math.min(ih - sy, sh));
+  return { sx, sy, sw, sh };
+}
+
 export function drawImage(ctx, o, onload) {
   const img = getImage(o.src, onload);
   ctx.save();
@@ -911,10 +911,7 @@ export function drawImage(ctx, o, onload) {
     if (o.crop && typeof o.crop.sw === 'number' && typeof o.crop.sh === 'number') {
       const iw = img.naturalWidth || img.width || o.w;
       const ih = img.naturalHeight || img.height || o.h;
-      const sx = (o.crop.sx <= 1 && o.crop.sw <= 1) ? o.crop.sx * iw : o.crop.sx;
-      const sy = (o.crop.sy <= 1 && o.crop.sh <= 1) ? o.crop.sy * ih : o.crop.sy;
-      const sw = (o.crop.sw <= 1) ? o.crop.sw * iw : o.crop.sw;
-      const sh = (o.crop.sh <= 1) ? o.crop.sh * ih : o.crop.sh;
+      const { sx, sy, sw, sh } = clampImageCrop(o.crop, iw, ih);
       ctx.drawImage(img, sx, sy, sw, sh, o.x, o.y, o.w, o.h);
     } else {
       ctx.drawImage(img, o.x, o.y, o.w, o.h);

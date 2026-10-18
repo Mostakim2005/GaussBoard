@@ -1355,5 +1355,16 @@
   "Pinned to ribbon": "Fijado a la cinta",
   "Insert objects": "Insertar objetos",
   "Ribbon tools": "Herramientas de la cinta",
-  "Pan canvas": "Desplazar lienzo"
+  "Pan canvas": "Desplazar lienzo",
+  "Catmull–Rom Bézier": "Bézier Catmull–Rom",
+  "Could not save template: {msg}": "No se pudo guardar la plantilla: {msg}",
+  "Edit template tags": "Editar etiquetas de plantilla",
+  "Template tags, separated by commas": "Etiquetas de plantilla, separadas por comas",
+  "Clear filters": "Borrar filtros",
+  "No templates match these tags.": "Ninguna plantilla coincide con estas etiquetas.",
+  "Video quality": "Calidad del vídeo",
+  "Filled": "Relleno",
+  "Open": "Abierto",
+  "Stealth": "Discreto",
+  "Arrowhead: {style}": "Punta de flecha: {style}"
 }

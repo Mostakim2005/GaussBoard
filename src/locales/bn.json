@@ -1355,5 +1355,16 @@
   "Pinned to ribbon": "রিবনে পিন করা হয়েছে",
   "Insert objects": "অবজেক্ট সন্নিবেশ করুন",
   "Ribbon tools": "রিবন টুলস",
-  "Pan canvas": "ক্যানভাস প্যান করুন"
+  "Pan canvas": "ক্যানভাস প্যান করুন",
+  "Catmull–Rom Bézier": "ক্যাটমুল-রোম বেজিয়ার",
+  "Could not save template: {msg}": "টেমপ্লেট সংরক্ষণ করা যায়নি: {msg}",
+  "Edit template tags": "টেমপ্লেটের ট্যাগ সম্পাদনা করুন",
+  "Template tags, separated by commas": "কমা দিয়ে আলাদা করা টেমপ্লেট ট্যাগ",
+  "Clear filters": "ফিল্টার মুছুন",
+  "No templates match these tags.": "এই ট্যাগগুলোর সঙ্গে কোনো টেমপ্লেট মেলে না।",
+  "Video quality": "ভিডিওর মান",
+  "Filled": "ভরা",
+  "Open": "খোলা",
+  "Stealth": "স্টেলথ",
+  "Arrowhead: {style}": "তীরের মাথা: {style}"
 }

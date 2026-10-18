@@ -240,18 +240,25 @@ export class AudioBar {
 
   async exportTrackAudio(tr) {
     if (!tr) return;
+    let objectUrl = null;
     try {
       const url = `app://board/asset/${tr.assetId}`;
       const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`Audio download failed (${resp.status})`);
       const blob = await resp.blob();
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      objectUrl = URL.createObjectURL(blob);
+      a.href = objectUrl;
       a.download = `${tr.name || 'recording'}.webm`;
       document.body.appendChild(a);
       a.click();
       a.remove();
+      // Give the browser time to start the download before releasing its URL.
+      setTimeout(() => { if (objectUrl) URL.revokeObjectURL(objectUrl); }, 1000);
+      objectUrl = null;
       this.app.toast(t('Exported audio recording'));
     } catch (e) {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
       this.app.toast(t('Export audio error: ') + e.message);
     }
     this.closeSessionMenu();

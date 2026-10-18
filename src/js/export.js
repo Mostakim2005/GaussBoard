@@ -292,6 +292,25 @@ function svgObjects(objects, meas) {
   return parts;
 }
 
+function svgArrowHead(from, to, size, style, color, width) {
+  const f = (n) => Number(n).toFixed(1);
+  const a = Math.atan2(to.y - from.y, to.x - from.x), len = size * 1.4;
+  const p = (angle) => ({ x: to.x - Math.cos(a + angle) * len, y: to.y - Math.sin(a + angle) * len });
+  const left = p(-0.38), right = p(0.38);
+  const back = (k) => ({ x: to.x - Math.cos(a) * size * k, y: to.y - Math.sin(a) * size * k });
+  const point = (q) => `${f(q.x)} ${f(q.y)}`;
+  if (style === 'open') return `<path d="M${point(left)} L${point(to)} L${point(right)}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if (style === 'diamond') {
+    const tail = back(2.31);
+    const side = size * 0.58;
+    const l = { x: tail.x + Math.cos(a + Math.PI / 2) * side, y: tail.y + Math.sin(a + Math.PI / 2) * side };
+    const r = { x: tail.x - Math.cos(a + Math.PI / 2) * side, y: tail.y - Math.sin(a + Math.PI / 2) * side };
+    return `<polygon points="${point(to)} ${point(left)} ${point(l)} ${point(tail)} ${point(r)} ${point(right)}" fill="${color}"/>`;
+  }
+  const notch = back(style === 'stealth' ? 1.25 : 0.45);
+  return `<polygon points="${point(to)} ${point(left)} ${point(notch)} ${point(right)}" fill="${color}"/>`;
+}
+
 function shapeSvg(o, rot) {
   const st = `fill="${o.fill && o.fill !== 'none' ? o.fill : 'none'}" stroke="${o.stroke && o.stroke !== 'none' ? o.stroke : 'none'}" stroke-width="${o.lineWidth || 3}" stroke-linejoin="round" stroke-linecap="round"`;
   const { x, y, w, h } = o;
@@ -302,9 +321,12 @@ function shapeSvg(o, rot) {
     case 'roundRect':
       return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(Math.abs(w), Math.abs(h)) * 0.16}" ${st}${rot}/>`;
     case 'line': case 'arrow': case 'doubleArrow': {
-      const marker = o.kind === 'line' ? '' : ' marker-end="url(#ah)"';
-      return `<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="${o.stroke}"/></marker></defs>` +
-        `<line x1="${x}" y1="${y}" x2="${x + w}" y2="${y + h}" stroke="${o.stroke}" stroke-width="${o.lineWidth || 3}" stroke-linecap="round"${marker}${rot}/>`;
+      const width = o.lineWidth || 3, size = width * 3.6 * (o.arrowScale || 1);
+      const line = `<line x1="${x}" y1="${y}" x2="${x + w}" y2="${y + h}" stroke="${o.stroke}" stroke-width="${width}" stroke-linecap="round"/>`;
+      if (o.kind === 'line') return `<line x1="${x}" y1="${y}" x2="${x + w}" y2="${y + h}" stroke="${o.stroke}" stroke-width="${width}" stroke-linecap="round"${rot}/>`;
+      const style = ['filled', 'open', 'stealth', 'diamond'].includes(o.headStyle) ? o.headStyle : 'filled';
+      return `<g${rot}>${line}` + svgArrowHead({ x, y }, { x: x + w, y: y + h }, size, style, o.stroke, width) +
+        (o.kind === 'doubleArrow' ? svgArrowHead({ x: x + w, y: y + h }, { x, y }, size, style, o.stroke, width) : '') + '</g>';
     }
     case 'triangle': return `<polygon points="${cx},${y} ${x + w},${y + h} ${x},${y + h}" ${st}${rot}/>`;
     case 'diamond': return `<polygon points="${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}" ${st}${rot}/>`;

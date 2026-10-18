@@ -1355,5 +1355,16 @@
   "Pinned to ribbon": "已釘選至功能區",
   "Insert objects": "插入物件",
   "Ribbon tools": "功能區工具",
-  "Pan canvas": "平移畫布"
+  "Pan canvas": "平移畫布",
+  "Catmull–Rom Bézier": "Catmull–Rom 貝茲曲線",
+  "Could not save template: {msg}": "無法儲存範本：{msg}",
+  "Edit template tags": "編輯範本標籤",
+  "Template tags, separated by commas": "範本標籤，以逗號分隔",
+  "Clear filters": "清除篩選條件",
+  "No templates match these tags.": "沒有範本符合這些標籤。",
+  "Video quality": "影片品質",
+  "Filled": "實心",
+  "Open": "空心",
+  "Stealth": "隱形",
+  "Arrowhead: {style}": "箭頭樣式：{style}"
 }

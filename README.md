@@ -101,6 +101,15 @@ npm run dist:linux   # AppImage + .deb
 Installers land in `dist/`. Build on the target OS (or use a CI matrix) — electron-builder
 does not cross-compile Windows installers from Linux without extra tooling.
 
+The audited v4.8.4 follow-up is labeled **V 4.8.4.1**. Its npm/Electron SemVer remains `4.8.4`,
+while the app release label and Windows artifacts use the requested `4.8.4.1` name. See
+[`docs/releases/RELEASE-4.8.4.1.md`](docs/releases/RELEASE-4.8.4.1.md) for the audit record,
+fixes, attribution and comparison with v4.8.5–v4.8.7.
+
+The consolidated **v4.8.8** Windows release carries the audited custom-feature fixes from
+the v4.8.2–v4.8.7 line. See [`docs/releases/RELEASE-4.8.8.md`](docs/releases/RELEASE-4.8.8.md)
+for the feature summary, audit attribution, known limitations, test results and artifact hashes.
+
 On Linux, the AppImage needs FUSE 2 to run. Most desktops already have it; on newer Ubuntu
 it is `sudo apt install libfuse2`. Otherwise `./GazBoard-*.AppImage --appimage-extract`
 unpacks it and `squashfs-root/gazboard` runs directly. The `.deb` has no such requirement.
@@ -397,11 +406,22 @@ edits, replays the log into a fresh `Store` and checks the two documents match.
 ```bash
 npm run smoke            # headless, uses LibreOffice if present
 npm run smoke:builtin    # forces the built-in Office converter
+npm run smoke:custom     # custom-feature, security, and release-fix smoke checks
+npm run smoke:features:4.8.8  # focused v4.8.8 UI feature checks
+npm run smoke:features:4.8.4.1  # crop and video-export audit fixes only
 npm run test:restart     # kills the app mid-session and checks the board comes back
 npm run test:storage     # storage path config and validation
 ```
 
-as of 13-Oct-2026, the smoke suite has 1193 assertions covering boot, ink, partial and whole-object erase, stylus/mouse device roles,
+The V 4.8.4.1 feature smoke runs separately from `npm run smoke`. It exercises crop
+cancel/apply/reset and undo, crop source bounds, and single/stitched video export duration,
+replay-clock isolation, timeout handling and cleanup. It does not run translation checks.
+
+The 4.8.8 custom-feature suite is separate from the mandatory regression suite. It covers
+the added inking, opacity, connector, template-tag, video-preset, margin geometry, audio,
+crop, zoom, and app-protocol security checks. Run `npm run smoke:custom` for the focused suite.
+
+as of 18-Oct-2026, the smoke suite has 1240 assertions covering boot, ink, partial and whole-object erase, stylus/mouse device roles,
 pan-while-drawing and edge auto-pan, shape recognition, notes/text/shapes/tables, undo/redo,
 transforms, hit testing, the pen tray, click-away deselect, the zoom readout, the handwriting
 font, the pen-nib cursor, the About plate, the handwriting default and its settings migration,

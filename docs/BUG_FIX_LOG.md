@@ -212,3 +212,30 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
   2. Move actions are handled via standard right-click and surfaced with toast confirmations.
 * **Files Touched**: `src/js/ui/toolbar.js`, `src/locales/*.json`.
 
+---
+
+### BUG-4841-01: Crop Apply/Reset Undo Entry Malformed
+* **Symptom**: Undo after cropping could throw because a string ID list was passed as store operations.
+* **Fix**: Capture an object snapshot before preview mutations and commit the completed crop/reset through `commitSnapshot()`.
+* **Files Touched**: `src/js/ui/contextmenu.js`.
+
+### BUG-4841-02: Crop Cancel Kept Preview Changes
+* **Symptom**: Closing the crop dialog left its in-place preview on the image, and Apply had no clean pre-preview state to undo to.
+* **Fix**: Restore the original snapshot on dismiss; Apply and Reset commit one snapshot transaction.
+* **Files Touched**: `src/js/ui/contextmenu.js`.
+
+### BUG-4841-03: Video Export Mutated Live Replay and Retained Surface Resources
+* **Symptom**: Export used the live replay engine and a regular animated `Surface`, retaining observers, resize handlers, and a frame loop.
+* **Fix**: Use an ephemeral surface and exporter-owned replay clock; dispose surface, media sources, streams, audio elements, and audio context.
+* **Files Touched**: `src/js/core/surface.js`, `src/js/export-video.js`.
+
+### BUG-4841-04: Video Audio Load Could Wait Forever
+* **Symptom**: Export awaited `canplaythrough` without a timeout and invented a fallback duration when metadata was unavailable.
+* **Fix**: Bound audio loading to 15 seconds and require finite track or media duration.
+* **Files Touched**: `src/js/export-video.js`.
+
+### BUG-4841-05: Invalid Crop Source Rectangle Could Abort a Frame
+* **Symptom**: Out-of-bounds or partial crop values could reach `drawImage()` unchanged.
+* **Fix**: Clamp the source origin and dimensions to the image bounds.
+* **Files Touched**: `src/js/core/render.js`.
+

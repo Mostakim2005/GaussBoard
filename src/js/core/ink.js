@@ -110,9 +110,9 @@ function smoothPath(pts, passes = 1) {
     const next = [cur[0]];
     for (let i = 1; i < cur.length - 1; i++) {
       next.push({
+        ...cur[i],
         x: (cur[i - 1].x + cur[i].x * 2 + cur[i + 1].x) / 4,
         y: (cur[i - 1].y + cur[i].y * 2 + cur[i + 1].y) / 4,
-        p: cur[i].p
       });
     }
     next.push(cur[cur.length - 1]);
@@ -149,6 +149,7 @@ export function preparePoints(points, size) {
 export const INK_ENGINES = {
   default: { id: 'default', label: 'GazBoard Default' },
   windowsInk: { id: 'windowsInk', label: 'Windows Ink (Velocity & Bezier)' },
+  catmullRomBezier: { id: 'catmullRomBezier', label: 'Catmull–Rom Bézier' },
   perfectFreehand: { id: 'perfectFreehand', label: 'Perfect Freehand' }
 };
 
@@ -158,6 +159,34 @@ export function setInkEngine(engine) {
 }
 export function getInkEngine() {
   return activeInkEngine;
+}
+
+// Centripetal Catmull–Rom converted to cubic Bézier controls. Chord-length
+// spacing reduces loops and cusps around unevenly spaced pointer samples.
+function catmullRomControls(p0, p1, p2, p3) {
+  const d = (a, b) => Math.max(1e-3, Math.sqrt(Math.hypot(b.x - a.x, b.y - a.y)));
+  const t0 = 0, t1 = t0 + d(p0, p1), t2 = t1 + d(p1, p2), t3 = t2 + d(p2, p3);
+  const dt = t2 - t1;
+  const tangent = (a, b, c, ta, tb, tc) => ({
+    x: ((b.x - a.x) / (tb - ta) - (c.x - a.x) / (tc - ta) + (c.x - b.x) / (tc - tb)) * dt,
+    y: ((b.y - a.y) / (tb - ta) - (c.y - a.y) / (tc - ta) + (c.y - b.y) / (tc - tb)) * dt
+  });
+  const m1 = tangent(p0, p1, p2, t0, t1, t2);
+  const m2 = tangent(p1, p2, p3, t1, t2, t3);
+  return [
+    { x: p1.x + m1.x / 3, y: p1.y + m1.y / 3 },
+    { x: p2.x - m2.x / 3, y: p2.y - m2.y / 3 }
+  ];
+}
+
+function catmullRomPath(path, pts) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const [cp1, cp2] = catmullRomControls(p0, p1, p2, p3);
+    path.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, p2.x, p2.y);
+  }
+  return path;
 }
 
 export function centrelinePath(points, size, engine = activeInkEngine) {
@@ -174,6 +203,8 @@ export function centrelinePath(points, size, engine = activeInkEngine) {
 
   path.moveTo(pts[0].x, pts[0].y);
   if (pts.length === 2) { path.lineTo(pts[1].x, pts[1].y); return path; }
+
+  if (engine === 'catmullRomBezier') return catmullRomPath(path, pts);
 
   if (engine === 'windowsInk') {
     // Windows Ink-style cubic Bezier spline with velocity-adaptive curvature
@@ -219,6 +250,8 @@ function runPath(pts, engine = activeInkEngine) {
   path.moveTo(pts[0].x, pts[0].y);
   if (pts.length === 1) { path.lineTo(pts[0].x + 0.01, pts[0].y); return path; }
   if (pts.length === 2) { path.lineTo(pts[1].x, pts[1].y); return path; }
+
+  if (engine === 'catmullRomBezier') return catmullRomPath(path, pts);
 
   if (engine === 'windowsInk') {
     for (let i = 0; i < pts.length - 1; i++) {
@@ -309,10 +342,11 @@ export function inkRuns(stroke, scale = 1) {
   // must not be handed to the other. Rounded, so ordinary panning and small
   // zoom nudges still hit the cache.
   const band = Math.round(Math.log2(Math.max(0.05, scale)) * 2);
+  const engine = activeInkEngine;
   const hit = runCache.get(pts);
-  if (hit && hit.len === pts.length && hit.size === size && hit.band === band) return hit.runs;
+  if (hit && hit.len === pts.length && hit.size === size && hit.band === band && hit.engine === engine) return hit.runs;
   const runs = pressureRuns(pts, size, scale);
-  runCache.set(pts, { len: pts.length, size, band, runs });
+  runCache.set(pts, { len: pts.length, size, band, engine, runs });
   return runs;
 }
 
@@ -320,9 +354,10 @@ export function inkPath(stroke) {
   const pts = stroke.points;
   if (!pts || !pts.length) return null;
   const size = stroke.width || 4;
+  const engine = activeInkEngine;
   const hit = cache.get(pts);
-  if (hit && hit.len === pts.length && hit.size === size) return hit.path;
+  if (hit && hit.len === pts.length && hit.size === size && hit.engine === engine) return hit.path;
   const path = centrelinePath(pts, size);
-  cache.set(pts, { len: pts.length, size, path });
+  cache.set(pts, { len: pts.length, size, engine, path });
   return path;
 }

@@ -9,15 +9,15 @@
 ---
 
 ## 1. Overview of Release
-Release 4.8.4 introduces major creative and media production features: multi-tag board template gallery filtering, dynamic ribbon bar pinning, standalone external audio import into the replay engine, non-destructive image crop/rotation, and a multi-session stitched MP4/WebM video exporter.
+Release 4.8.4 introduces creative and media production features: My boards tag filtering, ribbon tool pinning, external audio import, non-destructive image cropping and annotation, and multi-session stitched WebM video export. This dossier has been corrected against commit `e6a2caf`; see the 4.8.4.1 dossier for the follow-up audit and fixes.
 
 ---
 
 ## 2. Features Added & Modified
 
-### F-484-01: Template Gallery Multi-Tag Filtering
-- **Module**: `src/js/ui/panels.js` (lines 310–385)
-- **Description**: Added interactive tag chips (e.g. `grid`, `study`, `music`, `kanban`) above the template gallery. Clicking filters displayed templates instantly with compound boolean matching.
+### F-484-01: My Boards Tag Filtering
+- **Module**: `src/js/ui/panels.js`
+- **Description**: Added tag filtering for boards in My boards. This is board metadata filtering, not template gallery chips.
 
 ### F-484-02: Customizable Ribbon Tool Pinning Architecture
 - **Module**: `src/js/ui/toolbar.js` (lines 210–310)
@@ -27,21 +27,19 @@ Release 4.8.4 introduces major creative and media production features: multi-tag
 - **Module**: `src/js/insert.js` (lines 240–305)
 - **Description**: Allows importing external MP3, WAV, and M4A audio files into the board. Automatically calculates audio duration, creates an audio track entry in the document store, and displays the waveform.
 
-### F-484-04: Non-Destructive In-Canvas Image Crop & Rotation
-- **Module**: `src/js/ui/contextmenu.js` (lines 410–565)
-- **Description**: Right-clicking any placed image provides "Crop Image" and "Rotate 90°". Crop handles allow resizing the visible viewport without deleting underlying source image data.
+### F-484-04: Non-Destructive In-Canvas Image Crop & Annotation
+- **Module**: `src/js/ui/contextmenu.js`
+- **Description**: Image context actions provide crop controls and direct annotation. Crop metadata changes the visible source rectangle without deleting the underlying image. A Rotate 90° crop action is not part of commit `e6a2caf`.
 
-### F-484-05: Multi-Section Stitched Video Exporter
-- **Module**: `src/js/export-video.js` (lines 310–740)
-- **Description**: Renders entire board replay sessions across multiple audio tracks into a stitched WebM/MP4 video file.
-- **Implementation**: Uses an off-screen canvas rendering worker at fixed delta time steps; synchronizes audio tracks using Web Audio API buffer concatenation and encodes frames via MediaRecorder.
+### F-484-05: Multi-Session Stitched Video Exporter
+- **Module**: `src/js/export-video.js`
+- **Description**: Renders selected replay sessions into a stitched WebM video file.
+- **Implementation**: Uses an off-screen canvas, Web Audio stream routing, and `MediaRecorder`.
 
 ---
 
 ## 3. Bug Fixes in This Release
-- **BUG-484-01**: Fixed audio import duration metadata reading `Infinity` on variable-bitrate WebM files.
-- **BUG-484-02**: Fixed image bounding box hit-test desynchronization after in-canvas rotation.
-- **BUG-484-03**: Fixed video export memory leak when exporting sessions longer than 15 minutes.
+- **Audit correction**: The original dossier claimed fixes for audio duration, image rotation hit testing, and export memory cleanup. The 4.8.4 audit found these claims were not supported by the code at `e6a2caf`; see `RELEASE-4.8.4.1.md` for verified fixes and remaining findings.
 
 ---
 

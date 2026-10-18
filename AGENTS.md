@@ -55,6 +55,6 @@ Before reporting completion to the user, run these verification commands in Powe
 # 1. Full regression smoke test suite (Must pass 1,240 / 1,240):
 node scripts/smoke.js
 
-# 2. Strict 100% translation coverage check (Must pass 1,349 / 1,349):
+# 2. Strict 100% translation coverage check (Must pass 1,368 / 1,368):
 node scripts/i18n-check.js
 ```

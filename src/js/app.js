@@ -76,7 +76,7 @@ export const DEFAULT_SETTINGS = {
   noteColor: '#ffd94a', noteSize: 200, noteFont: 'hand',
   emojiChar: '\u2705', emojiSize: 96, emojiRecent: [], recentBoards: [],
   textColor: '#201f1e', textSize: 32, textFont: 'hand',
-  shapeKind: 'rect', arrowRoute: 'straight', shapeStroke: '#201f1e', shapeFill: 'none', shapeLineWidth: 3, shapeDash: null,
+  shapeKind: 'rect', arrowRoute: 'straight', arrowHeadStyle: 'filled', shapeStroke: '#201f1e', shapeFill: 'none', shapeLineWidth: 3, shapeDash: null,
   inkToShape: false, pressure: true, wheelZoom: false, mouseWheelMode: 'zoom', enableHoverToolbar: true, hiddenRibbonTools: [], returnToSelect: true, autosave: true,
   showGroupOutlines: true,
   edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, laserColor: '#ff2d2d',
@@ -2518,6 +2518,7 @@ class App {
     const o = {
       id: uid('c'), type: 'connector', route: ROUTES.includes(route) ? route : 'straight',
       a: { ...a }, b: { ...b }, heads,
+      headStyle: this.settings.arrowHeadStyle || 'filled',
       stroke: s.shapeStroke || '#201f1e', lineWidth: s.shapeLineWidth || 3, dash: s.shapeDash || null,
       x: 0, y: 0, w: 0, h: 0, rotation: 0
     };
@@ -2552,6 +2553,18 @@ class App {
     }
     this.store.commit('arrow heads', objs.map((o) => o.id));
     this.surface.invalidate();
+    this.syncUI();
+  }
+
+  setArrowHeadStyle(style) {
+    if (!['filled', 'open', 'stealth', 'diamond'].includes(style)) return;
+    this.settings.arrowHeadStyle = style;
+    this.saveSettings();
+    const objs = this.selected.filter((o) => !o.locked && (o.type === 'connector' || (o.type === 'shape' && ['line', 'arrow', 'doubleArrow'].includes(o.kind))));
+    if (objs.length) {
+      this.store.updateMany(objs.map((o) => o.id), { headStyle: style }, 'arrowhead style');
+      this.surface.invalidate();
+    }
     this.syncUI();
   }
 

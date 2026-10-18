@@ -4,7 +4,7 @@ import { t, LANGUAGES, currentLanguage } from '../i18n.js';
 import { packFor, isInstalled, isActive, installFromFile, remove as removeFontPack, sizeLabel } from '../fontpack.js';
 import { h } from './popover.js';
 import { icon } from './icons.js';
-import { TEMPLATES, templateThumb } from '../templates.js';
+import { TEMPLATES, filterTemplatesByTags, templateTags, templateThumb } from '../templates.js';
 import { PAPER, paperForPage } from './pdfdialog.js';
 import { exportBoards } from '../board-export.js';
 import { BOARD_COLORS, PATTERNS } from './palettes.js';
@@ -131,7 +131,13 @@ export function createPanels(app) {
   }
 
   function saveCustomTemplates(tpls) {
-    localStorage.setItem('gazboard:custom_templates', JSON.stringify(tpls));
+    try {
+      localStorage.setItem('gazboard:custom_templates', JSON.stringify(tpls));
+      return true;
+    } catch (error) {
+      app.toast(t('Could not save template: {msg}', { msg: error.message || String(error) }), 'help', 6000);
+      return false;
+    }
   }
 
   async function saveCurrentBoardAsTemplate() {
@@ -153,11 +159,12 @@ export function createPanels(app) {
       background: bg,
       pages,
       objects: nonAudioObjs,
+      tags: [],
       createdAt: Date.now()
     };
     const list = loadCustomTemplates();
     list.unshift(tpl);
-    saveCustomTemplates(list);
+    if (!saveCustomTemplates(list)) return;
     app.toast(t('Template saved: {name}', { name: tpl.name }));
     rerender();
   }
@@ -181,11 +188,12 @@ export function createPanels(app) {
           custom: true,
           type: isPdf ? 'pdf' : 'image',
           dataUrl: typeof dataUrl === 'string' ? dataUrl : null,
+          tags: [],
           fileName: file.name
         };
         const list = loadCustomTemplates();
         list.unshift(tpl);
-        saveCustomTemplates(list);
+        if (!saveCustomTemplates(list)) return;
         app.toast(t('Template imported: {name}', { name }));
         rerender();
       };
@@ -195,18 +203,34 @@ export function createPanels(app) {
   }
 
   const thumbCache = new Map();
+  const activeTemplateTagFilters = new Set();
   function templates() {
     open('templates', t('Templates'), () => {
       const customList = loadCustomTemplates();
       const allTemplates = [...customList, ...TEMPLATES];
+      const allTags = [...new Set(allTemplates.flatMap(templateTags))].sort((a, b) => a.localeCompare(b));
+      const visibleTemplates = filterTemplatesByTags(allTemplates, activeTemplateTagFilters);
       const groups = new Map();
-      for (const tpl of allTemplates) {
+      for (const tpl of visibleTemplates) {
         if (!groups.has(tpl.group)) groups.set(tpl.group, []);
         groups.get(tpl.group).push(tpl);
       }
       const wrap = h('div', {});
       wrap.appendChild(h('p', { style: 'margin:0 0 14px;color:var(--text-2);font-size:13px' },
         t('Templates are added to the board — your existing content is kept. Canvas sizes only change the shape of the page.')));
+      if (allTags.length) {
+        const filters = h('div', { class: 'template-tag-filters', style: 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px' });
+        for (const tag of allTags) {
+          const selected = activeTemplateTagFilters.has(tag);
+          const chip = h('button', { class: 'btn' + (selected ? ' primary' : ''), 'data-template-tag': tag,
+            onclick: () => { selected ? activeTemplateTagFilters.delete(tag) : activeTemplateTagFilters.add(tag); rerender(); } }, `#${tag}`);
+          chip.style.cssText += ';padding:3px 8px;font-size:11.5px';
+          filters.appendChild(chip);
+        }
+        if (activeTemplateTagFilters.size) filters.appendChild(h('button', { class: 'btn', onclick: () => { activeTemplateTagFilters.clear(); rerender(); } }, t('Clear filters')));
+        wrap.appendChild(filters);
+      }
+      if (!visibleTemplates.length) wrap.appendChild(h('p', { role: 'status', style: 'color:var(--text-2)' }, t('No templates match these tags.')));
       for (const [group, list] of groups) {
         const sec = h('div', { class: 'section' }, h('h5', {}, group));
         const grid = h('div', { class: 'tpl-grid' });
@@ -218,6 +242,21 @@ export function createPanels(app) {
           btn.appendChild(h('span', { class: 'name' }, tpl.name));
           btn.addEventListener('click', () => { app.applyTemplate(tpl); close(); });
           if (tpl.custom) {
+            const tagBtn = h('button', {
+              class: 'icon-btn', title: t('Edit template tags'), 'aria-label': t('Edit template tags'),
+              style: 'position:absolute;bottom:4px;right:32px;width:24px;height:24px;background:rgba(0,0,0,0.55);color:#fff;border-radius:4px;font-size:12px'
+            }, '#');
+            tagBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const value = window.prompt(t('Template tags, separated by commas'), (tpl.tags || []).join(', '));
+              if (value == null) return;
+              const tags = [...new Set(value.split(',').map((tag) => tag.trim().replace(/^#/, '')).filter(Boolean))];
+              const updated = loadCustomTemplates().map((item) => item.id === tpl.id ? { ...item, tags } : item);
+              if (saveCustomTemplates(updated)) rerender();
+            });
+            btn.appendChild(tagBtn);
+            const ownTags = Array.isArray(tpl.tags) ? tpl.tags : [];
+            if (ownTags.length) btn.appendChild(h('span', { style: 'position:absolute;left:5px;bottom:7px;color:#fff;background:rgba(0,0,0,.58);padding:1px 4px;border-radius:4px;font-size:9px' }, ownTags.map((tag) => `#${tag}`).join(' ')));
             const delBtn = h('button', {
               class: 'icon-btn',
               title: t('Delete template'),
@@ -226,7 +265,7 @@ export function createPanels(app) {
             delBtn.addEventListener('click', (e) => {
               e.stopPropagation();
               const updated = loadCustomTemplates().filter((c) => c.id !== tpl.id);
-              saveCustomTemplates(updated);
+              if (!saveCustomTemplates(updated)) return;
               thumbCache.delete(tpl.id);
               rerender();
             });
@@ -1465,7 +1504,20 @@ export function createPanels(app) {
             : null,
           row(t('Gesture scratch-out eraser'), mkToggle(() => s.scratchOut !== false, (v) => (s.scratchOut = v)),
             t('Scribble rapidly back and forth across strokes or text to erase them (StarNote style).')),
-          row(t('Pen opacity'), mkToggle(() => s.penOpacityEnabled === true, (v) => (s.penOpacityEnabled = v)),
+          row(t('Pen opacity'), h('div', { style: 'display:flex;align-items:center;gap:8px' },
+            mkToggle(() => s.penOpacityEnabled === true, (v) => (s.penOpacityEnabled = v)),
+            h('input', {
+              type: 'range', min: '10', max: '100', step: '1',
+              value: String(Math.round(Math.max(0.1, Math.min(1, Number(s.penOpacity ?? 1))) * 100)),
+              'aria-label': t('Pen opacity'), style: 'width:110px',
+              oninput: (e) => {
+                s.penOpacity = Number(e.target.value) / 100;
+                e.target.nextSibling.textContent = `${e.target.value}%`;
+              },
+              onchange: () => app.saveSettings()
+            }),
+            h('span', { style: 'font-size:12px;min-width:36px;text-align:right' },
+              `${Math.round(Math.max(0.1, Math.min(1, Number(s.penOpacity ?? 1))) * 100)}%`)),
             t('Allow drawing translucent pen strokes for layering effects.')),
           row(t('Laser trail duration'), mkChoice(
             [[0, t('Instant')], [300, '300ms'], [520, t('520ms')], [1200, '1.2s'], [2500, '2.5s'], [5000, '5.0s'], [10000, '10s']],
@@ -1521,6 +1573,7 @@ export function createPanels(app) {
           row(t('Inking engine'), mkChoice([
             ['default', t('GazBoard Default')],
             ['windowsInk', t('Windows Ink (Velocity & Bezier)')],
+            ['catmullRomBezier', t('Catmull–Rom Bézier')],
             ['perfectFreehand', t('Perfect Freehand')]
           ], () => s.inkEngine || 'default', (v) => {
             s.inkEngine = v;
