@@ -2575,14 +2575,20 @@ export class Interaction {
       this.surface.invalidate();
       return;
     }
-    if (e.ctrlKey || e.metaKey) {
-      this.surface.cam.zoomAt(sp.x, sp.y, Math.exp(-e.deltaY * 0.0022));
+    const dev = this.wheelDevice(e);
+    const mode = this.app.settings.mouseWheelMode || (this.app.settings.wheelZoom ? 'zoom' : (dev === 'trackpad' ? 'scroll' : 'zoom'));
+    let isZoom;
+    if (dev === 'trackpad') {
+      isZoom = (e.ctrlKey || e.metaKey) || (this.app.settings.wheelZoom && !e.ctrlKey && !e.metaKey);
+    } else {
+      isZoom = (mode === 'zoom' && !e.ctrlKey && !e.metaKey) || (mode === 'scroll' && (e.ctrlKey || e.metaKey));
+    }
+    if (isZoom) {
+      this.surface.cam.zoomAt(sp.x, sp.y, Math.exp(-e.deltaY * 0.002));
     } else if (e.shiftKey) {
       this.surface.cam.panBy(-e.deltaY, 0);
-    } else if (this.wheelDevice(e) === 'trackpad' && !this.app.settings.wheelZoom) {
-      this.surface.cam.panBy(-e.deltaX, -e.deltaY);
     } else {
-      this.surface.cam.zoomAt(sp.x, sp.y, Math.exp(-e.deltaY * 0.0018));
+      this.surface.cam.panBy(-e.deltaX, -e.deltaY);
     }
     this.surface.clampCamera();
     this.app.syncZoom();

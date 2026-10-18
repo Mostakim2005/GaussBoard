@@ -323,12 +323,21 @@ export class SearchDialog {
         set: (v) => { s.theme = v; app.saveSettings(); }
       },
       {
-        id: 'wheelZoom',
-        title: t('Mouse wheel zooms'),
-        desc: t('Off: wheel and trackpad pan; On: wheel zooms canvas'),
+        id: 'mouseWheelMode',
+        title: t('Mouse wheel action'),
+        desc: t('Intelligent dual mode: wheel scrolls or zooms, while holding Ctrl switches to the other action.'),
+        type: 'choice',
+        options: [['scroll', t('Page scroll / Pan (Ctrl to zoom)')], ['zoom', t('Zoom in/out (Ctrl to scroll)')]],
+        get: () => s.mouseWheelMode || (s.wheelZoom ? 'zoom' : 'scroll'),
+        set: (v) => { s.mouseWheelMode = v; s.wheelZoom = (v === 'zoom'); app.saveSettings(); }
+      },
+      {
+        id: 'enableHoverToolbar',
+        title: t('Show quick actions on hover'),
+        desc: t('Hovering over items shows the floating action menu (crop, duplicate, lock, delete) with Windows-style persistent focus.'),
         type: 'toggle',
-        get: () => !!s.wheelZoom,
-        set: (v) => { s.wheelZoom = v; app.saveSettings(); }
+        get: () => s.enableHoverToolbar !== false,
+        set: (v) => { s.enableHoverToolbar = v; app.saveSettings(); }
       },
       {
         id: 'edgePan',

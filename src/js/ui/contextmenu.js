@@ -22,14 +22,17 @@ function item(label, iconName, onClick, opts = {}) {
 
 export function showContextMenu(app, e, fromSelectionBar = false) {
   const ctxbar = document.getElementById('ctxbar');
-  if (ctxbar) ctxbar.classList.remove('show');
-
   const sel = app.surface.selection;
   const wp = app.surface.toWorld(e);
 
   // right-clicking an unselected object selects it first
   const hit = fromSelectionBar ? null : app.pickAt(wp);
   if (hit && !sel.has(hit.id)) app.setSelection([hit.id]);
+
+  // Keep selection bar visible if selection exists
+  if (app.surface.selection.size > 0 && !app.textEditor?.active) {
+    updateSelectionBar(app);
+  }
 
   const has = app.surface.selection.size > 0;
   const one = app.surface.selection.size === 1 ? app.store.get([...app.surface.selection][0]) : null;
@@ -43,6 +46,21 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
       }
     }
   };
+
+  // Determine side-by-side coordinates to prevent overlapping ctxbar
+  let posX = e.clientX;
+  let posY = e.clientY;
+  if (ctxbar && ctxbar.classList.contains('show')) {
+    const cr = ctxbar.getBoundingClientRect();
+    const menuWidth = 220;
+    if (cr.right + 8 + menuWidth <= window.innerWidth) {
+      posX = cr.right + 8;
+      posY = Math.max(10, Math.min(cr.top, window.innerHeight - 380));
+    } else if (cr.left - 8 - menuWidth >= 0) {
+      posX = cr.left - 8 - menuWidth;
+      posY = Math.max(10, Math.min(cr.top, window.innerHeight - 380));
+    }
+  }
 
   const menu = h('div', { class: 'menu' });
   const allLocked = has && app.selected.every((o) => o.locked);
@@ -58,7 +76,7 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(item(t('Copy'), 'copy', () => app.command('edit.copy'), { key: 'Ctrl+C' }));
     menu.appendChild(item(t('Copy as picture'), 'image', () => app.command('edit.copyPicture')));
     menu.appendChild(item(t('Export selection as PNG…'), 'image', () => app.command('export.pngSelection')));
-    openPopover({ x: e.clientX, y: e.clientY }, menu, popOpts);
+    openPopover({ x: posX, y: posY }, menu, popOpts);
     return;
   }
 
@@ -112,7 +130,7 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(item(t('Canvas…'), 'palette', () => app.panels.background()));
     menu.appendChild(item(t('Clear canvas'), 'trash', () => app.command('edit.clear'), { danger: true }));
   }
-  openPopover({ x: e.clientX, y: e.clientY }, menu, popOpts);
+  openPopover({ x: posX, y: posY }, menu, popOpts);
 }
 
 /* ------------------------------------------------------------------ *
@@ -121,6 +139,24 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
 export function updateSelectionBar(app, targetObj = null) {
   const bar = document.getElementById('ctxbar');
   if (!bar) return;
+
+  if (!bar._hoverBound) {
+    bar._hoverBound = true;
+    bar.addEventListener('mouseenter', () => {
+      clearTimeout(app._hoverBarTimer);
+    });
+    bar.addEventListener('mouseleave', () => {
+      if (!app.surface?.selection?.size) {
+        clearTimeout(app._hoverBarTimer);
+        app._hoverBarTimer = setTimeout(() => {
+          if (!bar.matches(':hover') && !app.surface?.selection?.size) {
+            bar.classList.remove('show');
+          }
+        }, 250);
+      }
+    });
+  }
+
   if (app.textEditor?.active) { formatBar(app, bar); return; }
   if (bar.dataset.mode === 'format') { bar.dataset.mode = ''; bar.onmousedown = null; bar.innerHTML = ''; }
   const sel = targetObj ? [targetObj] : [...app.surface.selection].map((id) => app.store.get(id)).filter(Boolean);

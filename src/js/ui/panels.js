@@ -1480,7 +1480,22 @@ export function createPanels(app) {
           h('h5', {}, t('Canvas')),
           row(t('Board link thumbnails'), mkToggle(() => s.boardLinkThumb !== false, (v) => { s.boardLinkThumb = v; app.saveSettings(); app.surface.invalidate(); }),
             t('Show thumbnail picture previews on board link cards by default.')),
-          row(t('Mouse wheel zooms'), mkToggle(() => s.wheelZoom, (v) => (s.wheelZoom = v)), t('Off: wheel and trackpad pan, Ctrl+wheel zooms.')),
+          row(t('Mouse wheel action'), mkChoice([
+            ['scroll', t('Page scroll / Pan (Ctrl to zoom)')],
+            ['zoom', t('Zoom in/out (Ctrl to scroll)')]
+          ], () => s.mouseWheelMode || (s.wheelZoom ? 'zoom' : 'scroll'), (v) => {
+            s.mouseWheelMode = v;
+            s.wheelZoom = (v === 'zoom');
+            app.saveSettings();
+          }), t('Intelligent dual mode: wheel scrolls or zooms, while holding Ctrl switches to the other action.')),
+          row(t('Show quick actions on hover'), mkToggle(() => s.enableHoverToolbar !== false, (v) => {
+            s.enableHoverToolbar = v;
+            app.saveSettings();
+            if (!v) {
+              const b = document.getElementById('ctxbar');
+              if (b && !app.surface?.selection?.size) b.classList.remove('show');
+            }
+          }), t('Hovering over items shows the floating action menu (crop, duplicate, lock, delete) with Windows-style persistent focus.')),
           row(t('Auto-pan at the edges'), mkToggle(() => s.edgePan, (v) => (s.edgePan = v)),
             t('While drawing or dragging, running the pointer into the edge of the window scrolls the canvas. A mouse button held down during a pen stroke drags the canvas too.')),
           row(t('Return to select after drawing'), mkToggle(() => s.returnToSelect, (v) => (s.returnToSelect = v))),

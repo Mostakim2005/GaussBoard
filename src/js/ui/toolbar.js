@@ -44,13 +44,26 @@ export function initToolbar(app) {
   bar.innerHTML = '';
   if (isPhoneLayout()) { initPhoneToolbar(app, bar); wireTopBar(app); return; }
 
-  const sep = () => bar.appendChild(h('div', { class: 'sep' }));
+  const sep = (dataSep) => {
+    const s = h('div', { class: 'sep' });
+    if (dataSep) s.dataset.sep = dataSep;
+    bar.appendChild(s);
+    return s;
+  };
 
   const iconTool = (opts) => {
     const b = h('button', { class: 'tool', title: opts.title });
     if (opts.tool) b.dataset.tool = opts.tool;
     if (opts.cmd) b.dataset.cmd = opts.cmd;
     if (opts.pop) b.dataset.pop = opts.pop;
+    if (opts.ribbonId) {
+      b.dataset.ribbonId = opts.ribbonId;
+      b.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        moveRibbonToolToPlus(app, opts.ribbonId);
+      });
+    }
     b.innerHTML = icon(opts.icon, 20);
     if (opts.dot) b.appendChild(h('span', { class: 'dot' }));
     // The shortcut letter lives on the button. Nobody memorises a shortcut
@@ -67,18 +80,19 @@ export function initToolbar(app) {
     if (was) openToolPopover(app, b, tool); else closePopover();
   };
 
-  iconTool({ tool: 'select', icon: 'select', key: 'V', title: t('Select (V)'), onClick: () => app.setTool('select') });
-  iconTool({ tool: 'lasso', icon: 'lasso', key: 'L', title: t('Lasso select (L)'), onClick: () => app.setTool('lasso') });
-  iconTool({ tool: 'pan', icon: 'hand', key: 'G', title: t('Pan the canvas (G) \u2014 drag to move around. Space, the middle mouse button and the scroll wheel do this too'),
+  iconTool({ ribbonId: 'select', tool: 'select', icon: 'select', key: 'V', title: t('Select (V)'), onClick: () => app.setTool('select') });
+  iconTool({ ribbonId: 'lasso', tool: 'lasso', icon: 'lasso', key: 'L', title: t('Lasso select (L)'), onClick: () => app.setTool('lasso') });
+  iconTool({ ribbonId: 'pan', tool: 'pan', icon: 'hand', key: 'G', title: t('Pan the canvas (G) \u2014 drag to move around. Space, the middle mouse button and the scroll wheel do this too'),
     onClick: () => app.setTool('pan') });
-  iconTool({ tool: 'laser', icon: 'laser', key: 'X', title: t('Laser pointer (X) \u2014 leaves a trail that fades; nothing is saved'),
+  iconTool({ ribbonId: 'laser', tool: 'laser', icon: 'laser', key: 'X', title: t('Laser pointer (X) \u2014 leaves a trail that fades; nothing is saved'),
     onClick: () => app.setTool('laser') });
-  sep();
+  sep('1');
 
   /* ---- the pen tray ---- */
   for (const pen of PENS) {
     const b = h('button', { class: 'pen', title: t('{pen} ({n}) \u2014 click again for thickness', { pen: pen.label, n: PENS.indexOf(pen) + 1 }) });
     b.dataset.pen = pen.id;
+    b.dataset.ribbonId = 'pen';
     if (pen.id === 'black') b.dataset.tool = 'pen';       // the canonical pen button
     // every pen wears its own number: 1-6 reach them directly, which is the
     // whole point of putting the keys on the buttons
@@ -88,54 +102,67 @@ export function initToolbar(app) {
       + `<span class="kbd">${PENS.indexOf(pen) + 1}</span>`;
     b.dataset.paint = now.color + '|' + now.effect;
     b.addEventListener('click', () => choosePen(app, pen.id, b));
+    b.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      moveRibbonToolToPlus(app, 'pen');
+    });
     bar.appendChild(b);
   }
 
   const hl = h('button', { class: 'pen', title: t('Highlighter (H) \u2014 click again for options') });
   hl.dataset.tool = 'highlighter';
+  hl.dataset.ribbonId = 'highlighter';
   hl.innerHTML = penIcon(app.settings.highlighterColor, 'none', 'highlighter') + '<span class="kbd">H</span>';
   hl.addEventListener('click', (e) => toggleTool('highlighter')(e, hl));
+  hl.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    moveRibbonToolToPlus(app, 'highlighter');
+  });
   bar.appendChild(hl);
 
   const er = h('button', { class: 'pen', title: t('Eraser (E) \u2014 click again for options') });
   er.dataset.tool = 'eraser';
+  er.dataset.ribbonId = 'eraser';
   er.innerHTML = penIcon('#f7a8c4', 'none', 'eraser') + '<span class="kbd">E</span>';
   er.addEventListener('click', (e) => toggleTool('eraser')(e, er));
+  er.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    moveRibbonToolToPlus(app, 'eraser');
+  });
   bar.appendChild(er);
-  sep();
+  sep('2');
 
-  iconTool({ cmd: 'ruler', icon: 'ruler', title: t('Ruler (Ctrl+R)'), onClick: () => app.command('ruler') });
-  iconTool({ tool: 'text', icon: 'text', dot: true, key: 'T', title: t('Text (T) \u2014 click again for font and size'),
+  iconTool({ ribbonId: 'ruler', cmd: 'ruler', icon: 'ruler', title: t('Ruler (Ctrl+R)'), onClick: () => app.command('ruler') });
+  iconTool({ ribbonId: 'text', tool: 'text', dot: true, key: 'T', title: t('Text (T) \u2014 click again for font and size'),
     onClick: toggleTool('text') });
-  iconTool({ tool: 'note', icon: 'note', dot: true, key: 'N', title: t('Sticky note (N) \u2014 click again for colours'),
+  iconTool({ ribbonId: 'note', tool: 'note', dot: true, key: 'N', title: t('Sticky note (N) \u2014 click again for colours'),
     onClick: toggleTool('note') });
-  // One press opens the shape menu, exactly like the emoji button. Under the
-  // click-again rule the first press only re-armed whatever shape was used
-  // last - after Escape, or after writing with the pen, that press looked like
-  // nothing happened, and the next drag drew a shape nobody had chosen.
-  iconTool({ tool: 'shape', icon: 'shapes', dot: true, key: 'S', title: t('Shapes (S)'),
+  iconTool({ ribbonId: 'shape', tool: 'shape', icon: 'shapes', dot: true, key: 'S', title: t('Shapes (S)'),
     onClick: (e, b) => { app.setTool('shape'); app.syncUI(); openToolPopover(app, b, 'shape'); } });
-  /*
-   * The emoji button always opens the picker.
-   *
-   * Every other tool follows "click to choose it, click again for its
-   * options", because a pen is useful the moment you pick it up and the
-   * options are a detour. The emoji tool is the other way round: choosing
-   * WHICH emoji is the whole act, and the tool on its own just repeats
-   * whatever you stamped last. Stamping one hands the board back to Select,
-   * so under the usual rule the next press only re-arms the tool and appears
-   * to do nothing at all - press, nothing, press again, there it is.
-   *
-   * Pressing it while the picker is open still shuts it, because openPopover
-   * treats a second press on the same key as "put that away".
-   */
-  iconTool({ tool: 'emoji', icon: 'emoji', title: t('Emoji \u2014 pick one to stamp on the board'),
+  iconTool({ ribbonId: 'emoji', tool: 'emoji', icon: 'emoji', title: t('Emoji \u2014 pick one to stamp on the board'),
     onClick: (e, b) => { app.setTool('emoji'); app.syncUI(); openToolPopover(app, b, 'emoji'); } });
-  // Pinned tools from the insert menu
-  if (!Array.isArray(app.settings.pinnedTools)) {
-    app.settings.pinnedTools = ['insert.image'];
-  }
-  const PIN_METADATA = {
+
+  const pinnedSlot = h('div', { id: 'pinnedToolsSlot', style: 'display:contents' });
+  bar.appendChild(pinnedSlot);
+  renderPinnedTools(app, pinnedSlot);
+
+  iconTool({ cmd: 'insert', icon: 'insert', pop: 'insert', title: t('Insert document, table or template'),
+    onClick: (e, b) => openInsertPopover(app, b) });
+  sep('3');
+
+  iconTool({ cmd: 'undo', icon: 'undo', title: t('Undo (Ctrl+Z)'), onClick: () => app.command('undo') });
+  iconTool({ cmd: 'redo', icon: 'redo', title: t('Redo (Ctrl+Y)'), onClick: () => app.command('redo') });
+  iconTool({ cmd: 'more', icon: 'more', pop: 'more', title: t('More'), onClick: (e, b) => openMorePopover(app, b) });
+
+  wireTopBar(app);
+  syncRibbonTools(app);
+}
+
+export function getPinMetadata(app) {
+  return {
     'insert.image': { icon: 'image', title: t('Insert image'), onClick: () => app.command('insert.image') },
     'insert.audio': { icon: 'audio', title: t('Insert audio or recording'), onClick: () => app.command('insert.audio') },
     'insert.document': { icon: 'doc', title: t('Insert document'), onClick: () => app.command('insert.document') },
@@ -143,37 +170,84 @@ export function initToolbar(app) {
     'insert.math': { icon: 'maths', title: t('Insert maths formula'), onClick: () => app.command('insert.math') },
     'insert.curtain': { icon: 'curtain', title: t('Answer cover'), onClick: () => app.command('insert.curtain') },
     'insert.boardlink': { icon: 'link', title: t('Link to a board'), onClick: () => app.command('insert.boardlink') },
+    'timer.open': { icon: 'timer', title: t('Class timer'), onClick: () => app.command('timer.open') },
+    'view.present': { icon: 'present', title: t('Present'), onClick: () => app.command('view.present') },
     'panels.templates': { icon: 'template', title: t('Templates'), onClick: () => app.panels.templates() }
   };
+}
 
+export function renderPinnedTools(app, slot = document.getElementById('pinnedToolsSlot')) {
+  if (!slot) return;
+  slot.innerHTML = '';
+  if (!Array.isArray(app.settings.pinnedTools)) {
+    app.settings.pinnedTools = ['insert.image'];
+  }
+  const metaMap = getPinMetadata(app);
   for (const pid of app.settings.pinnedTools) {
-    const meta = PIN_METADATA[pid];
+    const meta = metaMap[pid];
     if (!meta) continue;
-    const btn = iconTool({
-      cmd: pid,
-      icon: meta.icon,
-      title: `${meta.title} — ${t('Right-click to unpin')}`,
-      onClick: meta.onClick
+    const b = h('button', {
+      class: 'tool',
+      title: `${meta.title} — ${t('Right-click to unpin')}`
     });
-    btn.addEventListener('contextmenu', (e) => {
+    b.dataset.cmd = pid;
+    b.innerHTML = icon(meta.icon, 20);
+    b.addEventListener('click', (e) => meta.onClick(e, b));
+    b.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
       app.settings.pinnedTools = app.settings.pinnedTools.filter((id) => id !== pid);
       app.saveSettings();
-      initToolbar(app);
+      renderPinnedTools(app, slot);
       app.toast(t('Unpinned from ribbon'));
     });
+    slot.appendChild(b);
+  }
+}
+
+export function syncRibbonTools(app) {
+  const bar = document.getElementById('toolbar');
+  if (!bar) return;
+  const hidden = new Set(app.settings.hiddenRibbonTools || []);
+
+  bar.querySelectorAll('[data-ribbon-id]').forEach((el) => {
+    const id = el.dataset.ribbonId;
+    el.style.display = hidden.has(id) ? 'none' : '';
+  });
+
+  const slot = document.getElementById('pinnedToolsSlot');
+  if (slot) {
+    renderPinnedTools(app, slot);
   }
 
-  iconTool({ cmd: 'insert', icon: 'insert', pop: 'insert', title: t('Insert document, table or template'),
-    onClick: (e, b) => openInsertPopover(app, b) });
-  sep();
+  const group1 = ['select', 'lasso', 'pan', 'laser'].some((id) => !hidden.has(id));
+  const sep1 = bar.querySelector('[data-sep="1"]');
+  if (sep1) sep1.style.display = group1 ? '' : 'none';
 
-  iconTool({ cmd: 'undo', icon: 'undo', title: t('Undo (Ctrl+Z)'), onClick: () => app.command('undo') });
-  iconTool({ cmd: 'redo', icon: 'redo', title: t('Redo (Ctrl+Y)'), onClick: () => app.command('redo') });
-  iconTool({ cmd: 'more', icon: 'more', pop: 'more', title: t('More'), onClick: (e, b) => openMorePopover(app, b) });
+  const group2 = ['pen', 'highlighter', 'eraser'].some((id) => !hidden.has(id));
+  const sep2 = bar.querySelector('[data-sep="2"]');
+  if (sep2) sep2.style.display = group2 ? '' : 'none';
+}
 
-  wireTopBar(app);
+export function moveRibbonToolToPlus(app, ribbonId) {
+  if (!Array.isArray(app.settings.hiddenRibbonTools)) {
+    app.settings.hiddenRibbonTools = [];
+  }
+  if (!app.settings.hiddenRibbonTools.includes(ribbonId)) {
+    app.settings.hiddenRibbonTools.push(ribbonId);
+    app.saveSettings();
+  }
+  syncRibbonTools(app);
+  app.toast(t('Moved to + menu'));
+}
+
+export function restoreRibbonToolFromPlus(app, ribbonId) {
+  if (Array.isArray(app.settings.hiddenRibbonTools)) {
+    app.settings.hiddenRibbonTools = app.settings.hiddenRibbonTools.filter((id) => id !== ribbonId);
+    app.saveSettings();
+  }
+  syncRibbonTools(app);
+  app.toast(t('Pinned to ribbon'));
 }
 
 /* ==================================================================
@@ -969,16 +1043,19 @@ export function openToolPopover(app, anchor, tool) {
 
 /* ------------------------------------------------------------------ */
 function menuItem(label, iconName, onClick, opts = {}) {
-  const pinBtn = opts.pinKey ? h('span', {
-    class: 'menu-pin' + (opts.isPinned ? ' pinned' : ''),
-    title: opts.isPinned ? t('Unpin from ribbon') : t('Pin to ribbon'),
-    style: `margin-left:auto;padding:2px 6px;cursor:pointer;opacity:${opts.isPinned ? '1' : '0.35'};font-size:13px;display:flex;align-items:center;transition:opacity .15s;`,
-    onclick: (e) => {
+  let pinBtn = null;
+  if (opts.pinKey) {
+    pinBtn = h('span', {
+      class: 'menu-pin' + (opts.isPinned ? ' pinned' : ''),
+      title: opts.isPinned ? t('Unpin from ribbon') : t('Pin to ribbon'),
+      style: `margin-left:auto;padding:2px 6px;cursor:pointer;opacity:${opts.isPinned ? '1' : '0.35'};font-size:13px;display:flex;align-items:center;transition:opacity .15s;`
+    }, opts.isPinned ? '📌' : '📍');
+    pinBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      opts.onTogglePin?.();
-    }
-  }, opts.isPinned ? '📌' : '📍') : null;
+      opts.onTogglePin?.(pinBtn);
+    });
+  }
 
   const b = h('button', { class: 'menu-item' + (opts.danger ? ' danger' : '') },
     h('span', { html: icon(iconName, 17), style: 'display:flex' }),
@@ -1009,42 +1086,102 @@ export function openInsertPopover(app, anchor) {
   if (!Array.isArray(app.settings.pinnedTools)) {
     app.settings.pinnedTools = ['insert.image'];
   }
-  const pinned = new Set(app.settings.pinnedTools);
+  if (!Array.isArray(app.settings.hiddenRibbonTools)) {
+    app.settings.hiddenRibbonTools = [];
+  }
+  const pinnedSet = new Set(app.settings.pinnedTools);
+  const hiddenRibbonSet = new Set(app.settings.hiddenRibbonTools);
 
-  const togglePin = (id) => {
-    if (pinned.has(id)) {
-      pinned.delete(id);
-      app.settings.pinnedTools = [...pinned];
+  const toggleInsertPin = (id, pinBtn) => {
+    let isPinned;
+    if (pinnedSet.has(id)) {
+      pinnedSet.delete(id);
+      isPinned = false;
     } else {
-      pinned.add(id);
-      app.settings.pinnedTools = [...pinned];
+      pinnedSet.add(id);
+      isPinned = true;
     }
+    app.settings.pinnedTools = [...pinnedSet];
     app.saveSettings();
-    initToolbar(app);
-    openInsertPopover(app, anchor);
+
+    pinBtn.textContent = isPinned ? '📌' : '📍';
+    pinBtn.style.opacity = isPinned ? '1' : '0.35';
+    pinBtn.classList.toggle('pinned', isPinned);
+    pinBtn.title = isPinned ? t('Unpin from ribbon') : t('Pin to ribbon');
+
+    renderPinnedTools(app);
+    app.toast(isPinned ? t('Pinned to ribbon') : t('Unpinned from ribbon'));
   };
 
-  const pinnableItem = (label, iconName, onClick, id, key = null) => {
-    const isPinned = pinned.has(id);
+  const toggleRibbonToolPin = (id, pinBtn) => {
+    let isPinned;
+    if (hiddenRibbonSet.has(id)) {
+      hiddenRibbonSet.delete(id);
+      isPinned = true;
+    } else {
+      hiddenRibbonSet.add(id);
+      isPinned = false;
+    }
+    app.settings.hiddenRibbonTools = [...hiddenRibbonSet];
+    app.saveSettings();
+
+    pinBtn.textContent = isPinned ? '📌' : '📍';
+    pinBtn.style.opacity = isPinned ? '1' : '0.35';
+    pinBtn.classList.toggle('pinned', isPinned);
+    pinBtn.title = isPinned ? t('Unpin from ribbon') : t('Pin to ribbon');
+
+    syncRibbonTools(app);
+    app.toast(isPinned ? t('Pinned to ribbon') : t('Moved to + menu'));
+  };
+
+  const insertItem = (label, iconName, onClick, id, key = null) => {
+    const isPinned = pinnedSet.has(id);
     return menuItem(label, iconName, onClick, {
       key,
       pinKey: id,
       isPinned,
-      onTogglePin: () => togglePin(id)
+      onTogglePin: (btn) => toggleInsertPin(id, btn)
     });
   };
 
-  const body = h('div', { class: 'menu' },
-    pinnableItem(t('Image…'), 'image', () => app.command('insert.image'), 'insert.image'),
-    pinnableItem(t('Audio / Recording…'), 'audio', () => app.command('insert.audio'), 'insert.audio'),
-    pinnableItem(t('Document (Word, PowerPoint, PDF)…'), 'doc', () => app.command('insert.document'), 'insert.document'),
-    pinnableItem(t('Table'), 'table', () => app.command('insert.table'), 'insert.table'),
-    pinnableItem(t('Maths'), 'maths', () => app.command('insert.math'), 'insert.math'),
-    pinnableItem(t('Answer cover'), 'curtain', () => app.command('insert.curtain'), 'insert.curtain'),
-    pinnableItem(t('Link to a board…'), 'link', () => app.command('insert.boardlink'), 'insert.boardlink', '@'),
+  const ribbonToolItem = (label, iconName, onClick, id, key = null) => {
+    const isPinned = !hiddenRibbonSet.has(id);
+    return menuItem(label, iconName, onClick, {
+      key,
+      pinKey: id,
+      isPinned,
+      onTogglePin: (btn) => toggleRibbonToolPin(id, btn)
+    });
+  };
+
+  const body = h('div', { class: 'menu', style: 'max-height:80vh;overflow-y:auto;' },
+    h('div', { class: 'menu-title', style: 'padding:4px 8px;font-size:11px;font-weight:700;color:var(--text-3,rgba(0,0,0,0.5));text-transform:uppercase;letter-spacing:0.5px;' }, t('Insert objects')),
+    insertItem(t('Image…'), 'image', () => app.command('insert.image'), 'insert.image'),
+    insertItem(t('Audio / Recording…'), 'audio', () => app.command('insert.audio'), 'insert.audio'),
+    insertItem(t('Document (Word, PowerPoint, PDF)…'), 'doc', () => app.command('insert.document'), 'insert.document'),
+    insertItem(t('Table'), 'table', () => app.command('insert.table'), 'insert.table'),
+    insertItem(t('Maths'), 'maths', () => app.command('insert.math'), 'insert.math'),
+    insertItem(t('Answer cover'), 'curtain', () => app.command('insert.curtain'), 'insert.curtain'),
+    insertItem(t('Link to a board…'), 'link', () => app.command('insert.boardlink'), 'insert.boardlink', '@'),
+    insertItem(t('Class timer'), 'timer', () => app.command('timer.open'), 'timer.open'),
+    insertItem(t('Present'), 'present', () => app.command('view.present'), 'view.present', 'F5'),
+    insertItem(t('Templates…'), 'template', () => app.panels.templates(), 'panels.templates'),
     h('div', { class: 'menu-sep' }),
     menuItem(t('Paste from clipboard'), 'copy', () => app.command('edit.paste'), { key: 'Ctrl+V' }),
-    pinnableItem(t('Templates…'), 'template', () => app.panels.templates(), 'panels.templates')
+    h('div', { class: 'menu-sep' }),
+    h('div', { class: 'menu-title', style: 'padding:4px 8px;font-size:11px;font-weight:700;color:var(--text-3,rgba(0,0,0,0.5));text-transform:uppercase;letter-spacing:0.5px;' }, t('Ribbon tools')),
+    ribbonToolItem(t('Select'), 'select', () => app.setTool('select'), 'select', 'V'),
+    ribbonToolItem(t('Lasso select'), 'lasso', () => app.setTool('lasso'), 'lasso', 'L'),
+    ribbonToolItem(t('Pan canvas'), 'hand', () => app.setTool('pan'), 'pan', 'G'),
+    ribbonToolItem(t('Laser pointer'), 'laser', () => app.setTool('laser'), 'laser', 'X'),
+    ribbonToolItem(t('Pens'), 'pen', () => app.setTool('pen'), 'pen', '1-6'),
+    ribbonToolItem(t('Highlighter'), 'highlighter', () => { app.setTool('highlighter'); app.syncUI(); }, 'highlighter', 'H'),
+    ribbonToolItem(t('Eraser'), 'eraser', () => { app.setTool('eraser'); app.syncUI(); }, 'eraser', 'E'),
+    ribbonToolItem(t('Ruler'), 'ruler', () => app.command('ruler'), 'ruler', 'Ctrl+R'),
+    ribbonToolItem(t('Text'), 'text', () => { app.setTool('text'); app.syncUI(); }, 'text', 'T'),
+    ribbonToolItem(t('Sticky note'), 'note', () => { app.setTool('note'); app.syncUI(); }, 'note', 'N'),
+    ribbonToolItem(t('Shapes'), 'shapes', () => { app.setTool('shape'); app.syncUI(); openToolPopover(app, anchor, 'shape'); }, 'shape', 'S'),
+    ribbonToolItem(t('Emoji'), 'emoji', () => { app.setTool('emoji'); app.syncUI(); openToolPopover(app, anchor, 'emoji'); }, 'emoji')
   );
   openPopover(anchor, body, { key: 'insert' });
 }
@@ -1115,6 +1252,7 @@ export function syncToolbar(app) {
   const bar = document.getElementById('toolbar');
   const s = app.settings;
 
+  syncRibbonTools(app);
   syncPagebar(app);
   bar.classList.toggle('hide-keys', s.showToolKeys === false);
 

@@ -77,7 +77,7 @@ export const DEFAULT_SETTINGS = {
   emojiChar: '\u2705', emojiSize: 96, emojiRecent: [], recentBoards: [],
   textColor: '#201f1e', textSize: 32, textFont: 'hand',
   shapeKind: 'rect', arrowRoute: 'straight', shapeStroke: '#201f1e', shapeFill: 'none', shapeLineWidth: 3, shapeDash: null,
-  inkToShape: false, pressure: true, wheelZoom: false, returnToSelect: true, autosave: true,
+  inkToShape: false, pressure: true, wheelZoom: false, mouseWheelMode: 'zoom', enableHoverToolbar: true, hiddenRibbonTools: [], returnToSelect: true, autosave: true,
   showGroupOutlines: true,
   edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, laserColor: '#ff2d2d',
   penOpacityEnabled: false, penOpacity: 1, laserTrailDuration: 520, boardLinkThumb: true,
@@ -2913,11 +2913,20 @@ class App {
   }
 
   showHoverToolbar(obj) {
+    if (this.settings.enableHoverToolbar === false) return;
+    clearTimeout(this._hoverBarTimer);
+    const bar = document.getElementById('ctxbar');
     if (obj) {
       updateSelectionBar(this, obj);
-    } else if (!this.surface?.selection?.size) {
-      const bar = document.getElementById('ctxbar');
-      if (bar) bar.classList.remove('show');
+    } else {
+      // Grace timeout (350ms): allow pointer to cross into the floating bar without collapsing
+      this._hoverBarTimer = setTimeout(() => {
+        if (!this.surface?.selection?.size) {
+          if (bar && !bar.matches(':hover')) {
+            bar.classList.remove('show');
+          }
+        }
+      }, 350);
     }
   }
 
@@ -4606,7 +4615,18 @@ class App {
         return;
       }
       case 'ArrowLeft': case 'ArrowRight': case 'ArrowUp': case 'ArrowDown': {
-        if (!this.surface.selection.size) return;
+        if (!this.surface.selection.size) {
+          e.preventDefault();
+          const step = (e.shiftKey ? 240 : 80);
+          if (e.key === 'ArrowUp') this.surface.cam.panBy(0, step);
+          else if (e.key === 'ArrowDown') this.surface.cam.panBy(0, -step);
+          else if (e.key === 'ArrowLeft') this.surface.cam.panBy(step, 0);
+          else if (e.key === 'ArrowRight') this.surface.cam.panBy(-step, 0);
+          this.surface.clampCamera();
+          this.syncZoom();
+          this.surface.invalidate();
+          return;
+        }
         e.preventDefault();
         const step = (e.shiftKey ? 20 : 2) / this.surface.cam.z;
         const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
