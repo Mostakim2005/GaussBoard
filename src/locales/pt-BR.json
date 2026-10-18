@@ -1319,7 +1319,6 @@
   "Recording inserted onto board": "Gravação inserida no quadro",
   "Exported audio recording": "Gravação de áudio exportada",
   "Export audio error: ": "Erro ao exportar áudio: ",
-  "Rename recording:": "Renomear gravação:",
   "Delete recording \"{name}\"?": "Excluir gravação \"{name}\"?",
   "Insert the recording into the note": "Inserir gravação na nota",
   "Export audio": "Exportar áudio",
@@ -1389,5 +1388,10 @@
   "Follow strokes": "Acompanhar os traços",
   "Fixed view area": "Área da visão fixa",
   "Recording area": "Área da gravação",
-  "Whole board": "Quadro inteiro"
+  "Whole board": "Quadro inteiro",
+  "Camera follow framing": "Enquadramento do acompanhamento da câmera",
+  "Viewport": "Área visível",
+  "Center point": "Centralizar ponto",
+  "Center zone": "Zona central",
+  "Rename recording": "Renomear gravação"
 }

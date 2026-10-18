@@ -11,9 +11,9 @@
 | Need | Start here | Purpose |
 | :--- | :--- | :--- |
 | Understand only the original baseline | [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md) | Base features, source locations, and improvement checkpoints, excluding later custom additions. |
-| Trace custom changes from v4.8.2 through v4.8.10 | [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) | Version-by-version feature and fix record, source mapping, verification notes, and known limitations; v4.8.9 and v4.8.10 patch details are in their release dossiers. |
+| Trace custom changes from v4.8.2 through v4.8.11 | [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) | Version-by-version feature and fix record, source mapping, verification notes, and known limitations; v4.8.9 through v4.8.11 patch details are in their release dossiers. |
 | Find an implementation area | Layer dossiers below | Current architecture and source entry points; read only the relevant dossier for code work. |
-| See release claims and package registry | [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md) | Release ledger and binary/archive references. Current patch dossier: [`releases/RELEASE-4.8.10.md`](releases/RELEASE-4.8.10.md). |
+| See release claims and package registry | [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md) | Release ledger and binary/archive references. Current patch dossier: [`releases/RELEASE-4.8.11.md`](releases/RELEASE-4.8.11.md). |
 | See individual change records | [`FEATURE_RECORD.md`](FEATURE_RECORD.md), [`BUG_FIX_LOG.md`](BUG_FIX_LOG.md), `releases/RELEASE-*.md` | Feature IDs, bug resolutions, and per-release notes. |
 | See original requirements and design proposals | [`plan/`](plan/) | Historical analysis/specifications; proposals must be checked against current source before being described as shipped. |
 | See audit methodology and findings | [`releases/AUDIT-CUSTOM-FEATURES-4.8.1-to-4.8.7.md`](releases/AUDIT-CUSTOM-FEATURES-4.8.1-to-4.8.7.md), [`releases/AUDIT-4.8.4-FINDINGS.md`](releases/AUDIT-4.8.4-FINDINGS.md) | Audit records; consult the evolution record for later implementation/status. |
@@ -26,9 +26,9 @@ The initial audit was performed with **Codex 4.6 Medium in Cursor**. The seconda
 
 | Feature / Task Domain | Brief Description | Layer Dossier | Primary Source Files |
 | :--- | :--- | :--- | :--- |
-| **Audio-Ink Sync & Replay** | Audio recording with millisecond-timestamped strokes (`p.t`), configurable replay outline, and optional live camera follow | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/core/audio-recorder.js`<br>`src/js/core/replay.js` |
+| **Audio-Ink Sync & Replay** | Audio recording with millisecond-timestamped strokes (`p.t`), visible live replay outline, robust seeking, and optional viewport/center/dead-zone camera follow | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/core/audio-recorder.js`<br>`src/js/core/replay.js`<br>`src/js/core/surface.js` |
 | **Reading/Writing Playback Modes** | Playback defaults to read-only pan/navigation; Writing mode allows new replay-timestamped ink. Sync, camera follow, and replay outline appearance can be changed from AudioBar. | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/app.js`<br>`src/js/core/tools.js`<br>`src/js/core/surface.js`<br>`src/js/ui/replay-bar.js`<br>`src/js/ui/audio-bar.js` |
-| **AudioBar, Scrubber & Bookmarks** | Waveform density scrubber, skip intervals (5s, 10s, 15s, 30s), named bookmark editor | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/ui/audio-bar.js`<br>`src/js/ui/density-canvas.js` |
+| **AudioBar, Scrubber & Bookmarks** | Waveform density scrubber, skip intervals (5s, 10s, 15s, 30s), named bookmark editor, recording rename and adaptive action menu | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/ui/audio-bar.js`<br>`src/js/ui/density-canvas.js` |
 | **Canvas Audio Player Cards** | Interactive `type: 'audio'` cards placed on canvas with direct tap-to-play | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/core/render.js`<br>`src/js/core/tools.js` |
 | **Scratch-Out Gesture Eraser** | StarNote-style scribble eraser with dominant reversal axis spatial overlap guard | [`layers/02-inking-and-gestures.md`](layers/02-inking-and-gestures.md) | `src/js/core/scratch.js`<br>`src/js/core/tools.js` |
 | **Windows Ink Bézier Curves** | Pluggable inking with velocity-weighted cubic Bézier curve fitting & DirectInk | [`layers/02-inking-and-gestures.md`](layers/02-inking-and-gestures.md) | `src/js/core/ink.js`<br>`src/js/ui/panels.js` |
@@ -46,13 +46,13 @@ The initial audit was performed with **Codex 4.6 Medium in Cursor**. The seconda
 | **Notes Overview & Gallery Tags** | Gallery card direct double-click opening, smart reflow actions, `#tags` sidebar | [`layers/06-workspace-and-ui.md`](layers/06-workspace-and-ui.md) | `src/js/ui/note-overview.js`<br>`src/js/ui/panels.js` |
 | **OmniSearch & In-Settings** | Ctrl+F fuzzy multi-token search across titles/descriptions; live DOM filtering | [`layers/06-workspace-and-ui.md`](layers/06-workspace-and-ui.md) | `src/js/ui/search-dialog.js`<br>`src/js/ui/panels.js` |
 | **Ribbon Customization** | Pinned tool toggles (📌 / 📍) moving items between ribbon and `+` menu | [`layers/06-workspace-and-ui.md`](layers/06-workspace-and-ui.md) | `src/js/ui/toolbar.js` |
-| **Stitched Video Export & Framing** | Multi-session selection, fixed recording/whole-board views, or a camera-follow view that tracks reanimated strokes | [`layers/07-video-export.md`](layers/07-video-export.md) | `src/js/export-video.js` |
+| **Stitched Video Export & Framing** | Multi-session selection, fixed recording/whole-board views, camera-follow framing, and timestamped unique suggested filenames | [`layers/07-video-export.md`](layers/07-video-export.md) | `src/js/export-video.js` |
 | **Multi-Layer System (Standby)** | Layer system architecture (currently on standby per user request) | [`DEVELOPER_HANDOVER.md`](DEVELOPER_HANDOVER.md) (§6) | `docs/plan/04-quality.md` |
 | **Feature smoke-test groups** | Mandatory regressions and custom-addition suites run separately | Relevant layer dossier | `scripts/smoke.js`, `scripts/smoke-custom.js`; run `npm run smoke:custom` or a version-scoped `npm run smoke:features:*` |
 | **Replay reliability checks** | Unit checks for delayed seek, play lifecycle, ordered recording chunks, replay-clock ink, and sync rendering gate | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `test/replay-reading.test.mjs`; run `npm run smoke:replay` |
 | **Video framing checks** | Fixed/whole-board bounds, active replay stroke selection, camera follow easing, and export dialog choices | [`layers/07-video-export.md`](layers/07-video-export.md) | `test/video-framing.test.mjs`; run `npm run smoke:video` |
 
-Replay camera follow and video framing changes are documented in [`releases/RELEASE-4.8.10.md`](releases/RELEASE-4.8.10.md); the video-driven Study Tape changes remain in [`releases/RELEASE-4.8.9.md`](releases/RELEASE-4.8.9.md).
+Replay camera follow and video framing changes are documented in [`releases/RELEASE-4.8.10.md`](releases/RELEASE-4.8.10.md); replay/UI/export workflow fixes are in [`releases/RELEASE-4.8.11.md`](releases/RELEASE-4.8.11.md); the video-driven Study Tape changes remain in [`releases/RELEASE-4.8.9.md`](releases/RELEASE-4.8.9.md).
 
 ---
 

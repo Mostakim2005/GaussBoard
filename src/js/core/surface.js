@@ -832,6 +832,25 @@ export class Surface {
     ctx.setTransform(this.dpr * cam.z, 0, 0, this.dpr * cam.z, this.dpr * cam.x, this.dpr * cam.y);
 
     const objs = this.store.doc.objects;
+    const drawReplayOutline = (object, opacity = 0.7, widthBoost = 5) => {
+      // Highlighters normally use multiply blending to stay translucent. That
+      // blend makes a neon replay colour disappear against a light board, so
+      // replay feedback uses a normal source-over pen pass with explicit alpha.
+      const outline = {
+        ...object,
+        tool: 'pen',
+        effect: 'none',
+        color: outlineColor,
+        opacity,
+        width: (object.width || 4) + widthBoost
+      };
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.shadowColor = outlineColor;
+      ctx.shadowBlur = outlineEffect === 'neon' ? 14 : 0;
+      drawObject(ctx, outline, () => this.invalidate(), this.editing);
+      ctx.restore();
+    };
     for (const id of this.store.doc.order) {
       const o = objs[id];
       if (!o || o.audioId !== trackId) continue;
@@ -839,30 +858,29 @@ export class Surface {
       if (o.t1 != null && o.t1 <= t) {
         if (outlineEffect !== 'none' && t - o.t1 < 450) {
           const decay = 1 - ((t - o.t1) / 450);
-          ctx.save();
-          ctx.shadowColor = outlineColor;
-          ctx.shadowBlur = outlineEffect === 'neon' ? 12 * decay : 0;
-          drawObject(ctx, { ...o, width: (o.width || 4) + 4 * decay, color: outlineColor, opacity: 0.6 * decay }, () => this.invalidate(), this.editing);
-          ctx.restore();
+          drawReplayOutline(o, 0.75 * decay, 4 * decay);
         }
         drawObject(ctx, o, () => this.invalidate(), this.editing);
       } else if (o.t0 != null && o.t0 <= t && (o.t1 == null || t < o.t1)) {
         if (Array.isArray(o.points)) {
           const sliceIndex = o.points.findIndex((p) => p.t != null && p.t > t);
-          const pts = sliceIndex >= 0 ? o.points.slice(0, sliceIndex) : o.points;
+          let pts = sliceIndex >= 0 ? o.points.slice(0, sliceIndex) : o.points;
+          if (pts.length === 1) {
+            // Keep a just-started stroke visible before its second sampled
+            // point arrives; the one-pixel extension is only a render copy.
+            const p = pts[0];
+            pts = [p, { ...p, x: p.x + 0.5, y: p.y + 0.5 }];
+          }
           if (pts.length >= 2) {
             if (outlineEffect !== 'none') {
-              ctx.save();
-              ctx.shadowColor = outlineColor;
-              ctx.shadowBlur = outlineEffect === 'neon' ? 14 : 0;
-              drawObject(ctx, { ...o, points: pts, width: (o.width || 4) + 5, color: outlineColor, opacity: 0.7 }, () => this.invalidate(), this.editing);
-              ctx.restore();
+              drawReplayOutline({ ...o, points: pts }, 0.9, 5);
             }
 
             drawObject(ctx, { ...o, points: pts }, () => this.invalidate(), this.editing);
             const tip = pts[pts.length - 1];
             ctx.save();
             if (outlineEffect !== 'none') {
+              ctx.globalCompositeOperation = 'source-over';
               ctx.fillStyle = outlineColor;
               ctx.shadowColor = outlineColor;
               ctx.shadowBlur = outlineEffect === 'neon' ? 10 : 0;

@@ -17,6 +17,18 @@ export const VIDEO_EXPORT_PRESETS = Object.freeze({
 export const VIDEO_CAMERA_MODES = Object.freeze({ FIXED: 'fixed', FOLLOW: 'follow' });
 export const VIDEO_FIXED_FRAMES = Object.freeze({ RECORDING: 'recording', BOARD: 'board' });
 
+export function uniqueExportSuffix(now = new Date()) {
+  return now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+}
+
+export function videoExportFilename(boardName, suffix = uniqueExportSuffix(), trackName = '') {
+  const safe = (value, fallback) => String(value || fallback)
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/g, '').trim() || fallback;
+  const board = safe(boardName, 'Board');
+  const track = trackName ? `-${safe(trackName, 'Recording')}` : '';
+  return `${board}${track}-replay-${suffix}.webm`;
+}
+
 export function boundsForObjects(objects, pages = []) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const object of Object.values(objects || {})) {
@@ -613,7 +625,7 @@ export async function exportVideoFile(app, track = null) {
   if (shouldStitch || selectedTracks.length === 1) {
     const filePath = await window.board.saveDialog({
       title: t('Save a copy'),
-      defaultPath: `${app.store.doc.name || 'Board'}-replay.webm`,
+      defaultPath: videoExportFilename(app.store.doc.name),
       filters: [{ name: 'WebM Video', extensions: ['webm'] }]
     });
     if (!filePath) return null;
@@ -667,7 +679,7 @@ export async function exportVideoFile(app, track = null) {
       const safeName = (tr.name || `Recording-${i + 1}`).replace(/[^a-zA-Z0-9_\-]/g, '_');
       const filePath = await window.board.saveDialog({
         title: t('Save {name}', { name: tr.name || 'Recording' }),
-        defaultPath: `${app.store.doc.name || 'Board'}-${safeName}.webm`,
+        defaultPath: videoExportFilename(app.store.doc.name, uniqueExportSuffix(), safeName),
         filters: [{ name: 'WebM Video', extensions: ['webm'] }]
       });
       if (!filePath) continue;

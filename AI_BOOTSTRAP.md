@@ -8,9 +8,9 @@
 
 ## 1. Quick Repository Facts & Mental Model
 
-* **Project**: **GazBoard Replay** (Windows-first fork of GazBoard v4.8.1); current release **v4.8.10** (replay camera follow and selectable video framing, following the v4.8.9 Study Tape patch).
+* **Project**: **GazBoard Replay** (Windows-first fork of GazBoard v4.8.1); current working release **v4.8.11** (replay seek/outline fixes, live camera framing modes, recording actions, and unique export names, following v4.8.10).
   * Base-only behavior and source entry points: [`docs/BASE_FEATURE_CATALOG-4.8.1.md`](docs/BASE_FEATURE_CATALOG-4.8.1.md).
-  * Custom feature and fix history through v4.8.10: [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md), including the v4.8.9 and v4.8.10 release dossiers.
+  * Custom feature and fix history through v4.8.11: [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md), including v4.8.9 through v4.8.11 release dossiers.
   * Treat plans as proposals/history, not proof of shipped behavior. Verify current behavior against source and focused tests.
 * **Base Architecture**: Pure Vanilla JavaScript (ES6 Modules), HTML5 Canvas 2D, Electron 43.
   * **Zero Frontend Frameworks**: No React, Vue, Angular, or Svelte. Pure DOM manipulation and raw Canvas2D rendering.
@@ -44,7 +44,7 @@
 | **Templates & Zoom** | Importing external image/PDF templates, board snapshots, or zoom presets | 1. [`docs/layers/04-geometry-and-templates.md`](docs/layers/04-geometry-and-templates.md)<br>2. `src/js/templates.js` & `src/js/ui/toolbar.js` |
 | **PDF & Margins** | PDF import modes (background vs movable), margin adjustment dialog | 1. [`docs/layers/05-pdf-and-pagemargins.md`](docs/layers/05-pdf-and-pagemargins.md)<br>2. `src/js/ui/pagemargin-dialog.js` |
 | **Split View & UI** | Dual-pane study layout, OmniSearch (Ctrl+F), ribbon pinning, or tags | 1. [`docs/layers/06-workspace-and-ui.md`](docs/layers/06-workspace-and-ui.md)<br>2. `src/js/ui/split-workspace.js` & `src/js/ui/toolbar.js` |
-| **Video Exporter** | Multi-session video stitching, WebM export, or camera framing | 1. [`docs/layers/07-video-export.md`](docs/layers/07-video-export.md)<br>2. `src/js/export-video.js` |
+| **Video Exporter** | Multi-session video stitching, WebM export, camera framing, or filename behavior | 1. [`docs/layers/07-video-export.md`](docs/layers/07-video-export.md)<br>2. `src/js/export-video.js` |
 | **Layers (On Standby)** | Resuming the multi-layer system feature | 1. `docs/DEVELOPER_HANDOVER.md` (§6 On-Hold Features)<br>2. `docs/plan/04-quality.md` (Phase 4 Layer Architecture) |
 
 ---
@@ -101,5 +101,7 @@ node scripts/i18n-check.js
 # Windows packaging
 npm run dist:win
 ```
+
+Current patch release notes and verification state: [`docs/releases/RELEASE-4.8.11.md`](docs/releases/RELEASE-4.8.11.md).
 
 See [`docs/INDEX.md`](docs/INDEX.md) for feature-to-test navigation and [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) for release-specific scope.

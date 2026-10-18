@@ -1319,7 +1319,6 @@
   "Recording inserted onto board": "Aufnahme in Tafel eingefügt",
   "Exported audio recording": "Audioaufnahme exportiert",
   "Export audio error: ": "Fehler beim Audioexport: ",
-  "Rename recording:": "Aufnahme umbenennen:",
   "Delete recording \"{name}\"?": "Aufnahme „{name}“ löschen?",
   "Insert the recording into the note": "Aufnahme in Notiz einfügen",
   "Export audio": "Audio exportieren",
@@ -1389,5 +1388,10 @@
   "Follow strokes": "Strichen folgen",
   "Fixed view area": "Bereich der festen Ansicht",
   "Recording area": "Aufnahmebereich",
-  "Whole board": "Ganzes Whiteboard"
+  "Whole board": "Ganzes Whiteboard",
+  "Camera follow framing": "Kamera-Follow-Rahmen",
+  "Viewport": "Ansichtsbereich",
+  "Center point": "Punkt zentrieren",
+  "Center zone": "Mittelzone",
+  "Rename recording": "Aufnahme umbenennen"
 }

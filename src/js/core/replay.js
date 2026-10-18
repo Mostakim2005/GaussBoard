@@ -13,6 +13,8 @@ export class ReplayEngine {
     this.playbackRate = 1.0;
     this.ghostMode = 'translucent'; // 'translucent' | 'hidden'
     this.autoFollow = this.app?.settings?.replayCameraFollow !== false;
+    this.followMode = ['viewport', 'center', 'dead-zone'].includes(this.app?.settings?.replayCameraMode)
+      ? this.app.settings.replayCameraMode : 'viewport';
     this.pendingSeekMs = null;
     this.loadGeneration = 0;
     this.playGeneration = 0;
@@ -21,6 +23,19 @@ export class ReplayEngine {
       this.audio.addEventListener('timeupdate', () => this.syncClock());
       this.audio.addEventListener('ended', () => this.onEnded());
       this.audio.addEventListener('loadedmetadata', () => this.applyPendingSeek());
+      this.audio.addEventListener('canplay', () => this.applyPendingSeek());
+      this.audio.addEventListener('seeked', () => {
+        if (!this.audio) return;
+        if (this.pendingSeekMs != null) {
+          const targetSeconds = this.pendingSeekMs / 1000;
+          if (Math.abs(this.audio.currentTime - targetSeconds) < 0.05) this.pendingSeekMs = null;
+          else { this.applyPendingSeek(); return; }
+        }
+        this.currentTimeMs = this.audio.currentTime * 1000;
+        this.playStartPerfMs = performance.now();
+        this.playStartTimeMs = this.currentTimeMs;
+        this.surface?.invalidate();
+      });
       this.audio.addEventListener('error', () => {
         this.lastError = new Error('The selected audio could not be loaded.');
         this.pause();
@@ -128,8 +143,11 @@ export class ReplayEngine {
     this.playStartPerfMs = performance.now();
     this.playStartTimeMs = clamped;
     if (this.audio) {
+      // Keep the requested clock authoritative until Chromium confirms the
+      // seek. Otherwise the next animation frame can replace a failed/pending
+      // seek with the media element's old currentTime.
+      this.pendingSeekMs = clamped;
       if (this.audio.readyState >= 1) this.applyPendingSeek(clamped);
-      else this.pendingSeekMs = clamped;
     }
     if (this.surface) {
       this.surface._ink = null;
@@ -143,8 +161,23 @@ export class ReplayEngine {
     try {
       const durationMs = Number.isFinite(this.audio.duration) ? this.audio.duration * 1000 : (this.track?.durationMs || 0);
       const target = Math.min(Math.max(0, timeMs), durationMs || Infinity);
-      this.audio.currentTime = target / 1000;
-      this.pendingSeekMs = null;
+      const targetSeconds = target / 1000;
+      if (Math.abs((this.audio.currentTime || 0) - targetSeconds) < 0.025 && !this.audio.seeking) {
+        this.pendingSeekMs = null;
+        return true;
+      }
+      this.pendingSeekMs = target;
+      this.audio.currentTime = targetSeconds;
+      // Some media backends do not dispatch `seeked` for a no-op seek. Keep a
+      // small tolerance check for that case without losing asynchronous seeks.
+      if (!this.audio.seeking && Math.abs(this.audio.currentTime - targetSeconds) < 0.025) {
+        this.pendingSeekMs = null;
+        return true;
+      }
+      queueMicrotask(() => {
+        if (this.audio && !this.audio.seeking && Math.abs(this.audio.currentTime - targetSeconds) < 0.025
+          && this.pendingSeekMs === target) this.pendingSeekMs = null;
+      });
       return true;
     } catch {
       // Keep the requested position until metadata/seekable ranges are ready.
@@ -179,6 +212,15 @@ export class ReplayEngine {
     this.surface?.invalidate();
   }
 
+  setCameraMode(mode) {
+    if (!['viewport', 'center', 'dead-zone'].includes(mode)) return;
+    this.followMode = mode;
+    this._replayFollowTarget = null;
+    this.surface?.cam?.cancelGlide?.();
+    if (this.autoFollow) this.followActiveStroke();
+    this.surface?.invalidate();
+  }
+
   syncClock() {
     if (this.audio && !this.audio.paused && Number.isFinite(this.audio.currentTime)) {
       this.currentTimeMs = this.audio.currentTime * 1000;
@@ -197,7 +239,9 @@ export class ReplayEngine {
   loop() {
     if (!this.active) return;
     const dur = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 0);
-    if (this.audio && !this.audio.paused && Number.isFinite(this.audio.currentTime)) {
+    if (this.pendingSeekMs != null) {
+      this.currentTimeMs = this.pendingSeekMs;
+    } else if (this.audio && !this.audio.paused && Number.isFinite(this.audio.currentTime)) {
       this.currentTimeMs = this.audio.currentTime * 1000;
       this.playStartPerfMs = performance.now();
       this.playStartTimeMs = this.currentTimeMs;
@@ -227,10 +271,21 @@ export class ReplayEngine {
     return null;
   }
 
+  getActivePoint(stroke = this.getActiveStroke()) {
+    const points = stroke?.points;
+    if (!Array.isArray(points) || !points.length) return null;
+    let point = points[0];
+    for (const candidate of points) {
+      if (candidate.t == null || candidate.t <= this.currentTimeMs) point = candidate;
+      else break;
+    }
+    return Number.isFinite(point?.x) && Number.isFinite(point?.y) ? point : null;
+  }
+
   followActiveStroke() {
     const stroke = this.getActiveStroke();
     const box = stroke?.bbox || (stroke ? boundsOf(stroke) : null);
-    if (box && this.surface?.cam) {
+    if (box && this.surface?.cam && this.followMode === 'viewport') {
       const cam = this.surface.cam;
       if (this._replayFollowTarget === stroke.id && cam._anim) return;
       const vp = cam.viewport(this.surface.width, this.surface.height);
@@ -241,6 +296,32 @@ export class ReplayEngine {
         onStep: () => this.surface?.invalidate(),
         onDone: () => { this._replayFollowTarget = null; }
       });
+      return;
+    }
+    const point = this.getActivePoint(stroke);
+    const cam = this.surface?.cam;
+    if (!point || !cam) return;
+    cam.cancelGlide?.();
+    this._replayFollowTarget = stroke?.id || null;
+    const screen = cam.toScreen(point.x, point.y);
+    const width = this.surface.width, height = this.surface.height;
+    let dx = 0, dy = 0;
+    if (this.followMode === 'center') {
+      dx = width / 2 - screen.x;
+      dy = height / 2 - screen.y;
+    } else {
+      // A 40% x 40% central dead zone mirrors the user's sketched frame:
+      // leave the camera still until the animated point reaches its edge.
+      const left = width * 0.3, right = width * 0.7;
+      const top = height * 0.3, bottom = height * 0.7;
+      if (screen.x < left) dx = left - screen.x;
+      else if (screen.x > right) dx = right - screen.x;
+      if (screen.y < top) dy = top - screen.y;
+      else if (screen.y > bottom) dy = bottom - screen.y;
+    }
+    if (dx || dy) {
+      cam.panBy(dx, dy);
+      this.surface.invalidate();
     }
   }
 }

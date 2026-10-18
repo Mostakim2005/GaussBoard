@@ -5,9 +5,9 @@ Captures microphone audio via `MediaRecorder`, stamps sub-millisecond relative t
 
 ## 2. Primary Source Files (Touch ONLY These)
 * **Core Recording**: `src/js/core/audio-recorder.js` (`AudioRecorder` class, pause/resume continuity, duration tracking).
-* **Core Replay**: `src/js/core/replay.js` (`ReplayEngine` class, multi-speed playback, fallback `performance.now()` delta clock).
+* **Core Replay**: `src/js/core/replay.js` (`ReplayEngine` class, multi-speed playback, pending-seek synchronization, replay camera modes, fallback `performance.now()` delta clock).
 * **Document Store**: `src/js/core/store.js` (`Store.toJSON()`, `Store.load()` serialization of `doc.audioTracks`).
-* **AudioBar HUD**: `src/js/ui/audio-bar.js` (Floating draggable player, skip intervals `[5s, 10s, 15s, 30s]`, replay sync toggle, saved camera-follow toggle, configurable outline, Recording Panel with 3-dot context menu).
+* **AudioBar HUD**: `src/js/ui/audio-bar.js` (Floating draggable player, skip intervals `[5s, 10s, 15s, 30s]`, replay sync toggle, saved camera-follow toggle and framing mode, configurable outline, Recording Panel with 3-dot context menu).
 * **Waveform Scrubber**: `src/js/ui/density-canvas.js` (Interactive density canvas, hover preview card with clickable `[Jump]`, expandable bookmark rename editor).
 * **Canvas Audio Cards**: `src/js/core/render.js` (`drawAudioCard()`) & `src/js/core/tools.js` (Tap or double-click to play audio card).
 * **Top-Bar Button**: `src/js/ui/toolbar.js` (`#btnTopRecord` with glowing neon red ring and live digital timer).
@@ -43,11 +43,15 @@ stroke.points = [{ x, y, p, t: 1240 }, ...]; // p: pressure, t: relative timesta
 7. **Reading and Writing Modes**: Playback enters Reading mode. Canvas gestures pan and replay/audio-card taps work without changing objects. Writing mode permits edits and new strokes inherit the active replay track and replay-clock timestamps.
 8. **Sync Toggle and Replay Style**: `settings.audioInkSync` controls track-stroke separation and overlay rendering. Replay outline color and effect (`neon`, `outline`, `none`) are user-selectable settings.
 9. **Live Camera Follow**: `settings.replayCameraFollow` controls whether replay follows the active reanimated stroke after it leaves the viewport. The AudioBar toggle persists this choice; disabling it cancels an in-progress replay camera glide.
+10. **Seek Authority**: While a media seek is pending, the requested timeline position remains the replay clock source until the media element confirms the seek. `seeked`, `loadedmetadata`, and `canplay` events resolve or retry pending seeks; an old media clock must not overwrite a new scrub position.
+11. **Camera Framing Modes**: With camera follow enabled, `settings.replayCameraMode` chooses `viewport` (legacy fit when the full stroke leaves view), `center` (keep the active point centered), or `dead-zone` (keep the active point inside the central 40% of the viewport and pan only when it exits). These modes preserve the current zoom; the legacy viewport mode retains its previous fit behavior.
 
 ## 5. Relevant Bug Fixes
 * **BUG-005**: `#btnTopRecord` was disconnected from `audioRecorder` state and persistence $\rightarrow$ fixed in `toolbar.js`.
 * **BUG-006**: Replay clock stalled on seek & WebM duration was `Infinity` $\rightarrow$ fixed with `durationMs` and delta clock fallback.
 * **BUG-007**: Session dropdown was destroyed mid-click by 100ms polling $\rightarrow$ replaced with custom floating glassmorphic popover.
+* **v4.8.11 replay regression:** pending seeks could be overwritten by the media element's previous time before seeking completed. The replay clock now holds the requested time through the media seek lifecycle.
+* **v4.8.11 live outline visibility:** highlighter replay outlines inherited multiply blending and could vanish against the board. The feedback pass now draws as a source-over overlay while the original stroke keeps its normal appearance.
 
 ## 6. Verification Commands
 ```powershell
@@ -59,6 +63,8 @@ node scripts/smoke.js
 npm run smoke:replay
 # Focused checks for metadata-pending seeks, play rejection state, ordered
 # recording writes, replay-clock ink timestamps, and sync-overlay gating.
+# Also covers dead-zone camera movement, menu placement, rename persistence,
+# and safe unique video export filenames.
 npm run smoke:video
 # Focused video framing options and active-stroke camera-follow calculations.
 ```

@@ -1319,7 +1319,6 @@
   "Recording inserted onto board": "录音已插入画板",
   "Exported audio recording": "已导出音频录音",
   "Export audio error: ": "导出音频错误：",
-  "Rename recording:": "重命名录音：",
   "Delete recording \"{name}\"?": "删除录音“{name}”吗？",
   "Insert the recording into the note": "将录音插入笔记",
   "Export audio": "导出音频",
@@ -1389,5 +1388,10 @@
   "Follow strokes": "跟随笔迹",
   "Fixed view area": "固定视图范围",
   "Recording area": "录音区域",
-  "Whole board": "整个白板"
+  "Whole board": "整个白板",
+  "Camera follow framing": "摄像机跟随取景",
+  "Viewport": "视口",
+  "Center point": "居中显示笔迹点",
+  "Center zone": "中心区域",
+  "Rename recording": "重命名录音"
 }

@@ -90,6 +90,15 @@ GazBoard provides the base canvas, drawing and object model, board storage, docu
 - **Verification:** `npm run smoke:replay`, `npm run smoke:video`, `npm run smoke:features:4.8.8`, and mandatory `node scripts/smoke.js`; Windows packaging details are in the release dossier.
 - **Details:** [`releases/RELEASE-4.8.10.md`](releases/RELEASE-4.8.10.md).
 
+### v4.8.11 — replay controls and export workflow patch
+
+- **Fixed:** pending media seeks could be overwritten by the pre-seek audio clock, and live highlight outlines could be obscured by highlighter multiply blending. Seek requests now remain authoritative until the media confirms them; replay feedback uses a visible source-over pass.
+- **Fixed:** recording rename used browser `prompt()`, which Electron does not reliably display. It now uses the application dialog and a Store document operation so the name persists and can be undone.
+- **Added:** recording action menus choose available space above or below the selected item; replay camera follow can use legacy viewport framing, center-point framing, or a central 40% dead zone; video export suggested names include a UTC timestamp and Windows-safe title.
+- **Implementation areas:** `src/js/core/replay.js`, `src/js/core/surface.js`, `src/js/ui/audio-bar.js`, and `src/js/export-video.js`.
+- **Verification:** feature-focused UI/replay checks are in `test/audio-bar.test.mjs` and `test/replay-reading.test.mjs`; the full regression suite and Windows package results are recorded in [`releases/RELEASE-4.8.11.md`](releases/RELEASE-4.8.11.md).
+- **Encoder assessment:** WebCodecs is a possible optional accelerated backend with explicit muxing/runtime-support work; a native FFmpeg binary offers more controls but increases bundle and maintenance costs. v4.8.11 retains MediaRecorder pending real-device benchmarks.
+
 ## Change/removal policy
 
 The audited v4.8.8 release intentionally preserves existing inking choices and does not remove the listed user-facing additions. Where the implementation or wording changes between releases—such as skip intervals, engine labels, or incomplete margin behavior—the version record calls it out. A behavior listed in a planned specification is not marked shipped unless it exists in the source and has evidence in a feature check or release dossier.

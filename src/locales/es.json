@@ -1319,7 +1319,6 @@
   "Recording inserted onto board": "Grabación insertada en la pizarra",
   "Exported audio recording": "Grabación de audio exportada",
   "Export audio error: ": "Error al exportar audio: ",
-  "Rename recording:": "Renombrar grabación:",
   "Delete recording \"{name}\"?": "¿Eliminar grabación \"{name}\"?",
   "Insert the recording into the note": "Insertar la grabación en la nota",
   "Export audio": "Exportar audio",
@@ -1389,5 +1388,10 @@
   "Follow strokes": "Seguir los trazos",
   "Fixed view area": "Área de la vista fija",
   "Recording area": "Área de la grabación",
-  "Whole board": "Tablero completo"
+  "Whole board": "Tablero completo",
+  "Camera follow framing": "Encuadre del seguimiento de cámara",
+  "Viewport": "Área visible",
+  "Center point": "Centrar punto",
+  "Center zone": "Zona central",
+  "Rename recording": "Renombrar grabación"
 }

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ReplayEngine } from '../src/js/core/replay.js';
+import { Surface } from '../src/js/core/surface.js';
 import { AudioRecorder } from '../src/js/core/audio-recorder.js';
 import { audioInkClock, replayInkEnabled } from '../src/js/core/replay-clock.js';
 
@@ -158,6 +159,89 @@ test('live replay camera-follow can be toggled without changing replay state', (
     assert.equal(engine.autoFollow, true);
   } finally {
     if (previous === undefined) delete globalThis.Audio; else globalThis.Audio = previous;
+  }
+});
+
+test('pending seek remains the replay clock source while media catches up', () => {
+  const previous = {
+    Audio: globalThis.Audio,
+    requestAnimationFrame: globalThis.requestAnimationFrame,
+    cancelAnimationFrame: globalThis.cancelAnimationFrame
+  };
+  globalThis.Audio = FakeAudio;
+  globalThis.requestAnimationFrame = () => 1;
+  globalThis.cancelAnimationFrame = () => {};
+  try {
+    const engine = new ReplayEngine({ surface: { invalidate() {}, _ink: null } });
+    engine.loadTrack({ id: 'track-pending', assetId: 'asset-pending', durationMs: 5000 });
+    engine.active = true;
+    engine.audio.paused = false;
+    engine.pendingSeekMs = 2400;
+    engine.currentTimeMs = 2400;
+    engine.loop();
+    assert.equal(engine.currentTimeMs, 2400);
+    engine.pause();
+  } finally {
+    if (previous.Audio === undefined) delete globalThis.Audio; else globalThis.Audio = previous.Audio;
+    if (previous.requestAnimationFrame === undefined) delete globalThis.requestAnimationFrame; else globalThis.requestAnimationFrame = previous.requestAnimationFrame;
+    if (previous.cancelAnimationFrame === undefined) delete globalThis.cancelAnimationFrame; else globalThis.cancelAnimationFrame = previous.cancelAnimationFrame;
+  }
+});
+
+test('dead-zone camera stays still inside its frame and pans only at an edge', () => {
+  const previous = globalThis.Audio;
+  globalThis.Audio = FakeAudio;
+  try {
+    const stroke = { id: 's1', audioId: 'track-zone', type: 'stroke', t0: 0, t1: 1000,
+      bbox: { x: 200, y: 200, w: 220, h: 50 }, points: [{ x: 250, y: 250, t: 0 }, { x: 400, y: 250, t: 500 }] };
+    const cam = { x: 0, y: 0, z: 1, toScreen(x, y) { return { x: x + this.x, y: y + this.y }; },
+      panBy(dx, dy) { this.x += dx; this.y += dy; }, cancelGlide() {} };
+    const engine = new ReplayEngine({ settings: { replayCameraFollow: true, replayCameraMode: 'dead-zone' },
+      store: { doc: { order: ['s1'], objects: { s1: stroke } } },
+      surface: { cam, width: 500, height: 500, invalidate() {} } });
+    engine.track = { id: 'track-zone' };
+    engine.currentTimeMs = 100;
+    engine.followActiveStroke();
+    assert.deepEqual({ x: cam.x, y: cam.y }, { x: 0, y: 0 });
+    engine.currentTimeMs = 700;
+    engine.followActiveStroke();
+    assert.deepEqual({ x: cam.x, y: cam.y }, { x: -50, y: 0 });
+  } finally {
+    if (previous === undefined) delete globalThis.Audio; else globalThis.Audio = previous;
+  }
+});
+
+test('live replay draws a visible source-over outline for highlighter strokes', () => {
+  const previousPath2D = globalThis.Path2D;
+  class FakePath2D { moveTo() {} lineTo() {} quadraticCurveTo() {} bezierCurveTo() {} }
+  globalThis.Path2D = FakePath2D;
+  const commands = [];
+  const state = { globalAlpha: 1, globalCompositeOperation: 'source-over' };
+  const stack = [];
+  const ctx = {
+    save() { stack.push({ ...state, strokeStyle: this.strokeStyle, shadowColor: this.shadowColor, shadowBlur: this.shadowBlur }); },
+    restore() { Object.assign(state, stack.pop()); this.globalAlpha = state.globalAlpha; this.globalCompositeOperation = state.globalCompositeOperation; },
+    setTransform() {}, stroke(path) { commands.push({ style: this.strokeStyle, blend: this.globalCompositeOperation, width: this.lineWidth, path }); },
+    beginPath() {}, arc() {}, fill() {}, closePath() {},
+    set globalAlpha(value) { state.globalAlpha = value; }, get globalAlpha() { return state.globalAlpha; },
+    set globalCompositeOperation(value) { state.globalCompositeOperation = value; }, get globalCompositeOperation() { return state.globalCompositeOperation; }
+  };
+  try {
+    const stroke = { id: 'highlight', type: 'stroke', tool: 'highlighter', audioId: 'track-highlight',
+      t0: 0, t1: 100, width: 8, opacity: 0.5, color: '#ffee00',
+      points: [{ x: 10, y: 10, p: 0.5, t: 0 }, { x: 20, y: 10, p: 0.5, t: 100 }] };
+    const surface = Object.create(Surface.prototype);
+    surface.app = { settings: { audioInkSync: true, replayOutlineColor: '#00e5ff', replayOutlineEffect: 'neon' } };
+    surface.store = { doc: { objects: { highlight: stroke }, order: ['highlight'] } };
+    surface.cam = { x: 0, y: 0, z: 1 };
+    surface.dpr = 1;
+    surface.editing = null;
+    surface.invalidate = () => {};
+    surface.drawReplaySession(ctx, { track: { id: 'track-highlight' }, currentTimeMs: 50, ghostMode: 'none' });
+    assert.ok(commands.some((command) => command.style === '#00e5ff' && command.blend === 'source-over'),
+      'the replay outline should be drawn in visible source-over mode');
+  } finally {
+    if (previousPath2D === undefined) delete globalThis.Path2D; else globalThis.Path2D = previousPath2D;
   }
 });
 

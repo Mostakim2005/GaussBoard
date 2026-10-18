@@ -1319,7 +1319,6 @@
   "Recording inserted onto board": "রেকর্ডিং বোর্ডে সন্নিবেশিত হয়েছে",
   "Exported audio recording": "অডিও রেকর্ডিং রপ্তানি করা হয়েছে",
   "Export audio error: ": "অডিও রপ্তানি ত্রুটি: ",
-  "Rename recording:": "রেকর্ডিং পুনর্নামকরণ করুন:",
   "Delete recording \"{name}\"?": "রেকর্ডিং \"{name}\" মুছবেন?",
   "Insert the recording into the note": "নোটের মধ্যে রেকর্ডিংটি যুক্ত করুন",
   "Export audio": "অডিও রপ্তানি করুন",
@@ -1389,5 +1388,10 @@
   "Follow strokes": "স্ট্রোক অনুসরণ",
   "Fixed view area": "স্থির দৃশ্যের এলাকা",
   "Recording area": "রেকর্ডিং এলাকা",
-  "Whole board": "সম্পূর্ণ বোর্ড"
+  "Whole board": "সম্পূর্ণ বোর্ড",
+  "Camera follow framing": "ক্যামেরা অনুসরণের ফ্রেমিং",
+  "Viewport": "ভিউপোর্ট",
+  "Center point": "বিন্দু কেন্দ্রে",
+  "Center zone": "মধ্যবর্তী অঞ্চল",
+  "Rename recording": "রেকর্ডিং পুনর্নামকরণ"
 }

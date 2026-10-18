@@ -1319,7 +1319,6 @@
   "Recording inserted onto board": "تم إدراج التسجيل في اللوحة",
   "Exported audio recording": "تم تصدير التسجيل الصوتي",
   "Export audio error: ": "خطأ في تصدير الصوت: ",
-  "Rename recording:": "إعادة تسمية التسجيل:",
   "Delete recording \"{name}\"?": "هل تريد حذف التسجيل \"{name}\"؟",
   "Insert the recording into the note": "إدراج التسجيل في الملاحظة",
   "Export audio": "تصدير الصوت",
@@ -1389,5 +1388,10 @@
   "Follow strokes": "اتباع الخطوط",
   "Fixed view area": "منطقة العرض الثابت",
   "Recording area": "منطقة التسجيل",
-  "Whole board": "اللوحة كاملة"
+  "Whole board": "اللوحة كاملة",
+  "Camera follow framing": "إطار متابعة الكاميرا",
+  "Viewport": "منطقة العرض",
+  "Center point": "مركز النقطة",
+  "Center zone": "المنطقة الوسطى",
+  "Rename recording": "إعادة تسمية التسجيل"
 }

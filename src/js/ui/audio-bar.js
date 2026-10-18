@@ -14,6 +14,19 @@ export function formatTime(ms) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+export function trackMenuPosition(anchor, menu, viewport) {
+  const margin = 10;
+  const below = viewport.height - anchor.bottom - margin;
+  const above = anchor.top - margin;
+  const placeBelow = below >= Math.min(menu.height, 180) || below >= above;
+  const maxHeight = Math.max(80, Math.min(menu.height, placeBelow ? below : above));
+  const top = placeBelow
+    ? Math.min(viewport.height - maxHeight - margin, anchor.bottom + 4)
+    : Math.max(margin, anchor.top - maxHeight - 4);
+  const left = Math.max(margin, Math.min(viewport.width - menu.width - margin, anchor.right - menu.width));
+  return { left, top, maxHeight };
+}
+
 export class AudioBar {
   /**
    * @param {object} app Main application instance
@@ -285,16 +298,25 @@ export class AudioBar {
     this.closeSessionMenu();
   }
 
-  renameTrack(tr) {
+  async renameTrack(tr) {
     if (!tr) return;
-    const newName = prompt(t('Rename recording:'), tr.name || '');
-    if (newName && newName.trim()) {
-      tr.name = newName.trim();
-      if (this.app?.store) this.app.store.commit('rename recording', []);
+    const newName = await this.app?.askText?.(t('Rename recording'), '', {
+      value: tr.name || '', placeholder: tr.name || '', ok: t('Save')
+    });
+    if (newName && newName.trim() && newName.trim() !== (tr.name || '')) {
+      const store = this.app?.store;
+      const before = store?.doc?.audioTracks || [];
+      const after = before.map((item) => ({ ...item, bookmarks: item.bookmarks?.map((bookmark) => ({ ...bookmark })) }))
+        .map((item) => item.id === tr.id ? { ...item, name: newName.trim() } : item);
+      if (store) store.commit('rename recording', [{ t: 'doc', before: { audioTracks: before }, after: { audioTracks: after } }]);
+      this.track = after.find((item) => item.id === tr.id) || this.track;
+      if (this.app?.replayEngine?.track?.id === tr.id) this.app.replayEngine.track = this.track;
       this.syncUI();
       this.closeSessionMenu();
       this.toggleSessionMenu();
+      return;
     }
+    this.closeSessionMenu();
   }
 
   deleteTrack(tr) {
@@ -319,12 +341,12 @@ export class AudioBar {
     const existing = document.getElementById('abTrackMenu');
     if (existing) existing.remove();
 
-    const rect = anchorEl.getBoundingClientRect();
     const menu = h('div', {
       id: 'abTrackMenu',
-      style: `position:fixed;top:${rect.bottom + 4}px;left:${Math.max(10, rect.right - 210)}px;z-index:9999;background:var(--surface,#1f2328);color:var(--text,#ffffff);border:1px solid var(--line,rgba(255,255,255,0.18));border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.38);padding:6px;min-width:210px;display:flex;flex-direction:column;gap:4px;user-select:none;`
+      style: 'position:fixed;z-index:9999;background:var(--surface,#1f2328);color:var(--text,#ffffff);border:1px solid var(--line,rgba(255,255,255,0.18));border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.38);padding:6px;min-width:210px;max-width:min(280px,calc(100vw - 20px));overflow-y:auto;display:flex;flex-direction:column;gap:4px;user-select:none;'
     });
 
+    let dismiss = null;
     const item = (label, iconStr, action, danger = false) => {
       const row = h('div', {
         style: `display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:500;color:${danger ? '#ff5252' : 'inherit'};`,
@@ -335,6 +357,7 @@ export class AudioBar {
       row.addEventListener('click', (ev) => {
         ev.stopPropagation();
         menu.remove();
+        window.removeEventListener('pointerdown', dismiss);
         action();
       });
       return row;
@@ -345,14 +368,22 @@ export class AudioBar {
     menu.appendChild(item(t('Rename'), '✏️', () => this.renameTrack(tr)));
     menu.appendChild(item(t('Delete'), '❌', () => this.deleteTrack(tr), true));
 
-    const dismiss = (ev) => {
-      if (!menu.contains(ev.target) && ev.target !== anchorEl) {
+    document.body.appendChild(menu);
+    const rect = anchorEl.getBoundingClientRect();
+    const fitted = trackMenuPosition(rect, { width: menu.offsetWidth || 220, height: menu.offsetHeight || 190 }, {
+      width: window.innerWidth, height: window.innerHeight
+    });
+    menu.style.left = `${fitted.left}px`;
+    menu.style.top = `${fitted.top}px`;
+    menu.style.maxHeight = `${fitted.maxHeight}px`;
+
+    dismiss = (ev) => {
+      if (!menu.contains(ev.target) && !anchorEl.contains?.(ev.target) && ev.target !== anchorEl) {
         menu.remove();
         window.removeEventListener('pointerdown', dismiss);
       }
     };
     window.addEventListener('pointerdown', dismiss);
-    document.body.appendChild(menu);
   }
 
   toggleSessionMenu() {
@@ -565,6 +596,22 @@ export class AudioBar {
       this.setCameraFollow(this.app.settings.replayCameraFollow === false);
     });
 
+    this.cameraMode = h('select', {
+      class: 'ab-camera-mode', title: t('Camera follow framing'),
+      'aria-label': t('Camera follow framing'),
+      style: 'max-width:104px;padding:3px 4px;border:1px solid var(--line,rgba(128,128,128,.25));border-radius:9px;background:var(--surface,#fff);color:inherit;font:inherit;font-size:10px;'
+    },
+      h('option', { value: 'viewport' }, t('Viewport')),
+      h('option', { value: 'center' }, t('Center point')),
+      h('option', { value: 'dead-zone' }, t('Center zone'))
+    );
+    this.cameraMode.value = this.app.settings.replayCameraMode || 'viewport';
+    this.cameraMode.addEventListener('change', () => {
+      this.app.settings.replayCameraMode = this.cameraMode.value;
+      this.app.saveSettings();
+      this.app.replayEngine?.setCameraMode?.(this.cameraMode.value);
+    });
+
     this.outlineEffect = h('select', {
       class: 'ab-outline-effect', title: t('Replay outline effect'),
       'aria-label': t('Replay outline effect'),
@@ -622,7 +669,7 @@ export class AudioBar {
       id: 'audioBar',
       class: 'audio-bar-hud',
       style: 'position:absolute;z-index:1000;display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.18);user-select:none;font-size:13px;font-family:inherit;'
-    }, dragHandle, this.btnSession, this.btnRewind10, this.btnSkipStep, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnSync, this.btnFollow, this.outlineEffect, this.outlineColor, this.btnClose);
+    }, dragHandle, this.btnSession, this.btnRewind10, this.btnSkipStep, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnSync, this.btnFollow, this.cameraMode, this.outlineEffect, this.outlineColor, this.btnClose);
 
     this.wireDragging(dragHandle);
 
@@ -677,6 +724,12 @@ export class AudioBar {
   syncUI() {
     if (!this.el || !this.visible) return;
     const replay = this.app?.replayEngine;
+    const tracks = this.app?.store?.doc?.audioTracks || [];
+    const currentTrack = tracks.find((item) => item.id === this.track?.id);
+    if (currentTrack && currentTrack !== this.track) {
+      this.track = currentTrack;
+      if (replay?.track?.id === currentTrack.id) replay.track = currentTrack;
+    }
     const cur = replay?.currentTimeMs || 0;
     const dur = this.track?.durationMs || 0;
 
@@ -705,7 +758,6 @@ export class AudioBar {
       if (this.btnForward10) this.btnForward10.title = `Forward ${this.skipSeconds}s`;
     }
 
-    const tracks = this.app?.store?.doc?.audioTracks || [];
     if (this.btnSession) {
       if (tracks.length > 1) {
         this.btnSession.style.display = 'inline-flex';
@@ -734,6 +786,9 @@ export class AudioBar {
       this.btnFollow.style.opacity = followEnabled ? '1' : '0.5';
       this.btnFollow.setAttribute('aria-pressed', String(followEnabled));
       this.btnFollow.title = followEnabled ? t('Camera follow enabled') : t('Camera follow disabled');
+    }
+    if (this.cameraMode && this.cameraMode.value !== (this.app?.settings?.replayCameraMode || 'viewport')) {
+      this.cameraMode.value = this.app?.settings?.replayCameraMode || 'viewport';
     }
     if (this.outlineEffect && this.outlineEffect.value !== (this.app.settings.replayOutlineEffect || 'neon')) {
       this.outlineEffect.value = this.app.settings.replayOutlineEffect || 'neon';

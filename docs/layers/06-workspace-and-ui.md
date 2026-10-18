@@ -41,6 +41,7 @@ Governs high-level user interface containers, the dual-viewport Split Study Work
 ### Windows-Style Persistent Hover Quick Actions & Side-by-Side Coexistence:
 * `#ctxbar` features a 350ms grace bridge and `:hover` tracking matching native Windows hover menus (`BUG-012`).
 * When right-clicking an object with quick actions active, the context menu opens adjacent side-by-side (`cr.right + 8` or `cr.left - 8 - menuWidth`) with zero overlap (`BUG-013`).
+* Audio recording action menus use viewport measurements to open above or below the selected recording and constrain their height when neither side has full room. Recording names are edited with the app's modal text dialog and persisted as an undoable document transaction (v4.8.11).
 
 ## 4. Relevant Bug Fixes
 * **BUG-004**: In-settings search failed to match descriptions $\rightarrow$ multi-word token inverted index added.
