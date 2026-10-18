@@ -71,6 +71,7 @@ export const DEFAULT_SETTINGS = {
   // rememberPen() creates the map on first use; leaving it out is also what
   // makes Reset to defaults put every pen back to the colour it shipped with.
   highlighterColor: '#fff100', highlighterWidth: 20, highlighterOpacity: 0.5, highlighterColorPop: true,
+  audioInkSync: true, replayOutlineColor: '#00e5ff', replayOutlineEffect: 'neon', replayCameraFollow: true,
   eraserSize: 30, eraserMode: 'partial',
   pdfPaper: 'a4', pdfOrientation: '', pdfMargin: 'narrow', pdfMode: 'fit', pdfQuality: 2,
   noteColor: '#ffd94a', noteSize: 200, noteFont: 'hand',
@@ -223,6 +224,7 @@ class App {
     useConnectorStore(this.store);
     setConnectorBounds(connectorBounds);
     this.settings = this.loadSettings();
+    this.readingMode = false;
     // Before the Surface exists, so the very first frame is already the right
     // colour rather than a white flash that corrects itself a moment later.
     this.applyTheme();
@@ -2196,6 +2198,7 @@ class App {
   }
 
   applyTemplate(tpl) {
+    if (this.readingMode) return;
     if (tpl.custom) {
       if (tpl.background) {
         this.store.setBackground(tpl.background);
@@ -2252,6 +2255,15 @@ class App {
 
   /* ---------------- commands ---------------- */
   command(id) {
+    if (this.readingMode && [
+      'undo', 'edit.undo', 'redo', 'edit.redo', 'edit.delete', 'edit.cut', 'edit.paste',
+      'edit.duplicate', 'edit.group', 'edit.ungroup', 'edit.nameGroup', 'edit.clear', 'edit.lock',
+      'table.addRow', 'table.removeRow', 'table.addCol', 'table.removeCol',
+      'order.front', 'order.back', 'order.forward', 'order.backward',
+      'view.background', 'insert.image', 'insert.audio', 'insert.math', 'insert.document',
+      'insert.table', 'insert.curtain', 'insert.tape', 'insert.boardlink',
+      'curtain.reveal', 'curtain.coverAll', 'page.add', 'page.duplicate', 'page.delete', 'page.fitContent'
+    ].includes(id)) return;
     const s = this.store, sf = this.surface;
     switch (id) {
       case 'undo': case 'edit.undo': this.textEditor.commit(); s.undo(); this.pruneSelection(); break;
@@ -2389,6 +2401,23 @@ class App {
     this.surface.invalidate();
   }
 
+  setReadingMode(enabled, { silent = false } = {}) {
+    const next = !!enabled;
+    if (next === this.readingMode) return;
+    if (next) {
+      this.commitTextEdit();
+      this.interaction?.cancelGesture?.();
+    }
+    this.readingMode = next;
+    this.syncUI();
+    this.surface?.invalidate();
+    if (!silent) this.toast(next
+      ? t('Reading mode: board edits are paused')
+      : t('Writing mode: board editing is enabled'));
+  }
+
+  toggleReadingMode() { this.setReadingMode(!this.readingMode); }
+
   toggleSearchDialog(q = '') {
     if (!this.searchDialog) this.searchDialog = new SearchDialog(this);
     this.searchDialog.toggle(q);
@@ -2427,6 +2456,7 @@ class App {
 
   /** A pasted line of text, as a box on the board. */
   addPastedText(text, at, html = '') {
+    if (this.readingMode) return;
     /*
      * Words pasted onto the board keep the look they had where they were
      * copied - bold, italic, underline, colour - exactly as they do when
@@ -2846,6 +2876,7 @@ class App {
   }
 
   async pasteAt(wp) {
+    if (this.readingMode) return;
     if (!wp) wp = this.pastePoint();
     const held = this.clipboard.length;
     const now = await this.clipboardNow();
@@ -2919,6 +2950,7 @@ class App {
     this.syncBoardPath();
     syncToolbar(this);
     syncPresentBar(this);
+    this.replayBar?.syncReadingMode?.();
     updateSelectionBar(this);
     this.syncZoom();
     this.interaction?.refreshInkCursor?.();
@@ -4380,6 +4412,7 @@ class App {
 
     // paste from the system clipboard
     document.addEventListener('paste', async (e) => {
+      if (this.readingMode) { e.preventDefault(); return; }
       if (this.textEditor.active) return;
       // Pasting into a box that takes typing - the maths editor, a sharing
       // code, a board name, a dialog's field - is that box's paste, not the board's.
@@ -4420,6 +4453,7 @@ class App {
     stage.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
     stage.addEventListener('drop', (e) => {
       e.preventDefault();
+      if (this.readingMode) return;
       this.dropFiles([...(e.dataTransfer?.files || [])], this.surface.toWorld(e));
     });
 
@@ -4535,6 +4569,14 @@ class App {
 
     const mod = e.ctrlKey || e.metaKey;
 
+    if (this.readingMode) {
+      if ((mod && ['z', 'y', 'x', 'v', 'd', 'g', 'a'].includes(e.key.toLowerCase()))
+          || ['Delete', 'Backspace', 'F2'].includes(e.key)) {
+        e.preventDefault();
+        return;
+      }
+    }
+
     if (mod && (e.key === 'f' || e.key === 'k')) {
       e.preventDefault();
       this.toggleSearchDialog();
@@ -4627,6 +4669,7 @@ class App {
         return;
       }
       case 'ArrowLeft': case 'ArrowRight': case 'ArrowUp': case 'ArrowDown': {
+        if (this.readingMode && this.surface.selection.size) { e.preventDefault(); return; }
         if (!this.surface.selection.size) {
           e.preventDefault();
           const step = (e.shiftKey ? 240 : 80);

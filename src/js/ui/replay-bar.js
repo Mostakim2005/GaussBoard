@@ -204,6 +204,15 @@ export class ReplayBar {
       }
     });
 
+    this.btnMode = h('button', {
+      class: 'rb-btn rb-mode', type: 'button',
+      title: t('Switch between Reading mode and Writing mode'),
+      'aria-pressed': String(!!this.app.readingMode),
+      style: 'display:flex;align-items:center;gap:5px;background:rgba(128,128,128,0.12);border:0;cursor:pointer;padding:6px 9px;border-radius:18px;font-size:11.5px;font-weight:700;color:inherit;'
+    });
+    this.btnMode.addEventListener('click', () => this.app.toggleReadingMode?.());
+    this.syncReadingMode();
+
     // 5. Masking / Study Tape Button
     this.btnTape = h('button', {
       class: 'rb-btn rb-tape',
@@ -288,7 +297,7 @@ export class ReplayBar {
       id: 'replayBar',
       class: 'replay-bar-hud',
       style: 'position:absolute;z-index:9000;display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.14));border-radius:30px;box-shadow:0 6px 20px rgba(0,0,0,0.18);font-family:inherit;font-size:13px;backdrop-filter:blur(8px);'
-    }, handle, this.btnOverview, this.btnSearch, this.btnAudio, this.btnPlayBar, this.btnTape, this.btnSplit, this.btnVideo, this.btnScratch, this.btnMenu);
+    }, handle, this.btnOverview, this.btnSearch, this.btnAudio, this.btnPlayBar, this.btnMode, this.btnTape, this.btnSplit, this.btnVideo, this.btnScratch, this.btnMenu);
 
     this.updateVisibility();
   }
@@ -298,10 +307,20 @@ export class ReplayBar {
     if (this.btnSearch) this.btnSearch.style.display = this.visibleTools.search ? 'flex' : 'none';
     if (this.btnAudio) this.btnAudio.style.display = this.visibleTools.audio ? 'flex' : 'none';
     if (this.btnPlayBar) this.btnPlayBar.style.display = this.visibleTools.playbar ? 'flex' : 'none';
+    if (this.btnMode) this.btnMode.style.display = 'flex';
     if (this.btnTape) this.btnTape.style.display = this.visibleTools.tape ? 'flex' : 'none';
     if (this.btnSplit) this.btnSplit.style.display = this.visibleTools.split ? 'flex' : 'none';
     if (this.btnVideo) this.btnVideo.style.display = this.visibleTools.video ? 'flex' : 'none';
     if (this.btnScratch) this.btnScratch.style.display = this.visibleTools.scratch ? 'flex' : 'none';
+  }
+
+  syncReadingMode() {
+    if (!this.btnMode) return;
+    const reading = !!this.app.readingMode;
+    this.btnMode.textContent = reading ? t('Reading mode') : t('Writing mode');
+    this.btnMode.setAttribute('aria-pressed', String(reading));
+    this.btnMode.title = reading ? t('Reading mode: edits are paused; click to write') : t('Writing mode: editing is enabled; click to read');
+    this.btnMode.style.color = reading ? '#0078d4' : 'inherit';
   }
 
   async handleAudioClick() {

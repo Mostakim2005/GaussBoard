@@ -5,7 +5,7 @@ import { Surface } from './core/surface.js';
 import { t } from './i18n.js';
 import { isDarkBoard } from './core/render.js';
 import { boundsOf } from './core/store.js';
-import { boxesIntersect } from './core/util.js';
+import { stripBounds } from './core/pages.js';
 import { h } from './ui/popover.js';
 
 export const VIDEO_EXPORT_PRESETS = Object.freeze({
@@ -13,6 +13,93 @@ export const VIDEO_EXPORT_PRESETS = Object.freeze({
   '1080p30': Object.freeze({ width: 1920, height: 1080, fps: 30 }),
   '1080p60': Object.freeze({ width: 1920, height: 1080, fps: 60 })
 });
+
+export const VIDEO_CAMERA_MODES = Object.freeze({ FIXED: 'fixed', FOLLOW: 'follow' });
+export const VIDEO_FIXED_FRAMES = Object.freeze({ RECORDING: 'recording', BOARD: 'board' });
+
+export function boundsForObjects(objects, pages = []) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const object of Object.values(objects || {})) {
+    if (!object) continue;
+    const box = object.bbox || boundsOf(object);
+    if (!box || ![box.x, box.y, box.w, box.h].every(Number.isFinite)) continue;
+    minX = Math.min(minX, box.x);
+    minY = Math.min(minY, box.y);
+    maxX = Math.max(maxX, box.x + box.w);
+    maxY = Math.max(maxY, box.y + box.h);
+  }
+  const pagesBox = stripBounds(pages);
+  if (pagesBox) {
+    minX = Math.min(minX, pagesBox.x);
+    minY = Math.min(minY, pagesBox.y);
+    maxX = Math.max(maxX, pagesBox.x + pagesBox.w);
+    maxY = Math.max(maxY, pagesBox.y + pagesBox.h);
+  }
+  return minX < maxX && minY < maxY ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY } : null;
+}
+
+export function boundsForTrack(objects, trackId) {
+  return boundsForObjects(Object.fromEntries(Object.entries(objects || {}).filter(([, object]) => object?.audioId === trackId)));
+}
+
+export function targetCameraForBox(box, width, height, padding = 96, maxZoom = 2, minZoom = 0.05) {
+  if (!box || !Number.isFinite(box.x) || !Number.isFinite(box.y) || !(width > padding * 2) || !(height > padding * 2)) return null;
+  const boxWidth = Math.max(10, box.w || 0), boxHeight = Math.max(10, box.h || 0);
+  const centerX = box.x + (box.w || 0) / 2, centerY = box.y + (box.h || 0) / 2;
+  const zoom = Math.max(minZoom, Math.min(Math.min((width - padding * 2) / boxWidth, (height - padding * 2) / boxHeight), maxZoom));
+  return {
+    z: zoom,
+    x: width / 2 - centerX * zoom,
+    y: height / 2 - centerY * zoom
+  };
+}
+
+function frameCamera(surface, box, width, height, padding = 96) {
+  const target = targetCameraForBox(box, width, height, padding);
+  if (!target) return false;
+  surface.cam.x = target.x;
+  surface.cam.y = target.y;
+  surface.cam.z = target.z;
+  return true;
+}
+
+export function strokeAtOrAfter(objects, trackId, timeMs) {
+  const ordered = Object.values(objects || {}).filter((o) => o?.audioId === trackId && Number.isFinite(o.t0));
+  return ordered.find((o) => Number.isFinite(o.t1) && o.t0 <= timeMs && timeMs < o.t1)
+    || ordered.find((o) => o.t0 >= timeMs)
+    || null;
+}
+
+export function followExportCamera(surface, stroke, width, height, frameInterval) {
+  if (!stroke) return;
+  const box = stroke.bbox || boundsOf(stroke);
+  const target = targetCameraForBox(box, width, height, 110, 1.6, 0.3);
+  if (!target) return;
+  const amount = 1 - Math.exp(-Math.max(1, frameInterval) / 320);
+  surface.cam.x += (target.x - surface.cam.x) * amount;
+  surface.cam.y += (target.y - surface.cam.y) * amount;
+  surface.cam.z += (target.z - surface.cam.z) * amount;
+}
+
+function initializeExportCamera(surface, app, track, width, height, cameraMode, fixedFrame) {
+  const objects = app?.store?.doc?.objects || {};
+  let framed = false;
+  if (cameraMode === VIDEO_CAMERA_MODES.FOLLOW) {
+    const first = strokeAtOrAfter(objects, track.id, 0);
+    framed = frameCamera(surface, first?.bbox || (first ? boundsOf(first) : null), width, height, 110);
+    if (!framed) framed = frameCamera(surface, boundsForTrack(objects, track.id), width, height);
+  } else {
+    const box = fixedFrame === VIDEO_FIXED_FRAMES.BOARD
+      ? boundsForObjects(objects, app?.store?.doc?.pages)
+      : boundsForTrack(objects, track.id);
+    framed = frameCamera(surface, box, width, height);
+  }
+  if (!framed && app?.surface?.cam) {
+    surface.cam.x = app.surface.cam.x;
+    surface.cam.y = app.surface.cam.y;
+    surface.cam.z = app.surface.cam.z;
+  }
+}
 
 function waitForAudioReady(audio, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
@@ -63,7 +150,7 @@ export class VideoExporter {
    * @param {(pct: number) => void} [opts.onProgress] Callback with 0.0 - 1.0 progress
    * @returns {Promise<{ blob: Blob, durationMs: number }>}
    */
-  async exportReplayVideo({ track, width = 1920, height = 1080, fps = 30, onProgress = null } = {}) {
+  async exportReplayVideo({ track, width = 1920, height = 1080, fps = 30, onProgress = null, cameraMode = VIDEO_CAMERA_MODES.FIXED, fixedFrame = VIDEO_FIXED_FRAMES.RECORDING } = {}) {
     if (!track) throw new Error('No audio track specified for video export');
     this.cancelled = false;
 
@@ -77,32 +164,7 @@ export class VideoExporter {
     sf.resize(width, height);
     const replayClock = { track, currentTimeMs: 0, ghostMode: 'none' };
 
-    // Auto-frame offscreen camera to encompass all notes recorded with this audio track
-    const objs = this.app?.store?.doc?.objects || {};
-    const trackStrokes = Object.values(objs).filter((o) => o && o.audioId === track.id);
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const s of trackStrokes) {
-      const b = s.bbox || boundsOf(s);
-      if (b) {
-        minX = Math.min(minX, b.x);
-        minY = Math.min(minY, b.y);
-        maxX = Math.max(maxX, b.x + b.w);
-        maxY = Math.max(maxY, b.y + b.h);
-      }
-    }
-    if (minX < maxX) {
-      const bw = Math.max(10, maxX - minX), bh = Math.max(10, maxY - minY);
-      const pad = Math.max(48, Math.max(bw, bh) * 0.15);
-      const box = { x: minX - pad, y: minY - pad, w: bw + pad * 2, h: bh + pad * 2 };
-      const scale = Math.min(width / box.w, height / box.h);
-      sf.cam.z = Math.max(0.3, Math.min(scale, 2.0));
-      sf.cam.x = (width - box.w * sf.cam.z) / 2 - box.x * sf.cam.z;
-      sf.cam.y = (height - box.h * sf.cam.z) / 2 - box.y * sf.cam.z;
-    } else if (this.app?.surface?.cam) {
-      sf.cam.x = this.app.surface.cam.x;
-      sf.cam.y = this.app.surface.cam.y;
-      sf.cam.z = this.app.surface.cam.z;
-    }
+    initializeExportCamera(sf, this.app, track, width, height, cameraMode, fixedFrame);
 
     // Audio element
     const audio = new Audio();
@@ -190,6 +252,9 @@ export class VideoExporter {
       // Synchronize clock and redraw offscreen canvas
       const curMs = audio.currentTime * 1000;
       replayClock.currentTimeMs = curMs;
+      if (cameraMode === VIDEO_CAMERA_MODES.FOLLOW) {
+        followExportCamera(sf, strokeAtOrAfter(this.app?.store?.doc?.objects, track.id, curMs), width, height, frameInterval);
+      }
 
       // Deterministically render solid background, base scene, and synchronized replay session
       ctx.save();
@@ -229,9 +294,9 @@ export class VideoExporter {
   /**
    * Sequentially stitches multiple recordings and stroke sessions into a single WebM video.
    */
-  async exportStitchedReplayVideo({ tracks, width = 1920, height = 1080, fps = 30, onProgress = null } = {}) {
+  async exportStitchedReplayVideo({ tracks, width = 1920, height = 1080, fps = 30, onProgress = null, cameraMode = VIDEO_CAMERA_MODES.FIXED, fixedFrame = VIDEO_FIXED_FRAMES.RECORDING } = {}) {
     if (!tracks || !tracks.length) throw new Error('No audio tracks specified for video export');
-    if (tracks.length === 1) return this.exportReplayVideo({ track: tracks[0], width, height, fps, onProgress });
+    if (tracks.length === 1) return this.exportReplayVideo({ track: tracks[0], width, height, fps, onProgress, cameraMode, fixedFrame });
 
     this.cancelled = false;
     const canvas = document.createElement('canvas');
@@ -294,36 +359,12 @@ export class VideoExporter {
     const ctx = canvas.getContext('2d');
     const videoTrack = videoStream.getVideoTracks()[0];
 
-    const frameTrack = (track) => {
-      const objs = this.app?.store?.doc?.objects || {};
-      const trackStrokes = Object.values(objs).filter((o) => o && o.audioId === track.id);
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      for (const s of trackStrokes) {
-        const b = s.bbox || boundsOf(s);
-        if (b) {
-          minX = Math.min(minX, b.x);
-          minY = Math.min(minY, b.y);
-          maxX = Math.max(maxX, b.x + b.w);
-          maxY = Math.max(maxY, b.y + b.h);
-        }
-      }
-      if (minX < maxX) {
-        const bw = Math.max(10, maxX - minX), bh = Math.max(10, maxY - minY);
-        const pad = Math.max(48, Math.max(bw, bh) * 0.15);
-        const box = { x: minX - pad, y: minY - pad, w: bw + pad * 2, h: bh + pad * 2 };
-        const scale = Math.min(width / box.w, height / box.h);
-        sf.cam.z = Math.max(0.3, Math.min(scale, 2.0));
-        sf.cam.x = (width - box.w * sf.cam.z) / 2 - box.x * sf.cam.z;
-        sf.cam.y = (height - box.h * sf.cam.z) / 2 - box.y * sf.cam.z;
-      }
-    };
-
     for (let i = 0; i < tracks.length; i++) {
       if (this.cancelled) break;
       const track = tracks[i];
       replayClock.track = track;
       replayClock.currentTimeMs = 0;
-      frameTrack(track);
+      initializeExportCamera(sf, this.app, track, width, height, cameraMode, fixedFrame);
 
       const audio = new Audio();
       activeAudio = audio;
@@ -356,6 +397,9 @@ export class VideoExporter {
 
           const curMs = audio.currentTime * 1000;
           replayClock.currentTimeMs = curMs;
+          if (cameraMode === VIDEO_CAMERA_MODES.FOLLOW) {
+            followExportCamera(sf, strokeAtOrAfter(this.app?.store?.doc?.objects, track.id, curMs), width, height, frameInterval);
+          }
 
           ctx.save();
           ctx.fillStyle = isDarkBoard() ? '#1f1e1d' : '#f5f4f2';
@@ -439,6 +483,16 @@ export async function pickRecordingsForVideoExport(app, trackOverride = null) {
       h('option', { value: '1080p60' }, '1080p · 60 fps'));
     preset.value = '1080p30';
 
+    const cameraMode = h('select', { 'aria-label': t('Video framing'), style: 'padding:7px 9px;border-radius:7px;background:var(--surface-2);color:var(--text);border:1px solid var(--stroke)' },
+      h('option', { value: VIDEO_CAMERA_MODES.FIXED }, t('Fixed view')),
+      h('option', { value: VIDEO_CAMERA_MODES.FOLLOW }, t('Follow strokes')));
+    cameraMode.value = VIDEO_CAMERA_MODES.FIXED;
+    const fixedFrame = h('select', { 'aria-label': t('Fixed view area'), style: 'padding:7px 9px;border-radius:7px;background:var(--surface-2);color:var(--text);border:1px solid var(--stroke)' },
+      h('option', { value: VIDEO_FIXED_FRAMES.RECORDING }, t('Recording area')),
+      h('option', { value: VIDEO_FIXED_FRAMES.BOARD }, t('Whole board')));
+    fixedFrame.value = VIDEO_FIXED_FRAMES.RECORDING;
+    cameraMode.addEventListener('change', () => { fixedFrame.disabled = cameraMode.value !== VIDEO_CAMERA_MODES.FIXED; });
+
     const listContainer = h('div', {
       style: 'display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;border:1px solid var(--stroke);border-radius:8px;padding:8px;'
     });
@@ -517,7 +571,7 @@ export async function pickRecordingsForVideoExport(app, trackOverride = null) {
         return;
       }
       overlay.remove();
-      resolve({ tracks: chosen, stitch: stitchTogether, video: { ...VIDEO_EXPORT_PRESETS[preset.value] } });
+      resolve({ tracks: chosen, stitch: stitchTogether, video: { ...VIDEO_EXPORT_PRESETS[preset.value], cameraMode: cameraMode.value, fixedFrame: fixedFrame.value } });
     };
 
     actionRow.appendChild(btnCancel);
@@ -527,6 +581,10 @@ export async function pickRecordingsForVideoExport(app, trackOverride = null) {
     card.appendChild(desc);
     card.appendChild(h('label', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px' },
       t('Video quality'), preset));
+    card.appendChild(h('label', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px' },
+      t('Video framing'), cameraMode));
+    card.appendChild(h('label', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px' },
+      t('Fixed view area'), fixedFrame));
     card.appendChild(listContainer);
     if (tracks.length > 1) card.appendChild(stitchRow);
     card.appendChild(actionRow);

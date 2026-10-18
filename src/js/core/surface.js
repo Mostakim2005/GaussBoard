@@ -5,6 +5,7 @@ import { drawBackground, drawRuling, drawObject, drawSelection, drawMemberOutlin
 import { worldBounds, boundsOf } from './store.js';
 import { pageRects, pageMarginRects, pageIndexForBox, pageIndexForBoxIn, stripBounds } from './pages.js';
 import { boxesIntersect } from './util.js';
+import { replayInkEnabled } from './replay-clock.js';
 import { currentLanguage } from '../i18n.js';
 import { route as connectorRoute, midPoint } from './connectors.js';
 
@@ -178,8 +179,9 @@ export class Surface {
   freezeKey() {
     const cam = this.cam;
     const ed = this.editing ? `${this.editing.id}:${this.editing.cell || ''}` : '';
-    const repTrackId = (this.app?.replayEngine?.active || this.app?.audioBar?.visible) ? (this.app?.replayEngine?.track?.id || '') : '';
-    const rep = repTrackId ? `|rep:${repTrackId}` : '';
+    const repTrackId = replayInkEnabled(this.app?.settings) && (this.app?.replayEngine?.active || this.app?.audioBar?.visible)
+      ? (this.app?.replayEngine?.track?.id || '') : '';
+    const rep = repTrackId ? `|rep:${repTrackId}:sync` : '|replay-sync-off';
     return `${this.store.rev}.${this._liveRev || 0}|${cam.x}|${cam.y}|${cam.z}|${this.width}|${this.height}|${this.dpr}|${ed}${rep}`;
   }
 
@@ -526,7 +528,7 @@ export class Surface {
     // an image that finishes decoding mid-stroke has to invalidate the freeze,
     // or it would not appear until the pen lifted
     const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
-    const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
+    const activeTrackId = isReplay && replayInkEnabled(this.app?.settings) ? this.app.replayEngine.track?.id : null;
     const filter = activeTrackId ? (o) => o.audioId !== activeTrackId : null;
     this.drawScene(g, this.width, this.height, () => { this._ink = null; this.invalidate(); }, null, filter);
     return { canvas: c, key };
@@ -629,6 +631,9 @@ export class Surface {
       this.screenTransform();
       ctx.drawImage(this._ink.canvas, 0, 0, w, h);
       this.drawReplaySession(ctx);
+      // Keep a live replay-synchronized stroke visible while the user has
+      // explicitly switched back to Writing mode during playback.
+      if (this.wet) this._drawWet(ctx);
       this._painted = true;
     } else if (this.wet || this.laser.length) {
       const key = this.freezeKey();
@@ -647,7 +652,7 @@ export class Surface {
        * board load or a camera move is always the full one.
        */
       const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
-      const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
+      const activeTrackId = isReplay && replayInkEnabled(this.app?.settings) ? this.app.replayEngine.track?.id : null;
       const replayFilter = activeTrackId ? (o) => o.audioId !== activeTrackId : null;
       this.drawScene(ctx, w, h, () => this.invalidate(), this._band, replayFilter);
     } else if (this._ink && this._ink.key === this.freezeKey()) {
@@ -677,7 +682,7 @@ export class Surface {
        * taken before the picture existed, so it would never appear.
        */
       const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
-      const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
+      const activeTrackId = isReplay && replayInkEnabled(this.app?.settings) ? this.app.replayEngine.track?.id : null;
       const replayFilter = activeTrackId ? (o) => o.audioId !== activeTrackId : null;
       this.drawScene(ctx, w, h, () => { this._ink = null; this.invalidate(); }, null, replayFilter);
       this._painted = true;
@@ -814,9 +819,13 @@ export class Surface {
   }
 
   drawReplaySession(ctx, replay = this.app?.replayEngine) {
-    if (!replay || !replay.track) return;
+    if (!replay || !replay.track || !replayInkEnabled(this.app?.settings)) return;
     const t = replay.currentTimeMs;
     const trackId = replay.track.id;
+    const outlineColor = /^#[0-9a-f]{6}$/i.test(this.app?.settings?.replayOutlineColor || '')
+      ? this.app.settings.replayOutlineColor : '#00e5ff';
+    const outlineEffect = ['neon', 'outline', 'none'].includes(this.app?.settings?.replayOutlineEffect)
+      ? this.app.settings.replayOutlineEffect : 'neon';
     const cam = this.cam;
 
     ctx.save();
@@ -828,12 +837,12 @@ export class Surface {
       if (!o || o.audioId !== trackId) continue;
 
       if (o.t1 != null && o.t1 <= t) {
-        if (t - o.t1 < 450) {
+        if (outlineEffect !== 'none' && t - o.t1 < 450) {
           const decay = 1 - ((t - o.t1) / 450);
           ctx.save();
-          ctx.shadowColor = '#00e5ff';
-          ctx.shadowBlur = 12 * decay;
-          drawObject(ctx, { ...o, width: (o.width || 4) + 4 * decay, color: '#00e5ff', opacity: 0.6 * decay }, () => this.invalidate(), this.editing);
+          ctx.shadowColor = outlineColor;
+          ctx.shadowBlur = outlineEffect === 'neon' ? 12 * decay : 0;
+          drawObject(ctx, { ...o, width: (o.width || 4) + 4 * decay, color: outlineColor, opacity: 0.6 * decay }, () => this.invalidate(), this.editing);
           ctx.restore();
         }
         drawObject(ctx, o, () => this.invalidate(), this.editing);
@@ -842,22 +851,25 @@ export class Surface {
           const sliceIndex = o.points.findIndex((p) => p.t != null && p.t > t);
           const pts = sliceIndex >= 0 ? o.points.slice(0, sliceIndex) : o.points;
           if (pts.length >= 2) {
-            // Neon cyan glow outline under active stroke
-            ctx.save();
-            ctx.shadowColor = '#00e5ff';
-            ctx.shadowBlur = 14;
-            drawObject(ctx, { ...o, points: pts, width: (o.width || 4) + 5, color: '#00e5ff', opacity: 0.7 }, () => this.invalidate(), this.editing);
-            ctx.restore();
+            if (outlineEffect !== 'none') {
+              ctx.save();
+              ctx.shadowColor = outlineColor;
+              ctx.shadowBlur = outlineEffect === 'neon' ? 14 : 0;
+              drawObject(ctx, { ...o, points: pts, width: (o.width || 4) + 5, color: outlineColor, opacity: 0.7 }, () => this.invalidate(), this.editing);
+              ctx.restore();
+            }
 
             drawObject(ctx, { ...o, points: pts }, () => this.invalidate(), this.editing);
             const tip = pts[pts.length - 1];
             ctx.save();
-            ctx.fillStyle = '#00e5ff';
-            ctx.shadowColor = '#00e5ff';
-            ctx.shadowBlur = 10;
-            ctx.beginPath();
-            ctx.arc(tip.x, tip.y, (o.width || 4) / 2 + 2, 0, Math.PI * 2);
-            ctx.fill();
+            if (outlineEffect !== 'none') {
+              ctx.fillStyle = outlineColor;
+              ctx.shadowColor = outlineColor;
+              ctx.shadowBlur = outlineEffect === 'neon' ? 10 : 0;
+              ctx.beginPath();
+              ctx.arc(tip.x, tip.y, (o.width || 4) / 2 + 2, 0, Math.PI * 2);
+              ctx.fill();
+            }
             ctx.restore();
           }
         }

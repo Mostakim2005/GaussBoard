@@ -8,9 +8,9 @@
 
 ## 1. Quick Repository Facts & Mental Model
 
-* **Project**: **GazBoard Replay** (Windows-first fork of GazBoard v4.8.1); current release **v4.8.9** (Study Tape and answer-cover interaction follow-up to v4.8.8).
+* **Project**: **GazBoard Replay** (Windows-first fork of GazBoard v4.8.1); current release **v4.8.10** (replay camera follow and selectable video framing, following the v4.8.9 Study Tape patch).
   * Base-only behavior and source entry points: [`docs/BASE_FEATURE_CATALOG-4.8.1.md`](docs/BASE_FEATURE_CATALOG-4.8.1.md).
-  * Custom feature and fix history through v4.8.8: [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md).
+  * Custom feature and fix history through v4.8.10: [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md), including the v4.8.9 and v4.8.10 release dossiers.
   * Treat plans as proposals/history, not proof of shipped behavior. Verify current behavior against source and focused tests.
 * **Base Architecture**: Pure Vanilla JavaScript (ES6 Modules), HTML5 Canvas 2D, Electron 43.
   * **Zero Frontend Frameworks**: No React, Vue, Angular, or Svelte. Pure DOM manipulation and raw Canvas2D rendering.
@@ -92,6 +92,8 @@ node scripts/smoke.js
 npm run smoke:custom
 npm run smoke:features:4.8.4.1
 npm run smoke:features:4.8.8
+npm run smoke:replay
+npm run smoke:video
 
 # Translation parity
 node scripts/i18n-check.js

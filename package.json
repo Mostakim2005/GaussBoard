@@ -1,7 +1,7 @@
 {
   "name": "gazboard",
   "productName": "GazBoard",
-  "version": "4.8.9",
+  "version": "4.8.10",
   "description": "A free-form digital whiteboard - offline replica of the classic Microsoft Whiteboard 21.x experience, with Word / PowerPoint / PDF import.",
   "main": "main.js",
   "scripts": {
@@ -9,6 +9,8 @@
     "dev": "electron . --dev",
     "smoke": "node scripts/smoke.js",
     "smoke:custom": "node scripts/smoke-custom.js",
+    "smoke:replay": "node --test test/replay-reading.test.mjs",
+    "smoke:video": "node --test test/video-framing.test.mjs",
     "smoke:features:4.8.4.1": "node scripts/smoke.js --features-4.8.4.1",
     "smoke:features:4.8.8": "node scripts/smoke.js --features-4.8.8",
     "smoke:builtin": "node scripts/smoke.js --builtin",

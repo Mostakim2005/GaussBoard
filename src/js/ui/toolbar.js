@@ -502,6 +502,7 @@ function wireTopBar(app) {
         if (track && track.assetId) {
           if (!Array.isArray(app.store.doc.audioTracks)) app.store.doc.audioTracks = [];
           app.store.doc.audioTracks.push(track);
+          app.audioBar?.open(track);
           if (typeof app.persist === 'function') await app.persist();
           if (app.replayBar?.updateAudioUI) app.replayBar.updateAudioUI();
           if (app.audioBar?.syncUI) app.audioBar.syncUI();

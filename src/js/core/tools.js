@@ -14,6 +14,7 @@ import { Surface } from './surface.js';
 import { t, currentLanguage } from '../i18n.js';
 import { SHAPE_LABELS } from '../ui/palettes.js';
 import { route as connectorRoute, midPoint, bendThrough, targetAt, sameTarget, dotsFor, drawConnector, endBox } from './connectors.js';
+import { audioInkClock } from './replay-clock.js';
 
 const TAP_SLOP = 4;
 /*
@@ -98,6 +99,7 @@ export class Interaction {
     c.addEventListener('dblclick', (e) => this.onDoubleClick(e));
     c.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      if (this.app.readingMode) return;
       // Android opens expanded actions from the selection bar's More button.
       // Its native long-press event can arrive even after the pointer lifts.
       if (document.documentElement?.dataset.platform === 'android') return;
@@ -283,6 +285,14 @@ export class Interaction {
       return;
     }
     if (this.pointers.size > 2) return;
+
+    // Reading mode owns the canvas interaction path: every pointer may pan,
+    // but handles, selection, menus, and drawing tools cannot mutate the board.
+    if (this.app.readingMode) {
+      this.action = { type: 'pan', sp, cam: { x: this.surface.cam.x, y: this.surface.cam.y }, reading: true, downSp: sp };
+      this.actionId = e.pointerId;
+      return;
+    }
 
     // Remember what this press could dismiss. Finishing a text edit clears
     // its selection, before pointerup gets a chance to recognise the tap.
@@ -721,8 +731,8 @@ export class Interaction {
 
         // coalesced events give smoother ink on high-rate pens
         const evs = e && e.getCoalescedEvents ? e.getCoalescedEvents() : null;
-        const rec = this.app.audioRecorder;
-        const curT = (rec && rec.state === 'recording' && a.obj.audioId) ? rec.currentOffsetMs() : null;
+        const clock = audioInkClock(this.app);
+        const curT = clock && clock.trackId === a.obj.audioId ? clock.timeMs : null;
         if (evs && evs.length) {
           for (const ce of evs) {
             const csp = this.surface.screenPoint(ce);
@@ -958,6 +968,9 @@ export class Interaction {
     }
 
     switch (a.type) {
+      case 'pan':
+        if (a.reading && Math.hypot(sp.x - a.downSp.x, sp.y - a.downSp.y) < TAP_SLOP) this.readingTap(wp);
+        break;
       case 'laser': {
         const dur = this.app?.settings?.laserTrailDuration;
         if (dur === 0) {
@@ -1580,12 +1593,11 @@ export class Interaction {
     const startEdge = this.ruler.visible && this.ruler.snap ? this.rulerEdgeAt(wp) : null;
     const act = { type: 'draw', obj, snapAxis: null, sheet,
       ruled: startEdge !== null, ruledEdge: startEdge || 0 };
-    const rec = this.app.audioRecorder;
-    const isRec = rec && rec.state === 'recording';
-    const t0 = isRec ? rec.currentOffsetMs() : null;
-    if (isRec) {
-      obj.audioId = rec.activeTrackId;
-      obj.t0 = t0;
+    const clock = audioInkClock(this.app);
+    const t0 = clock?.timeMs ?? null;
+    if (clock) {
+      obj.audioId = clock.trackId;
+      obj.t0 = clock.timeMs;
     }
     const pt0 = this.snapToRuler({ ...wp, p: this.pressure(e), ...(t0 != null ? { t: t0 } : {}) }, act);
     obj.points.push(pt0);
@@ -1719,6 +1731,29 @@ export class Interaction {
     return true;
   }
 
+  /** A read-only tap can follow replay without selecting or changing board objects. */
+  readingTap(wp) {
+    const cover = curtainAt(this.store, wp, 8 / this.surface.cam.z);
+    if (cover) {
+      this.app.toggleCurtain(cover.id);
+      this.surface.invalidate();
+      return;
+    }
+    const hit = pick(this.store, wp, 8 / this.surface.cam.z);
+    if (!hit) return;
+    if (hit.type === 'audio') {
+      const track = (this.app.store?.doc?.audioTracks || []).find((item) => item.id === hit.trackId);
+      if (track) { this.app.audioBar?.open(track); this.app.audioBar?.togglePlay(); }
+      return;
+    }
+    const replay = this.app.replayEngine;
+    if (this.app.settings?.audioInkSync !== false && replay?.track?.id && hit.audioId === replay.track.id && hit.t0 != null) {
+      replay.seek(hit.t0);
+      const box = worldBounds(hit);
+      if (box) this.surface.pulseHighlight(box);
+    }
+  }
+
   /**
    * Throw a tap's mark away before it becomes an object, so it never reaches
    * the board and there is nothing in the undo history to explain either.
@@ -1772,8 +1807,11 @@ export class Interaction {
     const obj = a.obj;
     this.surface.wet = null;
     this.surface.wetPieces = null;
-    if (obj.audioId && this.app.audioRecorder) {
-      obj.t1 = this.app.audioRecorder.currentOffsetMs();
+    if (obj.audioId) {
+      const clock = audioInkClock(this.app);
+      if (clock?.trackId === obj.audioId) obj.t1 = clock.timeMs;
+      else if (this.app.audioRecorder?.activeTrackId === obj.audioId) obj.t1 = this.app.audioRecorder.elapsedOffsetMs;
+      else if (this.app.replayEngine?.track?.id === obj.audioId) obj.t1 = this.app.replayEngine.currentTimeMs;
     }
     /*
      * A line the ruler cut in two (or three). Each piece is real ink and they
@@ -2716,6 +2754,7 @@ export class Interaction {
   }
 
   onDoubleClick(e) {
+    if (this.app.readingMode) { e.preventDefault(); return; }
     if (this.fitTextToWords(this.surface.screenPoint(e))) return;
     const wp = this.surface.toWorld(e);
     const hit = pick(this.store, wp, 8 / this.surface.cam.z);

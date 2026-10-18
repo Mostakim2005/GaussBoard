@@ -18,8 +18,9 @@ Orchestrates offscreen canvas frame rendering and Web Audio multi-track multiple
 
 ### Offscreen Replay Pump:
 * Uses an offscreen HTML5 `<canvas>` sized to the target export resolution (e.g. 1080p).
-* Bounding Box Auto-Framing: Calculates the cumulative bounding box of all strokes and cards belonging to the active recording session and centers the camera with smooth padding.
-* Active Stroke Camera Tracking: If strokes extend beyond the initial viewport, the offscreen camera glides smoothly to keep the pen tip centered.
+* **Fixed view:** `Fixed view area` fits either the selected recording's ink bounds or the combined bounds of all board objects and page extents. The export frame stays stationary.
+* **Follow strokes:** the camera eases toward the active or next timestamped stroke as it is reanimated. If a recording has no associated strokes, the exporter falls back to the current board view.
+* Both framing choices apply to single-track and stitched exports; stitched exports initialize the camera at each recording boundary.
 
 ### Audio Multiplexing & Chunk Flushing:
 * Streams binary audio chunks via Web Audio `AudioContext.createMediaStreamDestination()`.
@@ -39,3 +40,5 @@ node scripts/smoke.js
 `VIDEO_EXPORT_PRESETS` in `src/js/export-video.js` exposes 720p30, 1080p30 and 1080p60. The selection dialog passes the selected output dimensions and frame rate into the single-track or stitched exporter. Presets are settings for the export pipeline; they do not guarantee identical codec support or output size across every Windows device.
 
 Focused tests validate preset configuration and the dialog's returned selection. Media encoding and long-duration memory behavior should still be manually verified on target Windows hardware before making stronger performance claims.
+
+Run `npm run smoke:video` for focused frame-bounds and camera-follow checks. `npm run smoke:features:4.8.8` exercises the export-dialog choices.

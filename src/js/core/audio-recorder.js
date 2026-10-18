@@ -13,6 +13,8 @@ export class AudioRecorder {
     this.activeTrackId = null;
     this.elapsedOffsetMs = 0;
     this.segmentStartMs = 0;
+    this.chunkQueue = Promise.resolve();
+    this.chunkError = null;
   }
 
   get recording() {
@@ -46,11 +48,15 @@ export class AudioRecorder {
       audioBitsPerSecond: 64000
     });
 
-    this.recorder.ondataavailable = async (e) => {
-      if (e.data && e.data.size > 0 && window.board?.recording?.appendChunk) {
+    this.chunkQueue = Promise.resolve();
+    this.chunkError = null;
+    this.recorder.ondataavailable = (e) => {
+      if (!e.data || e.data.size <= 0 || !window.board?.recording?.appendChunk) return;
+      const sessionId = this.sessionId;
+      this.chunkQueue = this.chunkQueue.then(async () => {
         const buf = await e.data.arrayBuffer();
-        await window.board.recording.appendChunk(this.sessionId, new Uint8Array(buf));
-      }
+        await window.board.recording.appendChunk(sessionId, new Uint8Array(buf));
+      }).catch((error) => { this.chunkError ||= error; });
     };
 
     this.elapsedOffsetMs = 0;
@@ -88,14 +94,26 @@ export class AudioRecorder {
 
     return new Promise((resolve) => {
       this.recorder.onstop = async () => {
-        if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
-        if (this.audioCtx) await this.audioCtx.close();
-        let result = {};
-        if (window.board?.recording?.finish) {
-          result = await window.board.recording.finish(this.sessionId, finalDurationMs);
+        try {
+          // MediaRecorder dispatches its final dataavailable before onstop, but
+          // arrayBuffer() and the IPC write are asynchronous. Serialize every
+          // chunk and await the queue before closing/finalizing the asset.
+          await this.chunkQueue;
+          if (this.chunkError) throw this.chunkError;
+          if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+          if (this.audioCtx) await this.audioCtx.close();
+          let result = {};
+          if (window.board?.recording?.finish) {
+            result = await window.board.recording.finish(this.sessionId, finalDurationMs);
+          }
+          if (this.onStateChange) this.onStateChange(this.state);
+          resolve({ ...result, id: this.activeTrackId, durationMs: finalDurationMs });
+        } catch (error) {
+          if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+          if (this.audioCtx) { try { await this.audioCtx.close(); } catch {} }
+          if (this.onStateChange) this.onStateChange(this.state);
+          resolve({ id: this.activeTrackId, durationMs: finalDurationMs, error });
         }
-        if (this.onStateChange) this.onStateChange(this.state);
-        resolve({ ...result, id: this.activeTrackId, durationMs: finalDurationMs });
       };
       this.recorder.stop();
     });

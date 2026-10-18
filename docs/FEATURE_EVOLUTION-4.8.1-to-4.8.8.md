@@ -82,6 +82,14 @@ GazBoard provides the base canvas, drawing and object model, board storage, docu
 - **Verification:** focused feature smoke 6/6 and mandatory regression suite 1,240/1,240. The release dossier records Windows build checksums and artifact details.
 - **Details:** [`releases/RELEASE-4.8.9.md`](releases/RELEASE-4.8.9.md).
 
+### v4.8.10 — replay camera follow and selectable video framing
+
+- **Added:** a saved AudioBar toggle controls live replay camera follow. When enabled, the camera eases toward the active reanimated stroke after it leaves the viewport; disabling it cancels an in-progress follow glide.
+- **Added:** video export framing choices for a stationary recording-area view, a stationary whole-board view, or a moving camera that follows the active/next timestamped stroke. These choices apply to single-track and stitched exports.
+- **Approach:** the exporter computes bounded content rectangles, initializes a fixed or stroke-focused view, and eases follow-camera motion per frame using the audio playback clock.
+- **Verification:** `npm run smoke:replay`, `npm run smoke:video`, `npm run smoke:features:4.8.8`, and mandatory `node scripts/smoke.js`; Windows packaging details are in the release dossier.
+- **Details:** [`releases/RELEASE-4.8.10.md`](releases/RELEASE-4.8.10.md).
+
 ## Change/removal policy
 
 The audited v4.8.8 release intentionally preserves existing inking choices and does not remove the listed user-facing additions. Where the implementation or wording changes between releases—such as skip intervals, engine labels, or incomplete margin behavior—the version record calls it out. A behavior listed in a planned specification is not marked shipped unless it exists in the source and has evidence in a feature check or release dossier.

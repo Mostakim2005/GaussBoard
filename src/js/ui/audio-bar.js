@@ -114,6 +114,7 @@ export class AudioBar {
       }
     } catch (e) {
       console.warn('Playback error:', e);
+      this.app?.toast?.(t('Could not play this recording.'));
     }
     this.syncUI();
   }
@@ -142,6 +143,26 @@ export class AudioBar {
     const next = replay.ghostMode === 'translucent' ? 'hidden' : 'translucent';
     replay.setGhostMode(next);
     this.syncUI();
+  }
+
+  setAudioInkSync(enabled) {
+    this.app.settings.audioInkSync = !!enabled;
+    this.app.saveSettings();
+    if (this.app.surface) { this.app.surface._ink = null; this.app.surface.invalidate(); }
+    this.syncUI();
+  }
+
+  setCameraFollow(enabled) {
+    this.app.settings.replayCameraFollow = !!enabled;
+    this.app.replayEngine?.setCameraFollow?.(enabled);
+    this.app.saveSettings();
+    this.syncUI();
+  }
+
+  updateReplayStyle(key, value) {
+    this.app.settings[key] = value;
+    this.app.saveSettings();
+    if (this.app.surface) { this.app.surface._ink = null; this.app.surface.invalidate(); }
   }
 
   addBookmark() {
@@ -363,8 +384,7 @@ export class AudioBar {
     const syncSw = h('input', { type: 'checkbox', checked: this.app?.settings?.audioInkSync !== false });
     syncSw.addEventListener('change', () => {
       if (this.app?.settings) {
-        this.app.settings.audioInkSync = syncSw.checked;
-        this.app.saveSettings();
+        this.setAudioInkSync(syncSw.checked);
       }
     });
     const syncRow = h('div', {
@@ -525,6 +545,45 @@ export class AudioBar {
       this.toggleGhostMode();
     });
 
+    this.btnSync = h('button', {
+      class: 'ab-btn ab-sync', type: 'button',
+      title: t('Audio-Ink Sync'),
+      style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:3px 7px;border-radius:10px;font-size:11px;font-weight:700;color:inherit;'
+    }, t('Audio-Ink Sync'));
+    this.btnSync.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.setAudioInkSync(this.app.settings.audioInkSync === false);
+    });
+
+    this.btnFollow = h('button', {
+      class: 'ab-btn ab-follow', type: 'button',
+      title: t('Camera follow'),
+      style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:3px 7px;border-radius:10px;font-size:11px;font-weight:700;color:inherit;'
+    }, t('Camera follow'));
+    this.btnFollow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.setCameraFollow(this.app.settings.replayCameraFollow === false);
+    });
+
+    this.outlineEffect = h('select', {
+      class: 'ab-outline-effect', title: t('Replay outline effect'),
+      'aria-label': t('Replay outline effect'),
+      style: 'max-width:82px;padding:3px 4px;border:1px solid var(--line,rgba(128,128,128,.25));border-radius:9px;background:var(--surface,#fff);color:inherit;font:inherit;font-size:10px;'
+    },
+      h('option', { value: 'neon' }, t('Neon')),
+      h('option', { value: 'outline' }, t('Outline')),
+      h('option', { value: 'none' }, t('No outline'))
+    );
+    this.outlineEffect.value = this.app.settings.replayOutlineEffect || 'neon';
+    this.outlineEffect.addEventListener('change', () => this.updateReplayStyle('replayOutlineEffect', this.outlineEffect.value));
+
+    this.outlineColor = h('input', {
+      class: 'ab-outline-color', type: 'color', title: t('Replay outline color'),
+      'aria-label': t('Replay outline color'), value: this.app.settings.replayOutlineColor || '#00e5ff',
+      style: 'width:24px;height:24px;padding:1px;border:0;background:transparent;cursor:pointer;'
+    });
+    this.outlineColor.addEventListener('input', () => this.updateReplayStyle('replayOutlineColor', this.outlineColor.value));
+
     this.btnClose = h('button', {
       class: 'ab-btn ab-close',
       title: t('Close'),
@@ -563,7 +622,7 @@ export class AudioBar {
       id: 'audioBar',
       class: 'audio-bar-hud',
       style: 'position:absolute;z-index:1000;display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.18);user-select:none;font-size:13px;font-family:inherit;'
-    }, dragHandle, this.btnSession, this.btnRewind10, this.btnSkipStep, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnClose);
+    }, dragHandle, this.btnSession, this.btnRewind10, this.btnSkipStep, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnSync, this.btnFollow, this.outlineEffect, this.outlineColor, this.btnClose);
 
     this.wireDragging(dragHandle);
 
@@ -663,6 +722,24 @@ export class AudioBar {
 
     if (replay) {
       this.btnGhost.style.opacity = replay.ghostMode === 'translucent' ? '1.0' : '0.4';
+    }
+    const syncEnabled = this.app?.settings?.audioInkSync !== false;
+    if (this.btnSync) {
+      this.btnSync.style.opacity = syncEnabled ? '1' : '0.5';
+      this.btnSync.setAttribute('aria-pressed', String(syncEnabled));
+      this.btnSync.title = syncEnabled ? t('Audio-Ink Sync enabled') : t('Audio-Ink Sync disabled');
+    }
+    const followEnabled = this.app?.settings?.replayCameraFollow !== false;
+    if (this.btnFollow) {
+      this.btnFollow.style.opacity = followEnabled ? '1' : '0.5';
+      this.btnFollow.setAttribute('aria-pressed', String(followEnabled));
+      this.btnFollow.title = followEnabled ? t('Camera follow enabled') : t('Camera follow disabled');
+    }
+    if (this.outlineEffect && this.outlineEffect.value !== (this.app.settings.replayOutlineEffect || 'neon')) {
+      this.outlineEffect.value = this.app.settings.replayOutlineEffect || 'neon';
+    }
+    if (this.outlineColor && this.outlineColor.value !== (this.app.settings.replayOutlineColor || '#00e5ff')) {
+      this.outlineColor.value = this.app.settings.replayOutlineColor || '#00e5ff';
     }
 
     this.density.update({

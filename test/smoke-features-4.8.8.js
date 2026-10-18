@@ -52,9 +52,27 @@ const browserChecks = String.raw`(async () => {
     const preset = await wait(() => document.querySelector('#videoExportModal select'));
     preset.value = '1080p60';
     preset.dispatchEvent(new Event('change', { bubbles: true }));
+    const cameraMode = document.querySelector('#videoExportModal select[aria-label="Video framing"]');
+    const fixedFrame = document.querySelector('#videoExportModal select[aria-label="Fixed view area"]');
+    cameraMode.value = 'follow';
+    cameraMode.dispatchEvent(new Event('change', { bubbles: true }));
+    const followDisablesFixedScope = fixedFrame.disabled;
     [...document.querySelectorAll('#videoExportModal button')].find((b) => b.textContent.trim() === 'Export Video').click();
-    const result = await selected;
-    out.videoPresetDialogReturnsSelectedSizeAndRate = result.video.width === 1920 && result.video.height === 1080 && result.video.fps === 60;
+    const followResult = await selected;
+    out.videoFollowFramingSelectionReturnsFollowMode = followDisablesFixedScope && followResult.video.cameraMode === 'follow';
+
+    const boardSelected = pickRecordingsForVideoExport(app, [{ id: 'board-frame-smoke', name: 'Board frame', durationMs: 1000 }]);
+    await wait(() => document.querySelector('#videoExportModal select[aria-label="Video framing"]'));
+    const boardCameraMode = document.querySelector('#videoExportModal select[aria-label="Video framing"]');
+    const boardFixedFrame = document.querySelector('#videoExportModal select[aria-label="Fixed view area"]');
+    boardCameraMode.value = 'fixed';
+    boardCameraMode.dispatchEvent(new Event('change', { bubbles: true }));
+    boardFixedFrame.value = 'board';
+    [...document.querySelectorAll('#videoExportModal button')].find((b) => b.textContent.trim() === 'Export Video').click();
+    const boardResult = await boardSelected;
+    out.videoFixedWholeBoardSelectionReturnsBoardFrame = boardResult.video.cameraMode === 'fixed' && boardResult.video.fixedFrame === 'board';
+
+    out.videoPresetDialogReturnsSelectedSizeAndRate = followResult.video.width === 1920 && followResult.video.height === 1080 && followResult.video.fps === 60;
   } catch (e) { out.videoPresetDialogReturnsSelectedSizeAndRate = String(e); }
 
   try {
@@ -133,6 +151,8 @@ async function run(win, app) {
     penOpacityRangeStoresAndEnablesValue: 'pen opacity slider stores its range and toggle state',
     templateTagFilterShowsMatchingTemplate: 'template tag filtering shows the matching template',
     videoPresetDialogReturnsSelectedSizeAndRate: 'video export dialog returns the chosen resolution and frame rate',
+    videoFollowFramingSelectionReturnsFollowMode: 'video export dialog returns replay-follow framing and disables fixed scope',
+    videoFixedWholeBoardSelectionReturnsBoardFrame: 'video export dialog returns fixed whole-board framing',
     rectangularCoverTogglesAndKeepsAnswer: 'rectangular cover toggles on and off with its answer restored',
     freehandStudyTapeTogglesTwice: 'freehand study tape toggles revealed and concealed',
     ribbonAndAddMenuActivateTapeTool: 'ribbon and add menu activate the study tape drawing tool'
