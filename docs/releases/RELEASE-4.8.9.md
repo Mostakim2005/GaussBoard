@@ -4,7 +4,7 @@
 - **Release date:** 2026-10-18
 - **Base:** v4.8.8, with the video-driven Study Tape and answer-cover interaction fixes
 - **Audit attribution:** Initial audit by Codex 4.6 Medium in Cursor; secondary audit and fixes by GPT-6 Luna High using Codex.
-- **Git tag:** `v4.8.9` (to be created on the release commit)
+- **Git tag:** `v4.8.9` (created locally; remote push is pending GitHub authentication)
 - **Windows artifacts:** `GazBoard-4.8.9-portable.exe` (107,270,755 bytes), `GazBoard-Setup-4.8.9.exe` (107,525,327 bytes), and installer blockmap (113,644 bytes).
 - **Portable SHA-256:** `0229340AFC24407E5691B419997C041547FDDDD5DA7968DBD6C6B9F7663CF55C`
 - **Installer SHA-256:** `EC545BC4F9044E2340BFEB65C97B25EEE16BA1C3AC4EDEB66026191D03E1CC52`
@@ -36,7 +36,7 @@
 
 ## Artifacts
 
-Build with `npm run dist:win`. This produces the Windows portable executable and installer; record final byte sizes and SHA-256 digests here after the build.
+Built with `npm run dist:win`. The portable executable and installer, including their final byte sizes and SHA-256 digests, are listed above.
 
 ## Relationship to v4.8.8
 
