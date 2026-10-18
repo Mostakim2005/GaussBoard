@@ -33,3 +33,9 @@ node scripts/smoke.js
 # - VideoExporter pipeline engine exists
 # - Store serializes and restores audioTracks in doc schema
 ```
+
+## 5. v4.8.8 Presets and Test Boundary
+
+`VIDEO_EXPORT_PRESETS` in `src/js/export-video.js` exposes 720p30, 1080p30 and 1080p60. The selection dialog passes the selected output dimensions and frame rate into the single-track or stitched exporter. Presets are settings for the export pipeline; they do not guarantee identical codec support or output size across every Windows device.
+
+Focused tests validate preset configuration and the dialog's returned selection. Media encoding and long-duration memory behavior should still be manually verified on target Windows hardware before making stronger performance claims.

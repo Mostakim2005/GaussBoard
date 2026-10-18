@@ -1,5 +1,7 @@
 # Document 1: Master Feature Specification & User Experience Catalog
 
+> **Document status:** Product requirements/specification, including proposals; it is not proof that each listed behavior shipped. Current implementation history is [`../../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md), and the original baseline is separately cataloged in [`../../BASE_FEATURE_CATALOG-4.8.1.md`](../../BASE_FEATURE_CATALOG-4.8.1.md). Keep current inking choices available and make Catmull–Rom/Bézier an additional option. Any proposal to change or remove an engine must explain effects on stored-stroke appearance, pressure, latency, audio timing, caches, highlighters, exports, and user choice.
+
 This document defines the complete catalog of **user-facing capabilities, interactions, and functional requirements** for the enhanced note-taking and whiteboard experience on Windows. It synthesizes requirements from **StarNote**, **Flexcil**, **Notability**, and the provided specification into a clear product definition.
 
 In accordance with product design principles, this document focuses strictly on **what the user experiences and can do (the Feature Set)**, leaving technical mechanisms and engineering architecture to Documents 2 and 3.

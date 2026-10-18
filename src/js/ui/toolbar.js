@@ -121,6 +121,8 @@ export function initToolbar(app) {
     moveRibbonToolToPlus(app, 'highlighter');
   });
   bar.appendChild(hl);
+  iconTool({ ribbonId: 'tape', tool: 'tape', icon: 'curtain', title: t('Study Tape'),
+    onClick: () => { app.setTool('tape'); app.syncUI(); closePopover(); } });
 
   const er = h('button', { class: 'pen', title: t('Eraser (E) \u2014 click again for options') });
   er.dataset.tool = 'eraser';
@@ -224,7 +226,7 @@ export function syncRibbonTools(app) {
   const sep1 = bar.querySelector('[data-sep="1"]');
   if (sep1) sep1.style.display = group1 ? '' : 'none';
 
-  const group2 = ['pen', 'highlighter', 'eraser'].some((id) => !hidden.has(id));
+  const group2 = ['pen', 'highlighter', 'tape', 'eraser'].some((id) => !hidden.has(id));
   const sep2 = bar.querySelector('[data-sep="2"]');
   if (sep2) sep2.style.display = group2 ? '' : 'none';
 }
@@ -314,6 +316,7 @@ function initPhoneToolbar(app, bar) {
     }
     body.appendChild(h('div', { class: 'menu-sep' }));
     body.appendChild(menuItem(t('Highlighter'), 'highlighter', () => { app.setTool('highlighter'); app.syncUI(); }));
+    body.appendChild(menuItem(t('Study Tape'), 'curtain', () => { app.setTool('tape'); app.syncUI(); }));
     openPopover(rest, body, { key: 'pens' });
   });
 
@@ -357,6 +360,7 @@ function initPhoneToolbar(app, bar) {
     openPopover(add, h('div', { class: 'menu' },
       menuItem(t('Sticky note'), 'note', pickTool('note')),
       menuItem(t('Text'), 'text', pickTool('text')),
+      menuItem(t('Study Tape'), 'curtain', pickTool('tape')),
       menuItem(t('Maths'), 'maths', () => app.command('insert.math')),
       menuItem(t('Emoji'), 'emoji', () => { app.setTool('emoji'); app.syncUI(); openToolPopover(app, add, 'emoji'); }),
       // Shapes are a family, not one square. The chooser lives in the tool
@@ -1176,6 +1180,7 @@ export function openInsertPopover(app, anchor) {
     ribbonToolItem(t('Laser pointer'), 'laser', () => app.setTool('laser'), 'laser', 'X'),
     ribbonToolItem(t('Pens'), 'pen', () => app.setTool('pen'), 'pen', '1-6'),
     ribbonToolItem(t('Highlighter'), 'highlighter', () => { app.setTool('highlighter'); app.syncUI(); }, 'highlighter', 'H'),
+    ribbonToolItem(t('Study Tape'), 'curtain', () => { app.setTool('tape'); app.syncUI(); }, 'tape'),
     ribbonToolItem(t('Eraser'), 'eraser', () => { app.setTool('eraser'); app.syncUI(); }, 'eraser', 'E'),
     ribbonToolItem(t('Ruler'), 'ruler', () => app.command('ruler'), 'ruler', 'Ctrl+R'),
     ribbonToolItem(t('Text'), 'text', () => { app.setTool('text'); app.syncUI(); }, 'text', 'T'),

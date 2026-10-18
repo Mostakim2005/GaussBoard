@@ -14,6 +14,8 @@
 
 Version 4.8.8 consolidates the advertised 4.8.2–4.8.7 additions and the follow-up fixes from the custom-feature audit. It preserves the existing inking choices and adds Catmull–Rom/Bézier as a distinct selectable engine.
 
+For the original v4.8.1-only product surface, see [`../BASE_FEATURE_CATALOG-4.8.1.md`](../BASE_FEATURE_CATALOG-4.8.1.md). For version-by-version implementation and correction history, see [`../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md). The audit attribution above reflects the project owner's report.
+
 ## Changes in this release
 
 - Adds a selectable Catmull–Rom/Bézier inking engine while retaining GazBoard Default, Windows Ink, and Perfect Freehand. Engine changes invalidate cached stroke geometry; stored sample timestamps and metadata are preserved.
@@ -54,6 +56,8 @@ The Electron smoke suites were run with unique `GAZBOARD_USER_DATA` folders afte
 - Page margin guides are a visual writing aid only; they are not enforced as a clipping/print area in PDF or other exports.
 - Video presets are exercised through the export dialog and configuration path. The custom smoke suite does not encode a full-duration real Windows MediaRecorder output.
 - External audio import depends on the host's media decoder for metadata; unknown duration is retained as unknown rather than guessed.
+- The subsequent v4.8.9 patch release contains the video-driven Study Tape and answer-cover fixes; see [`RELEASE-4.8.9.md`](RELEASE-4.8.9.md).
+- The implementation findings and focused verification are recorded in [`WORKING-FOLLOWUP-4.8.8-study-tape.md`](WORKING-FOLLOWUP-4.8.8-study-tape.md).
 
 ## Audit record
 

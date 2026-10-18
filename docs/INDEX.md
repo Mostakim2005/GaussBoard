@@ -6,6 +6,20 @@
 > 2. Open **ONLY** the designated Tier 1 Layer Dossier in `docs/layers/`.
 > 3. That dossier will give you the exact 1–2 source files to edit, the data schema, and the invariant rules to follow.
 
+## Documentation authority and lookup
+
+| Need | Start here | Purpose |
+| :--- | :--- | :--- |
+| Understand only the original baseline | [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md) | Base features, source locations, and improvement checkpoints, excluding later custom additions. |
+| Trace custom changes from v4.8.2 through v4.8.9 | [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) | Version-by-version feature and fix record, source mapping, verification notes, and known limitations; v4.8.9 patch details are in its release dossier. |
+| Find an implementation area | Layer dossiers below | Current architecture and source entry points; read only the relevant dossier for code work. |
+| See release claims and package registry | [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md) | Release ledger and binary/archive references. Current patch dossier: [`releases/RELEASE-4.8.9.md`](releases/RELEASE-4.8.9.md). |
+| See individual change records | [`FEATURE_RECORD.md`](FEATURE_RECORD.md), [`BUG_FIX_LOG.md`](BUG_FIX_LOG.md), `releases/RELEASE-*.md` | Feature IDs, bug resolutions, and per-release notes. |
+| See original requirements and design proposals | [`plan/`](plan/) | Historical analysis/specifications; proposals must be checked against current source before being described as shipped. |
+| See audit methodology and findings | [`releases/AUDIT-CUSTOM-FEATURES-4.8.1-to-4.8.7.md`](releases/AUDIT-CUSTOM-FEATURES-4.8.1-to-4.8.7.md), [`releases/AUDIT-4.8.4-FINDINGS.md`](releases/AUDIT-4.8.4-FINDINGS.md) | Audit records; consult the evolution record for later implementation/status. |
+
+The initial audit was performed with **Codex 4.6 Medium in Cursor**. The secondary audit and fixes were applied with **GPT-6 Luna High using Codex**. Release dossiers and plans can include historical or proposed claims; verify shipped behavior in current source and feature-focused tests.
+
 ---
 
 ## 1. Master Feature & Subsystem Lookup Table
@@ -19,7 +33,7 @@
 | **Windows Ink Bézier Curves** | Pluggable inking with velocity-weighted cubic Bézier curve fitting & DirectInk | [`layers/02-inking-and-gestures.md`](layers/02-inking-and-gestures.md) | `src/js/core/ink.js`<br>`src/js/ui/panels.js` |
 | **Highlighter Opacity & Color-Pop**| 50% default opacity slider (10%–100%) and dark text color-popping contrast enhancement | [`layers/02-inking-and-gestures.md`](layers/02-inking-and-gestures.md) | `src/js/core/render.js`<br>`src/js/ui/toolbar.js` |
 | **Pen Opacity & Laser Trails** | Pen opacity slider (10%–100%) and laser pointer trail duration options | [`layers/02-inking-and-gestures.md`](layers/02-inking-and-gestures.md) | `src/js/core/render.js`<br>`src/js/ui/panels.js` |
-| **Active-Recall Study Tape** | Hatched diagonal neon tape toggling between concealed and revealed on tap | [`layers/03-canvas-and-study-tape.md`](layers/03-canvas-and-study-tape.md) | `src/js/core/render.js`<br>`src/js/core/hit.js` |
+| **Active-Recall Study Tape & Answer Covers** | Persistent freehand tape and rectangular covers toggle concealed/revealed on tap; dedicated Study Tape tool in ribbon and Add/tools menus | [`layers/03-canvas-and-study-tape.md`](layers/03-canvas-and-study-tape.md) | `src/js/core/tools.js`<br>`src/js/core/hit.js`<br>`src/js/ui/toolbar.js` |
 | **Scene Partitioning & Glow** | Base frozen canvas filtering and dynamic replay stroke bloom decay | [`layers/03-canvas-and-study-tape.md`](layers/03-canvas-and-study-tape.md) | `src/js/core/surface.js`<br>`src/js/core/render.js` |
 | **Image Cropping & Annotations** | Non-destructive image edge sliders and attached pen annotations grouping/lock | [`layers/03-canvas-and-study-tape.md`](layers/03-canvas-and-study-tape.md) | `src/js/ui/contextmenu.js`<br>`src/js/core/render.js` |
 | **Arrowhead & Line Geometry** | Barbed elongated arrowheads, scaling, line thickness stepping & conversion | [`layers/04-geometry-and-templates.md`](layers/04-geometry-and-templates.md) | `src/js/core/connectors.js`<br>`src/js/core/render.js` |
@@ -33,6 +47,9 @@
 | **Ribbon Customization** | Pinned tool toggles (📌 / 📍) moving items between ribbon and `+` menu | [`layers/06-workspace-and-ui.md`](layers/06-workspace-and-ui.md) | `src/js/ui/toolbar.js` |
 | **Stitched Video Export** | Multi-session selection picker, ▲/▼ reordering, and combined WebM video export | [`layers/07-video-export.md`](layers/07-video-export.md) | `src/js/export-video.js` |
 | **Multi-Layer System (Standby)** | Layer system architecture (currently on standby per user request) | [`DEVELOPER_HANDOVER.md`](DEVELOPER_HANDOVER.md) (§6) | `docs/plan/04-quality.md` |
+| **Feature smoke-test groups** | Mandatory regressions and custom-addition suites run separately | Relevant layer dossier | `scripts/smoke.js`, `scripts/smoke-custom.js`; run `npm run smoke:custom` or a version-scoped `npm run smoke:features:*` |
+
+The video-driven Study Tape changes and their release verification are documented in [`releases/RELEASE-4.8.9.md`](releases/RELEASE-4.8.9.md).
 
 ---
 

@@ -1,5 +1,7 @@
 # GazBoard Replay — Developer Handover & Future Agent Guide
 
+> **Current release and documentation routing:** v4.8.8 is the consolidated source release. Start with [`INDEX.md`](INDEX.md); use [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md) for baseline-only features and [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) for later additions, fixes, source mapping, and known limitations. Historical plans describe proposals/analysis and should not override current source evidence. User preferences call for keeping multiple choices available when feasible; inking trade-offs are in `layers/02-inking-and-gestures.md`.
+
 > **Important**: This document is the primary onboarding manual for any future AI assistant, software engineer, or contributor picking up this project in a new session or clean environment. It details the complete architecture, data models, state flows, invariant guardrails, and build instructions.
 
 ---
@@ -140,6 +142,8 @@ The whiteboard state is serialized via `Store.toJSON()` and hydrated via `Store.
 ---
 
 ## 5. Verification Commands
+
+The mandatory regression suite and custom-addition suites are separate. Run `npm run smoke:custom` for the custom feature group, or `npm run smoke:features:4.8.4.1` / `npm run smoke:features:4.8.8` for release-scoped checks. Translation verification is separate and should be run when locale/UI strings are part of the change.
 
 Before creating any release or commit, verify the entire test suite passes:
 ```powershell

@@ -1988,7 +1988,7 @@ class App {
     this.store.commit(label, ops);
   }
 
-  /** Lift one cover. Returns false if there was nothing to lift. */
+  /** Reveal one concealed cover. Returns false if already revealed or missing. */
   revealCurtain(id) {
     const o = this.store.get(id);
     if (!o || o.type !== 'curtain' || o.revealed) return false;
@@ -2002,25 +2002,24 @@ class App {
   }
 
   /**
-   * Toggle a curtain between revealed and concealed if it is a study tape strip.
-   * Standard curtains fall back to one-way reveal.
+   * Toggle any answer cover or study tape between concealed and revealed.
    */
   toggleCurtain(id) {
     const o = this.store.get(id);
     if (!o || o.type !== 'curtain') return false;
-    if (o.subtype === 'tape') {
-      const next = !o.revealed;
-      if (next) {
-        this.surface.fadeOut(o);
-        for (const w of this.onCovers([id])) this.surface.fadeOut(w);
-      }
-      this.setCovers([id], next, next ? 'reveal tape' : 'conceal tape');
-      this.dropHidden();
-      this.surface.invalidate();
-      this.syncUI();
-      return true;
+    const next = !o.revealed;
+    if (next) {
+      this.surface.fadeOut(o);
+      for (const w of this.onCovers([id])) this.surface.fadeOut(w);
     }
-    return this.revealCurtain(id);
+    const label = o.subtype === 'tape'
+      ? (next ? 'reveal tape' : 'conceal tape')
+      : (next ? 'reveal' : 'conceal');
+    this.setCovers([id], next, label);
+    this.dropHidden();
+    this.surface.invalidate();
+    this.syncUI();
+    return true;
   }
 
   /** Lift every cover in the selection, as one undo. */

@@ -1,4 +1,6 @@
 # Phase 0: Comprehension Check & Requirement Gap Analysis
+
+> **Document status:** Historical comprehension and gap analysis. Its findings reflect the planning snapshot and may predate shipped fixes. Current source-checked custom changes: [`../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md); v4.8.1 baseline only: [`../BASE_FEATURE_CATALOG-4.8.1.md`](../BASE_FEATURE_CATALOG-4.8.1.md).
 **Project**: GazBoard Replay (Windows-first fork of GazBoard)  
 **Target Repository**: `https://github.com/fahim9778/GazBoard`  
 **Base App Version**: 4.8.1 (`package.json` [VERIFIED IN CODE: package.json:4])  

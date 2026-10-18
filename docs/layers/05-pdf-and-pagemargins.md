@@ -41,3 +41,9 @@ node scripts/smoke.js
 # - PDF import adds pages — 3 pages
 # - desktop Settings shows the active boards folder and the storage controls
 ```
+
+## 5. v4.8.8 Page Margin Status
+
+Margin fields remain per-page data. `src/js/core/pages.js` computes guide rectangles and `src/js/core/surface.js` draws them on the interactive canvas. The guide overlay is not rendered into PNG, PDF or video output, and it does not clip user content or reserve a printable area. This is a known partial implementation; the release dossier and feature history must use this exact boundary.
+
+The focused unit checks verify margin calculation, scope, persistence and undo operations. They do not verify margin enforcement in an exported document because no such export consumer exists yet.

@@ -1,4 +1,6 @@
 # Phase 2: Feature-by-Feature Architectural Analysis
+
+> **Document status:** Historical feature analysis and proposals. This is not a complete statement of what shipped. For current code evidence use [`../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md); for the v4.8.1 base surface use [`../BASE_FEATURE_CATALOG-4.8.1.md`](../BASE_FEATURE_CATALOG-4.8.1.md). User-choice requirement: preserve existing modes and offer alternatives as separately selectable options where feasible; do not reduce a multi-option design to a binary switch.
 **Project**: GazBoard Replay (Windows-first fork of GazBoard)  
 **Target Repository**: `https://github.com/fahim9778/GazBoard`  
 **Base App Version**: 4.8.1 (`package.json` [VERIFIED IN CODE: package.json:4])  

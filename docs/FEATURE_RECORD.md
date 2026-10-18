@@ -1,5 +1,7 @@
 # GazBoard Replay — Master Feature & Fixes Record
 
+> **Current source of release-by-release truth:** [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) plus the v4.8.9 patch dossier. The catalog of original v4.8.1-only capabilities is [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md). This record retains detailed feature IDs and historical implementation notes; check the linked evolution record when an older entry conflicts with current source.
+
 This document serves as the master registry of all features, enhancements, bug fixes, algorithmic parameters, and regression invariants implemented in GazBoard Replay (Windows-first fork). Every entry lists its purpose, source files, acceptance criteria, and regression test invariants.
 
 ---
@@ -9,7 +11,7 @@ This document serves as the master registry of all features, enhancements, bug f
 | Feature ID | Name | Primary Files | Status | Regression Invariant |
 | :--- | :--- | :--- | :--- | :--- |
 | **F-101** | StarNote Gesture Scratch-Out Eraser | `src/js/core/scratch.js`<br>`src/js/core/tools.js`<br>`src/js/ui/toolbar.js` | Verified | $\ge 5$ sharp reversals, density $\ge 3.5$, net progress $\le 0.35$, dominant reversal axis spatial overlap guard ($\ge 0.25$). No time limit cutoff. Never erases digits (`2 3 2`, `3`) or words (`w`, `m`, `WRM`). Explicit ON/OFF toggle in Eraser popover. |
-| **F-102** | Active-Recall Study Tape | `src/js/core/render.js`<br>`src/js/core/tools.js`<br>`src/js/core/hit.js` | Verified | Concealed: diagonal hatched violet/cyan stripes with neon border. Revealed: faint translucent neon outline. Tapping reveals/conceals instantly without dragging background canvas. Supports freehand marker strokes and rectangular boxes. |
+| **F-102** | Active-Recall Study Tape and Answer Covers | `src/js/core/render.js`<br>`src/js/core/tools.js`<br>`src/js/core/hit.js`<br>`src/js/core/store.js`<br>`src/js/app.js`<br>`src/js/ui/toolbar.js` | Follow-up verification added | Freehand tape and rectangular covers persist in both states and toggle concealed/revealed on tap. The revealed outline remains hittable; attached content follows each state. A dedicated tape-drawing tool is available from the ribbon and Add/tools menus. Focused checks are in `test/smoke-features-4.8.8.js`; root-cause and release-boundary notes are in `docs/releases/WORKING-FOLLOWUP-4.8.8-study-tape.md`. |
 | **F-103** | Audio Recording & Temporal Stroke Sync | `src/js/core/audio-recorder.js`<br>`src/js/core/tools.js`<br>`src/js/core/store.js`<br>`src/js/ui/toolbar.js` | Verified | `#btnTopRecord` captures `p.t` on every stroke point; records WebM audio; stores metadata in `doc.audioTracks`. Additive schema (v2 backward compatible). Stripped from LAN sync. |
 | **F-104** | Canvas Replay Engine & Glow Inking | `src/js/core/replay.js`<br>`src/js/core/surface.js` | Verified | Past strokes: 100% ink (with 450ms cyan bloom decay on finish). Active stroke: electric neon cyan glow outline (`#00e5ff`, shadowBlur 14, width + 5) with glowing pen tip. Future strokes: light-gray ghosted ink (`alpha=0.38, grayscale(1)`). Fallback delta clock prevents audio stall. Base canvas isolates audio strokes. |
 | **F-105** | AudioBar HUD, Scrubber & Bookmarks | `src/js/ui/audio-bar.js`<br>`src/js/ui/density-canvas.js` | Verified | Floating player with speeds (0.5x–2.0x), configurable skip steps (5s, 10s, 13s, 15s, 30s), custom glassmorphic session selector, interactive density waveform, stylus/touch seeking, and floating bookmark preview card with clickable `[Jump]` button. |
@@ -193,9 +195,9 @@ This document serves as the master registry of all features, enhancements, bug f
 - Initial audit attribution: **Codex 4.6 Medium in Cursor**. Secondary audit and fixes attribution: **GPT-6 Luna High using Codex**. Both attributions are provided by the project owner.
 - The v4.8.5, v4.8.6 and v4.8.7 changes are compared in `docs/releases/RELEASE-4.8.4.1.md` and are not included in this build.
 
-1. **Cover Selection vs Study Tape Tap**:
-   - `hitCurtain.subtype === 'tape'` toggles immediately on tap.
-   - Standard answer covers (`subtype !== 'tape'`) must be selectable in `select` mode so `#ctxbar` displays the "Reveal" button.
+1. **Cover Selection and Study Tape Tap**:
+   - Both `subtype === 'tape'` and standard answer covers toggle on a direct tap, including the second tap to conceal again.
+   - Revealed cover outlines stay hittable and objects attached to them are restored/hidden with the state. In Select mode, dragging still moves a cover; the floating toolbar's Reveal action remains available for unrevealed covers.
 2. **Base Canvas Scene Partitioning**:
    - When an audio session is active or loaded into `AudioBar`, base drawing passes (`drawScene`, `warmFreeze`) MUST apply `(o) => o.audioId !== activeTrackId`. Never draw audio strokes into the base canvas before `drawReplaySession()` runs.
 3. **Point Timestamp Preservation**:

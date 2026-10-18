@@ -1,6 +1,8 @@
 # GazBoard Progressive Releases & Binary Index
 
-This document provides the ledger of progressive Windows releases, from the original base (`4.8.1`) through the latest consolidated audit release (`4.8.8`). Each release is paired with its Windows executable and a dedicated release dossier.
+For a source-checked narrative of feature changes, implementation approach, corrections, and known limitations, see [`../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md). For the original baseline only, see [`../BASE_FEATURE_CATALOG-4.8.1.md`](../BASE_FEATURE_CATALOG-4.8.1.md). Audit attribution: initial audit by **Codex 4.6 Medium in Cursor**; secondary audit and fixes by **GPT-6 Luna High using Codex**.
+
+This document provides the ledger of progressive Windows releases, from the original base (`4.8.1`) through the latest patch release (`4.8.9`). Each release is paired with its Windows executable and a dedicated release dossier.
 
 ---
 
@@ -15,8 +17,9 @@ This document provides the ledger of progressive Windows releases, from the orig
 | **V 4.8.4.1** | `e6a2caf` + audit fixes | [`GazBoard-4.8.4.1-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/V-4.8.4.1/dist/GazBoard-4.8.4.1-portable.exe) | Build output | [`RELEASE-4.8.4.1.md`](RELEASE-4.8.4.1.md) | Crop undo/cancel and source bounds; isolated, cleaned video export; v4.8.5–v4.8.7 comparison recorded, not merged. |
 | **v4.8.5** | `fa6b58f` | [`GazBoard-4.8.5-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/dist/GazBoard-4.8.5-portable.exe) | 107,256,816 B | [`RELEASE-4.8.5.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/docs/releases/RELEASE-4.8.5.md) | Connector arrowhead styles (open, stealth, diamond), custom template creator, Catmull-Rom Bézier smoothing, zoom popover. |
 | **v4.8.6** | `ffe7a4a` | [`GazBoard-4.8.6-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/dist/GazBoard-4.8.6-portable.exe) | 107,263,747 B | [`RELEASE-4.8.6.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/docs/releases/RELEASE-4.8.6.md) | Calibrated 50% highlighter opacity, configurable audio skip (5s–30s), recording 3-dot menu, PDF background mode, page margins dialog. |
-| **v4.8.7** | `84817ac` | [`GazBoard-4.8.7-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/dist/GazBoard-4.8.7-portable.exe) | 107,267,071 B | [`RELEASE-4.8.7.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/docs/releases/RELEASE-4.8.7.md) | Mouse wheel scroll/zoom dual-mode, 4-way arrow navigation, plus-menu hot-pinning, full ribbon tool mobility, persistent hover bar, side-by-side context menu. |
+| **v4.8.7** | `7549a64` feature code; `84817ac` release/docs record | [`GazBoard-4.8.7-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/dist/GazBoard-4.8.7-portable.exe) | 107,267,071 B | [`RELEASE-4.8.7.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/docs/releases/RELEASE-4.8.7.md) | Mouse wheel scroll/zoom dual-mode, 4-way arrow navigation, plus-menu hot-pinning, full ribbon tool mobility, persistent hover bar, side-by-side context menu. |
 | **v4.8.8** | `e00b93f` (`v4.8.8` local tag) | [`GazBoard-4.8.8-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/V-4.8.8/dist/GazBoard-4.8.8-portable.exe) | 107,270,761 B | [`RELEASE-4.8.8.md`](RELEASE-4.8.8.md) | Consolidated 4.8.2–4.8.7 features; added selectable Catmull–Rom/Bézier engine, template tag filtering, pen opacity range, video presets, margin guides, arrowhead styles, audio and protocol-path hardening. |
+| **v4.8.9** | `v4.8.9` (Study Tape patch) | [`GazBoard-4.8.9-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/dist/GazBoard-4.8.9-portable.exe) | 107,270,755 B | [`RELEASE-4.8.9.md`](RELEASE-4.8.9.md) | Video-driven Study Tape and answer-cover toggling, hit-testing/bounds/render fixes, and dedicated ribbon/Add-menu tool entries. |
 
 ---
 

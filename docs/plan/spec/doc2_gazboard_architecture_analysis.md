@@ -1,5 +1,7 @@
 # Document 2: GazBoard Architectural & Codebase Analysis
 
+> **Document status:** Historical architecture analysis. Validate all file and behavior claims against current source; the current version map is [`../../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) and the v4.8.1 source map is [`../../BASE_FEATURE_CATALOG-4.8.1.md`](../../BASE_FEATURE_CATALOG-4.8.1.md).
+
 This document provides a deep architectural analysis of [fahim9778/GazBoard](https://github.com/fahim9778/GazBoard). It breaks down how GazBoard is engineered today—its languages, rendering pipeline, document store, interaction model, and storage subsystem—and establishes a direct technical mapping between GazBoard's current code components and the target feature set defined in Document 1.
 
 ---

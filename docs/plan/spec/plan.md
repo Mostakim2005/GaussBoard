@@ -14,6 +14,8 @@ design that fully meets a requirement and you flag over-engineering.
 
 PROJECT
 
+CURRENT STATUS NOTE: This is a historical planning prompt, not a current implementation inventory. The consolidated source release is v4.8.8. Check docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md for shipped changes and docs/BASE_FEATURE_CATALOG-4.8.1.md for the v4.8.1 baseline. Preserve multiple inking choices where feasible and evaluate cross-feature effects before changing them.
+
 I am creating "GazBoard Replay": a Windows-first fork of GazBoard
 
 (https://github.com/fahim9778/GazBoard), an offline, local-first, free-form

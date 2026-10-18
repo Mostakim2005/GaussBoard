@@ -1,4 +1,6 @@
 # Phase 7: Risk Register, Release Checklist & Upstream Contribution Package
+
+> **Document status:** Historical release plan. The current consolidated source release is v4.8.8; use [`../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md), `../releases/RELEASE-4.8.8.md`, and `../releases/RELEASES_INDEX.md` for implementation and release evidence. Copy a release into the Antigravity archive only after its code, focused tests, mandatory smoke, and packaging have been verified.
 **Project**: GazBoard Replay (Windows-first fork of GazBoard)  
 **Target Repository**: `https://github.com/fahim9778/GazBoard`  
 **Base App Version**: 4.8.1 (`package.json` [VERIFIED IN CODE: package.json:4])  

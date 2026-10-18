@@ -36,7 +36,7 @@ stroke.points = [{ x, y, p, t: 1240 }, ...]; // p: pressure, t: relative timesta
 ## 4. Mandatory Subsystem Invariants (Never Violate)
 1. **Scene Partitioning**: During replay, strokes where `o.audioId === activeTrackId` must **never** be rendered in the base frozen canvas. Base passes (`drawScene`, `warmFreeze`) MUST filter: `(o) => o.audioId !== activeTrackId`. Replay strokes render exclusively in `Surface.drawReplaySession()`.
 2. **Timestamp Preservation**: All stroke point generators and smoothing passes in `tools.js` and `ink.js` must preserve `p.t`. Stripping `p.t` breaks audio-ink synchronization.
-3. **Finite Duration Fallback**: WebM streams report `duration = Infinity` in Chromium until indexing completes. Always record explicit wall-clock elapsed duration in `track.durationMs` and fall back to it.
+3. **Finite Duration Handling**: WebM streams from in-app recording can report `duration = Infinity` in Chromium until indexing completes, so retain wall-clock elapsed `track.durationMs`. For imported audio, use finite metadata when available and keep the duration unknown if unavailable; do not fabricate a fallback duration.
 4. **Autonomous Delta Clock**: If `<audio>` element stalls or drops frames during seeking, `ReplayEngine` delta clock must continue advancing replay animations smoothly.
 
 ## 5. Relevant Bug Fixes
@@ -52,3 +52,11 @@ node scripts/smoke.js
 # - Store serializes and restores audioTracks in doc schema
 # - No uncaught renderer errors during seek
 ```
+
+## 7. v4.8.8 Additions and Audit Notes
+
+- **External media duration:** `src/js/insert.js` attempts bounded metadata loading for imported audio. If no finite duration can be read, it keeps the duration unknown instead of fabricating a 60-second value.
+- **Temporary media resources:** `src/js/insert.js` and `src/js/ui/audio-bar.js` revoke temporary object URLs after metadata resolution or download use.
+- **Video export presets:** `src/js/export-video.js` defines 720p30, 1080p30 and 1080p60 presets; the UI passes explicit dimensions and frame rate into the exporter.
+- **Feature test entry points:** `npm run smoke:custom` runs the custom unit/security checks plus focused 4.8.4.1 and 4.8.8 Electron checks. The 4.8.8 video checks assert dialog selection/configuration; they do not perform a long real-time Windows encode.
+- **Change history:** See `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md` for version boundaries and correction notes.

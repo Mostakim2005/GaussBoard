@@ -41,3 +41,10 @@ node scripts/smoke.js
 # - one press on the shape button opens the shape menu
 # - an insert onto an empty board lands in the middle of the view
 ```
+
+## 5. v4.8.8 Arrow Styles and Template Tags
+
+- `src/js/core/connectors.js` exports `HEAD_STYLES` and `drawArrowhead()` for filled, open, stealth and diamond geometry. Canvas connectors, shape arrows, and vector export share these style choices. Older objects without a `headStyle` continue to use the filled default.
+- `src/js/templates.js` derives filterable tags for built-in templates and reads editable tags from custom templates. Selected tags are combined as an AND filter. This extends, but does not replace, My boards tag filtering.
+- `npm run smoke:custom` checks all four arrowhead styles and the template tag predicate; `npm run smoke:features:4.8.8` checks the live template filter UI.
+- Version correction: v4.8.5's release dossier advertised head shapes and engine labels that were not all present as described in the tagged code. The verified additions are detailed in `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`.

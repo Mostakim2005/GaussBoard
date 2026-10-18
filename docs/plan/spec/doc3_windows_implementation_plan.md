@@ -1,5 +1,7 @@
 # Document 3: Proposed Technical Implementation Strategy & Windows Engineering Blueprint
 
+> **Document status:** Historical implementation roadmap; proposed phases do not necessarily match shipped code. Consult [`../../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) and `../../releases/RELEASE-4.8.8.md` for the current source release and verification record.
+
 This document specifies the **optimized engineering design, data structures, algorithms, and implementation blueprint** for building all desired features into **GazBoard on Windows**. 
 
 Because GazBoard is a dedicated desktop application with full control over its HTML5 2D Canvas and Electron environment, we can implement these features using direct, low-overhead, native techniques rather than the complex workarounds required by third-party plugin frameworks.

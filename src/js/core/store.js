@@ -393,7 +393,7 @@ export function setConnectorBounds(fn) { connectorBox = fn; }
 export function boundsOf(o) {
   if (!o) return { x: 0, y: 0, w: 0, h: 0 };
   if (o.type === 'connector') return connectorBox ? connectorBox(o) : { x: o.x || 0, y: o.y || 0, w: o.w || 0, h: o.h || 0 };
-  if (o.type === 'stroke') {
+  if (o.type === 'stroke' || (o.type === 'curtain' && Array.isArray(o.points))) {
     const b = o.bbox || { x: 0, y: 0, w: 0, h: 0 };
     const pad = (o.width || 4) / 2 + 1;
     return { x: b.x - pad, y: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 };

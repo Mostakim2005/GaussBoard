@@ -3,6 +3,10 @@
 **Status:** Source audit, follow-up implementation, and separate feature checks completed for the consolidated v4.8.8 working tree.  
 **Scope:** Cumulative product changes recorded from the v4.8.1 baseline through the v4.8.7 feature commit. Translation quality was not audited as a separate task.
 
+**Audit attribution:** Initial audit by **Codex 4.6 Medium in Cursor**; secondary audit and fixes by **GPT-6 Luna High using Codex**, as reported by the project owner.
+
+**Current-status note:** This report's inventory table describes the audited v4.8.7 tree. The follow-up consolidated release is v4.8.8. Read [`../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) and [`RELEASE-4.8.8.md`](RELEASE-4.8.8.md) for source-checked changes and current known limits; do not interpret “present in v4.8.7” as current v4.8.8 status.
+
 ## Version Evidence and Scope Notes
 
 The repository has Git tags for v4.8.0 and v4.8.1 only. The v4.8.2–v4.8.7 boundaries are documented release commits, not version tags. The v4.8.7 product code is at `7549a64`; `84817ac` adds documentation and hardening records after it. `package.json` still reports `4.8.1`, so About/build metadata do not identify this checkout as v4.8.7. This audit treats the confirmed release history and records as the intended target.

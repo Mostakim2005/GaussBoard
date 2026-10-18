@@ -14213,11 +14213,10 @@ module.exports.run = async (win, app) => {
     r.fadeGone = !sf._fades.has(c.id);
     settle();
     r.liftedPixel = px(mid);
-    r.notPickable = pick(a.store, { x: -150, y: 0 }) === null ||
-      pick(a.store, { x: -150, y: 0 })?.id !== c.id;
-    r.notInMarquee = !inBox(a.store, { x: -400, y: -300, w: 800, h: 600 }).some((o) => o.id === c.id);
+    r.revealedCoverPickable = pick(a.store, { x: -150, y: 0 })?.id === c.id;
+    r.revealedCoverInMarquee = inBox(a.store, { x: -400, y: -300, w: 800, h: 600 }).some((o) => o.id === c.id);
     a.command('edit.selectAll');
-    r.notInSelectAll = !a.surface.selection.has(c.id) && a.surface.selection.has('ans');
+    r.revealedCoverInSelectAll = a.surface.selection.has(c.id);
     a.setSelection([]);
     a.setTool('pen');                  // select-all hands the board to Select
     // a lifted cover is not in an export either
@@ -14227,7 +14226,7 @@ module.exports.run = async (win, app) => {
     a.store.doc.objects[c.id] = null; a.store.rev++;
     const without = shot();
     a.store.doc.objects[c.id] = lifted; a.store.rev++;
-    r.exportUntouched = withLifted === without;
+    r.exportIncludesOutline = withLifted !== without;
 
     // --- undo puts it back ---
     a.command('undo');
@@ -14276,17 +14275,13 @@ module.exports.run = async (win, app) => {
     a.command('undo'); settle();
     sf.laser.length = 0;
 
-    // --- Select picks it up instead, and its bar offers Reveal by name ---
+    // --- Select taps toggle a cover directly in both directions ---
     a.setTool('select');
     tap('mouse', mid);
-    r.selectSelects = a.surface.selection.has(c.id) && a.store.get(c.id).revealed === false;
-    a.syncUI();
-    const btn = document.querySelector('#ctxbar .reveal-btn');
-    r.barHasReveal = !!btn && /Reveal/.test(btn.textContent);
-    btn?.click();
-    r.barRevealed = a.store.get(c.id).revealed === true;
-    r.barDropsSelection = !a.surface.selection.has(c.id);
-    a.command('undo'); settle();
+    r.selectTapReveals = a.store.get(c.id).revealed === true;
+    r.revealedCoverStillExists = a.store.get(c.id)?.type === 'curtain';
+    tap('mouse', mid);
+    r.selectTapConceals = a.store.get(c.id).revealed === false;
 
     // --- a locked cover still lifts on a double-click ---
     a.store.update(c.id, { locked: true }, 'x');
@@ -14335,12 +14330,12 @@ module.exports.run = async (win, app) => {
   check('once lifted, the answer underneath is what you see',
     !isCover(cover.liftedPixel),
     `pixel after: ${cover.liftedPixel}, before: ${cover.coveredPixel}`);
-  check('a lifted cover cannot be clicked, boxed or select-all’d',
-    cover.notPickable && cover.notInMarquee && cover.notInSelectAll,
-    `click: ${cover.notPickable ? 'misses it' : 'HITS it'}, marquee: ${cover.notInMarquee ? 'skips it' : 'TAKES it'}, ` +
-    `select all: ${cover.notInSelectAll ? 'skips it' : 'TAKES it'}`);
-  check('and it is not in an export', cover.exportUntouched,
-    `export with the lifted cover matches one without it: ${cover.exportUntouched}`);
+  check('a revealed cover stays visible, clickable and selectable',
+    cover.revealedCoverPickable && cover.revealedCoverInMarquee && cover.revealedCoverInSelectAll,
+    `clickable: ${cover.revealedCoverPickable}, marquee: ${cover.revealedCoverInMarquee}, ` +
+    `select all: ${cover.revealedCoverInSelectAll}`);
+  check('the revealed cover outline remains in an export', cover.exportIncludesOutline,
+    `export changes when the revealed cover outline is present: ${cover.exportIncludesOutline}`);
   check('undo puts the cover back over the answer',
     cover.undoCovers && isCover(cover.backPixel),
     `covered again: ${cover.undoCovers}, pixel: ${cover.backPixel}`);
@@ -14356,10 +14351,10 @@ module.exports.run = async (win, app) => {
   check('the laser: a tap lifts it, sweeping across it does not',
     cover.laserTapLifted && cover.laserSweepKept,
     `sweep kept it: ${cover.laserSweepKept}, tap lifted it: ${cover.laserTapLifted}`);
-  check('Select picks a cover up, and its bar has a Reveal button that lifts it',
-    cover.selectSelects && cover.barHasReveal && cover.barRevealed && cover.barDropsSelection,
-    `selected: ${cover.selectSelects}, Reveal on the bar: ${cover.barHasReveal}, ` +
-    `pressing it lifts it: ${cover.barRevealed}, and lets go of it: ${cover.barDropsSelection}`);
+  check('a Select tap reveals and the next Select tap conceals the persistent cover',
+    cover.selectTapReveals && cover.selectTapConceals && cover.revealedCoverStillExists,
+    `revealed on first tap: ${cover.selectTapReveals}, still exists: ${cover.revealedCoverStillExists}, ` +
+    `concealed on second tap: ${cover.selectTapConceals}`);
   check('a locked cover still lifts on a double-click',
     cover.lockedDoubleClick, `lifted: ${cover.lockedDoubleClick}`);
   check('Cover answers again puts every lifted cover back, as one undo',

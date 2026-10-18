@@ -1,4 +1,6 @@
 # Phase 3: Critical Evaluation of Proposed Implementation Method
+
+> **Document status:** Historical proposal/evaluation. Current shipped choices and source locations are in [`../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) and [`../layers/02-inking-and-gestures.md`](../layers/02-inking-and-gestures.md). Preserve the existing inking engines and keep Catmull–Rom/Bézier as a separate selectable option. Compare visual fidelity, pressure response, latency, CPU/memory, cache invalidation, audio timestamp preservation (`p.t`), highlighter compositing, and export consistency before recommending a default or removal.
 **Project**: GazBoard Replay (Windows-first fork of GazBoard)  
 **Target Repository**: `https://github.com/fahim9778/GazBoard`  
 **Base App Version**: 4.8.1 (`package.json` [VERIFIED IN CODE: package.json:4])  

@@ -1,4 +1,6 @@
 # Phase 1: Base Application Technical Audit
+
+> **Document status:** Historical base-architecture audit, not the current security findings register. Read `../releases/AUDIT-CUSTOM-FEATURES-4.8.1-to-4.8.7.md` and `../releases/RELEASE-4.8.8.md` for the later custom-feature audit and fixes; use `../BASE_FEATURE_CATALOG-4.8.1.md` to locate the original base implementation.
 **Project**: GazBoard Replay (Windows-first fork of GazBoard)  
 **Target Repository**: `https://github.com/fahim9778/GazBoard`  
 **Base App Version**: 4.8.1 (`package.json` [VERIFIED IN CODE: package.json:4])  

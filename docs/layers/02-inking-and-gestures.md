@@ -45,3 +45,11 @@ node scripts/smoke.js
 # - on a dark board a shape drawn in default colour is light
 # - laser duration switches immediately
 ```
+
+## 6. v4.8.8 Engine Choice and Compatibility
+
+The settings registry in `src/js/core/ink.js` exposes `default` (GazBoard Default), `windowsInk`, `perfectFreehand`, and `catmullRomBezier` (Catmull–Rom Bézier). v4.8.8 adds the last as a separate choice; it does not remove or replace the prior choices. `src/js/ui/panels.js` persists the selected key, and the path/run caches in `ink.js` include the engine key so changing engines cannot reuse geometry produced by the previous choice.
+
+The engine changes how saved point samples are converted to a rendered path. It does not rewrite the stored point list. Keep `p.t`, pressure and metadata intact: audio replay timing, variable-pressure rendering, undo and saved-board data depend on the samples. Since the selected engine is a user setting and may affect the appearance of previously saved strokes when redrawn, changes to this behavior should remain explicit and user-selectable.
+
+Potential interactions to check when changing an engine include perceived input latency, small-loop/acute-corner overshoot, pressure joins, cache invalidation, audio stroke timing, highlighter compositing, rendering cost on large boards, and PNG/SVG/PDF/video consistency. The intended checks are separate: `node --test test/custom-features.test.mjs` covers registry and timestamp preservation; `npm run smoke:custom` includes the 4.8.8 UI checks. See `docs/plan/03-method-eval.md` for option trade-offs.

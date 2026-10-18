@@ -1,4 +1,6 @@
 # Phase 6: AI Agent Execution Plan & Guardrail Architecture
+
+> **Document status:** Historical workflow proposal. Follow the current repository `AGENTS.md` and `AI_BOOTSTRAP.md` for active rules, then route by `../INDEX.md`. The source-checked version history is `../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`.
 **Project**: GazBoard Replay (Windows-first fork of GazBoard)  
 **Target Repository**: `https://github.com/fahim9778/GazBoard`  
 **Base App Version**: 4.8.1 (`package.json` [VERIFIED IN CODE: package.json:4])  

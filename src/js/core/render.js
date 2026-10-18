@@ -2,7 +2,7 @@
 
 import { boundsOf, worldBounds } from './store.js';
 import { pageRects as worldPageRects } from './pages.js';
-import { hexToRgba, readableText, wrapText, fitFontSize, clamp } from './util.js';
+import { hexToRgba, readableText, wrapText, fitFontSize, clamp, bboxOfPoints } from './util.js';
 import { inkPath, inkRuns, strokeWeight, hasPressureVariation } from './ink.js';
 import { objectRuns, layoutRich, fitRichSize, drawRichLines, needsRich, watchChips } from './richtext.js';
 import { mathEntry, hasMaths } from './maths.js';
@@ -998,8 +998,8 @@ export const CURTAIN_LABEL = t('Tap to reveal');
  * spoiler. Faint stripes and a label say "there is something under here" so
  * nobody mistakes it for a coloured box they are meant to read.
  *
- * Once revealed it draws nothing at all - it is not faded, not outlined, not
- * in the export. Undo, or "Cover answers again", brings it back.
+ * Once revealed it remains as a faint outline, so it can be tapped to cover
+ * the answer again. Its attached answer content becomes visible underneath.
  */
 export function drawCurtain(ctx, o) {
   // Freehand Marker Study Tape (drawn with points)
@@ -1078,17 +1078,18 @@ export function drawCurtain(ctx, o) {
 
   // Rectangular Curtain or Tape Card
   if (o.revealed) {
-    if (o.subtype !== 'tape') return;
     const { x, y, w, h } = o;
     const r = Math.min(Math.abs(w), Math.abs(h)) * 0.13;
     ctx.save();
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
-    ctx.fillStyle = 'rgba(168, 85, 247, 0.08)';
+    ctx.fillStyle = 'rgba(168, 85, 247, 0.035)';
     ctx.fill();
-    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 5]);
+    ctx.lineWidth = o.subtype === 'tape' ? 1.5 : 2;
     ctx.strokeStyle = o.color || '#a855f7';
     ctx.stroke();
+    ctx.setLineDash([]);
     ctx.restore();
     return;
   }

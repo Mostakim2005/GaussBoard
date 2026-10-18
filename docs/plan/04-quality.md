@@ -1,4 +1,6 @@
 # Phase 4: Cross-Cutting Quality Analysis
+
+> **Document status:** Historical quality plan. Current commands are defined in `package.json`: mandatory regression `node scripts/smoke.js`; separate custom additions `npm run smoke:custom`; release-focused groups `npm run smoke:features:4.8.4.1` and `npm run smoke:features:4.8.8`. Translation parity is `node scripts/i18n-check.js`. Test claims/results are time-bound; use `docs/releases/RELEASE-4.8.8.md` for the latest recorded run and `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md` for known limitations.
 **Project**: GazBoard Replay (Windows-first fork of GazBoard)  
 **Target Repository**: `https://github.com/fahim9778/GazBoard`  
 **Base App Version**: 4.8.1 (`package.json` [VERIFIED IN CODE: package.json:4])  

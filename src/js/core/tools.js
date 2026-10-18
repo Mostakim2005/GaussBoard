@@ -516,13 +516,13 @@ export class Interaction {
       }
     }
     /*
-     * The laser, mouse pointer, or tapping on study tape:
+     * The laser, mouse pointer, or tapping on a cover or study tape:
      * a tap means "toggle reveal/conceal". Remember what they landed on;
      * onUp decides whether it was a tap or a drag.
      */
     const hitCurtain = curtainAt(this.store, wp, 10 / this.surface.cam.z);
     if (this.action && !this.spaceDown && e.button === 0) {
-      if (tool === 'laser' || tool === 'mousePointer' || (hitCurtain && hitCurtain.subtype === 'tape' && tool === 'select')) {
+      if (tool === 'laser' || tool === 'mousePointer' || (hitCurtain && tool === 'select')) {
         this.action.cover = hitCurtain;
         this.action.downSp = sp;
       }

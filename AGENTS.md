@@ -27,6 +27,12 @@
      * Multi-Layer System (On Standby) $\rightarrow$ [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md) (§6)
 5. **Fourth Step — Edit ONLY the Specified Files**:
    * Touch only the 1–2 files listed in Section 2 of that layer dossier.
+   * **Documentation-only exception:** if the user explicitly requests a documentation refresh across the project, inspect and update only the project-authored Markdown files that match the requested subject and each file's purpose. Use [`docs/INDEX.md`](docs/INDEX.md) for routing; do not bulk-ingest or indiscriminately rewrite `docs/`.
+   * The v4.8.1 base catalog and cumulative custom-feature record are separate: [`docs/BASE_FEATURE_CATALOG-4.8.1.md`](docs/BASE_FEATURE_CATALOG-4.8.1.md) and [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md).
+
+## 1A. Current Documentation Map
+
+The repository's current consolidated release is v4.8.8. Use `docs/INDEX.md` to route documentation work, `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md` for source-checked release history, and `docs/BASE_FEATURE_CATALOG-4.8.1.md` for baseline-only behavior. Historical plans document intent and analysis at the time; they are not authoritative statements of current implementation. Preserve user choices as additive selectable options where practical, and record their effects on other subsystems.
 
 ---
 
@@ -37,13 +43,13 @@
 2. **Stroke Point Timestamp Preservation (`p.t`)**:
    * Point generators, smoothing passes, and curve fitters in `tools.js` and `ink.js` must preserve `p.t`. Stripping `p.t` breaks audio synchronization.
 3. **Finite Audio Duration Safeguard**:
-   * Never rely on `audio.duration` without checking `isFinite()`. Always fall back to `track.durationMs = Date.now() - startTime`.
+   * For in-app recordings, never rely on `audio.duration` without checking `isFinite()`; retain elapsed wall-clock `track.durationMs`. For imported audio, use finite metadata when available and leave duration unknown when unavailable rather than guessing.
 4. **100% Internationalization (i18n) Parity**:
    * Every user-facing UI string must be wrapped in `t('...')` and present across all 7 locale dictionaries (`ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, `zh-Hant.json`).
 5. **Zero Extra Native Dependencies**:
    * Do not introduce npm packages that require C/C++ compilation (`node-gyp`). All algorithms must remain pure portable JavaScript.
-6. **Study Tape vs Curtain Discrimination**:
-   * Study tape (`subtype: 'tape'`) must toggle between concealed and revealed on a single click or tap. Standard curtains (`subtype !== 'tape'`) must remain selectable for the reveal toolbar.
+6. **Study Tape and Answer Cover Toggle**:
+   * Both study tape (`subtype: 'tape'`) and rectangular answer covers (`subtype !== 'tape'`) persist on the board and toggle concealed/revealed on tap. Revealed covers remain hittable as faint outlines; attached content follows the cover state. The Study Tape drawing tool is available from the ribbon and Add/tools menus.
 
 ---
 

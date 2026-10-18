@@ -6,6 +6,8 @@
 - **Purpose**: Follow-up audit fixes for the 4.8.4 increment. Later v4.8.5–v4.8.7 feature commits are not included in this build.
 - **Windows artifacts**: `GazBoard-4.8.4.1-portable.exe` and `GazBoard-4.8.4.1-Setup.exe`
 
+> This remains a historical follow-up built on v4.8.4. The current consolidated line is v4.8.8 and is documented in [`../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md). Some 4.8.4.1 findings were addressed later; consult the current-status section in [`AUDIT-4.8.4-FINDINGS.md`](AUDIT-4.8.4-FINDINGS.md) before treating a historical “not fixed” status as current.
+
 ## Audit attribution
 
 - Initial audit: **Codex 4.6 Medium in Cursor**, as reported by the project owner.

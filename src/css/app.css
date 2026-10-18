@@ -878,7 +878,7 @@ kbd {
  *  pointer, or on touch tablets) does the toolbar take the full width and the
  *  readouts step up out of its way.
  * ================================================================= */
-@media (max-width: 1340px) {
+@media (max-width: 1480px) {
   #toolbar {
     left: 12px; right: 252px;
     transform: none;

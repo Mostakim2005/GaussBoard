@@ -1,4 +1,6 @@
 # Phase 5: File-by-File Implementation Plan
+
+> **Document status:** Historical implementation plan. It describes proposed sequencing, not a guaranteed inventory of current code. For shipped changes and source mapping, see [`../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md); for base-only mappings, see [`../BASE_FEATURE_CATALOG-4.8.1.md`](../BASE_FEATURE_CATALOG-4.8.1.md). Current release/build records are in `../releases/`.
 **Project**: GazBoard Replay (Windows-first fork of GazBoard)  
 **Target Repository**: `https://github.com/fahim9778/GazBoard`  
 **Base App Version**: 4.8.1 (`package.json` [VERIFIED IN CODE: package.json:4])  

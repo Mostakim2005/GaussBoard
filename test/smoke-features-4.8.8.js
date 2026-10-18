@@ -57,6 +57,73 @@ const browserChecks = String.raw`(async () => {
     out.videoPresetDialogReturnsSelectedSizeAndRate = result.video.width === 1920 && result.video.height === 1080 && result.video.fps === 60;
   } catch (e) { out.videoPresetDialogReturnsSelectedSizeAndRate = String(e); }
 
+  try {
+    await app.panels.close();
+    const savedAutosave = app.settings.autosave;
+    app.settings.autosave = false;
+    app.newBoard(true);
+    const sf = app.surface, it = app.interaction;
+    sf.cam.x = sf.width / 2; sf.cam.y = sf.height / 2; sf.cam.z = 1;
+    app.setTool('select');
+    const answer = { id: 'tape-toggle-answer', type: 'text', x: -20, y: -10, w: 120, h: 40,
+      text: 'answer', rotation: 0 };
+    app.store.add(answer, 'feature smoke answer');
+    const cover = app.addCurtain();
+    app.store.update(cover.id, { x: -40, y: -30, w: 160, h: 80 }, 'feature smoke placement');
+    app.setTool('select');
+    const rect = sf.canvas.getBoundingClientRect();
+    const point = sf.cam.toScreen(cover.x + 20, cover.y + 20);
+    const ev = (buttons) => ({ pointerId: 211, pointerType: 'mouse', button: 0, buttons, pressure: 0.5,
+      clientX: rect.left + point.x, clientY: rect.top + point.y, shiftKey: false, altKey: false,
+      ctrlKey: false, metaKey: false });
+    const tap = () => { it.onDown(ev(1)); it.onUp(ev(0)); it.action = null; it.actionId = null; it.pointers.clear(); };
+    tap();
+    const coverRevealed = app.store.get(cover.id)?.revealed === true;
+    tap();
+    const coverConcealedAgain = app.store.get(cover.id)?.revealed === false;
+
+    app.newBoard(true);
+    const tape = { id: 'freehand-tape-toggle', type: 'curtain', subtype: 'tape', tool: 'tape', width: 30,
+      points: [{ x: -30, y: 0 }, { x: 40, y: 0 }], bbox: { x: -30, y: 0, w: 70, h: 0 }, rotation: 0, revealed: false };
+    app.store.add(tape, 'feature smoke tape');
+    sf.cam.x = sf.width / 2; sf.cam.y = sf.height / 2; sf.cam.z = 1;
+    const tapePoint = sf.cam.toScreen(0, 0);
+    const tapeEvent = (buttons) => ({ ...ev(buttons), pointerId: 212,
+      clientX: rect.left + tapePoint.x, clientY: rect.top + tapePoint.y });
+    const tapeTap = () => { it.onDown(tapeEvent(1)); it.onUp(tapeEvent(0)); it.action = null; it.actionId = null; it.pointers.clear(); };
+    app.setTool('select');
+    const { pick, curtainAt } = await import('app://board/js/core/hit.js');
+    const tapeHitBeforeTap = pick(app.store, { x: 0, y: 0 })?.id === tape.id && curtainAt(app.store, { x: 0, y: 0 })?.id === tape.id;
+    tapeTap();
+    const tapeRevealed = app.store.get(tape.id)?.revealed === true;
+    const tapeStateAfterFirst = app.store.get(tape.id)?.revealed;
+    tapeTap();
+    const tapeConcealedAgain = app.store.get(tape.id)?.revealed === false;
+    const tapeStateAfterSecond = app.store.get(tape.id)?.revealed;
+
+    const ribbonTape = document.querySelector('#toolbar [data-ribbon-id="tape"]');
+    ribbonTape?.click();
+    const ribbonActivatesDrawingTool = app.tool === 'tape';
+    app.setTool('select');
+    document.querySelector('#toolbar [data-cmd="insert"]')?.click();
+    const addTapeItem = [...document.querySelectorAll('.menu-item')].find((el) => el.textContent.includes('Study Tape'));
+    addTapeItem?.click();
+    const addMenuActivatesDrawingTool = app.tool === 'tape';
+    app.settings.autosave = savedAutosave;
+    app.newBoard(true);
+    out.rectangularCoverTogglesAndKeepsAnswer = coverRevealed && coverConcealedAgain ||
+      'revealed=' + coverRevealed + ', concealed=' + coverConcealedAgain + ', state=' + app.store.get(cover.id)?.revealed;
+    out.freehandStudyTapeTogglesTwice = tapeRevealed && tapeConcealedAgain ||
+      'hit=' + tapeHitBeforeTap + ', after1=' + tapeStateAfterFirst + ', after2=' + tapeStateAfterSecond +
+      ', revealed=' + tapeRevealed + ', concealed=' + tapeConcealedAgain;
+    out.ribbonAndAddMenuActivateTapeTool = ribbonTape && addTapeItem && ribbonActivatesDrawingTool && addMenuActivatesDrawingTool ||
+      'button=' + !!ribbonTape + ', item=' + !!addTapeItem + ', ribbon=' + ribbonActivatesDrawingTool + ', menu=' + addMenuActivatesDrawingTool;
+  } catch (e) {
+    out.rectangularCoverTogglesAndKeepsAnswer = String(e);
+    out.freehandStudyTapeTogglesTwice = String(e);
+    out.ribbonAndAddMenuActivateTapeTool = String(e);
+  }
+
   return out;
 })()`;
 
@@ -65,7 +132,10 @@ async function run(win, app) {
   const names = {
     penOpacityRangeStoresAndEnablesValue: 'pen opacity slider stores its range and toggle state',
     templateTagFilterShowsMatchingTemplate: 'template tag filtering shows the matching template',
-    videoPresetDialogReturnsSelectedSizeAndRate: 'video export dialog returns the chosen resolution and frame rate'
+    videoPresetDialogReturnsSelectedSizeAndRate: 'video export dialog returns the chosen resolution and frame rate',
+    rectangularCoverTogglesAndKeepsAnswer: 'rectangular cover toggles on and off with its answer restored',
+    freehandStudyTapeTogglesTwice: 'freehand study tape toggles revealed and concealed',
+    ribbonAndAddMenuActivateTapeTool: 'ribbon and add menu activate the study tape drawing tool'
   };
   let passed = 0, failed = 0;
   const lines = [];

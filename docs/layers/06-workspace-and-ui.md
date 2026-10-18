@@ -60,3 +60,10 @@ node scripts/i18n-check.js
 # - 1240 passed, 0 failed
 # - 1357/1357 translated across all 7 languages
 ```
+
+## 6. v4.8.8 Filtering and User-Choice Rules
+
+- **Tag filters:** My boards filters board metadata; the Templates panel filters built-in and custom template tags. They are distinct data sources and must remain separately testable.
+- **Settings choice:** preserve existing choices and add options as requested. For example, the inking engine selector retains the existing engines and adds Catmull–Rom/Bézier. Do not silently turn a multi-choice setting into a yes/no switch.
+- **Focused checks:** `npm run smoke:features:4.8.8` covers the live template tag filter and pen-opacity control. `npm run smoke:custom` runs these alongside the Node-level feature and security tests.
+- **Current version:** the full suite remains `node scripts/smoke.js` (1,240 assertions); new custom additions are tracked separately in `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`.

@@ -18,14 +18,13 @@ export function toLocal(o, p) {
 /**
  * Is this object there to be touched at all?
  *
- * An answer cover that has been lifted is still in the document - that is
- * what lets undo and "Cover answers again" put it back - but as far as the
- * pointer is concerned it is gone. Leaving it hittable would make an empty
- * patch of board mysteriously selectable, and would stop taps reaching the
- * very answer it was hiding. Ink written ON a cover leaves with it, and is
- * `hidden` for as long as the cover is lifted - gone from the pointer too.
+ * Revealed covers remain hittable because the same tap gesture conceals them
+ * again. Their attached annotations are marked `hidden` while the answer is
+ * revealed, so taps pass through to the answer once the cover is toggled.
  */
-export const ghost = (o) => !!o && (!!o.hidden || (o.type === 'curtain' && o.subtype !== 'tape' && !!o.revealed));
+// Revealed covers remain visible as a faint outline and hittable so another
+// tap can conceal them again. Content attached to a cover is hidden separately.
+export const ghost = (o) => !!o && !!o.hidden;
 
 export function hitObject(o, p, tol = 6) {
   if (ghost(o)) return false;
@@ -122,7 +121,7 @@ export function inLasso(store, poly) {
  * The answer cover a tap at `p` would land on, or null.
  *
  * Ink is looked straight through: a teacher who circled the cover, or wrote
- * "Q1" on it, still expects a tap there to lift it. Anything else sitting on
+ * "Q1" on it, still expects a tap there to toggle it. Anything else sitting on
  * top - a note, a picture - is what the tap is really on, so it wins.
  */
 export function curtainAt(store, p, tol = 6) {
