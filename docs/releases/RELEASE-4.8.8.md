@@ -8,6 +8,7 @@
 - **Portable SHA-256:** `64B38D7E16ED93F6230DFFA90F4BCAC7FA69DBD7AFC1C4A59E585AE2EF9C3A9C`
 - **Installer SHA-256:** `B08894B5D16CB851C6D787B44F6B3DEF3894562D99FC4ED4D9C7045E608258F8`
 - **Build toolchain:** electron-builder 26.15.3; Electron 43.5.0; Windows x64.
+- **Local Git release tag:** `v4.8.8` at feature/release commit `e00b93f`; not pushed to a remote.
 
 ## Overview
 
