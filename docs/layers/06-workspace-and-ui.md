@@ -27,18 +27,36 @@ Governs high-level user interface containers, the dual-viewport Split Study Work
 * Tokenizes queries into individual words and matches across both titles and descriptive body text.
 * Settings panel live-filters DOM section cards on `input` events, hiding non-matching sections without page reloads (`BUG-004`).
 
-### Ribbon Customization:
+### Ribbon Customization & Plus Menu Hot-Pinning:
 * Each item in the `+` insert menu features a selectable pin icon (📌 / 📍) allowing users to pin frequently used tools directly to the ribbon or move items back into the menu.
-* Right-clicking any pinned tool on the ribbon instantly unpins it.
+* **In-Place Hot-Pinning**: Toggling pin/unpin updates the DOM in-place without rebuilding the toolbar DOM or dismissing the popover, allowing multiple pin toggles in one sitting (`BUG-014`).
+* **Bidirectional Ribbon Customization**: Front ribbon tools (`select`, `lasso`, `pan`, `laser`, pens, `highlighter`, `eraser`, `ruler`, `text`, `note`, `shape`, `emoji`) can be moved to the `+` menu via right-click (`BUG-015`).
+* Dedicated `#pinnedToolsSlot` manages dynamic tools cleanly.
+
+### Navigation & Mouse Wheel Dual Mode (`src/js/core/tools.js`, `src/js/app.js`):
+* `mouseWheelMode` setting allows choosing between `scroll` (Page scroll / Pan) and `zoom` (Zoom in/out).
+* Holding `Ctrl` intelligently flips between zoom and scroll; `Shift+wheel` pans horizontally.
+* Arrow keys pan 4-way on infinite canvas and scroll pages in paged mode when no item is selected (`BUG-016`).
+
+### Windows-Style Persistent Hover Quick Actions & Side-by-Side Coexistence:
+* `#ctxbar` features a 350ms grace bridge and `:hover` tracking matching native Windows hover menus (`BUG-012`).
+* When right-clicking an object with quick actions active, the context menu opens adjacent side-by-side (`cr.right + 8` or `cr.left - 8 - menuWidth`) with zero overlap (`BUG-013`).
 
 ## 4. Relevant Bug Fixes
 * **BUG-004**: In-settings search failed to match descriptions $\rightarrow$ multi-word token inverted index added.
 * **BUG-008**: Split workspace initialized on unmounted pane $\rightarrow$ lifecycle reordered in `split-workspace.js`.
+* **BUG-012**: Hover toolbar dismissed prematurely when moving cursor $\rightarrow$ 350ms grace timeout and `:hover` tracking.
+* **BUG-013**: Context menu collided with hover toolbar $\rightarrow$ side-by-side non-overlapping positioning calculation.
+* **BUG-014**: Pin toggle closed the `+` popover $\rightarrow$ in-place hot-toggling DOM and persistent `#pinnedToolsSlot`.
+* **BUG-015**: Ribbon tools were not movable $\rightarrow$ bidirectional right-click to move and `hiddenRibbonTools` sync.
+* **BUG-016**: Mouse wheel could not scroll and arrow keys lacked navigation $\rightarrow$ intelligent dual mode & 4-way arrow pan.
+* **BUG-017**: Bengali smoke test exact title match failed $\rightarrow$ clean button title preserved.
 
 ## 5. Verification Commands
 ```powershell
 node scripts/smoke.js
+node scripts/i18n-check.js
 # Verified tests:
-# - SplitWorkspace dual layout manager exists
-# - folders nest, show their path, list what is in them
+# - 1240 passed, 0 failed
+# - 1357/1357 translated across all 7 languages
 ```

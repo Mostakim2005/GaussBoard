@@ -148,6 +148,33 @@ This document serves as the master registry of all features, enhancements, bug f
    - `node scripts/smoke.js`: 1240/1240 passed (100% pass rate).
    - `node scripts/i18n-check.js`: 1349/1349 translated (100% complete) across all 7 locales.
 
+### 2.6 Milestone 5 Feedback Hardening: Navigation, Plus Menu Hot-Pinning, Ribbon Customization & Hover Persistence
+1. **Mouse Wheel Dual Mode & Arrow Key Navigation** (`src/js/core/tools.js`, `src/js/app.js`, `src/js/ui/panels.js`, `src/js/ui/search-dialog.js`):
+   - **Settings Toggle**: `Mouse wheel action` selector with two clear options:
+     - `Page scroll / Pan (Ctrl to zoom)` (`mouseWheelMode: 'scroll'`)
+     - `Zoom in/out (Ctrl to scroll)` (`mouseWheelMode: 'zoom'`)
+   - **Intelligent Dual Mode**: Wheel executes the configured primary action; holding `Ctrl` seamlessly switches to the alternate action; `Shift+wheel` performs horizontal panning.
+   - **Trackpad Protection**: Native two-finger trackpad panning and pinch-to-zoom remain completely smooth and unaffected.
+   - **Arrow Key Navigation**:
+     - Infinite canvas: arrow keys ($\leftarrow, \rightarrow, \uparrow, \downarrow$) pan in all 4 directions.
+     - Paged mode: $\uparrow, \downarrow$ smoothly scroll page-by-page.
+     - `Shift` key accelerates step size; safely suppressed when editing text or typing in inputs.
+2. **Plus (`+`) Menu In-Place Hot-Pinning & Ribbon Customization** (`src/js/ui/toolbar.js`, `src/js/app.js`):
+   - **Hot-Pinning in Place**: Toggling pin/unpin (📌 / 📍) in the `+` menu updates the pin icon, opacity, title, and ribbon state instantly without closing the popover or destroying the anchor button, enabling multiple pins/unpins in one sitting.
+   - **Persistent Pinned Slot**: Dedicated `#pinnedToolsSlot` container in the toolbar allows hot-swapping pinned buttons without re-rendering or wiping `#toolbar`.
+   - **Bidirectional Ribbon Customization**:
+     - All primary ribbon tools (`select`, `lasso`, `pan`, `laser`, pens, `highlighter`, `eraser`, `ruler`, `text`, `note`, `shape`, `emoji`) can be moved to the `+` menu.
+     - Right-clicking any ribbon tool moves it to the `+` menu (`app.settings.hiddenRibbonTools`) with a toast notification.
+     - The `+` menu displays a dedicated "Ribbon tools" section with live 📌/📍 toggles and direct click-to-activate support.
+     - Includes Class tools (`timer.open`, `view.present`, `insert.curtain`) as pinnable items.
+3. **Windows-Style Persistent Hover Quick Actions & Side-by-Side Coexistence** (`src/js/app.js`, `src/js/ui/contextmenu.js`, `src/js/ui/panels.js`):
+   - **Hover Grace Bridge**: Added a 350ms grace timeout and `:hover` tracking on `#ctxbar` so users can comfortably move the pointer onto the floating quick-action bar without premature dismissal.
+   - **Side-by-Side Menu Positioning**: When both the horizontal quick-action toolbar (`#ctxbar`) and the vertical context menu are active, the context menu positions itself adjacent to `#ctxbar` (`cr.right + 8` or `cr.left - 8 - menuWidth`), guaranteeing zero overlap.
+   - **Settings Toggle**: Added `Show quick actions on hover` switch in Settings.
+4. **Verification**:
+   - `node scripts/smoke.js`: 1240/1240 passed (100%).
+   - `node scripts/i18n-check.js`: 1357/1357 translated (100%) across all 7 languages.
+
 ---
 
 ## 3. Critical Architectural Rules & Anti-Regression Guardrails

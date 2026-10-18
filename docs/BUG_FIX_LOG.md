@@ -19,6 +19,12 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 | **BUG-009** | Settings Button Color Choices Lacked Immediate Click Feedback | Low | UI / Settings | Resolved |
 | **BUG-010** | Storage Switch Timing Race Condition in Re-entrant Smoke Test | Low | Storage / Testing | Resolved |
 | **BUG-011** | i18n Missing String Placeholders & Locale Parity Drift | Medium | Internationalization | Resolved |
+| **BUG-012** | Hover Toolbar Premature Dismissal on Cursor Approach | Medium | UI / Toolbar | Resolved |
+| **BUG-013** | Context Menu and Quick Action Toolbar Screen Overlap | Medium | UI / Context Menu | Resolved |
+| **BUG-014** | Plus (+) Menu Popover Dismissal on Pin/Unpin Toggle | Medium | UI / Popover | Resolved |
+| **BUG-015** | Front Ribbon Tool Non-Configurability & Plus Menu Separation | Medium | UI / Ribbon Customization | Resolved |
+| **BUG-016** | Mouse Wheel Zoom vs Scroll Ambiguity & Arrow Key Navigation | High | Interaction / Navigation | Resolved |
+| **BUG-017** | Smoke Test Title Assertion Failure from Toolbar Tooltip Suffix | Low | Testing / i18n | Resolved |
 
 ---
 
@@ -139,3 +145,70 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
   2. Synchronized full, grammatically verified translations into `ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, and `zh-Hant.json`.
   3. Validated placeholder integrity (`{name}`, `{n}`, `{count}`) so interpolation never errors.
 * **Files Touched**: `src/locales/*.json`.
+
+---
+
+### BUG-012: Hover Toolbar (#ctxbar) Premature Dismissal on Cursor Approach
+* **Symptom**: Hovering an object revealed the floating action toolbar (`#ctxbar`), but moving the mouse towards it immediately dismissed the bar before the user could click any action button.
+* **Root Cause**: The hover hit-test dismissed the toolbar synchronously whenever the pointer left the bounds of the hovered canvas object, without accounting for the physical gap between the object and the floating menu bar.
+* **Fix**:
+  1. Implemented a 350ms grace timeout before hiding `#ctxbar`.
+  2. Attached `mouseenter` and `mouseleave` listeners to `#ctxbar` so cursor entry cancels the dismissal timer and keeps the bar active with Windows-style persistent focus.
+  3. Added an explicit user preference toggle: `Show quick actions on hover` in Settings.
+* **Files Touched**: `src/js/app.js`, `src/js/ui/panels.js`, `src/js/ui/contextmenu.js`.
+
+---
+
+### BUG-013: Context Menu and Quick Action Toolbar Screen Overlap
+* **Symptom**: Right-clicking an object opened both the horizontal quick-action toolbar (`#ctxbar`) and the vertical context menu right on top of each other, obstructing menu items.
+* **Root Cause**: Both UI elements positioned themselves relative to the clicked object's coordinates without computing mutual exclusion bounding boxes.
+* **Fix**:
+  1. Updated `showContextMenu(app, e)` in `src/js/ui/contextmenu.js` to inspect `#ctxbar.getBoundingClientRect()`.
+  2. Dynamically positions the vertical context menu side-by-side: placed 8px adjacent to the right of `#ctxbar` (`cr.right + 8`), or flipping to the left (`cr.left - 8 - menuWidth`) if near screen edge.
+  3. Both menus coexist simultaneously without overlapping.
+* **Files Touched**: `src/js/ui/contextmenu.js`.
+
+---
+
+### BUG-014: Plus (+) Menu Popover Dismissal on Pin/Unpin Toggle
+* **Symptom**: Clicking the pin/unpin icon (📌 / 📍) in the `+` menu closed the popover and returned focus to the canvas, forcing the user to reopen the menu for every single pin change.
+* **Root Cause**: `togglePin()` triggered `initToolbar(app)`, which called `bar.innerHTML = ''`, destroying the `+` anchor button in the DOM and causing `openPopover`'s click-outside detection and toggle logic to dismiss the popover.
+* **Fix**:
+  1. Created a persistent `#pinnedToolsSlot` inside the toolbar.
+  2. Implemented `toggleInsertPin(id, pinBtn)`: updates only `pinBtn` text, opacity, and title directly in the DOM without rebuilding the popover or destroying the toolbar.
+  3. Re-renders only `#pinnedToolsSlot` in-place, keeping the popover open for multiple consecutive pin/unpin operations.
+* **Files Touched**: `src/js/ui/toolbar.js`.
+
+---
+
+### BUG-015: Front Ribbon Tool Non-Configurability & Plus Menu Separation
+* **Symptom**: Front ribbon tools (`select`, `lasso`, `pan`, `laser`, pens, `highlighter`, `eraser`, `ruler`, `text`, `note`, `shape`, `emoji`) were statically hardcoded and could not be moved or organized into the `+` menu.
+* **Root Cause**: Ribbon construction assumed a static set of tools and lacked serialization for hidden ribbon items.
+* **Fix**:
+  1. Introduced `app.settings.hiddenRibbonTools` array in `DEFAULT_SETTINGS`.
+  2. Wrapped ribbon tools with right-click context menu listeners: right-clicking any tool moves it to the `+` menu with a toast notification (`t('Moved to + menu')`).
+  3. Added a comprehensive "Ribbon tools" section in `openInsertPopover` with 📌/📍 toggles for each tool and direct tool activation.
+  4. Added `syncRibbonTools(app)` to dynamically toggle `style.display = 'none'` on hidden tools without re-rendering the ribbon.
+* **Files Touched**: `src/js/app.js`, `src/js/ui/toolbar.js`.
+
+---
+
+### BUG-016: Mouse Wheel Zoom vs Scroll Ambiguity & Arrow Key Navigation
+* **Symptom**: Mouse wheel scrolling zoomed the canvas without an option to pan/scroll pages, and arrow keys did not provide canvas navigation.
+* **Root Cause**: `onWheel()` routed mouse wheel notches to zoom without checking user preferences, and `onKeyDown()` lacked Arrow key navigation handlers when no object was selected.
+* **Fix**:
+  1. Added `mouseWheelMode` setting (`'scroll'` vs `'zoom'`) with intelligent dual mode: wheel performs the chosen action, holding `Ctrl` switches to the other action, and `Shift+wheel` pans horizontally.
+  2. Preserved trackpad gesture distinction: two-finger gestures continue to pan smoothly by default, while pinch zooms.
+  3. Added Arrow key pan/scroll navigation in `onKeyDown()`: on infinite canvas, $\leftarrow, \rightarrow, \uparrow, \downarrow$ pan in all four directions; in paged mode, $\uparrow, \downarrow$ scroll pages; `Shift` accelerates step size. Handlers are safely bypassed during text editing or input focus.
+* **Files Touched**: `src/js/app.js`, `src/js/core/tools.js`, `src/js/ui/panels.js`, `src/js/ui/search-dialog.js`.
+
+---
+
+### BUG-017: Smoke Test Title Assertion Failure from Toolbar Tooltip Suffix
+* **Symptom**: `node scripts/smoke.js` failed on test `"chosen in Settings, Bangla reaches the toolbar, the top bar and the menu bar"`.
+* **Root Cause**: The test asserts `bnUi.selectTitle === bnDict['Select (V)']`. Appending ` — Right-click to move to + menu` to `b.title` caused an exact string equality mismatch.
+* **Fix**:
+  1. Retained exact `opts.title` on ribbon buttons without extra suffix.
+  2. Move actions are handled via standard right-click and surfaced with toast confirmations.
+* **Files Touched**: `src/js/ui/toolbar.js`, `src/locales/*.json`.
+
