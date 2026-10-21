@@ -3,7 +3,7 @@
 import { boundsOf, worldBounds, WINDOW_HEADER_H } from './store.js';
 import { pageRects as worldPageRects } from './pages.js';
 import { hexToRgba, readableText, wrapText, fitFontSize, clamp, bboxOfPoints } from './util.js';
-import { inkPath, inkRuns, strokeWeight, hasPressureVariation } from './ink.js';
+import { inkPath, inkRuns, strokeWeight, hasPressureVariation, calligraphyPath } from './ink.js';
 import { objectRuns, layoutRich, fitRichSize, drawRichLines, needsRich, watchChips } from './richtext.js';
 import { mathEntry, hasMaths } from './maths.js';
 import { drawArrowhead, drawConnector } from './connectors.js';
@@ -488,9 +488,23 @@ function inkStyle(ctx, o) {
 export function drawStroke(ctx, o) {
   const pts = o.points;
   if (!pts || !pts.length) return;
+
+  if (o.tool === 'calligraphy') {
+    const envelope = calligraphyPath(o);
+    if (!envelope) return;
+    ctx.save();
+    if (o.opacity != null && o.opacity < 1) ctx.globalAlpha = o.opacity;
+    ctx.fillStyle = inkStyle(ctx, o);
+    ctx.fill(envelope);
+    ctx.restore();
+    return;
+  }
+
   const path = inkPath(o);
   if (!path) return;
   const highlighter = o.tool === 'highlighter';
+  const isBrush = o.tool === 'brush';
+  const isFountain = o.tool === 'fountain';
 
   ctx.save();
   if (highlighter) {
@@ -503,7 +517,7 @@ export function drawStroke(ctx, o) {
   ctx.lineJoin = 'round';
   ctx.strokeStyle = inkStyle(ctx, o);
 
-  const varying = !highlighter && o.pressure !== false && hasPressureVariation(pts);
+  const varying = !highlighter && o.pressure !== false && (hasPressureVariation(pts) || isBrush || isFountain);
   if (varying) {
     let scale = 1;
     try {
@@ -511,7 +525,12 @@ export function drawStroke(ctx, o) {
       scale = Math.hypot(m.a, m.b) || 1;
     } catch { scale = 1; }
     const runs = inkRuns(o, scale);
-    for (const r of runs) { ctx.lineWidth = r.width; ctx.stroke(r.path); }
+    if (runs && runs.length) {
+      for (const r of runs) { ctx.lineWidth = r.width; ctx.stroke(r.path); }
+    } else {
+      ctx.lineWidth = o.width || (isBrush ? 8 : 4);
+      ctx.stroke(path);
+    }
   } else {
     ctx.lineWidth = highlighter ? (o.width || 20) : strokeWeight(pts, o.width || 4, o.pressure !== false);
     ctx.stroke(path);

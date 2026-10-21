@@ -13,6 +13,7 @@ import { t } from '../i18n.js';
 
 const TOOL_ICON = {
   select: 'select', lasso: 'lasso', pen: 'pen', highlighter: 'highlighter',
+  brush: 'brush', fountain: 'fountain', calligraphy: 'calligraphy',
   eraser: 'eraser', note: 'note', text: 'text', shape: 'shapes', emoji: 'emoji'
 };
 const CMD_ICON = { undo: 'undo', redo: 'redo', insert: 'insert', ruler: 'ruler', more: 'more' };
@@ -172,6 +173,27 @@ export function initToolbar(app) {
   hl.innerHTML = penIcon(app.settings.highlighterColor, 'none', 'highlighter') + '<span class="kbd">H</span>';
   hl.addEventListener('click', (e) => toggleTool('highlighter')(e, hl));
   bar.appendChild(hl);
+
+  const brushBtn = h('button', { class: 'pen', title: t('Brush Pen (B) \u2014 click again for options') });
+  brushBtn.dataset.tool = 'brush';
+  brushBtn.dataset.ribbonId = 'brush';
+  brushBtn.innerHTML = penIcon(app.settings.brushColor || app.settings.penColor || '#201f1e', 'none', 'brush') + '<span class="kbd">B</span>';
+  brushBtn.addEventListener('click', (e) => toggleTool('brush')(e, brushBtn));
+  bar.appendChild(brushBtn);
+
+  const ftnBtn = h('button', { class: 'pen', title: t('Fountain Pen (F) \u2014 click again for options') });
+  ftnBtn.dataset.tool = 'fountain';
+  ftnBtn.dataset.ribbonId = 'fountain';
+  ftnBtn.innerHTML = penIcon(app.settings.fountainColor || app.settings.penColor || '#002050', 'none', 'fountain') + '<span class="kbd">F</span>';
+  ftnBtn.addEventListener('click', (e) => toggleTool('fountain')(e, ftnBtn));
+  bar.appendChild(ftnBtn);
+
+  const calBtn = h('button', { class: 'pen', title: t('Calligraphy Pen (C) \u2014 click again for options') });
+  calBtn.dataset.tool = 'calligraphy';
+  calBtn.dataset.ribbonId = 'calligraphy';
+  calBtn.innerHTML = penIcon(app.settings.calligraphyColor || app.settings.penColor || '#1a1a1a', 'none', 'calligraphy') + '<span class="kbd">C</span>';
+  calBtn.addEventListener('click', (e) => toggleTool('calligraphy')(e, calBtn));
+  bar.appendChild(calBtn);
   iconTool({ ribbonId: 'tape', tool: 'tape', icon: 'curtain', title: t('Study Tape'),
     onClick: () => { app.setTool('tape'); app.syncUI(); closePopover(); } });
 
@@ -921,6 +943,30 @@ export function openToolPopover(app, anchor, tool) {
   const s = app.settings;
   let body;
 
+  const penTypeSwitcher = (cur) => {
+    const types = [
+      { id: 'pen', label: t('Ballpoint'), icon: 'pen' },
+      { id: 'brush', label: t('Brush'), icon: 'brush' },
+      { id: 'fountain', label: t('Fountain'), icon: 'fountain' },
+      { id: 'calligraphy', label: t('Calligraphy'), icon: 'calligraphy' }
+    ];
+    return h('div', { class: 'row', style: 'display:flex;gap:4px;margin-bottom:12px;background:var(--desk,#f0f0f0);padding:3px;border-radius:8px;' },
+      ...types.map((pt) => {
+        const active = cur === pt.id;
+        const b = h('button', {
+          class: 'btn' + (active ? ' primary' : ''),
+          style: `flex:1;padding:5px 6px;font-size:11.5px;display:flex;align-items:center;justify-content:center;gap:4px;border:none;border-radius:6px;${active ? 'font-weight:600;' : 'background:none;'}`
+        }, h('span', { html: icon(pt.icon, 13) }), pt.label);
+        b.addEventListener('click', () => {
+          app.setTool(pt.id);
+          app.syncUI();
+          openToolPopover(app, anchor, pt.id);
+        });
+        return b;
+      })
+    );
+  };
+
   if (tool === 'pen') {
     const effects = h('div', { class: 'row' },
       ...PEN_EFFECTS.map((e) => {
@@ -957,6 +1003,7 @@ export function openToolPopover(app, anchor, tool) {
     customInk.appendChild(customInput);
 
     body = h('div', {},
+      penTypeSwitcher('pen'),
       h('h4', {}, t('Ink colour')),
       swatchRow(PEN_COLORS, s.penEffect === 'none' ? s.penColor : null, (c) => {
         pickInk(c); closePopover();
@@ -973,6 +1020,175 @@ export function openToolPopover(app, anchor, tool) {
         })),
       h('div', { class: 'row' },
         toggle(t('Ruler snapping'), app.ruler.snap, (v) => { app.ruler.snap = v; }))
+    );
+  } else if (tool === 'brush') {
+    const curColor = s.brushColor || s.penColor || '#201f1e';
+    const pickInk = (c) => {
+      s.brushColor = c;
+      app.saveSettings();
+      app.syncUI();
+    };
+    const customInk = h('label', { class: 'sw sw-custom', title: t('Any colour') });
+    const customInput = h('input', { type: 'color', value: curColor });
+    customInput.addEventListener('input', () => { customInk.style.background = customInput.value; pickInk(customInput.value); });
+    customInk.style.background = curColor;
+    customInk.appendChild(customInput);
+
+    const curOpacity = Math.round((s.brushOpacity ?? 0.9) * 100);
+    const opacityVal = h('span', { style: 'font-size:12px;font-weight:600;min-width:36px;text-align:right;' }, `${curOpacity}%`);
+    const opacitySlider = h('input', {
+      type: 'range', min: '10', max: '100', step: '5', value: String(curOpacity),
+      style: 'flex:1;cursor:pointer;accent-color:var(--accent,#0078d4);'
+    });
+    opacitySlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      s.brushOpacity = val / 100;
+      opacityVal.textContent = `${val}%`;
+      app.saveSettings();
+    });
+
+    const softnessRow = h('div', { class: 'row', style: 'display:flex;gap:4px;margin-top:6px;' },
+      ...['light', 'medium', 'strong'].map((mode) => {
+        const b = h('button', {
+          class: 'btn' + ((s.brushSoftness || 'medium') === mode ? ' primary' : ''),
+          style: 'padding:4px 10px;font-size:12px;text-transform:capitalize;'
+        }, t(mode));
+        b.addEventListener('click', () => {
+          markActive(softnessRow, b, 'primary');
+          s.brushSoftness = mode;
+          app.saveSettings();
+        });
+        return b;
+      })
+    );
+
+    body = h('div', { style: 'min-width:250px;' },
+      penTypeSwitcher('brush'),
+      h('h4', { style: 'margin:8px 0 4px 0;' }, t('Ink colour')),
+      swatchRow(PEN_COLORS, curColor, (c) => { pickInk(c); closePopover(); }, [customInk]),
+      h('h4', { style: 'margin-top:12px' }, t('Thickness')),
+      sizeRow([3, 6, 8, 14, 22], s.brushWidth || 8, (v) => { s.brushWidth = v; app.saveSettings(); app.syncUI(); }, curColor),
+      h('h4', { style: 'margin-top:12px' }, t('Opacity')),
+      h('div', { style: 'display:flex;align-items:center;gap:10px;margin-top:4px;' }, opacitySlider, opacityVal),
+      h('h4', { style: 'margin-top:12px' }, t('Bristle softness')),
+      softnessRow,
+      h('div', { class: 'row', style: 'margin-top:12px;' },
+        toggle(t('Velocity thinning (flick taper)'), s.brushVelocityThinning !== false, (v) => {
+          s.brushVelocityThinning = v;
+          app.saveSettings();
+        }))
+    );
+  } else if (tool === 'fountain') {
+    const curColor = s.fountainColor || s.penColor || '#002050';
+    const pickInk = (c) => {
+      s.fountainColor = c;
+      app.saveSettings();
+      app.syncUI();
+    };
+    const customInk = h('label', { class: 'sw sw-custom', title: t('Any colour') });
+    const customInput = h('input', { type: 'color', value: curColor });
+    customInput.addEventListener('input', () => { customInk.style.background = customInput.value; pickInk(customInput.value); });
+    customInk.style.background = curColor;
+    customInk.appendChild(customInput);
+
+    const slantRow = h('div', { class: 'row', style: 'display:flex;gap:4px;margin-top:6px;' },
+      ...[15, 30, 45, 60].map((deg) => {
+        const b = h('button', {
+          class: 'btn' + ((s.fountainSlant ?? 45) === deg ? ' primary' : ''),
+          style: 'padding:4px 10px;font-size:12px;'
+        }, `${deg}°`);
+        b.addEventListener('click', () => {
+          markActive(slantRow, b, 'primary');
+          s.fountainSlant = deg;
+          app.saveSettings();
+        });
+        return b;
+      })
+    );
+
+    const flexRow = h('div', { class: 'row', style: 'display:flex;gap:4px;margin-top:6px;' },
+      ...['subtle', 'normal', 'expressive'].map((mode) => {
+        const b = h('button', {
+          class: 'btn' + ((s.fountainFlex || 'normal') === mode ? ' primary' : ''),
+          style: 'padding:4px 10px;font-size:12px;text-transform:capitalize;'
+        }, t(mode));
+        b.addEventListener('click', () => {
+          markActive(flexRow, b, 'primary');
+          s.fountainFlex = mode;
+          app.saveSettings();
+        });
+        return b;
+      })
+    );
+
+    body = h('div', { style: 'min-width:250px;' },
+      penTypeSwitcher('fountain'),
+      h('h4', { style: 'margin:8px 0 4px 0;' }, t('Ink colour')),
+      swatchRow(PEN_COLORS, curColor, (c) => { pickInk(c); closePopover(); }, [customInk]),
+      h('h4', { style: 'margin-top:12px' }, t('Nib size')),
+      sizeRow([2, 3, 5, 8, 12], s.fountainWidth || 4, (v) => { s.fountainWidth = v; app.saveSettings(); app.syncUI(); }, curColor),
+      h('h4', { style: 'margin-top:12px' }, t('Nib slant angle')),
+      slantRow,
+      h('h4', { style: 'margin-top:12px' }, t('Tine flex')),
+      flexRow
+    );
+  } else if (tool === 'calligraphy') {
+    const curColor = s.calligraphyColor || s.penColor || '#1a1a1a';
+    const pickInk = (c) => {
+      s.calligraphyColor = c;
+      app.saveSettings();
+      app.syncUI();
+    };
+    const customInk = h('label', { class: 'sw sw-custom', title: t('Any colour') });
+    const customInput = h('input', { type: 'color', value: curColor });
+    customInput.addEventListener('input', () => { customInk.style.background = customInput.value; pickInk(customInput.value); });
+    customInk.style.background = curColor;
+    customInk.appendChild(customInput);
+
+    const angleRow = h('div', { class: 'row', style: 'display:flex;gap:4px;margin-top:6px;' },
+      ...[0, 30, 35, 45, 60].map((deg) => {
+        const b = h('button', {
+          class: 'btn' + ((s.calligraphyAngle ?? 35) === deg ? ' primary' : ''),
+          style: 'padding:4px 10px;font-size:12px;'
+        }, `${deg}°`);
+        b.addEventListener('click', () => {
+          markActive(angleRow, b, 'primary');
+          s.calligraphyAngle = deg;
+          app.saveSettings();
+        });
+        return b;
+      })
+    );
+
+    const flatnessRow = h('div', { class: 'row', style: 'display:flex;gap:4px;margin-top:6px;' },
+      ...[
+        { id: 2, label: 'Oval (2:1)' },
+        { id: 4, label: 'Chisel (4:1)' },
+        { id: 8, label: 'Razor (8:1)' }
+      ].map((f) => {
+        const b = h('button', {
+          class: 'btn' + ((s.calligraphyFlatness ?? 4) === f.id ? ' primary' : ''),
+          style: 'padding:4px 8px;font-size:12px;'
+        }, f.label);
+        b.addEventListener('click', () => {
+          markActive(flatnessRow, b, 'primary');
+          s.calligraphyFlatness = f.id;
+          app.saveSettings();
+        });
+        return b;
+      })
+    );
+
+    body = h('div', { style: 'min-width:250px;' },
+      penTypeSwitcher('calligraphy'),
+      h('h4', { style: 'margin:8px 0 4px 0;' }, t('Ink colour')),
+      swatchRow(PEN_COLORS, curColor, (c) => { pickInk(c); closePopover(); }, [customInk]),
+      h('h4', { style: 'margin-top:12px' }, t('Chisel width')),
+      sizeRow([4, 8, 12, 18, 26], s.calligraphyWidth || 12, (v) => { s.calligraphyWidth = v; app.saveSettings(); app.syncUI(); }, curColor),
+      h('h4', { style: 'margin-top:12px' }, t('Chisel angle')),
+      angleRow,
+      h('h4', { style: 'margin-top:12px' }, t('Flatness (edge ratio)')),
+      flatnessRow
     );
   } else if (tool === 'highlighter') {
     const curOpacity = Math.round(((s.highlighterOpacity ?? 0.5)) * 100);
@@ -1308,6 +1524,9 @@ export function openInsertPopover(app, anchor) {
       );
     }),
     ribbonToolItem(t('Highlighter'), 'highlighter', () => { app.setTool('highlighter'); app.syncUI(); }, 'highlighter', 'H'),
+    ribbonToolItem(t('Brush Pen'), 'brush', () => { app.setTool('brush'); app.syncUI(); }, 'brush', 'B'),
+    ribbonToolItem(t('Fountain Pen'), 'fountain', () => { app.setTool('fountain'); app.syncUI(); }, 'fountain', 'F'),
+    ribbonToolItem(t('Calligraphy Pen'), 'calligraphy', () => { app.setTool('calligraphy'); app.syncUI(); }, 'calligraphy', 'C'),
     ribbonToolItem(t('Study Tape'), 'curtain', () => { app.setTool('tape'); app.syncUI(); }, 'tape'),
     ribbonToolItem(t('Eraser'), 'eraser', () => { app.setTool('eraser'); app.syncUI(); }, 'eraser', 'E'),
     ribbonToolItem(t('Ruler'), 'ruler', () => app.command('ruler'), 'ruler', 'Ctrl+R'),
@@ -1416,6 +1635,27 @@ export function syncToolbar(app) {
     // highlighter is repainted or recolouring silently drops the "H"
     const want = penIcon(s.highlighterColor, 'none', 'highlighter') + '<span class="kbd">H</span>';
     if (hl.dataset.paint !== s.highlighterColor) { hl.innerHTML = want; hl.dataset.paint = s.highlighterColor; }
+  }
+  const brushBtn = bar.querySelector('.pen[data-tool="brush"]');
+  if (brushBtn) {
+    brushBtn.classList.toggle('active', app.tool === 'brush');
+    const bColor = s.brushColor || s.penColor || '#201f1e';
+    const want = penIcon(bColor, 'none', 'brush') + '<span class="kbd">B</span>';
+    if (brushBtn.dataset.paint !== bColor) { brushBtn.innerHTML = want; brushBtn.dataset.paint = bColor; }
+  }
+  const ftnBtn = bar.querySelector('.pen[data-tool="fountain"]');
+  if (ftnBtn) {
+    ftnBtn.classList.toggle('active', app.tool === 'fountain');
+    const fColor = s.fountainColor || s.penColor || '#002050';
+    const want = penIcon(fColor, 'none', 'fountain') + '<span class="kbd">F</span>';
+    if (ftnBtn.dataset.paint !== fColor) { ftnBtn.innerHTML = want; ftnBtn.dataset.paint = fColor; }
+  }
+  const calBtn = bar.querySelector('.pen[data-tool="calligraphy"]');
+  if (calBtn) {
+    calBtn.classList.toggle('active', app.tool === 'calligraphy');
+    const cColor = s.calligraphyColor || s.penColor || '#1a1a1a';
+    const want = penIcon(cColor, 'none', 'calligraphy') + '<span class="kbd">C</span>';
+    if (calBtn.dataset.paint !== cColor) { calBtn.innerHTML = want; calBtn.dataset.paint = cColor; }
   }
   const er = bar.querySelector('.pen[data-tool="eraser"]');
   if (er) er.classList.toggle('active', app.tool === 'eraser');

@@ -4,8 +4,10 @@ import assert from 'node:assert/strict';
 import { isScratchGesture } from '../src/js/core/scratch.js';
 import {
   INK_ENGINES, getInkEngine, hasPressureVariation, preparePoints,
-  setInkEngine, strokeWeight, inkPath
+  setInkEngine, strokeWeight, inkPath,
+  calligraphyEnvelope, calligraphySvgPath, brushRuns, fountainRuns
 } from '../src/js/core/ink.js';
+import { INK_TOOLS, isInkTool } from '../src/js/core/tools.js';
 import { HEAD_STYLES, ROUTES, connectorSvg, drawConnector, route, useConnectorStore } from '../src/js/core/connectors.js';
 import { clampImageCrop } from '../src/js/core/render.js';
 import { Camera } from '../src/js/core/camera.js';
@@ -378,4 +380,86 @@ test('dual-viewport interaction isolation and store independence', () => {
   leftStudyStore.redo();
   assert.equal(leftStudyStore.has('s2'), true);
   assert.equal(primaryStore.has('s1'), true);
+});
+
+test('new pen types: brush, fountain, and calligraphy stroke geometry and tool recognition', () => {
+  // 1. Tool recognition
+  assert.equal(isInkTool('brush'), true);
+  assert.equal(isInkTool('fountain'), true);
+  assert.equal(isInkTool('calligraphy'), true);
+  assert.equal(isInkTool('pen'), true);
+  assert.equal(isInkTool('highlighter'), true);
+  assert.equal(isInkTool('select'), false);
+  assert.equal(isInkTool('ruler'), false);
+  assert.equal(isInkTool('eraser'), false);
+
+  class TestPath2D {
+    commands = [];
+    moveTo(...args) { this.commands.push(['moveTo', ...args]); }
+    lineTo(...args) { this.commands.push(['lineTo', ...args]); }
+    quadraticCurveTo(...args) { this.commands.push(['quadraticCurveTo', ...args]); }
+    bezierCurveTo(...args) { this.commands.push(['bezierCurveTo', ...args]); }
+    closePath() { this.commands.push(['closePath']); }
+  }
+  const priorPath2D = globalThis.Path2D;
+  globalThis.Path2D = TestPath2D;
+
+  try {
+    // 2. Calligraphy envelope geometry and SVG export
+    const calPoints = [
+      { x: 10, y: 10, p: 0.5 },
+      { x: 20, y: 25, p: 0.5 },
+      { x: 35, y: 50, p: 0.6 },
+      { x: 50, y: 80, p: 0.5 }
+    ];
+    const envelope = calligraphyEnvelope(calPoints, 12, 35, 4);
+    assert.ok(envelope instanceof TestPath2D);
+    assert.ok(envelope.commands.some(([op]) => op === 'closePath'), 'Calligraphy envelope must form a closed polygon');
+
+    const calSvg = calligraphySvgPath({ points: calPoints, width: 12, angle: 35, flatness: 4 });
+    assert.ok(typeof calSvg === 'string');
+    assert.ok(calSvg.startsWith('M') && calSvg.endsWith('Z'), 'Calligraphy SVG path must be a valid closed path string');
+
+    // 3. Fountain pen directional tine spreading
+    // Slant 45 deg: parallel motion (45 deg) should produce thin stroke; perpendicular motion (135 deg) produces wide stroke
+    const ptsParallel = [
+      { x: 0, y: 0, p: 0.5, t: 0 },
+      { x: 20, y: 20, p: 0.5, t: 10 },
+      { x: 40, y: 40, p: 0.5, t: 20 },
+      { x: 60, y: 60, p: 0.5, t: 30 }
+    ];
+    const ptsPerp = [
+      { x: 60, y: 0, p: 0.5, t: 0 },
+      { x: 40, y: 20, p: 0.5, t: 10 },
+      { x: 20, y: 40, p: 0.5, t: 20 },
+      { x: 0, y: 60, p: 0.5, t: 30 }
+    ];
+    const runsParallel = fountainRuns(ptsParallel, 10, 45, 'normal', 1);
+    const runsPerp = fountainRuns(ptsPerp, 10, 45, 'normal', 1);
+    const maxWParallel = Math.max(...runsParallel.map((r) => r.width));
+    const maxWPerp = Math.max(...runsPerp.map((r) => r.width));
+    assert.ok(maxWPerp > maxWParallel, `Perpendicular stroke (${maxWPerp}px) should spread wider than parallel stroke (${maxWParallel}px)`);
+
+    // 4. Brush pen softness and velocity thinning
+    const slowBrushPoints = [
+      { x: 0, y: 0, p: 0.5, t: 0 },
+      { x: 10, y: 0, p: 0.5, t: 500 },
+      { x: 20, y: 0, p: 0.5, t: 1000 },
+      { x: 30, y: 0, p: 0.5, t: 1500 }
+    ];
+    const fastBrushPoints = [
+      { x: 0, y: 0, p: 0.5, t: 0 },
+      { x: 50, y: 0, p: 0.5, t: 10 },
+      { x: 100, y: 0, p: 0.5, t: 20 },
+      { x: 150, y: 0, p: 0.5, t: 30 }
+    ];
+    const runsSlow = brushRuns(slowBrushPoints, 12, 'soft', true, 1);
+    const runsFast = brushRuns(fastBrushPoints, 12, 'soft', true, 1);
+    const avgSlowW = runsSlow.reduce((acc, r) => acc + r.width, 0) / runsSlow.length;
+    const avgFastW = runsFast.reduce((acc, r) => acc + r.width, 0) / runsFast.length;
+    assert.ok(avgSlowW > avgFastW, 'Brush pen with velocity thinning should produce narrower strokes when drawn quickly');
+  } finally {
+    if (priorPath2D === undefined) delete globalThis.Path2D;
+    else globalThis.Path2D = priorPath2D;
+  }
 });

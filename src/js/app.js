@@ -82,6 +82,9 @@ export const DEFAULT_SETTINGS = {
   showGroupOutlines: true,
   edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, laserColor: '#ff2d2d',
   penOpacityEnabled: false, penOpacity: 1, laserTrailDuration: 520, boardLinkThumb: true,
+  brushColor: '#201f1e', brushWidth: 8, brushOpacity: 0.9, brushSoftness: 'medium', brushVelocityThinning: true,
+  fountainColor: '#002050', fountainWidth: 4, fountainSlant: 45, fountainFlex: 'normal',
+  calligraphyColor: '#1a1a1a', calligraphyWidth: 12, calligraphyAngle: 35, calligraphyFlatness: 4,
   textMarkdown: true, defaultCardStyle: 'canvas', wikilinkDblClick: 'ask', quickActionPopovers: true,
   // My boards' folders: a catalogue on this device, never inside a board (core/folders.js)
   folders: [], boardFolders: {},
@@ -1031,7 +1034,8 @@ class App {
   static PLACING = ['note', 'text', 'shape', 'emoji', 'table'];
 
   setTool(tool) {
-    if (tool === 'pen' || tool === 'highlighter') this.lastInkTool = tool;
+    const isInk = ['pen', 'highlighter', 'brush', 'fountain', 'calligraphy'].includes(tool);
+    if (isInk) this.lastInkTool = tool;
     if (this.tool === tool) return;
     /*
      * Reaching for a tool that drops something remembers what you were doing
@@ -1046,7 +1050,7 @@ class App {
     this.textEditor.commit();
     this.tool = tool;
     // a pen nib left behind by the tool it belonged to is just a stray picture
-    if (tool !== 'pen' && tool !== 'highlighter') this.interaction.hideInkPointer();
+    if (!isInk) this.interaction.hideInkPointer();
     if (tool !== 'laser') this.surface.laser.length = 0;   // no stale dot left behind
     // panning is a view change, not an edit - it must not throw a selection away
     if (tool !== 'select' && tool !== 'lasso' && tool !== 'pan') this.setSelection([]);
@@ -4768,7 +4772,7 @@ class App {
     // "@" on the board: a link to another board, where the pointer is
     if (e.key === '@' && !mod) { e.preventDefault(); this.command('insert.boardlink'); return; }
 
-    const keyTool = { v: 'select', l: 'lasso', p: 'pen', h: 'highlighter', e: 'eraser', n: 'note', t: 'text', s: 'shape', x: 'laser', g: 'pan' }[e.key.toLowerCase()];
+    const keyTool = { v: 'select', l: 'lasso', p: 'pen', h: 'highlighter', b: 'brush', f: 'fountain', c: 'calligraphy', e: 'eraser', n: 'note', t: 'text', s: 'shape', x: 'laser', g: 'pan' }[e.key.toLowerCase()];
     if (keyTool) { this.setTool(keyTool); return; }
     if (e.key === '?') this.showShortcuts();
   }

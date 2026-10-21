@@ -58,6 +58,9 @@ const EDGE_PANNABLE = new Set(['draw', 'erase', 'lasso', 'marquee', 'move', 'res
 // 'laser' is deliberately absent: pointing near the edge of the window should
 // not drag the board out from under what you are pointing at.
 
+export const INK_TOOLS = new Set(['pen', 'highlighter', 'brush', 'fountain', 'calligraphy']);
+export const isInkTool = (t) => INK_TOOLS.has(t);
+
 export class Interaction {
   constructor(app, opts = {}) {
     this.app = app;
@@ -188,7 +191,7 @@ export class Interaction {
     // and becomes a POINTER - it selects and drags objects, and pans the empty
     // canvas. It is not a plain pan tool: dragging a picture has to move the
     // picture, not the whole board.
-    if (e.pointerType === 'mouse' && !this.app.mouseInks && (this.tool === 'pen' || this.tool === 'highlighter'))
+    if (e.pointerType === 'mouse' && !this.app.mouseInks && isInkTool(this.tool))
       return 'mousePointer';
     /*
      * And the same rule for a finger, which is how one-finger panning works.
@@ -200,7 +203,7 @@ export class Interaction {
      * erase, and there is no ambiguity to resolve.
      */
     if (e.pointerType === 'touch' && !this.app.fingerInks
-        && (this.tool === 'pen' || this.tool === 'highlighter'))
+        && isInkTool(this.tool))
       return 'mousePointer';
     return this.tool;
   }
@@ -477,7 +480,7 @@ export class Interaction {
         this.surface.laser = [{ x: wp.x, y: wp.y, t: performance.now() }];
         this.action = { type: 'laser' };
         break;
-      case 'pen': case 'highlighter': case 'tape':
+      case 'pen': case 'highlighter': case 'tape': case 'brush': case 'fountain': case 'calligraphy':
         this.startStroke(e, wp, tool);
         if (this.action) this.action.selectionAtDown = selectionAtDown;
         break;
@@ -1071,7 +1074,7 @@ export class Interaction {
     // over now rather than waiting for a move that, on a pen just lifted off,
     // may not arrive for some time. After `action` is cleared, so that
     // showInkPointer sees a hover and picks the system cursor.
-    if (a.type === 'draw' && (this.tool === 'pen' || this.tool === 'highlighter')) {
+    if (a.type === 'draw' && isInkTool(this.tool)) {
       this.showInkPointer(sp, this.tool, e.pointerType);
     }
     this.app.syncUI();
@@ -1601,6 +1604,37 @@ export class Interaction {
     const s = this.app.settings;
     const isTape = tool === 'tape';
     const isHl = tool === 'highlighter';
+    const isBrush = tool === 'brush';
+    const isFountain = tool === 'fountain';
+    const isCalligraphy = tool === 'calligraphy';
+
+    let strokeColor = s.penColor;
+    let strokeWidth = s.penWidth;
+    let strokeOpacity = s.penOpacityEnabled ? (s.penOpacity ?? 1) : 1;
+    let strokeEffect = s.penEffect;
+
+    if (isHl) {
+      strokeColor = s.highlighterColor;
+      strokeWidth = s.highlighterWidth;
+      strokeOpacity = s.highlighterOpacity ?? 0.5;
+      strokeEffect = 'none';
+    } else if (isBrush) {
+      strokeColor = s.brushColor || s.penColor;
+      strokeWidth = s.brushWidth || 8;
+      strokeOpacity = s.brushOpacity ?? 0.9;
+      strokeEffect = 'none';
+    } else if (isFountain) {
+      strokeColor = s.fountainColor || s.penColor;
+      strokeWidth = s.fountainWidth || 4;
+      strokeOpacity = s.fountainOpacity ?? 1;
+      strokeEffect = 'none';
+    } else if (isCalligraphy) {
+      strokeColor = s.calligraphyColor || s.penColor;
+      strokeWidth = s.calligraphyWidth || 12;
+      strokeOpacity = s.calligraphyOpacity ?? 1;
+      strokeEffect = 'none';
+    }
+
     const obj = isTape ? {
       id: uid('cv'), type: 'curtain', subtype: 'tape', tool: 'tape',
       color: '#a855f7',
@@ -1609,13 +1643,19 @@ export class Interaction {
       points: [], bbox: { x: wp.x, y: wp.y, w: 0, h: 0 }, rotation: 0,
       revealed: false
     } : {
-      id: uid('s'), type: 'stroke', tool: isHl ? 'highlighter' : 'pen',
-      color: isHl ? s.highlighterColor : s.penColor,
-      width: isHl ? s.highlighterWidth : s.penWidth,
-      effect: isHl ? 'none' : s.penEffect,
+      id: uid('s'), type: 'stroke', tool,
+      color: strokeColor,
+      width: strokeWidth,
+      effect: strokeEffect,
       hue: Math.random() * 360,
-      opacity: isHl ? (s.highlighterOpacity ?? 0.5) : (s.penOpacityEnabled ? (s.penOpacity ?? 1) : 1),
+      opacity: strokeOpacity,
       colorPop: isHl ? (s.highlighterColorPop !== false) : undefined,
+      softness: isBrush ? (s.brushSoftness || 'medium') : undefined,
+      velocityThinning: isBrush ? (s.brushVelocityThinning !== false) : undefined,
+      slant: isFountain ? (s.fountainSlant ?? 45) : undefined,
+      flex: isFountain ? (s.fountainFlex || 'normal') : undefined,
+      angle: isCalligraphy ? (s.calligraphyAngle ?? 35) : undefined,
+      flatness: isCalligraphy ? (s.calligraphyFlatness ?? 4) : undefined,
       points: [], bbox: { x: wp.x, y: wp.y, w: 0, h: 0 }, rotation: 0
     };
     // starting in the gutter is drawing on the desk: nothing happens
@@ -2502,7 +2542,11 @@ export class Interaction {
   placeNib(el, sp, t) {
     const s = this.app.settings;
     const hl = t === 'highlighter';
-    const url = inkGlyphUrl(hl ? 'highlighter' : 'pen', hl ? s.highlighterColor : s.penColor);
+    const color = hl ? s.highlighterColor :
+                  t === 'brush' ? (s.brushColor || s.penColor) :
+                  t === 'fountain' ? (s.fountainColor || s.penColor) :
+                  t === 'calligraphy' ? (s.calligraphyColor || s.penColor) : s.penColor;
+    const url = inkGlyphUrl(hl ? 'highlighter' : 'pen', color);
     if (this._nibUrl !== url) { this._nibUrl = url; el.style.backgroundImage = url; }
     const hot = inkGlyphHotspot(hl ? 'highlighter' : 'pen');
     el.style.transform = 'translate3d(' + Math.round(sp.x - hot.x) + 'px,'
@@ -2512,17 +2556,17 @@ export class Interaction {
   /** The pen/highlighter cursor, tinted with the colour the tool is loaded with. */
   inkCursor(tool) {
     const s = this.app.settings;
-    // The nib shows the ink. On a dark board the default ink is light, so a
-    // black nib is the same small lie the tray and the swatches were telling:
-    // it says one thing and the pen does another.
-    return inkCursor(tool === 'highlighter' ? 'highlighter' : 'pen',
-      tool === 'highlighter' ? s.highlighterColor : inkPaint(s.penColor));
+    const color = tool === 'highlighter' ? s.highlighterColor :
+                  tool === 'brush' ? (s.brushColor || s.penColor) :
+                  tool === 'fountain' ? (s.fountainColor || s.penColor) :
+                  tool === 'calligraphy' ? (s.calligraphyColor || s.penColor) : inkPaint(s.penColor);
+    return inkCursor(tool === 'highlighter' ? 'highlighter' : 'pen', color);
   }
 
   updateHover(sp, wp, deviceType = 'mouse') {
     let cursor = 'default';
     const t = this.tool;
-    const inkTool = t === 'pen' || t === 'highlighter';
+    const inkTool = isInkTool(t);
     const mousePointer = deviceType === 'mouse' && !this.app.mouseInks && inkTool;
     if (this.spaceDown) cursor = 'grab';
     else if (mousePointer) cursor = 'grab';
@@ -2833,7 +2877,7 @@ export class Interaction {
       return;
     }
     // only the picking tools own selection chrome
-    if (this.tool !== 'pen' && this.tool !== 'highlighter') this.app.setSelection([hit.id]);
+    if (!isInkTool(this.tool)) this.app.setSelection([hit.id]);
     if (hit.locked) { this.app.setSelection([hit.id]); this.app.hintLocked(); return; }
     // A double-click on something grouped steps INTO the group and takes hold
     // of the one piece, rather than editing its text. Double-click again and

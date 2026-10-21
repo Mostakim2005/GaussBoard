@@ -14,6 +14,7 @@ import { t } from './i18n.js';
 import { mathEntry, mathPng, hasMaths, inlineFit } from './core/maths.js';
 import { connectorSvg } from './core/connectors.js';
 import { loadZip } from './board-export.js';
+import { calligraphySvgPath } from './core/ink.js';
 
 /**
  * What a bitmap or vector export covers.
@@ -227,9 +228,14 @@ function svgObjects(objects, meas) {
     const b = worldBounds(o);
     const rot = o.rotation ? ` transform="rotate(${(o.rotation * 180) / Math.PI} ${b.x + b.w / 2} ${b.y + b.h / 2})"` : '';
     if (o.type === 'stroke') {
-      const d = o.points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-      const hl = o.tool === 'highlighter';
-      parts.push(`<path d="${d}" fill="none" stroke="${o.color}" stroke-width="${o.width}" stroke-linecap="round" stroke-linejoin="round"${hl ? ` opacity="${o.opacity ?? 0.38}"` : ''}${rot}/>`);
+      if (o.tool === 'calligraphy') {
+        const d = calligraphySvgPath(o);
+        parts.push(`<path d="${d}" fill="${o.color}"${o.opacity != null && o.opacity < 1 ? ` opacity="${o.opacity}"` : ''}${rot}/>`);
+      } else {
+        const d = o.points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+        const hl = o.tool === 'highlighter';
+        parts.push(`<path d="${d}" fill="none" stroke="${o.color}" stroke-width="${o.width}" stroke-linecap="round" stroke-linejoin="round"${hl ? ` opacity="${o.opacity ?? 0.38}"` : (o.opacity != null && o.opacity < 1 ? ` opacity="${o.opacity}"` : '')}${rot}/>`);
+      }
     } else if (o.type === 'connector') {
       parts.push(connectorSvg(o));
     } else if (o.type === 'boardlink') {

@@ -147,6 +147,35 @@ export function penIcon(color, effect, kind = 'pen') {
       <path d="M5 12a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v8H5z" fill="#f3f2f1" stroke="#c8c6c4"/>
       <rect x="5" y="19" width="16" height="2.5" fill="rgba(0,0,0,.12)"/></svg>`;
   }
+  if (kind === 'brush') {
+    return `<svg viewBox="0 0 26 44" width="26" height="44" aria-hidden="true">
+      <defs>${defs}</defs>
+      <path d="M8.5 18h9v19a3 3 0 0 1-3 3h-3a3 3 0 0 1-3-3z" fill="#c49a6c"/>
+      <path d="M8 12.5h10v5.5H8z" fill="#a19f9d" stroke="#797775" stroke-width="0.8"/>
+      <path d="M13 1.5c-2.8 4-4.5 7-4.5 11h9c0-4-1.7-7-4.5-11z" fill="${fill}"/>
+      <rect x="8.5" y="16" width="9" height="2" fill="rgba(0,0,0,.25)"/></svg>`;
+  }
+  if (kind === 'fountain') {
+    return `<svg viewBox="0 0 26 44" width="26" height="44" aria-hidden="true">
+      <defs>${defs}</defs>
+      <path d="M7 16h12v21a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3z" fill="#1b2a47"/>
+      <path d="M8 13.5h10v2.5H8z" fill="#d4af37"/>
+      <path d="M13 1.5l5 12H8l5-12z" fill="#c8c6c4" stroke="#8a8886" stroke-width="0.8" stroke-linejoin="round"/>
+      <path d="M13 3v7" stroke="#323130" stroke-width="0.8"/>
+      <circle cx="13" cy="7.5" r="0.8" fill="#323130"/>
+      <path d="M13 1.5l2.5 6h-5l2.5-6z" fill="${fill}"/>
+      <rect x="7" y="27" width="12" height="3" fill="rgba(255,255,255,.18)"/></svg>`;
+  }
+  if (kind === 'calligraphy') {
+    return `<svg viewBox="0 0 26 44" width="26" height="44" aria-hidden="true">
+      <defs>${defs}</defs>
+      <path d="M7 16h12v21a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3z" fill="#2d2d2d"/>
+      <path d="M8 13.5h10v2.5H8z" fill="#d4af37"/>
+      <path d="M9 3l8 4.5v6H9v-10.5z" fill="#e1dfdd" stroke="#8a8886" stroke-width="0.8"/>
+      <path d="M9 3l8 4.5-2 3-8-4.5 2-3z" fill="${fill}"/>
+      <line x1="13" y1="5.2" x2="13" y2="13" stroke="#605e5c" stroke-width="0.8"/>
+      <rect x="7" y="27" width="12" height="3" fill="rgba(255,255,255,.18)"/></svg>`;
+  }
 
   return `<svg viewBox="0 0 26 44" width="26" height="44" aria-hidden="true">
     <defs>${defs}</defs>
