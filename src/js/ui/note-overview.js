@@ -147,14 +147,27 @@ export class NoteOverviewDrawer {
       const title = b.name || b.title || t('Untitled');
       const dateStr = b.updated ? new Date(b.updated).toLocaleDateString() : '';
 
-      // Card thumbnail placeholder / icon
-      const thumb = h('div', {
-        class: 'note-card-thumb',
-        style: 'height:120px;border-radius:10px;background:var(--desk,#f0f0f4);border:1px solid var(--line,rgba(0,0,0,0.08));display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;'
-      }, h('svg', {
-        viewBox: '0 0 24 24', width: '36', height: '36', fill: 'none', stroke: 'rgba(128,128,128,0.5)', 'stroke-width': '1.5',
-        html: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>'
-      }));
+      // Card thumbnail
+      const thumbUrl = b.thumb || (isCurrent ? this.app?.boardPictureFor?.() : null);
+      let thumb;
+      if (thumbUrl) {
+        thumb = h('div', {
+          class: 'note-card-thumb',
+          style: 'height:120px;border-radius:10px;background:var(--desk,#f0f0f4);border:1px solid var(--line,rgba(0,0,0,0.08));display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;'
+        }, h('img', {
+          src: thumbUrl,
+          alt: title,
+          style: 'width:100%;height:100%;object-fit:cover;display:block;'
+        }));
+      } else {
+        thumb = h('div', {
+          class: 'note-card-thumb',
+          style: 'height:120px;border-radius:10px;background:var(--desk,#f0f0f4);border:1px solid var(--line,rgba(0,0,0,0.08));display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;'
+        }, h('svg', {
+          viewBox: '0 0 24 24', width: '36', height: '36', fill: 'none', stroke: 'rgba(128,128,128,0.5)', 'stroke-width': '1.5',
+          html: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>'
+        }));
+      }
 
       // Tag pills
       const tagPills = [];
@@ -272,8 +285,61 @@ export class NoteOverviewDrawer {
     }
   }
 
+  showInputModal(title, placeholder, defaultValue = '') {
+    return new Promise((resolve) => {
+      const backdrop = h('div', {
+        class: 'note-overview-modal-backdrop',
+        style: 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;'
+      });
+
+      const input = h('input', {
+        type: 'text',
+        value: defaultValue,
+        placeholder,
+        style: 'width:100%;box-sizing:border-box;padding:8px 12px;border:1px solid var(--line,rgba(0,0,0,0.15));background:var(--desk,#f0f0f4);border-radius:8px;font-size:13px;color:var(--text,inherit);outline:none;margin-top:8px;'
+      });
+
+      const btnCancel = h('button', {
+        class: 'btn',
+        style: 'padding:5px 12px;font-size:12px;border-radius:8px;cursor:pointer;'
+      }, t('Cancel'));
+
+      const btnSubmit = h('button', {
+        class: 'btn primary',
+        style: 'padding:5px 14px;font-size:12px;border-radius:8px;cursor:pointer;'
+      }, t('Add'));
+
+      const finish = (val) => {
+        backdrop.remove();
+        resolve(val);
+      };
+
+      btnCancel.addEventListener('click', () => finish(null));
+      btnSubmit.addEventListener('click', () => finish(input.value.trim()));
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') finish(input.value.trim());
+        if (e.key === 'Escape') finish(null);
+      });
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) finish(null);
+      });
+
+      const box = h('div', {
+        style: 'width:320px;max-width:90vw;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(255,255,255,0.15));border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,0.3);padding:16px;display:flex;flex-direction:column;gap:10px;'
+      },
+        h('span', { style: 'font-weight:700;font-size:14px;' }, title),
+        input,
+        h('div', { style: 'display:flex;justify-content:flex-end;gap:8px;margin-top:4px;' }, btnCancel, btnSubmit)
+      );
+
+      backdrop.appendChild(box);
+      document.body.appendChild(backdrop);
+      setTimeout(() => input.focus(), 50);
+    });
+  }
+
   async addTagToBoard(board) {
-    const tag = prompt(t('Enter tag name (e.g. #study or #ai/llm):'));
+    const tag = await this.showInputModal(t('Add tag to board'), t('Enter tag name (e.g. #study or #ai/llm)'));
     if (!tag || !tag.trim()) return;
     const cleaned = tag.trim().startsWith('#') ? tag.trim() : '#' + tag.trim();
 
@@ -311,7 +377,7 @@ export class NoteOverviewDrawer {
   }
 
   async addAliasToBoard(board) {
-    const alias = prompt(t('Enter alias for board (e.g. Lecture 4 Notes):'));
+    const alias = await this.showInputModal(t('Add alias to board'), t('Enter alias for board (e.g. Lecture 4 Notes)'));
     if (!alias || !alias.trim()) return;
     const cleaned = alias.trim();
 

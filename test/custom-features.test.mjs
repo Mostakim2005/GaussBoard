@@ -279,3 +279,24 @@ test('scribble gesture honors sensitivity configuration', () => {
   // Under 'high' sensitivity (permissive), it passes
   assert.equal(isScratchGesture(moderateScratch, 'high'), true);
 });
+
+test('note overview clean tags and alias formatting', () => {
+  const formatTag = (t) => t.trim().startsWith('#') ? t.trim() : '#' + t.trim();
+  assert.equal(formatTag('study'), '#study');
+  assert.equal(formatTag('#deeplearning'), '#deeplearning');
+  assert.equal(formatTag('  ai/agents  '), '#ai/agents');
+
+  const formatAlias = (a) => a.trim();
+  assert.equal(formatAlias('  Lecture 4 Notes  '), 'Lecture 4 Notes');
+});
+
+test('note overview thumbnail selection prioritizes real thumb over fallback', () => {
+  const boardWithThumb = { id: 'b1', name: 'Board 1', thumb: 'data:image/png;base64,abc123' };
+  const boardWithoutThumb = { id: 'b2', name: 'Board 2', thumb: null };
+
+  const getThumb = (b, isCurrent, currentPicture) => b.thumb || (isCurrent ? currentPicture : null);
+
+  assert.equal(getThumb(boardWithThumb, false, null), 'data:image/png;base64,abc123');
+  assert.equal(getThumb(boardWithoutThumb, false, null), null);
+  assert.equal(getThumb(boardWithoutThumb, true, 'data:image/png;base64,live999'), 'data:image/png;base64,live999');
+});

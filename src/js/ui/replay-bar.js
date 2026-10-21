@@ -327,7 +327,7 @@ export class ReplayBar {
     this.el = h('div', {
       id: 'replayBar',
       class: 'replay-bar-hud',
-      style: 'position:absolute;z-index:9000;display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.14));border-radius:30px;box-shadow:0 6px 20px rgba(0,0,0,0.18);font-family:inherit;font-size:13px;backdrop-filter:blur(8px);'
+      style: 'position:absolute;z-index:9000;display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--surface-glass,rgba(28,32,38,0.9));color:var(--text,#ffffff);border:1px solid var(--stroke-glass,rgba(255,255,255,0.16));border-radius:36px;box-shadow:0 10px 32px rgba(0,0,0,0.32),0 2px 6px rgba(0,0,0,0.18),inset 0 1px 0 rgba(255,255,255,0.12);font-family:inherit;font-size:13px;backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);transition:box-shadow 0.2s,border-color 0.2s;'
     }, handle, this.btnOverview, this.btnSearch, this.btnAudio, this.btnPlayBar, this.btnMode, this.btnTape, this.btnSplit, this.btnMarkdown, this.btnPageMargin, this.btnVideo, this.btnScratch, this.btnMenu);
 
     this.updateVisibility();
@@ -441,49 +441,59 @@ export class ReplayBar {
 
     const menu = h('div', {
       id: 'replayBarMenu',
-      style: 'position:absolute;z-index:9999;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,0.22);padding:10px 14px;font-size:12.5px;min-width:210px;'
+      style: 'position:absolute;z-index:9999;background:var(--surface-glass,rgba(26,30,36,0.94));color:var(--text,#ffffff);border:1px solid var(--stroke-glass,rgba(255,255,255,0.14));border-radius:16px;box-shadow:0 16px 40px rgba(0,0,0,0.42),inset 0 1px 0 rgba(255,255,255,0.15);padding:14px;font-size:12.5px;min-width:250px;backdrop-filter:blur(24px) saturate(190%);-webkit-backdrop-filter:blur(24px) saturate(190%);'
     });
 
     // Positioning helper
     const rect = this.btnMenu.getBoundingClientRect();
-    menu.style.left = `${Math.min(window.innerWidth - 230, Math.max(10, rect.left))}px`;
+    menu.style.left = `${Math.min(window.innerWidth - 270, Math.max(10, rect.left))}px`;
     menu.style.top = `${rect.bottom + 8}px`;
 
-    const section = (title) => h('div', { style: 'font-weight:700;font-size:11.5px;color:var(--text-2,rgba(128,128,128,0.9));margin:8px 0 4px;text-transform:uppercase;letter-spacing:0.5px;' }, title);
+    const section = (title) => h('div', { style: 'font-weight:700;font-size:11px;color:var(--text-3,rgba(255,255,255,0.55));margin:10px 0 6px;text-transform:uppercase;letter-spacing:0.6px;' }, title);
 
-    const dockRow = h('div', { style: 'display:flex;gap:4px;margin-bottom:6px;' });
+    const dockRow = h('div', { style: 'display:flex;gap:3px;background:rgba(128,128,128,0.12);padding:3px;border-radius:10px;margin-bottom:6px;' });
     for (const d of ['top', 'bottom', 'left', 'right', 'free']) {
+      const isCur = this.dock === d;
       const b = h('button', {
-        class: 'btn' + (this.dock === d ? ' primary' : ''),
-        style: 'flex:1;padding:3px 6px;font-size:11px;text-transform:capitalize;',
+        class: 'rb-dock-opt' + (isCur ? ' active' : ''),
+        style: `flex:1;padding:4px 6px;font-size:11px;font-weight:${isCur ? '600' : '500'};border:none;border-radius:7px;background:${isCur ? '#0078d4' : 'transparent'};color:${isCur ? '#ffffff' : 'inherit'};cursor:pointer;text-transform:capitalize;transition:all 0.15s;`,
         onclick: () => { this.setDock(d); menu.remove(); }
       }, d);
       dockRow.appendChild(b);
     }
 
-    const orientRow = h('div', { style: 'display:flex;gap:4px;margin-bottom:6px;' });
+    const orientRow = h('div', { style: 'display:flex;gap:3px;background:rgba(128,128,128,0.12);padding:3px;border-radius:10px;margin-bottom:6px;' });
     for (const o of ['horizontal', 'vertical']) {
+      const isCur = this.orientation === o;
       const b = h('button', {
-        class: 'btn' + (this.orientation === o ? ' primary' : ''),
-        style: 'flex:1;padding:3px 6px;font-size:11px;text-transform:capitalize;',
+        class: 'rb-orient-opt' + (isCur ? ' active' : ''),
+        style: `flex:1;padding:4px 6px;font-size:11px;font-weight:${isCur ? '600' : '500'};border:none;border-radius:7px;background:${isCur ? '#0078d4' : 'transparent'};color:${isCur ? '#ffffff' : 'inherit'};cursor:pointer;text-transform:capitalize;transition:all 0.15s;`,
         onclick: () => { this.setOrientation(o); menu.remove(); }
       }, o);
       orientRow.appendChild(b);
     }
 
     const toolToggle = (key, name) => {
-      const row = h('label', { style: 'display:flex;align-items:center;justify-content:space-between;padding:3px 0;cursor:pointer;' },
-        h('span', {}, name),
-        h('input', {
-          type: 'checkbox',
-          checked: this.visibleTools[key] !== false,
-          onchange: (ev) => {
-            this.visibleTools[key] = ev.target.checked;
-            this.updateVisibility();
-            this.saveState();
-          }
-        })
+      const isChecked = this.visibleTools[key] !== false;
+      const sw = h('input', {
+        type: 'checkbox',
+        checked: isChecked,
+        style: 'cursor:pointer;accent-color:#0078d4;'
+      });
+      sw.addEventListener('change', (ev) => {
+        this.visibleTools[key] = ev.target.checked;
+        this.updateVisibility();
+        this.saveState();
+      });
+
+      const row = h('label', {
+        style: 'display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:8px;cursor:pointer;transition:background 0.12s;'
+      },
+        h('span', { style: 'font-weight:500;' }, name),
+        sw
       );
+      row.addEventListener('mouseenter', () => row.style.background = 'rgba(255,255,255,0.06)');
+      row.addEventListener('mouseleave', () => row.style.background = 'none');
       return row;
     };
 
