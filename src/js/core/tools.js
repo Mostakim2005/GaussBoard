@@ -59,11 +59,14 @@ const EDGE_PANNABLE = new Set(['draw', 'erase', 'lasso', 'marquee', 'move', 'res
 // not drag the board out from under what you are pointing at.
 
 export class Interaction {
-  constructor(app) {
+  constructor(app, opts = {}) {
     this.app = app;
-    this.surface = app.surface;
-    this.store = app.store;
-    this.canvas = app.surface.canvas;
+    this.opts = opts;
+    this.surface = opts.surface || app.surface;
+    this.store = opts.store || app.store;
+    this.canvas = opts.canvas || this.surface.canvas;
+    this._ac = new AbortController();
+    const { signal } = this._ac;
 
     this.pointers = new Map();
     this.action = null;
@@ -82,10 +85,10 @@ export class Interaction {
     this._eatNextMenu = false;  // a right-drag must not end in a context menu
 
     const c = this.canvas;
-    c.addEventListener('pointerdown', (e) => this.onDown(e));
-    c.addEventListener('pointermove', (e) => this.onMove(e));
-    c.addEventListener('pointerup', (e) => this.onUp(e));
-    c.addEventListener('pointercancel', (e) => this.onUp(e));
+    c.addEventListener('pointerdown', (e) => this.onDown(e), { signal });
+    c.addEventListener('pointermove', (e) => this.onMove(e), { signal });
+    c.addEventListener('pointerup', (e) => this.onUp(e), { signal });
+    c.addEventListener('pointercancel', (e) => this.onUp(e), { signal });
     c.addEventListener('pointerleave', () => {
       if (this.action) return;
       this.surface.hoverId = null;
@@ -95,9 +98,9 @@ export class Interaction {
       this.hideInkPointer();
       this.eraserCursor = null;
       this.surface.invalidate();
-    });
-    c.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
-    c.addEventListener('dblclick', (e) => this.onDoubleClick(e));
+    }, { signal });
+    c.addEventListener('wheel', (e) => this.onWheel(e), { passive: false, signal });
+    c.addEventListener('dblclick', (e) => this.onDoubleClick(e), { signal });
     c.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       if (this.app.readingMode) return;
@@ -137,9 +140,21 @@ export class Interaction {
       // nothing that used to work is lost.
       this.rightPan = null;
       this.app.showContextMenu(e);
-    });
+    }, { signal });
 
-    this.surface.overlays.push((ctx, s) => this.drawOverlay(ctx, s));
+    this._overlayCb = (ctx, s) => this.drawOverlay(ctx, s);
+    this.surface.overlays.push(this._overlayCb);
+  }
+
+  destroy() {
+    this._ac?.abort();
+    if (this._overlayCb && this.surface?.overlays) {
+      const idx = this.surface.overlays.indexOf(this._overlayCb);
+      if (idx !== -1) this.surface.overlays.splice(idx, 1);
+    }
+    this.cancelNibHide();
+    this.stopEdgePan();
+    this.hideInkPointer();
   }
 
   get tool() { return this.app.tool; }
@@ -1704,7 +1719,7 @@ export class Interaction {
     const hitAudio = pick(this.store, p0, 8 / z);
     if (hitAudio && hitAudio.type === 'audio') {
       this.discardTapMark();
-      const tr = (this.app.store?.doc?.audioTracks || []).find((t) => t.id === hitAudio.trackId);
+      const tr = ((this.store || this.app.store)?.doc?.audioTracks || []).find((t) => t.id === hitAudio.trackId);
       if (tr) {
         this.app.audioBar?.open(tr);
         this.app.audioBar?.togglePlay();
@@ -1766,7 +1781,7 @@ export class Interaction {
     const hit = pick(this.store, wp, 8 / this.surface.cam.z);
     if (!hit) return;
     if (hit.type === 'audio') {
-      const track = (this.app.store?.doc?.audioTracks || []).find((item) => item.id === hit.trackId);
+      const track = ((this.store || this.app.store)?.doc?.audioTracks || []).find((item) => item.id === hit.trackId);
       if (track) { this.app.audioBar?.open(track); this.app.audioBar?.togglePlay(); }
       return;
     }
@@ -2326,7 +2341,7 @@ export class Interaction {
 
   /** The ink-pointer layer, looked up once and kept. */
   nibEl() {
-    if (this._nibEl === undefined) this._nibEl = document.getElementById('inkNib') || null;
+    if (this._nibEl === undefined) this._nibEl = this.opts?.inkNib || document.getElementById('inkNib') || null;
     return this._nibEl;
   }
 
@@ -2810,7 +2825,7 @@ export class Interaction {
     // covers are the norm, since nobody wants one nudged mid-lesson.
     if (hit.type === 'curtain') { this.app.toggleCurtain(hit.id); return; }
     if (hit.type === 'audio') {
-      const tr = (this.app.store?.doc?.audioTracks || []).find((t) => t.id === hit.trackId);
+      const tr = ((this.store || this.app.store)?.doc?.audioTracks || []).find((t) => t.id === hit.trackId);
       if (tr) {
         this.app.audioBar?.open(tr);
         this.app.audioBar?.togglePlay();

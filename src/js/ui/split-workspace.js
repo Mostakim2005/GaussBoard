@@ -5,6 +5,8 @@ import { h } from './popover.js';
 import { Surface } from '../core/surface.js';
 import { Store } from '../core/store.js';
 import { Interaction } from '../core/tools.js';
+import { PropertiesDialog } from './properties-dialog.js';
+import { icon } from './icons.js';
 import { t } from '../i18n.js';
 
 export class SplitWorkspace {
@@ -24,10 +26,19 @@ export class SplitWorkspace {
     this.leftStore = null;
     this.leftSurface = null;
     this.leftInteraction = null;
+    this.leftNib = null;
+    this.leftBoardId = null;
+    this.leftPropertiesDialog = null;
+    this._saveTimer = null;
+    this._resizeHandler = null;
+    this._pickerOutsideClick = null;
     this.primaryCanvas = null;
     this.originalCanvasParent = null;
     this.originalCanvasNextSibling = null;
     this.reparentedNodes = [];
+    this.boardList = [];
+    this.pickerDropdown = null;
+    this.pickerInput = null;
   }
 
   get active() {
@@ -37,7 +48,7 @@ export class SplitWorkspace {
   /**
    * Mount dual-viewport workspace layout.
    */
-  enable({ leftBoardData = null, ratio = 0.5 } = {}) {
+  enable({ leftBoardData = null, ratio = 0.5, leftBoardId = null } = {}) {
     if (this.enabled) return;
     if (typeof document === 'undefined') {
       this.enabled = true;
@@ -51,6 +62,7 @@ export class SplitWorkspace {
     if (!this.primaryCanvas) return;
 
     this.ratio = Math.max(0.2, Math.min(0.8, ratio));
+    this.leftBoardId = leftBoardId || null;
 
     // Stash original elements to reparent and restore on disable
     const toReparent = [
@@ -75,25 +87,66 @@ export class SplitWorkspace {
       style: 'position:absolute;inset:0;display:flex;width:100%;height:100%;overflow:hidden;z-index:2;'
     });
 
-    // Left pane (Reference deck / PDF)
+    // Left pane (Reference deck / Study board)
     this.leftPane = h('div', {
       id: 'stageLeft',
       class: 'split-pane split-left',
       style: `position:relative;flex:none;width:${(this.ratio * 100).toFixed(1)}%;height:100%;overflow:hidden;background:var(--desk,#f0f0f0);display:flex;flex-direction:column;`
     });
 
-    // Left pane top header
-    this.boardSelect = h('select', {
-      class: 'split-board-select',
-      style: 'flex:1;max-width:240px;padding:4px 8px;border-radius:8px;border:1px solid var(--line,rgba(0,0,0,0.15));background:var(--surface,#ffffff);color:inherit;font-size:12px;outline:none;'
-    }, h('option', { value: '' }, t('-- Select Board to Study --')));
+    // Board picker combobox
+    const boardPickerEl = this.buildBoardPicker();
 
-    this.boardSelect.addEventListener('change', (e) => {
-      const id = e.target.value;
-      if (id) this.loadLeftBoard(id);
+    // Left pane buttons: Undo, Redo, Properties, Swap, Close
+    const btnUndo = h('button', {
+      class: 'btn-split-undo',
+      title: t('Undo (Left board)'),
+      style: 'background:none;border:none;cursor:pointer;padding:4px;color:inherit;display:flex;align-items:center;opacity:0.8;',
+      html: icon('undo', 16)
+    });
+    btnUndo.addEventListener('click', () => {
+      if (!this.leftStore) return;
+      this.leftStore.undo();
+      this.leftSurface?.repaintAll();
+      this.saveLeftBoardDebounced();
+    });
+
+    const btnRedo = h('button', {
+      class: 'btn-split-redo',
+      title: t('Redo (Left board)'),
+      style: 'background:none;border:none;cursor:pointer;padding:4px;color:inherit;display:flex;align-items:center;opacity:0.8;',
+      html: icon('redo', 16)
+    });
+    btnRedo.addEventListener('click', () => {
+      if (!this.leftStore) return;
+      this.leftStore.redo();
+      this.leftSurface?.repaintAll();
+      this.saveLeftBoardDebounced();
+    });
+
+    const btnProps = h('button', {
+      class: 'btn-split-props',
+      title: t('Board Properties — Study Board'),
+      style: 'background:rgba(0,0,0,0.05);border:1px solid var(--line,rgba(0,0,0,0.1));border-radius:6px;cursor:pointer;padding:3px 7px;font-size:11px;font-weight:600;color:inherit;display:flex;align-items:center;gap:4px;',
+      html: '<span style="font-weight:700;color:#0078d4;">#</span><span>' + t('Properties') + '</span>'
+    });
+    btnProps.addEventListener('click', () => {
+      if (!this.leftStore?.doc) return;
+      if (!this.leftPropertiesDialog) {
+        this.leftPropertiesDialog = new PropertiesDialog(this.app, {
+          doc: this.leftStore.doc,
+          onSave: async () => {
+            await this.saveLeftBoard();
+          }
+        });
+      } else {
+        this.leftPropertiesDialog.targetDoc = this.leftStore.doc;
+      }
+      this.leftPropertiesDialog.open();
     });
 
     const btnSwap = h('button', {
+      class: 'btn-split-swap',
       title: t('Swap left and right boards'),
       style: 'background:none;border:none;cursor:pointer;padding:4px;color:inherit;display:flex;align-items:center;',
       html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16"/></svg>'
@@ -101,19 +154,25 @@ export class SplitWorkspace {
     btnSwap.addEventListener('click', () => this.swapPanes());
 
     const btnCloseSplit = h('button', {
+      class: 'btn-split-close',
       title: t('Close split view'),
       style: 'background:none;border:none;cursor:pointer;padding:4px;color:inherit;display:flex;align-items:center;',
-      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+      html: icon('close', 16)
     });
     btnCloseSplit.addEventListener('click', () => this.disable());
 
+    const actionsWrap = h('div', {
+      style: 'display:flex;align-items:center;gap:3px;'
+    }, btnUndo, btnRedo, btnProps, btnSwap, btnCloseSplit);
+
     const leftHeader = h('div', {
       class: 'split-left-header',
-      style: 'height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;background:var(--surface,#ffffff);border-bottom:1px solid var(--line,rgba(0,0,0,0.1));z-index:10;'
-    }, this.boardSelect, h('div', { style: 'display:flex;gap:4px;' }, btnSwap, btnCloseSplit));
+      style: 'height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:var(--surface,#ffffff);border-bottom:1px solid var(--line,rgba(0,0,0,0.1));z-index:10;gap:8px;'
+    }, boardPickerEl, actionsWrap);
 
     // Left canvas viewport wrapper
     const canvasWrap = h('div', {
+      class: 'split-left-canvas-wrap',
       style: 'position:relative;flex:1;width:100%;height:100%;overflow:hidden;'
     });
 
@@ -122,6 +181,14 @@ export class SplitWorkspace {
     cLeft.id = 'cLeft';
     cLeft.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;';
     canvasWrap.appendChild(cLeft);
+
+    // Left ink nib cursor
+    const leftNib = h('div', {
+      id: 'inkNibLeft',
+      style: 'position:absolute;pointer-events:none;z-index:99;display:none;width:24px;height:24px;background-size:contain;background-repeat:no-repeat;transform:translate3d(-50%,-50%,0);'
+    });
+    canvasWrap.appendChild(leftNib);
+    this.leftNib = leftNib;
 
     this.leftPane.appendChild(leftHeader);
     this.leftPane.appendChild(canvasWrap);
@@ -153,6 +220,9 @@ export class SplitWorkspace {
     this.leftStore = new Store();
     if (leftBoardData) {
       this.leftStore.load(leftBoardData);
+      if (this.pickerInput && leftBoardData.title) {
+        this.pickerInput.value = leftBoardData.title;
+      }
     }
     this.leftSurface = new Surface(cLeft, this.leftStore, { lowLatency: false });
     this.leftSurface.resize();
@@ -160,11 +230,42 @@ export class SplitWorkspace {
     // Wire divider drag interaction
     this.wireDivider(this.divider);
 
-    // Wire pan and zoom navigation on left canvas
+    // Wire left canvas navigation (wheel zooming and panning)
     this.wireLeftCanvasNavigation(cLeft);
 
-    // Populate board list dropdown
-    this.populateBoardDropdown();
+    // Proxy for dual interaction pipeline
+    const leftAppProxy = new Proxy(this.app, {
+      get: (target, prop) => {
+        if (prop === 'store') return this.leftStore;
+        if (prop === 'surface') return this.leftSurface;
+        if (prop === 'inkNibEl') return this.leftNib;
+        if (prop === 'syncUI') return () => this.leftSurface?.invalidate();
+        if (prop === 'onGestureEnd') return () => this.saveLeftBoardDebounced();
+        if (prop === 'setSelection') return (ids, additive = false) => {
+          const sel = this.leftSurface?.selection;
+          if (!sel) return;
+          if (!additive) sel.clear();
+          for (const id of ids) {
+            if (this.leftStore?.has(id)) sel.add(id);
+          }
+          this.leftSurface?.invalidate();
+        };
+        return target[prop];
+      }
+    });
+
+    this.leftInteraction = new Interaction(leftAppProxy, {
+      surface: this.leftSurface,
+      store: this.leftStore,
+      canvas: cLeft,
+      inkNib: this.leftNib
+    });
+
+    this._resizeHandler = () => {
+      if (this.leftSurface) this.leftSurface.resize();
+      if (this.app?.surface) this.app.surface.resize();
+    };
+    window.addEventListener('resize', this._resizeHandler);
 
     // Update primary canvas surface size
     if (this.app?.surface) {
@@ -180,11 +281,38 @@ export class SplitWorkspace {
   disable() {
     if (!this.enabled) return;
 
+    clearTimeout(this._saveTimer);
+    if (this.leftBoardId) {
+      this.saveLeftBoard();
+    }
+
+    if (this._resizeHandler) {
+      window.removeEventListener('resize', this._resizeHandler);
+      this._resizeHandler = null;
+    }
+
+    if (this._pickerOutsideClick) {
+      window.removeEventListener('pointerdown', this._pickerOutsideClick);
+      this._pickerOutsideClick = null;
+    }
+
+    if (this.leftInteraction) {
+      this.leftInteraction.destroy();
+      this.leftInteraction = null;
+    }
+
     if (this.leftSurface) {
       this.leftSurface.stop?.();
       this.leftSurface = null;
     }
     this.leftStore = null;
+    this.leftNib = null;
+    this.leftBoardId = null;
+
+    if (this.leftPropertiesDialog) {
+      this.leftPropertiesDialog.close();
+      this.leftPropertiesDialog = null;
+    }
 
     if (this.reparentedNodes?.length) {
       for (const rec of this.reparentedNodes) {
@@ -217,6 +345,8 @@ export class SplitWorkspace {
     this.leftPane = null;
     this.rightPane = null;
     this.divider = null;
+    this.pickerDropdown = null;
+    this.pickerInput = null;
 
     if (this.app?.surface) {
       this.app.surface.resize();
@@ -275,26 +405,210 @@ export class SplitWorkspace {
     const leftData = this.leftStore.toJSON();
     const rightData = this.app.store.toJSON();
 
+    const prevLeftId = this.leftBoardId;
+    const prevRightId = this.app.boardId;
+
     this.leftStore.load(rightData);
+    this.leftBoardId = prevRightId;
     this.app.loadBoard(leftData, { asCopy: false });
+
+    if (this.pickerInput) {
+      this.pickerInput.value = this.leftStore.doc?.title || t('Untitled');
+    }
 
     if (this.leftSurface) this.leftSurface.repaintAll();
     if (this.app.surface) this.app.surface.repaintAll();
   }
 
-  async populateBoardDropdown() {
-    if (!this.boardSelect) return;
+  buildBoardPicker() {
+    const wrap = h('div', {
+      class: 'split-board-picker',
+      style: 'position:relative;flex:1;max-width:280px;'
+    });
+
+    const bar = h('div', {
+      class: 'split-picker-bar',
+      style: 'display:flex;align-items:center;background:var(--surface,#ffffff);border:1px solid var(--line,rgba(0,0,0,0.18));border-radius:8px;padding:2px 8px;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,0.06);'
+    });
+
+    const searchIcon = h('span', {
+      style: 'display:flex;align-items:center;opacity:0.5;color:inherit;',
+      html: icon('search', 13)
+    });
+
+    this.pickerInput = h('input', {
+      type: 'text',
+      class: 'split-board-search-input',
+      placeholder: t('Search or create board...'),
+      style: 'flex:1;border:none;background:none;outline:none;font-size:12px;color:inherit;min-width:60px;padding:2px 0;'
+    });
+
+    const arrowIcon = h('span', {
+      style: 'cursor:pointer;display:flex;align-items:center;opacity:0.5;color:inherit;',
+      html: icon('chevronDown', 13)
+    });
+
+    bar.appendChild(searchIcon);
+    bar.appendChild(this.pickerInput);
+    bar.appendChild(arrowIcon);
+    wrap.appendChild(bar);
+
+    this.pickerDropdown = h('div', {
+      class: 'split-picker-dropdown',
+      style: 'display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:340px;overflow-y:auto;background:var(--surface,#ffffff);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.2);z-index:200;padding:6px;backdrop-filter:blur(20px);'
+    });
+    wrap.appendChild(this.pickerDropdown);
+
+    this.pickerInput.addEventListener('focus', () => {
+      this.openPickerDropdown();
+    });
+
+    this.pickerInput.addEventListener('input', () => {
+      this.renderPickerList(this.pickerInput.value);
+    });
+
+    arrowIcon.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.pickerDropdown.style.display === 'block') {
+        this.closePickerDropdown();
+      } else {
+        this.openPickerDropdown();
+        this.pickerInput.focus();
+      }
+    });
+
+    this._pickerOutsideClick = (e) => {
+      if (wrap && !wrap.contains(e.target)) {
+        this.closePickerDropdown();
+      }
+    };
+    window.addEventListener('pointerdown', this._pickerOutsideClick);
+
+    return wrap;
+  }
+
+  async openPickerDropdown() {
+    if (!this.pickerDropdown) return;
+    this.pickerDropdown.style.display = 'block';
+    await this.refreshBoardList();
+    this.renderPickerList(this.pickerInput?.value || '');
+  }
+
+  closePickerDropdown() {
+    if (this.pickerDropdown) this.pickerDropdown.style.display = 'none';
+  }
+
+  async refreshBoardList() {
     try {
       if (window.board?.boards?.list) {
-        const list = await window.board.boards.list();
-        for (const b of list) {
-          const opt = document.createElement('option');
-          opt.value = b.id;
-          opt.textContent = b.name || b.title || t('Untitled');
-          this.boardSelect.appendChild(opt);
-        }
+        this.boardList = await window.board.boards.list() || [];
+      } else if (this.app?.storage?.list) {
+        this.boardList = await this.app.storage.list() || [];
+      } else {
+        this.boardList = [];
       }
-    } catch {}
+    } catch {
+      this.boardList = [];
+    }
+  }
+
+  renderPickerList(query = '') {
+    if (!this.pickerDropdown) return;
+    this.pickerDropdown.innerHTML = '';
+    const q = (query || '').trim().toLowerCase();
+
+    // 1. If query is non-empty and does NOT exactly match any board title, offer "+ Create board"
+    const exactMatch = this.boardList.some(b => (b.name || b.title || '').toLowerCase() === q);
+    if (q && !exactMatch) {
+      const createItem = h('div', {
+        class: 'split-create-board-action',
+        style: 'display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;background:rgba(0,120,212,0.08);color:#0078d4;font-size:12px;font-weight:600;margin-bottom:6px;',
+        html: `${icon('plus', 14)} <span>${t('Create board "{name}"', { name: query.trim() })}</span>`
+      });
+      createItem.addEventListener('pointerdown', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await this.createNewStudyBoard(query.trim());
+      });
+      this.pickerDropdown.appendChild(createItem);
+    }
+
+    // 2. Filter existing boards
+    const filtered = this.boardList.filter(b => {
+      if (!q) return true;
+      const title = (b.name || b.title || '').toLowerCase();
+      if (title.includes(q)) return true;
+      const tags = Array.isArray(b.tags) ? b.tags.join(' ').toLowerCase() : '';
+      if (tags.includes(q)) return true;
+      const aliases = Array.isArray(b.aliases) ? b.aliases.join(' ').toLowerCase() : '';
+      if (aliases.includes(q)) return true;
+      return false;
+    });
+
+    if (filtered.length === 0 && (!q || exactMatch)) {
+      const empty = h('div', {
+        style: 'padding:12px;text-align:center;font-size:12px;color:var(--text-2,rgba(128,128,128,0.7));font-style:italic;'
+      }, t('No boards found'));
+      this.pickerDropdown.appendChild(empty);
+      return;
+    }
+
+    for (const b of filtered) {
+      const item = h('div', {
+        class: 'split-board-item',
+        style: 'display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:7px;cursor:pointer;transition:background 0.15s;'
+      });
+      item.addEventListener('mouseenter', () => { item.style.background = 'rgba(0,0,0,0.05)'; });
+      item.addEventListener('mouseleave', () => { item.style.background = 'none'; });
+
+      // Thumbnail preview
+      let thumbWrap;
+      if (b.thumb) {
+        thumbWrap = h('div', {
+          style: 'width:36px;height:24px;border-radius:4px;overflow:hidden;border:1px solid var(--line,rgba(0,0,0,0.1));background:var(--desk,#eeeeee);flex-shrink:0;display:flex;align-items:center;justify-content:center;'
+        }, h('img', {
+          src: b.thumb,
+          style: 'width:100%;height:100%;object-fit:cover;'
+        }));
+      } else {
+        thumbWrap = h('div', {
+          style: 'width:36px;height:24px;border-radius:4px;border:1px solid var(--line,rgba(0,0,0,0.1));background:var(--desk,#eeeeee);flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--text-2,rgba(128,128,128,0.6));',
+          html: icon('doc', 14)
+        });
+      }
+
+      // Title & metadata
+      const titleSpan = h('div', {
+        style: 'font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;color:inherit;'
+      }, b.name || b.title || t('Untitled'));
+
+      const metaParts = [];
+      if (b.modified) {
+        const d = new Date(b.modified);
+        metaParts.push(d.toLocaleDateString());
+      }
+      if (Array.isArray(b.tags) && b.tags.length > 0) {
+        metaParts.push(b.tags.slice(0, 2).map(tg => tg.startsWith('#') ? tg : '#' + tg).join(' '));
+      }
+      const metaSpan = h('div', {
+        style: 'font-size:10px;color:var(--text-2,rgba(128,128,128,0.7));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;'
+      }, metaParts.join(' · '));
+
+      const infoCol = h('div', { style: 'flex:1;overflow:hidden;display:flex;flex-direction:column;gap:1px;' }, titleSpan, metaSpan);
+
+      item.appendChild(thumbWrap);
+      item.appendChild(infoCol);
+
+      item.addEventListener('pointerdown', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.pickerInput.value = b.name || b.title || t('Untitled');
+        this.closePickerDropdown();
+        await this.loadLeftBoard(b.id);
+      });
+
+      this.pickerDropdown.appendChild(item);
+    }
   }
 
   async loadLeftBoard(id) {
@@ -312,15 +626,82 @@ export class SplitWorkspace {
         try { data = JSON.parse(data); } catch {}
       }
       if (data) {
+        this.leftBoardId = id;
         this.leftStore.load(data);
         if (this.leftSurface) {
           this.leftSurface.cam.reset?.();
           this.leftSurface.repaintAll();
         }
-        if (this.boardSelect) this.boardSelect.value = id;
+        if (this.pickerInput) {
+          this.pickerInput.value = data.title || t('Untitled');
+        }
+        if (this.leftPropertiesDialog) {
+          this.leftPropertiesDialog.targetDoc = this.leftStore.doc;
+          if (this.leftPropertiesDialog.visible) {
+            this.leftPropertiesDialog.sync();
+          }
+        }
       }
     } catch (err) {
       this.app?.toast?.(t('Failed to load board: {msg}', { msg: err.message }));
+    }
+  }
+
+  async createNewStudyBoard(title) {
+    if (!title || !title.trim()) return;
+    const name = title.trim();
+    const id = `b_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const newDoc = {
+      v: 2,
+      id,
+      title: name,
+      created: Date.now(),
+      modified: Date.now(),
+      elements: [],
+      pages: [{ id: 'p_1', x: 0, y: 0, w: 1920, h: 1080 }],
+      properties: { tags: [], aliases: [] }
+    };
+    try {
+      if (window.board?.boards?.save) {
+        // Critical: setLast: false ensures the user's primary startup board pointer is preserved!
+        await window.board.boards.save({ id, json: JSON.stringify(newDoc), setLast: false });
+      }
+      this.leftBoardId = id;
+      if (this.leftStore) {
+        this.leftStore.load(newDoc);
+        if (this.leftSurface) {
+          this.leftSurface.cam.reset?.();
+          this.leftSurface.repaintAll();
+        }
+      }
+      if (this.pickerInput) this.pickerInput.value = name;
+      this.closePickerDropdown();
+      if (this.leftPropertiesDialog) {
+        this.leftPropertiesDialog.targetDoc = this.leftStore.doc;
+        if (this.leftPropertiesDialog.visible) {
+          this.leftPropertiesDialog.sync();
+        }
+      }
+      this.app?.toast?.(t('Created study board "{name}"', { name }), 'check');
+    } catch (err) {
+      this.app?.toast?.(t('Failed to create board: {msg}', { msg: err.message }));
+    }
+  }
+
+  saveLeftBoardDebounced() {
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => this.saveLeftBoard(), 600);
+  }
+
+  async saveLeftBoard() {
+    if (!this.leftBoardId || !this.leftStore) return;
+    try {
+      const json = JSON.stringify(this.leftStore.toJSON());
+      if (window.board?.boards?.save) {
+        await window.board.boards.save({ id: this.leftBoardId, json, setLast: false });
+      }
+    } catch (err) {
+      console.warn('Failed to auto-save left study board:', err);
     }
   }
 
@@ -339,34 +720,5 @@ export class SplitWorkspace {
       }
       this.leftSurface.repaintAll();
     }, { passive: false });
-
-    let leftPanning = false, startX = 0, startY = 0;
-    cLeft.addEventListener('pointerdown', (e) => {
-      if (e.button === 0 || e.button === 1) {
-        leftPanning = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        try { cLeft.setPointerCapture(e.pointerId); } catch {}
-      }
-    });
-
-    cLeft.addEventListener('pointermove', (e) => {
-      if (!leftPanning || !this.leftSurface) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      startX = e.clientX;
-      startY = e.clientY;
-      this.leftSurface.cam.pan?.(dx, dy);
-      this.leftSurface.repaintAll();
-    });
-
-    const endLeftPan = (e) => {
-      if (leftPanning) {
-        leftPanning = false;
-        try { cLeft.releasePointerCapture(e.pointerId); } catch {}
-      }
-    };
-    cLeft.addEventListener('pointerup', endLeftPan);
-    cLeft.addEventListener('pointercancel', endLeftPan);
   }
 }

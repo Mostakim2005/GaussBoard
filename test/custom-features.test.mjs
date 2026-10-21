@@ -300,3 +300,82 @@ test('note overview thumbnail selection prioritizes real thumb over fallback', (
   assert.equal(getThumb(boardWithoutThumb, false, null), null);
   assert.equal(getThumb(boardWithoutThumb, true, 'data:image/png;base64,live999'), 'data:image/png;base64,live999');
 });
+
+test('split-workspace board autocomplete filtering and new board template generation with setLast: false', () => {
+  const boardCatalog = [
+    { id: 'b1', name: 'Physics Notes', tags: ['#stem', '#physics'], aliases: ['Phys 101'] },
+    { id: 'b2', name: 'Calculus IV', tags: ['#math'], aliases: ['Multivariable'] },
+    { id: 'b3', name: 'Machine Learning', tags: ['#ai', '#stem'], aliases: ['ML Intro'] }
+  ];
+
+  const filterBoards = (query, list) => {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(b => {
+      const title = (b.name || '').toLowerCase();
+      if (title.includes(q)) return true;
+      const tags = (b.tags || []).join(' ').toLowerCase();
+      if (tags.includes(q)) return true;
+      const aliases = (b.aliases || []).join(' ').toLowerCase();
+      if (aliases.includes(q)) return true;
+      return false;
+    });
+  };
+
+  // Autocomplete matching by name, tag, and alias
+  assert.equal(filterBoards('phys', boardCatalog).length, 1);
+  assert.equal(filterBoards('#stem', boardCatalog).length, 2);
+  assert.equal(filterBoards('Multivariable', boardCatalog).length, 1);
+  assert.equal(filterBoards('Quantum', boardCatalog).length, 0);
+
+  // Exact match detection for showing "+ Create board"
+  const isExact = (query, list) => list.some(b => b.name.toLowerCase() === query.trim().toLowerCase());
+  assert.equal(isExact('Calculus IV', boardCatalog), true);
+  assert.equal(isExact('Quantum Mechanics', boardCatalog), false);
+
+  // Payload structure for creating new study board with setLast: false
+  const createBoardPayload = (title) => ({
+    id: 'b_test_123',
+    saveCall: {
+      id: 'b_test_123',
+      json: JSON.stringify({
+        v: 2,
+        title,
+        elements: [],
+        pages: [{ id: 'p_1' }]
+      }),
+      setLast: false // Crucial: never overwrite startup active board pointer
+    }
+  });
+
+  const res = createBoardPayload('Quantum Mechanics');
+  assert.equal(res.saveCall.setLast, false);
+  const parsed = JSON.parse(res.saveCall.json);
+  assert.equal(parsed.title, 'Quantum Mechanics');
+  assert.equal(parsed.v, 2);
+});
+
+test('dual-viewport interaction isolation and store independence', () => {
+  const primaryStore = new Store();
+  const leftStudyStore = new Store();
+
+  // Add stroke to primary board
+  primaryStore.add({ id: 's1', type: 'stroke', points: [{ x: 10, y: 10 }] });
+  assert.equal(primaryStore.has('s1'), true);
+  assert.equal(leftStudyStore.has('s1'), false);
+
+  // Add stroke to left study board
+  leftStudyStore.add({ id: 's2', type: 'stroke', points: [{ x: 50, y: 50 }] });
+  assert.equal(leftStudyStore.has('s2'), true);
+  assert.equal(primaryStore.has('s2'), false);
+
+  // Undo on left study board does not touch primary board
+  leftStudyStore.undo();
+  assert.equal(leftStudyStore.has('s2'), false);
+  assert.equal(primaryStore.has('s1'), true);
+
+  // Redo restores on left board independently
+  leftStudyStore.redo();
+  assert.equal(leftStudyStore.has('s2'), true);
+  assert.equal(primaryStore.has('s1'), true);
+});

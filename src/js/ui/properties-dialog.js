@@ -6,8 +6,10 @@ import { icon } from './icons.js';
 import { t } from '../i18n.js';
 
 export class PropertiesDialog {
-  constructor(app) {
+  constructor(app, opts = {}) {
     this.app = app;
+    this.targetDoc = opts.doc || null;
+    this.onCustomSave = opts.onSave || null;
     this.el = null;
     this.visible = false;
     this.tagListEl = null;
@@ -16,10 +18,15 @@ export class PropertiesDialog {
     this.inputAlias = null;
   }
 
+  get doc() {
+    return this.targetDoc || this.app?.store?.doc;
+  }
+
   build() {
     if (this.el) return;
 
-    const title = h('span', { style: 'font-weight:700;font-size:15px;' }, t('Board Properties'));
+    const titleText = this.targetDoc ? t('Board Properties — Study Board') : t('Board Properties');
+    const title = h('span', { style: 'font-weight:700;font-size:15px;' }, titleText);
     const btnClose = h('button', {
       style: 'background:none;border:none;cursor:pointer;padding:4px;color:var(--text-2,rgba(128,128,128,0.8));display:flex;',
       html: icon('close', 18)
@@ -197,7 +204,7 @@ export class PropertiesDialog {
 
   sync() {
     if (!this.tagListEl || !this.aliasListEl) return;
-    const doc = this.app?.store?.doc;
+    const doc = this.doc;
     if (!doc) return;
 
     doc.properties = doc.properties || {};
@@ -259,7 +266,7 @@ export class PropertiesDialog {
   async addTag(raw) {
     if (!raw || !raw.trim()) return;
     const tag = raw.trim().startsWith('#') ? raw.trim() : '#' + raw.trim();
-    const doc = this.app?.store?.doc;
+    const doc = this.doc;
     if (!doc) return;
 
     doc.properties = doc.properties || {};
@@ -272,7 +279,7 @@ export class PropertiesDialog {
   }
 
   async removeTag(tag) {
-    const doc = this.app?.store?.doc;
+    const doc = this.doc;
     if (!doc || !doc.properties?.tags) return;
     doc.properties.tags = doc.properties.tags.filter((t) => t !== tag);
     doc.tags = doc.properties.tags;
@@ -282,7 +289,7 @@ export class PropertiesDialog {
   async addAlias(raw) {
     if (!raw || !raw.trim()) return;
     const alias = raw.trim();
-    const doc = this.app?.store?.doc;
+    const doc = this.doc;
     if (!doc) return;
 
     doc.properties = doc.properties || {};
@@ -295,7 +302,7 @@ export class PropertiesDialog {
   }
 
   async removeAlias(alias) {
-    const doc = this.app?.store?.doc;
+    const doc = this.doc;
     if (!doc || !doc.properties?.aliases) return;
     doc.properties.aliases = doc.properties.aliases.filter((a) => a !== alias);
     doc.aliases = doc.properties.aliases;
@@ -321,11 +328,15 @@ export class PropertiesDialog {
   async save() {
     this.sync();
     try {
-      if (typeof this.app?.persist === 'function') {
-        await this.app.persist();
-      }
-      if (typeof this.app?.updateTopProperties === 'function') {
-        this.app.updateTopProperties();
+      if (typeof this.onCustomSave === 'function') {
+        await this.onCustomSave(this.doc);
+      } else {
+        if (typeof this.app?.persist === 'function') {
+          await this.app.persist();
+        }
+        if (typeof this.app?.updateTopProperties === 'function') {
+          this.app.updateTopProperties();
+        }
       }
       this.app?.toast?.(t('Properties saved'));
     } catch (err) {
