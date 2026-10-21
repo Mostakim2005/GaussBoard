@@ -10,7 +10,8 @@ import { boundsOf } from '../core/store.js';
 import { fitFontSize, readableText, wrapText, clamp } from '../core/util.js';
 import { faceOf, noteTypeRange, inkPaint } from '../core/render.js';
 import { objectRuns, normalizeRuns, layoutRich, fitRichSize, htmlToRuns, needsRich } from '../core/richtext.js';
-import { refSpans, refToken, refLabel, refMissing } from '../core/boardrefs.js';
+import { refSpans, refToken, refLabel, refMissing, wikilinksToRefs } from '../core/boardrefs.js';
+import { isMarkdown, renderMarkdownToHtml, toggleTaskAtLine } from '../core/markdown.js';
 import { openBoardPicker } from './boardpicker.js';
 import { updateSelectionBar } from './contextmenu.js';
 import { t } from '../i18n.js';
@@ -19,12 +20,6 @@ import { t } from '../i18n.js';
 
 const BLOCK = new Set(['DIV', 'P', 'LI']);
 
-/*
- * The box's contents as a flat list: each text node, each line break, and the
- * line break implied by a new block (the browser sometimes makes one). A line
- * break that is the very last thing in the box is the browser's placeholder
- * for an empty last line, not a character, so it is left out.
- */
 function flatten(root, keepTail = false) {
   const items = [];
   let pos = 0;
@@ -33,7 +28,6 @@ function flatten(root, keepTail = false) {
       if (ch.nodeType === 3) {
         if (ch.data) { items.push({ kind: 'text', node: ch, from: pos, to: pos + ch.data.length }); pos += ch.data.length; }
       } else if (ch.nodeType === 1) {
-        // a link to a board is one piece, whatever its label says: its text is the link itself
         const ref = ch.getAttribute && ch.getAttribute('data-ref');
         if (ref) { items.push({ kind: 'ref', node: ch, token: ref, from: pos, to: pos + ref.length }); pos += ref.length; }
         else if (ch.tagName === 'BR') { items.push({ kind: 'br', node: ch, from: pos, to: pos + 1 }); pos += 1; }
@@ -82,8 +76,6 @@ function pointAt(root, n) {
       return [parent, Array.prototype.indexOf.call(parent.childNodes, it.node)];
     }
   }
-  // The end: before the placeholder break if there is one, so the caret sits
-  // on the empty last line rather than past it.
   const tail = root.lastChild;
   if (tail && tail.nodeType === 1 && tail.tagName === 'BR' && !items.some((it) => it.node === tail)) {
     return [root, root.childNodes.length - 1];
@@ -108,21 +100,13 @@ function looksOf(el, root) {
   return { bold: w >= 600, italic: /italic|oblique/.test(cs.fontStyle), under, color: toHex(cs.color) };
 }
 
-/**
- * What is in the box, as runs: every stretch whose look differs from the box
- * itself carries that difference. Reading the COMPUTED style means it does not
- * matter how the browser chose to mark the words up - <b>, a styled span, a
- * <font> tag - only how they actually look.
- */
 function runsOf(root, paint = (c) => c) {
   const base = looksOf(root, root);
-  // The board's own ink is shown through the theme; read it back as itself.
   const shown = String(paint('#201f1e'));
   const autoShown = (/^#[0-9a-f]{6}$/i.test(shown) ? shown.toLowerCase() : toHex(shown)) || '#201f1e';
   const runs = [];
   for (const it of flatten(root)) {
     if (it.kind !== 'text' && it.kind !== 'ref') { runs.push({ t: '\n' }); continue; }
-    // a link takes the look of the words it sits in; its own blue is only how it is shown
     const l = looksOf(it.kind === 'ref' ? (it.node.parentElement || root) : it.node.parentElement, root);
     const r = { t: it.kind === 'ref' ? it.token : it.node.data };
     if (l.bold !== base.bold) r.b = l.bold ? 1 : 0;
@@ -153,7 +137,6 @@ function fill(root, runs, text, paint = (c) => c) {
       if (piece) appendWithLinks(into, piece);
     });
   }
-  // An empty last line needs something for the caret to stand on.
   if (/\n$/.test(runsTextOf(list))) root.appendChild(document.createElement('br'));
 }
 const runsTextOf = (list) => list.map((r) => r.t).join('');
@@ -216,6 +199,8 @@ export class TextEditor {
     this.app = app;
     this.layer = document.getElementById('editLayer');
     this.el = null;
+    this.previewEl = null;
+    this.previewMode = false;
     this.target = null;
     this.cell = null;
     this.measure = document.createElement('canvas').getContext('2d');
@@ -228,29 +213,19 @@ export class TextEditor {
     const app = this.app;
     this.target = obj;
     this.cell = cell;
-    // A note grows to fit what is typed into it. The height it had when
-    // editing started is kept so the growth can be rewound and re-applied as
-    // part of the same undo entry as the text itself.
+    this.previewMode = false;
     this.startH = obj.h;
     this.startW = obj.w;
-    // How wide an automatic text box may grow before its words wrap. Fixed for
-    // the whole edit, so deleting text cannot lower it and make retyping wrap
-    // early. Boxes made before this was stored get one from their font size.
     this.wrapW = obj.type === 'text'
       ? (obj.wrapW || Math.max(obj.w || 0, (obj.fontSize || 24) * 11.25)) : null;
 
     const ta = document.createElement('div');
-    ta.className = 'rt';
+    const isMd = !cell && obj.markdown !== false && (obj.type === 'text' || obj.type === 'note');
+    ta.className = isMd ? 'rt markdown-mode' : 'rt';
     ta.contentEditable = 'true';
     ta.setAttribute('role', 'textbox');
     ta.setAttribute('aria-multiline', 'true');
     ta.spellcheck = true;
-    /*
-     * Grammarly and its kind put a floating button inside any box you type
-     * into - over the very words being written, on a board where the box is
-     * sized to the words. These attributes are how such tools are told a field
-     * is not theirs to decorate; the spell check underline still works.
-     */
     ta.setAttribute('data-gramm', 'false');
     ta.setAttribute('data-gramm_editor', 'false');
     ta.setAttribute('data-enable-grammarly', 'false');
@@ -259,15 +234,9 @@ export class TextEditor {
     fill(ta, objectRuns(obj, cell), cell ? (obj.cells?.[cell] || '') : (obj.text || ''), this.paint);
     this.el = ta;
     this.layer.appendChild(ta);
-    // On touch/mobile viewports, keep active edit target in comfortable visible area above software keyboard
+
     const p = app.surface.cam.toScreen(obj.x + (obj.w || 200) / 2, obj.y + (obj.h || 100) / 2);
     const vh = window.visualViewport ? window.visualViewport.height : (window.innerHeight || 768);
-    // A pen-and-touch Windows laptop reports touch points and fires ontouchstart
-    // exactly as a phone does, so testing for touch AT ALL made the board scroll
-    // out from under anyone editing a note low in the window on a touchscreen PC.
-    // What this actually wants to know is whether the pointer is a fingertip, and
-    // that is what (pointer: coarse) reports: a phone or tablet matches, a laptop
-    // with a mouse or a pen does not, touchscreen or otherwise.
     const touchFirst = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
     if (p.y > vh * 0.65 && touchFirst) {
       app.surface.cam.panBy(0, -(p.y - vh * 0.38));
@@ -275,26 +244,13 @@ export class TextEditor {
       app.surface.invalidate();
     }
 
-    // The canvas must stop drawing this object's text while the textarea is
-    // showing it, or the two sit a pixel apart and smear into each other.
     app.surface.editing = { id: obj.id, cell };
-    // On a phone the keyboard takes most of the screen and the toolbar ends up
-    // sitting on the very box being typed into. The pens are no use mid-word,
-    // so they stand down until the words are finished - see app.css.
     document.body.classList.add('typing');
 
     this.place();
 
     ta.addEventListener('input', () => { this.place(); app.surface.invalidate(); this.watchMention(); });
-    /*
-     * Words come in with the look the board can draw, and nothing else.
-     *
-     * Pasting into an editable box would otherwise bring the source's whole
-     * page along - its fonts, sizes, backgrounds, links - none of which the
-     * board can draw. What survives from Word or a web page is bold, italic,
-     * underline and colour (see htmlToRuns). Ctrl+Shift+V pastes the words
-     * alone, in whatever style is being typed.
-     */
+
     const insertPlain = (text) => {
       const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
       lines.forEach((line, i) => {
@@ -341,40 +297,101 @@ export class TextEditor {
     });
     ta.addEventListener('keydown', (e) => {
       e.stopPropagation();
-      // the list of boards after "@" has first say over the keys it moves through
       if (this.mention?.open && !e.isComposing && this.mention.key(e)) { e.preventDefault(); return; }
-      // Ctrl+Shift+V: the words only, whatever they looked like where they came from.
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'V' || e.key === 'v')) this._plainPaste = true;
+      if (e.key === 'F2') {
+        e.preventDefault();
+        this.toggleLivePreview();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        this.insertWikilinkSyntax();
+        return;
+      }
       if (e.key === 'Escape') { e.preventDefault(); this.cancel(); app.surface.canvas.focus(); }
       else if (e.key === 'Enter' && !(e.ctrlKey || e.metaKey) && !e.isComposing) {
-        // A new line, never a new block - the board has no paragraphs to give it.
         e.preventDefault();
         document.execCommand('insertLineBreak');
       }
       else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.commit(); }
       else if (e.key === 'Tab' && cell) { e.preventDefault(); this.commit(); }
     });
-    ta.addEventListener('blur', () => { if (!this._picking) this.commit(); });
-    // The format bar shows what the caret is sitting in.
+    ta.addEventListener('blur', () => { if (!this._picking && !this.previewMode) this.commit(); });
     this._onSel = () => { if (this.el && document.activeElement === this.el) updateSelectionBar(app, true); };
     document.addEventListener('selectionchange', this._onSel);
     ta.addEventListener('pointerdown', (e) => e.stopPropagation());
-    /*
-     * Caret at the end, not everything selected.
-     *
-     * Opening an existing box with all of its text highlighted means the next
-     * key you press deletes the lot. That is a fine way to REPLACE something
-     * and a terrible default for coming back to fix a word, which is what
-     * re-opening a text box is nearly always for. Every text box on a page
-     * behaves the other way: you get a caret, and the text stays put. Ctrl+A
-     * is still there for anyone who did want all of it.
-     */
+
     setTimeout(() => {
       ta.focus();
       const end = ta.value.length;
       ta.setSelectionRange(end, end);
     }, 0);
     app.surface.invalidate();
+  }
+
+  /**
+   * Toggle between raw Markdown source editing and rendered Obsidian Live Preview.
+   */
+  toggleLivePreview() {
+    if (!this.el || !this.target) return;
+    this.previewMode = !this.previewMode;
+    if (this.previewMode) {
+      if (!this.previewEl) {
+        const pv = document.createElement('div');
+        pv.className = 'rt gb-markdown-body gb-live-preview';
+        pv.addEventListener('pointerdown', (e) => {
+          e.stopPropagation();
+          const cb = e.target.closest('input.gb-task-checkbox');
+          if (cb) {
+            e.preventDefault();
+            const lineIdx = Number(cb.getAttribute('data-line'));
+            const toggled = toggleTaskAtLine(this.el.value, lineIdx);
+            if (toggled.toggled) {
+              this.el.value = toggled.text;
+              this.renderPreviewDom();
+            }
+            return;
+          }
+          // Clicking anywhere else in preview switches back to editable source
+          this.toggleLivePreview();
+        });
+        this.previewEl = pv;
+        this.layer.appendChild(pv);
+      }
+      this.renderPreviewDom();
+      this.el.style.display = 'none';
+      this.previewEl.style.display = '';
+    } else {
+      if (this.previewEl) this.previewEl.style.display = 'none';
+      this.el.style.display = '';
+      this.el.focus();
+    }
+    this.place();
+  }
+
+  renderPreviewDom() {
+    if (!this.previewEl || !this.el) return;
+    this.previewEl.innerHTML = renderMarkdownToHtml(this.el.value);
+  }
+
+  /**
+   * Inserts `[[board]]` or wraps current selection in `[selection](url)` on Ctrl+K.
+   */
+  insertWikilinkSyntax() {
+    if (!this.el) return;
+    if (document.activeElement !== this.el) this.el.focus();
+    const a = this.el.selectionStart;
+    const b = this.el.selectionEnd;
+    const val = this.el.value;
+    const selected = val.slice(a, b);
+    if (selected) {
+      const wrapped = `[[${selected}]]`;
+      this._insertPlain?.(wrapped);
+    } else {
+      this._insertPlain?.('[[');
+      this.watchMention();
+    }
   }
 
   place() {
@@ -388,55 +405,15 @@ export class TextEditor {
     } else box = boundsOf(o);
 
     if (o.type === 'note' && !this.cell) {
-      /*
-       * Grows AND shrinks. It used to only grow, so a note that had swollen to
-       * hold a paragraph stayed that size no matter how much of it you deleted
-       * - you could empty the thing completely and still be looking at a note
-       * four lines tall.
-       *
-       * The floor is the height the note had when this edit began, never
-       * smaller: a note somebody sized by hand keeps the size they gave it.
-       * And the measuring is done against that same fixed height rather than
-       * the live one, because the automatic font size is chosen to fit the
-       * height - measure against a height that is itself changing and the two
-       * chase each other.
-       */
       const base = this.startH != null ? this.startH : o.h;
       const want = Math.max(base, this.noteHeight(o, this.el.value, base, this.runs()));
       if (want !== o.h) { o.h = want; box = boundsOf(o); app.surface.touch?.(); }
     }
 
-    /*
-     * A text box is exactly as tall as its words, as you type them.
-     *
-     * It used to keep the height it was created with, so the moment the text
-     * ran past one line the box scrolled inside itself and the first line went
-     * out of sight. Then I made it grow but not shrink, on the theory that
-     * resizing on every backspace would make the frame flinch. That was wrong
-     * twice over: deleting a paragraph left a tall empty box, and the box then
-     * snapped smaller anyway the instant you clicked away, because that is what
-     * commit() has always done. A jump at the end is worse than movement while
-     * typing, and this way there is no jump at all - what you are looking at
-     * while you type is already the finished size.
-     *
-     * Nothing here can oscillate: the width is fixed while editing, so the
-     * number of lines depends on the words alone and never on the height.
-     */
     if (o.type === 'text' && !this.cell && o.autoSize !== false) {
-      /*
-       * And exactly as WIDE as its words, too: it grows to the right as you
-       * type and comes back in as you delete, up to its wrapping width, where
-       * the words start a new line instead. It used to open at that full width
-       * and stay there until you clicked away, so a two-letter word sat in a
-       * frame with a long empty stretch after it, and a box you came back to
-       * later could not grow at all - it wrapped at whatever width it had been
-       * shrunk to. A box sized by hand (autoSize false) keeps its width.
-       */
       const want = this.fitBox(o, this.el.value, this.wrapW, this.runs());
       if (want.h !== o.h || want.w !== o.w) { o.h = want.h; o.w = want.w; box = boundsOf(o); app.surface.touch?.(); }
     } else if (o.type === 'text' && !this.cell) {
-      // Sized by hand: the width is theirs, but the height still follows the
-      // words, or the lines typed past the bottom are hidden.
       const want = this.fitBox(o, this.el.value, o.w, this.runs()).h;
       if (want !== o.h) { o.h = want; box = boundsOf(o); app.surface.touch?.(); }
     }
@@ -446,66 +423,50 @@ export class TextEditor {
     const p = cam.toScreen(wx, wy);
 
     let size = o.fontSize || 0;
-    // Measure in the face the text is actually set in. Comic Sans runs much wider
-    // than Segoe UI, so autofitting against the sans face overflows the note.
     const face = faceOf(o.font);
     if (!size) {
       this.measure.font = `16px ${face}`;
-      // A note's type range comes from its own width, so it is the same on
-      // screen whatever zoom the note was made at - see noteTypeRange().
       const range = o.type === 'note' ? noteTypeRange(o) : { max: 72, min: 10 };
       const runs = this.runs();
       size = runs
         ? fitRichSize(this.measure, runs, ww, wh, this.richBase(o, face), range.max, range.min)
         : fitFontSize(this.measure, this.el.value || ' ', ww, wh, face, '400', range.max, range.min);
     }
-    const s = this.el.style;
-    s.left = p.x + 'px';
-    s.top = p.y + 'px';
-    s.width = Math.max(24, ww * cam.z) + 'px';
-    s.height = Math.max(20, wh * cam.z) + 'px';
-    s.fontSize = size * cam.z + 'px';
-    s.lineHeight = 1.28;
-    s.fontFamily = face;      // what you type in is what gets committed
-    s.fontWeight = o.bold ? '600' : '400';
-    s.fontStyle = o.italic ? 'italic' : 'normal';
-    s.textDecorationLine = o.underline && !this.cell ? 'underline' : 'none';
-    s.textAlign = this.cell ? 'center' : (o.align || (o.type === 'text' ? 'left' : 'center'));
-    /*
-     * A note carries its own colour, so its text is read off that and is right
-     * in either theme. Everything else is ink on the board, which means on a
-     * dark board it has to follow the same rule the canvas does - otherwise you
-     * type in black onto black and watch nothing appear, then see the words the
-     * moment you click away and the canvas takes over.
-     */
-    const ink = o.type === 'note' ? (o.textColor || readableText(o.color || '#ffd94a'))
-      : inkPaint(o.color || o.textColor);
-    s.color = ink;
-    s.caretColor = ink;                 // a black caret is invisible on a dark note
-    /*
-     * Show what will actually be there.
-     *
-     * Everything except a note used to be typed into an opaque white panel,
-     * which hid the shape it was inside, the ink behind it, and the fact that a
-     * text box has no fill of its own. You typed onto white and got something
-     * else the moment you clicked away. A note keeps its own colour because a
-     * note really is a coloured square; everything else shows whatever the
-     * object will actually be drawn with, which is usually nothing.
-     */
-    s.background = o.type === 'note' ? o.color
-      : (!this.cell && o.background && o.background !== 'none' ? o.background : 'transparent');
-    // The frame has to be visible against whatever it is sitting on, and on a
-    // dark note that is not near-black.
-    s.outlineColor = o.type === 'note' ? ink : 'rgba(0,0,0,.45)';
-    s.transform = o.rotation ? `rotate(${o.rotation}rad)` : '';
-    s.transformOrigin = '0 0';
-    s.padding = '0';
-    if (o.type === 'note' || o.type === 'shape' || this.cell) {
-      const lines = this.el.value.split('\n').length;
-      const contentH = lines * size * 1.28 * cam.z;
-      s.paddingTop = Math.max(0, (wh * cam.z - contentH) / 2) + 'px';
-    } else s.paddingTop = '0';
-    // Keep the format bar above the box as it grows.
+
+    const applyBoxStyle = (domEl) => {
+      if (!domEl) return;
+      const s = domEl.style;
+      s.left = p.x + 'px';
+      s.top = p.y + 'px';
+      s.width = Math.max(24, ww * cam.z) + 'px';
+      s.height = Math.max(20, wh * cam.z) + 'px';
+      s.fontSize = size * cam.z + 'px';
+      s.lineHeight = 1.28;
+      s.fontFamily = face;
+      s.fontWeight = o.bold ? '600' : '400';
+      s.fontStyle = o.italic ? 'italic' : 'normal';
+      s.textDecorationLine = o.underline && !this.cell ? 'underline' : 'none';
+      s.textAlign = this.cell ? 'center' : (o.align || (o.type === 'text' ? 'left' : 'center'));
+      const ink = o.type === 'note' ? (o.textColor || readableText(o.color || '#ffd94a'))
+        : inkPaint(o.color || o.textColor);
+      s.color = ink;
+      s.caretColor = ink;
+      s.background = o.type === 'note' ? o.color
+        : (!this.cell && o.background && o.background !== 'none' ? o.background : 'transparent');
+      s.outlineColor = o.type === 'note' ? ink : 'rgba(0,0,0,.45)';
+      s.transform = o.rotation ? `rotate(${o.rotation}rad)` : '';
+      s.transformOrigin = '0 0';
+      s.padding = '0';
+      if (o.type === 'note' || o.type === 'shape' || this.cell) {
+        const lines = this.el.value.split('\n').length;
+        const contentH = lines * size * 1.28 * cam.z;
+        s.paddingTop = Math.max(0, (wh * cam.z - contentH) / 2) + 'px';
+      } else s.paddingTop = '0';
+    };
+
+    applyBoxStyle(this.el);
+    applyBoxStyle(this.previewEl);
+
     if (document.activeElement === this.el) updateSelectionBar(app, true);
   }
 
@@ -523,19 +484,23 @@ export class TextEditor {
   commit() {
     if (!this.el || !this.target) return;
     this.endMention();
-    const value = this.el.value;
-    // Read while the box is still on the page: the styles are read off it.
-    const runs = this.runs();
-    const o = this.target;
+    const rawValue = this.el.value;
+    // Translate [[Target Board#Page|Alias]] wikilinks into native @[Label](b:boardId#page) tokens on commit
+    const value = wikilinksToRefs(rawValue);
+    const runs = value !== rawValue ? null : this.runs();
     const el = this.el;
+    const pv = this.previewEl;
     this.stopWatching();
     this.el = null;
+    this.previewEl = null;
+    this.previewMode = false;
     const target = this.target;
     const cell = this.cell;
     this.target = null; this.cell = null;
-    this.app.surface.editing = null;      // the canvas owns the text again
+    this.app.surface.editing = null;
     document.body.classList.remove('typing');
     el.remove();
+    if (pv) pv.remove();
 
     const store = this.app.store;
     const same = (a, b) => JSON.stringify(a || null) === JSON.stringify(b || null);
@@ -556,10 +521,6 @@ export class TextEditor {
       const patch = { text: value };
       if (runs || target.runs !== undefined) patch.runs = runs || undefined;
       if (target.type === 'text' && target.autoSize !== false) {
-        // Rewind the growth that happened while typing, so the undo entry
-        // records the height the box had BEFORE this edit rather than the one
-        // it drifted to during it. fitBox reads the width and the font, never
-        // the height, so the answer is the same either way.
         if (this.startH != null) target.h = this.startH;
         if (this.startW != null) target.w = this.startW;
         Object.assign(patch, this.fitBox(target, value, this.wrapW, runs));
@@ -570,21 +531,17 @@ export class TextEditor {
         if (h !== target.h) patch.h = h;
       }
       if (target.type === 'note') {
-        // Rewind the live resizing so update() records the height the note had
-        // before this edit, then ask for the height the finished text needs -
-        // never below where it started.
         if (this.startH != null) target.h = this.startH;
         const base = target.h;
         const want = Math.max(base, this.noteHeight(target, value, base, runs));
         if (want !== target.h) patch.h = want;
       }
       store.update(target.id, patch, 'edit text');
-      // an empty brand-new text box is not worth keeping
       if (!value && target.type === 'text') store.remove([target.id], 'remove empty text');
     } else if (!value && target.type === 'text' && !target.text) {
       store.remove([target.id], 'remove empty text');
     } else if (this.startH != null && (target.type === 'note' || target.type === 'text')) {
-      target.h = this.startH;      // nothing changed, so neither should the box
+      target.h = this.startH;
       if (target.type === 'text' && this.startW != null) target.w = this.startW;
     }
     this.startH = null; this.startW = null; this.wrapW = null;
@@ -594,12 +551,6 @@ export class TextEditor {
     this.app.syncUI();
   }
 
-  /**
-   * Shrink a text box to the text in it.
-   *
-   * A new box starts wide enough to type into; leaving it that size afterwards
-   * gives a short label a selection frame several times its own width.
-   */
   fitBox(o, value, wrapW = this.wrapW, runs = null) {
     if (!runs && needsRich(value)) runs = [{ t: value }];
     const size = o.fontSize || 24;
@@ -616,20 +567,15 @@ export class TextEditor {
       lines = wrapText(this.measure, value, limit);
       for (const line of lines) widest = Math.max(widest, this.measure.measureText(line).width);
     }
+    const mdActive = o.markdown !== false && !runs && isMarkdown(value);
+    const lineMult = mdActive ? 1.48 : 1.28;
+    const extraPad = mdActive ? size * 0.8 : pad * 0.4;
     return {
-      w: clamp(widest + pad, size * 1.2, limit),   // never wider than its wrapping width: long text wraps
-      h: Math.max(size * 1.3, lines.length * size * 1.28 + pad * 0.4)
+      w: clamp(widest + pad + (mdActive ? 20 : 0), size * 1.2, limit),
+      h: Math.max(size * 1.3, lines.length * size * lineMult + extraPad)
     };
   }
 
-  /**
-   * How tall a note has to be for its text to fit inside it.
-   *
-   * Notes shrink their text first - that is what they have always done - and
-   * only grow when even the smallest size will not fit. The result is never
-   * smaller than the note already is, so a note the user sized by hand keeps
-   * the size they gave it.
-   */
   noteHeight(o, value, baseH = o.h, runs = null) {
     if (!runs && needsRich(value)) runs = [{ t: value }];
     const pad = Math.max(10, o.w * 0.08);
@@ -638,9 +584,6 @@ export class TextEditor {
     const weight = o.bold ? '600' : '400';
     let size = o.fontSize;
     if (!size) {
-      // Against baseH, not the live height. The automatic size is picked to fit
-      // the box, and the box is about to be sized to fit the text: measuring
-      // against a height that is itself moving sets the two chasing each other.
       this.measure.font = `${weight} 16px ${face}`;
       const range = noteTypeRange(o);
       size = runs
@@ -649,8 +592,6 @@ export class TextEditor {
     }
     this.measure.font = `${weight} ${size}px ${face}`;
     const lines = runs ? layoutRich(this.measure, runs, innerW, this.richBase(o, face, size)) : wrapText(this.measure, value || ' ', innerW);
-    // What the text NEEDS. Whether the note is allowed to become that small is
-    // the caller's business, and the answer is never below the size it started.
     return Math.ceil(lines.length * size * 1.28 + pad * 2);
   }
 
@@ -659,24 +600,13 @@ export class TextEditor {
     this.endMention();
     const target = this.target;
     const el = this.el;
-    /*
-     * Clear the fields BEFORE detaching the textarea.
-     *
-     * Removing a focused element fires `blur`, and the blur handler is
-     * commit(). With this.el still set, that commit ran for real - so
-     * cancelling an edit quietly SAVED it instead of throwing it away, the
-     * note-height rewind below never happened, and commit's own el.remove()
-     * then threw on a node that was already gone. Nulling first makes the
-     * blur-driven commit hit its own guard and return, which is what it
-     * should always have done.
-     */
+    const pv = this.previewEl;
     this.stopWatching();
-    this.el = null; this.target = null; this.cell = null;
-    this.app.surface.editing = null;      // the canvas owns the text again
+    this.el = null; this.previewEl = null; this.previewMode = false; this.target = null; this.cell = null;
+    this.app.surface.editing = null;
     document.body.classList.remove('typing');
     el.remove();
-    // A cancelled edit gives back whatever height it grew to while typing -
-    // for a text box exactly as for a note.
+    if (pv) pv.remove();
     if (target && (target.type === 'note' || target.type === 'text') && this.startH != null) {
       target.h = this.startH;
       if (target.type === 'text' && this.startW != null) target.w = this.startW;
@@ -691,9 +621,8 @@ export class TextEditor {
   reposition() { if (this.el) this.place(); }
 
   /*
-   * "@" followed by a few words, right before the caret, is a search for a
-   * board. It has to start a word - "me@home.com" is an address, not a link -
-   * and it gives up at a new line, at a second "@", or after forty letters.
+   * "@" or "[[" followed by a few words, right before the caret, is a search for a
+   * board.
    */
   mentionQuery() {
     if (!this.el) return null;
@@ -701,8 +630,14 @@ export class TextEditor {
     if (!s || !s.rangeCount || !s.isCollapsed) return null;
     const caret = this.el.selectionStart;
     const before = this.el.value.slice(0, caret);
+
+    // Check Obsidian `[[` trigger first
+    const wl = /\[\[([^\]\n]{0,40})$/.exec(before);
+    if (wl) {
+      return { at: caret - wl[1].length - 2, caret, query: wl[1], wikilink: true };
+    }
+
     const m = /(^|[\s(\[{"'“‘])@([^@\n]{0,40})$/.exec(before);
-    // "@[" is a link already made, not a search
     if (!m || /\s\s$/.test(m[2]) || /^[\s[]/.test(m[2])) return null;
     return { at: caret - m[2].length - 1, caret, query: m[2] };
   }
@@ -730,7 +665,7 @@ export class TextEditor {
     if (m?.open) m.close();
   }
 
-  /** Swap the "@words" just typed for a link to the board chosen (made first, when asked for). */
+  /** Swap the "@words" or "[[words" just typed for a link to the board chosen. */
   async pickMention(choice) {
     const at = this._mentionAt;
     this.mention = null;
@@ -742,12 +677,13 @@ export class TextEditor {
       if (!ref || !this.el) return;
     }
     this.el.focus();
-    this.el.setSelectionRange(at.at, at.caret);
+    const afterCaret = this.el.value.slice(at.caret);
+    const extraClose = at.wikilink && afterCaret.startsWith(']]') ? 2 : 0;
+    this.el.setSelectionRange(at.at, at.caret + extraClose);
     const sel = document.getSelection();
     if (!sel || !sel.rangeCount) return;
     const range = sel.getRangeAt(0);
     range.deleteContents();
-    // the link, then a space, with the caret after the space ready for the next word
     const chip = linkChip(ref), space = document.createTextNode(' ');
     range.insertNode(space);
     range.insertNode(chip);
@@ -762,11 +698,6 @@ export class TextEditor {
     this._onSel = null;
   }
 
-  /**
-   * Bold, italic or underline for the highlighted words - or, with nothing
-   * highlighted, for whatever is typed next. The same thing Ctrl+B, Ctrl+I and
-   * Ctrl+U do on their own.
-   */
   format(kind) {
     if (!this.el) return;
     if (document.activeElement !== this.el) this.el.focus();
@@ -776,7 +707,6 @@ export class TextEditor {
     this.app.surface.invalidate();
   }
 
-  /** Colour the highlighted words (or what is typed next). Null goes back to the box's own colour. */
   colour(hex) {
     if (!this.el) return;
     if (document.activeElement !== this.el) this.el.focus();
@@ -786,13 +716,6 @@ export class TextEditor {
     this.app.surface.invalidate();
   }
 
-  /**
-   * Paste from the machine's clipboard through the app rather than through
-   * the keyboard. On a phone this matters: pasting from the keyboard's own
-   * clipboard strip types the words in as if they were typed, and the bold
-   * and colours copied in Word never arrive. Asking the clipboard directly
-   * gets the formatted copy too.
-   */
   async pasteFromClipboard() {
     if (!this.el || !window.board?.clipboardRead) return false;
     let got = null;
@@ -811,7 +734,6 @@ export class TextEditor {
     return false;
   }
 
-  /** Is the caret (or the highlighted words) bold / italic / underlined? */
   state(kind) {
     try { return document.queryCommandState(kind); } catch { return false; }
   }

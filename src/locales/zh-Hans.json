@@ -1393,5 +1393,7 @@
   "Viewport": "视口",
   "Center point": "居中显示笔迹点",
   "Center zone": "中心区域",
-  "Rename recording": "重命名录音"
+  "Rename recording": "重命名录音",
+  "Markdown": "Markdown",
+  "Insert Wikilink": "插入白板链接"
 }

@@ -17,31 +17,65 @@ const TOOL_ICON = {
 };
 const CMD_ICON = { undo: 'undo', redo: 'redo', insert: 'insert', ruler: 'ruler', more: 'more' };
 
-/**
- * The toolbar is built here rather than in the HTML, because the pen tray is
- * data-driven: each pen is its own button carrying its own colour, the way
- * Whiteboard lays them out, and the one in your hand lifts out of the bar.
- */
-/**
- * Is this a phone-shaped screen being poked with a finger?
- *
- * Both halves matter. A coarse pointer alone catches a 12" tablet, which has
- * room for the whole tray; a narrow window alone catches a half-width desktop
- * window, where the mouse is still the pointer and the keys still work. The
- * compact bar is for the case where neither the width nor the pointer is
- * generous - and it is read once, at start-up, because rebuilding a toolbar
- * under somebody's thumb while they rotate the phone is worse than a bar that
- * is slightly too small until the next launch.
- */
 export function isPhoneLayout() {
   if (typeof matchMedia !== 'function') return false;
   return matchMedia('(pointer: coarse)').matches
     && (matchMedia('(max-width: 760px)').matches || matchMedia('(max-height: 460px)').matches);
 }
 
+/**
+ * Wires the Markdown toggle badge (`M↓`) and Wikilink button (`[[]]`) into
+ * `#textFormatBar` if present in the DOM.
+ */
+export function wireTextFormatBarMarkdown(app) {
+  const fmtBar = document.getElementById('textFormatBar');
+  if (!fmtBar || fmtBar.querySelector('[data-cmd="markdownToggle"]')) return;
+
+  const mdBtn = h('button', {
+    class: 'tool tool-sm md-toggle-btn',
+    title: t('Markdown'),
+    style: 'font-weight:700;font-size:12px;padding:0 6px;'
+  }, 'M↓');
+  mdBtn.dataset.cmd = 'markdownToggle';
+  mdBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = app.textEditor?.target || (app.surface?.selection?.size === 1 ? app.store.get([...app.surface.selection][0]) : null);
+    if (target && (target.type === 'text' || target.type === 'note')) {
+      const next = target.markdown === false;
+      app.store.update(target.id, { markdown: next }, 'markdown mode');
+      mdBtn.classList.toggle('active', next);
+      app.surface.invalidate();
+    } else if (app.textEditor?.active) {
+      app.textEditor.toggleLivePreview();
+      mdBtn.classList.toggle('active', app.textEditor.previewMode);
+    }
+  });
+
+  const wlBtn = h('button', {
+    class: 'tool tool-sm',
+    title: t('Insert Wikilink'),
+    style: 'font-weight:600;font-size:11.5px;padding:0 5px;'
+  }, '[[]]');
+  wlBtn.dataset.cmd = 'insertWikilink';
+  wlBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (app.textEditor?.active) {
+      app.textEditor.insertWikilinkSyntax();
+    } else {
+      app.command?.('insert.boardlink');
+    }
+  });
+
+  fmtBar.appendChild(mdBtn);
+  fmtBar.appendChild(wlBtn);
+}
+
 export function initToolbar(app) {
   const bar = document.getElementById('toolbar');
   bar.innerHTML = '';
+  wireTextFormatBarMarkdown(app);
   if (isPhoneLayout()) { initPhoneToolbar(app, bar); wireTopBar(app); return; }
 
   const sep = (dataSep) => {
@@ -66,8 +100,6 @@ export function initToolbar(app) {
     }
     b.innerHTML = icon(opts.icon, 20);
     if (opts.dot) b.appendChild(h('span', { class: 'dot' }));
-    // The shortcut letter lives on the button. Nobody memorises a shortcut
-    // sheet mid-lesson; seeing "P" under the pen is what makes them get used.
     if (opts.key) b.appendChild(h('span', { class: 'kbd' }, opts.key));
     b.addEventListener('click', (e) => opts.onClick(e, b));
     bar.appendChild(b);
@@ -93,11 +125,8 @@ export function initToolbar(app) {
     const b = h('button', { class: 'pen', title: t('{pen} ({n}) \u2014 click again for thickness', { pen: pen.label, n: PENS.indexOf(pen) + 1 }) });
     b.dataset.pen = pen.id;
     b.dataset.ribbonId = 'pen';
-    if (pen.id === 'black') b.dataset.tool = 'pen';       // the canonical pen button
-    // every pen wears its own number: 1-6 reach them directly, which is the
-    // whole point of putting the keys on the buttons
+    if (pen.id === 'black') b.dataset.tool = 'pen';
     const now = penById(app.settings, pen.id) || pen;
-    // the barrel is a preview of the ink, so it follows it onto a dark board
     b.innerHTML = penIcon(inkPaint(now.color), now.effect) + '<span class="size-dot"></span>'
       + `<span class="kbd">${PENS.indexOf(pen) + 1}</span>`;
     b.dataset.paint = now.color + '|' + now.effect;
@@ -252,26 +281,6 @@ export function restoreRibbonToolFromPlus(app, ribbonId) {
   app.toast(t('Pinned to ribbon'));
 }
 
-/* ==================================================================
- *  The phone bar.
- *
- *  The desktop tray is seventeen buttons wide. On a phone that becomes a
- *  horizontal scroller: the thing you reach for most - a pen - is as much work
- *  to find as the thing you reach for once a month, and both of them are a
- *  swipe away from where your thumb already is.
- *
- *  So this is a different bar, not the same bar squeezed. What survives on it
- *  is what a person writing on a board actually touches: three pens, the
- *  rubber, undo. Everything else earns its place behind one of two menus, and
- *  the pointing tools - select, lasso, hand, laser - go to the back, because
- *  none of them puts a mark on the board.
- *
- *  The desktop bar above is untouched. This is chosen once at start-up by
- *  isPhoneLayout(), so a laptop, a tablet and a half-width window all keep the
- *  tray they have always had.
- * ================================================================== */
-
-/** The three pens that live on the bar; the rest are one tap deeper. */
 const PHONE_PENS = ['black', 'red', 'blue'];
 
 function initPhoneToolbar(app, bar) {
@@ -287,7 +296,6 @@ function initPhoneToolbar(app, bar) {
 
   const pickPen = (pen, b) => choosePen(app, pen.id, b);
 
-  /* ---- the three everyday pens ---- */
   for (const id of PHONE_PENS) {
     const pen = PENS.find((p) => p.id === id);
     if (!pen) continue;
@@ -300,7 +308,6 @@ function initPhoneToolbar(app, bar) {
     b.addEventListener('click', () => pickPen(pen, b));
   }
 
-  /* ---- everything else that makes a mark, one tap deeper ---- */
   const rest = btn('tool tool-sm', t('More pens and the highlighter'), icon('chevronUp', 18));
   rest.dataset.pop = 'pens';
   rest.addEventListener('click', () => {
@@ -320,7 +327,6 @@ function initPhoneToolbar(app, bar) {
     openPopover(rest, body, { key: 'pens' });
   });
 
-  /* ---- the rubber, beside the pens where it belongs ---- */
   const er = btn('pen', t('Eraser — tap again for options'),
     penIcon('#f7a8c4', 'none', 'eraser'));
   er.dataset.tool = 'eraser';
@@ -332,18 +338,10 @@ function initPhoneToolbar(app, bar) {
   });
   sep();
 
-  /*
-   * Finger draws / finger moves the board.
-   *
-   * Only shown once a pen has actually touched this screen. On a phone with no
-   * stylus the finger is the only thing there is, it draws, and a button
-   * offering to take that away would be a trap rather than a choice.
-   */
   const fingerBtn = btn('tool tool-sm', t('Finger draws or moves the board'), icon('hand', 18));
   fingerBtn.dataset.cmd = 'fingerInk';
   fingerBtn.addEventListener('click', () => { app.toggleFingerInk(); syncToolbar(app); });
 
-  /* ---- undo and redo, the other thing a hand reaches for constantly ---- */
   const un = btn('tool tool-sm', t('Undo'), icon('undo', 18));
   un.dataset.cmd = 'undo';
   un.addEventListener('click', () => app.command('undo'));
@@ -352,7 +350,6 @@ function initPhoneToolbar(app, bar) {
   re.addEventListener('click', () => app.command('redo'));
   sep();
 
-  /* ---- things you add to the board ---- */
   const add = btn('tool tool-sm', t('Add a note, text, shape, ruler or picture'), icon('plus', 18));
   add.dataset.pop = 'add';
   add.addEventListener('click', () => {
@@ -363,13 +360,7 @@ function initPhoneToolbar(app, bar) {
       menuItem(t('Study Tape'), 'curtain', pickTool('tape')),
       menuItem(t('Maths'), 'maths', () => app.command('insert.math')),
       menuItem(t('Emoji'), 'emoji', () => { app.setTool('emoji'); app.syncUI(); openToolPopover(app, add, 'emoji'); }),
-      // Shapes are a family, not one square. The chooser lives in the tool
-      // popover, and on a phone there is no shape button to open it from - so
-      // picking Shape here opens it, anchored where the finger already is.
       menuItem(t('Shape'), 'shapes', () => { app.setTool('shape'); app.syncUI(); openToolPopover(app, add, 'shape'); }),
-      // A phone has no Ctrl+V. Holding a finger on bare board opens the same
-      // menu with a Paste that lands where you pressed; this is the one for
-      // when you would rather not hunt for a clear patch of canvas.
       menuItem(t('Paste'), 'copy', () => app.pasteAt(null)),
       menuItem(app.ruler.visible ? t('Hide ruler') : t('Ruler'), 'ruler', () => app.command('ruler')),
       h('div', { class: 'menu-sep' }),
@@ -381,7 +372,6 @@ function initPhoneToolbar(app, bar) {
     ), { key: 'add' });
   });
 
-  /* ---- and the rest: pointing tools first, then the old More menu ---- */
   const more = btn('tool tool-sm', t('More'), icon('more', 18));
   more.dataset.pop = 'more';
   more.addEventListener('click', () => {
@@ -427,14 +417,11 @@ function wireTopBar(app) {
   const labels = { btnBoards: t('Boards'), btnTemplates: t('Templates'), btnBackground: t('Canvas'), btnExport: t('Export'), btnPresent: t('Present') };
   for (const [id, ic, fn] of top) {
     const el = document.getElementById(id);
-    // A build without sharing has no such button in the page, and asking for
-    // one that is not there used to take the whole toolbar down with it.
     if (!el) continue;
     el.innerHTML = icon(ic, 18) + (labels[id] ? `<span>${labels[id]}</span>` : '');
     el.addEventListener('click', fn);
   }
 
-  // Properties Button (Obsidian-style tags & aliases)
   const btnProps = document.getElementById('btnProperties');
   if (btnProps) {
     btnProps.addEventListener('click', () => {
@@ -449,7 +436,6 @@ function wireTopBar(app) {
     });
   }
 
-  // Omni Search Button
   const btnOmni = document.getElementById('btnOmniSearch');
   if (btnOmni) {
     btnOmni.addEventListener('click', () => {
@@ -459,7 +445,6 @@ function wireTopBar(app) {
     });
   }
 
-  // Top Bar Embedded Audio Record Button
   const btnTopRec = document.getElementById('btnTopRecord');
   const lblTopTime = document.getElementById('topRecTime');
   if (btnTopRec) {
@@ -519,7 +504,6 @@ function wireTopBar(app) {
     });
   }
 
-  // Live top-bar chips for board tags & aliases (Image 3)
   app.updateTopProperties = () => {
     const container = document.getElementById('topPropertiesChips');
     if (!container) return;
@@ -647,12 +631,6 @@ function openZoomPresetPopover(app, anchor) {
   openPopover(anchor, wrap, { align: 'above-center' });
 }
 
-/* ------------------------------------------------------------------ *
- *  The page navigator
- *
- *  Only ever shown on a pad. On an infinite board there are no pages to
- *  step through, and a control that is permanently disabled is just clutter.
- * ------------------------------------------------------------------ */
 function initPagebar(app) {
   const bar = document.getElementById('pagebar');
   if (!bar) return;
@@ -680,12 +658,8 @@ function initPagebar(app) {
   });
 }
 
-/** Reflect the current page in the navigator. Called from syncToolbar. */
 function syncPagebar(app) { app.syncPageLabel(); }
 
-/* ------------------------------------------------------------------ */
-/** Move the `active` marker to `el` immediately - the popover stays open, so
- *  waiting for the next render would show the previous choice. */
 function markActive(wrap, el, cls = 'active') {
   for (const sib of wrap.children) sib.classList.remove(cls);
   el.classList.add(cls);
@@ -695,17 +669,6 @@ function swatchRow(colors, current, onPick, extra = []) {
   const wrap = h('div', { class: 'swatches' });
   for (const c of colors) {
     const b = h('button', { class: 'sw' + (c === current ? ' active' : ''), title: c, 'aria-label': c });
-    /*
-     * A swatch has to show what the pen will actually put on the board. On a
-     * dark board the default ink paints light, so a black circle here is a
-     * promise the pen does not keep.
-     *
-     * Painting it light creates a second problem, though: #ffffff is already in
-     * this palette, and two swatches that look identical but behave differently
-     * - one follows the theme, one is always white - is a worse lie than the
-     * first. So the adaptive one is marked. The ring says "this one changes
-     * with the board"; the plain white one next to it does not.
-     */
     const shown = inkPaint(c);
     b.style.background = shown;
     if (shown !== c) {
@@ -721,7 +684,6 @@ function swatchRow(colors, current, onPick, extra = []) {
 
 function sizeRow(sizes, current, onPick, color = '#201f1e') {
   const wrap = h('div', { class: 'sizes' });
-  // the dots are a preview of the ink, so they follow it onto a dark board
   const dotColor = inkPaint(color);
   for (const s of sizes) {
     const b = h('button', { class: 'size' + (s === current ? ' active' : ''), title: t('{s} px', { s }) });
@@ -733,7 +695,6 @@ function sizeRow(sizes, current, onPick, color = '#201f1e') {
   return wrap;
 }
 
-/** Each face previewed in itself, so 'Handwriting' looks like handwriting. */
 function fontRow(fonts, current, onPick) {
   const wrap = h('div', { class: 'font-row' });
   for (const f of fonts) {
@@ -752,16 +713,6 @@ function toggle(label, checked, onChange) {
   return h('label', { class: 'toggle' }, input, h('span', {}, label));
 }
 
-/**
- * The emoji picker: a search box, the ones you used lately, then the groups.
- *
- * Choosing one does two things at once, and which one matters depends on what
- * is selected. With an emoji selected it swaps that emoji's character, so a
- * tick placed by mistake becomes a cross without deleting anything. With
- * nothing selected it simply becomes the one the next tap will stamp. Both
- * cases remember it, so the picker opens on what you were last using rather
- * than scrolling back to the top every time.
- */
 function emojiPicker(app) {
   const s = app.settings;
   const results = h('div', { class: 'emoji-grid' });
@@ -784,7 +735,6 @@ function emojiPicker(app) {
 
   const search = h('input', {
     class: 'emoji-search', type: 'search', placeholder: t('Search \u2014 tick, arrow, idea\u2026'),
-    // a phone keyboard that autocorrects a search term is nobody's friend
     autocomplete: 'off', autocorrect: 'off', autocapitalize: 'none', spellcheck: 'false'
   });
 
@@ -807,13 +757,9 @@ function emojiPicker(app) {
   };
 
   search.addEventListener('input', render);
-  // Escape while typing in the search box puts the picker away. Without this
-  // the press goes to the board, where the app ignores it because the focus is
-  // in a text field - so it appeared to do nothing at all.
   search.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closePopover(); }
   });
-  // Enter takes the first match, so a search can be finished without aiming.
   search.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Enter') return;
     const first = searchEmoji(search.value.trim(), 1)[0];
@@ -836,23 +782,10 @@ function emojiPicker(app) {
 
   const body = h('div', { class: 'emoji-pop' }, search, results, sections);
   render();
-  // The board is the thing being used; grabbing focus here would raise the
-  // on-screen keyboard on a phone every time the picker opened. Only a real
-  // pointer gets the cursor put in the box for it.
   if (!matchMedia('(pointer: coarse)').matches) setTimeout(() => search.focus(), 0);
   return body;
 }
 
-/**
- * Give the pen in your hand a new ink - what picking a colour in the pen's
- * popover does.
- *
- * The colour is written to that pen, not just to "the current ink": picking
- * up another pen and coming back must find it still there. This is the ONLY
- * way a pen changes colour. Recolouring a stroke already on the board used to
- * do it too, which meant fixing the colour of one old line quietly swapped the
- * ink of the pen you were about to write with.
- */
 export function pickPenInk(app, c) {
   const s = app.settings;
   s.penColor = c; s.penEffect = 'none';
@@ -883,16 +816,6 @@ export function openToolPopover(app, anchor, tool) {
         return b;
       })
     );
-    /*
-     * Any colour, including one the theme will never touch.
-     *
-     * The swatch above marked with a ring is the DEFAULT ink, and it follows
-     * the board by design. Somebody who actually wants black on a dark board -
-     * or white on a white one, which is just as much their business - needs a
-     * way to say so, and a colour they picked themselves is exactly that: it is
-     * a deliberate choice, so it is painted as chosen, in both themes and in
-     * every export.
-     */
     const pickInk = (c) => pickPenInk(app, c);
     const customInk = h('label', { class: 'sw sw-custom', title: t('Any colour — used exactly as picked, whatever the theme') });
     const customInput = h('input', { type: 'color' });
@@ -1003,7 +926,15 @@ export function openToolPopover(app, anchor, tool) {
       h('h4', { style: 'margin-top:12px' }, t('Font')),
       fontRow(FONTS, s.noteFont, (id) => {
         s.noteFont = id; app.saveSettings(); app.applyToSelection({ font: id }, 'note');
-      })
+      }),
+      h('div', { class: 'row', style: 'margin-top:12px' },
+        toggle(t('Markdown'), s.noteMarkdown !== false, (v) => {
+          s.noteMarkdown = v;
+          app.saveSettings();
+          app.applyToSelection({ markdown: v }, 'note');
+          app.surface?.invalidate();
+        })
+      )
     );
   } else if (tool === 'text') {
     body = h('div', {},
@@ -1014,7 +945,15 @@ export function openToolPopover(app, anchor, tool) {
       h('h4', { style: 'margin-top:12px' }, t('Font')),
       fontRow(FONTS, s.textFont, (id) => {
         s.textFont = id; app.saveSettings(); app.applyToSelection({ font: id }, 'text');
-      })
+      }),
+      h('div', { class: 'row', style: 'margin-top:12px' },
+        toggle(t('Markdown'), s.textMarkdown !== false, (v) => {
+          s.textMarkdown = v;
+          app.saveSettings();
+          app.applyToSelection({ markdown: v }, 'text');
+          app.surface?.invalidate();
+        })
+      )
     );
   } else if (tool === 'emoji') {
     body = emojiPicker(app);
@@ -1077,7 +1016,6 @@ function menuItem(label, iconName, onClick, opts = {}) {
   return b;
 }
 
-/** The teaching kit, the same three wherever a menu offers them. */
 function teachingItems(app) {
   const lifted = app.store.objects.some((o) => o.type === 'curtain' && o.revealed);
   return [
@@ -1230,16 +1168,6 @@ export function openExportPopover(app, anchor) {
   openPopover(anchor, body, { key: 'export', placement: 'bottom', align: 'end' });
 }
 
-/** Refresh active states, the raised pen, and the little colour dots. */
-/**
- * Pick up a pen - by id, not by colour.
- *
- * The tray used to decide "is this pen already in my hand?" by comparing the
- * colour in hand against the pen's own. That answers wrongly the moment two
- * pens are set to the same colour: both light up, and clicking either one is
- * read as a second click on the one already held, which opens the thickness
- * popover instead of switching pens. The id says which pen without ambiguity.
- */
 export function choosePen(app, id, anchor) {
   const s = app.settings;
   const pen = penById(s, id);
@@ -1258,6 +1186,7 @@ export function syncToolbar(app) {
   const bar = document.getElementById('toolbar');
   const s = app.settings;
 
+  wireTextFormatBarMarkdown(app);
   syncRibbonTools(app);
   syncPagebar(app);
   bar.classList.toggle('hide-keys', s.showToolKeys === false);
@@ -1267,10 +1196,6 @@ export function syncToolbar(app) {
     const pen = penById(s, b.dataset.pen);
     if (!pen) continue;
     b.classList.toggle('active', app.tool === 'pen' && held === pen.id);
-    // a recoloured pen has to LOOK recoloured, or the tray still shows the
-    // colour it shipped with while writing in the one you chose
-    // the painted colour, not the stored one: switching theme changes what the
-    // barrel should look like without changing the pen at all
     const paint = inkPaint(pen.color) + '|' + pen.effect;
     if (b.dataset.paint !== paint) {
       const kbd = b.querySelector('.kbd');
@@ -1284,28 +1209,17 @@ export function syncToolbar(app) {
   const hl = bar.querySelector('.pen[data-tool="highlighter"]');
   if (hl) {
     hl.classList.toggle('active', app.tool === 'highlighter');
-    // the badge is part of the button, so it has to be re-added when the
-    // highlighter is repainted or recolouring silently drops the "H"
     const want = penIcon(s.highlighterColor, 'none', 'highlighter') + '<span class="kbd">H</span>';
     if (hl.dataset.paint !== s.highlighterColor) { hl.innerHTML = want; hl.dataset.paint = s.highlighterColor; }
   }
   const er = bar.querySelector('.pen[data-tool="eraser"]');
   if (er) er.classList.toggle('active', app.tool === 'eraser');
 
-  /*
-   * The finger button says which way round things are RIGHT NOW, and appears
-   * only once there is a pen to be the other option. Its icon is the thing the
-   * finger will do if you press it - a hand when the finger draws, a pen when
-   * the finger is moving the board - which is the way a toggle reads when you
-   * are looking at it rather than remembering it.
-   */
   const fb = bar.querySelector('.tool[data-cmd="fingerInk"]');
   if (fb) {
     const offer = app.penSeenThisSession || s.inkWithFinger === 'no';
     fb.style.display = offer ? '' : 'none';
     const drawing = app.fingerInks;
-    // Only repaint when it actually flips: syncUI runs on every tool change,
-    // and rewriting a button's contents that often is work for nothing.
     const want = drawing ? 'hand' : 'pen';
     if (fb.dataset.face !== want) { fb.innerHTML = icon(want, 18); fb.dataset.face = want; }
     fb.classList.toggle('active', !drawing);

@@ -3,10 +3,11 @@
 
 import { boundsOf, worldBounds } from './store.js';
 import { distToSegment, pointInBox, pointInPolygon, rotatePoint, boxesIntersect, boxContains } from './util.js';
-import { shapePath } from './render.js';
+import { shapePath, noteTypeRange } from './render.js';
 import { hitConnector } from './connectors.js';
+import { TASK_LINE_RE, toggleTaskAtLine } from './markdown.js';
 
-const scratch = document.createElement('canvas').getContext('2d');
+const scratch = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
 
 /** Map a world point into an object's un-rotated local space. */
 export function toLocal(o, p) {
@@ -15,13 +16,6 @@ export function toLocal(o, p) {
   return rotatePoint(p.x, p.y, b.x + b.w / 2, b.y + b.h / 2, -o.rotation);
 }
 
-/**
- * Is this object there to be touched at all?
- *
- * Revealed covers remain hittable because the same tap gesture conceals them
- * again. Their attached annotations are marked `hidden` while the answer is
- * revealed, so taps pass through to the answer once the cover is toggled.
- */
 // Revealed covers remain visible as a faint outline and hittable so another
 // tap can conceal them again. Content attached to a cover is hidden separately.
 export const ghost = (o) => !!o && !!o.hidden;
@@ -45,7 +39,7 @@ export function hitObject(o, p, tol = 6) {
     return false;
   }
 
-  if (o.type === 'shape') {
+  if (o.type === 'shape' && scratch) {
     if (!pointInBox(lp, { x: b.x - tol, y: b.y - tol, w: b.w + tol * 2, h: b.h + tol * 2 })) return false;
     const filled = o.fill && o.fill !== 'none';
     scratch.save();
@@ -64,12 +58,90 @@ export function hitObject(o, p, tol = 6) {
 }
 
 /**
- * Topmost object at `p`, or null.
+ * Tests whether a world point `p` lands on an interactive Markdown task
+ * checkbox (`- [ ]` or `- [x]`) inside a text or note object `o`.
  *
- * Locked objects ARE returned: a click has to be able to reach one, otherwise
- * locking is a one-way trip with no way to select the thing and unlock it.
- * Everything that moves or deletes in bulk - marquee, lasso, eraser - skips
- * them instead, which is where the protection actually belongs.
+ * @returns {{ obj: object, line: number, checked: boolean } | null}
+ */
+export function hitTaskCheckbox(o, p) {
+  if (!o || ghost(o) || o.markdown === false) return null;
+  if (o.type !== 'text' && o.type !== 'note') return null;
+  if (typeof o.text !== 'string' || !/[-*+]\s+\[[ xX]\]/.test(o.text)) return null;
+
+  const lp = toLocal(o, p);
+  const b = boundsOf(o);
+  if (!pointInBox(lp, b)) return null;
+
+  const isNote = o.type === 'note';
+  const padX = isNote ? Math.max(10, o.w * 0.08) + 10 : 10;
+  const padY = isNote ? Math.max(10, o.w * 0.08) + 8 : 8;
+  const fontSize = o.fontSize || (isNote ? Math.min(24, noteTypeRange(o).max) : 24);
+  const lineH = fontSize * 1.45;
+
+  const lines = o.text.replace(/\r\n?/g, '\n').split('\n');
+  let curY = b.y + padY;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const hMatch = line.match(/^\s*(#{1,6})\s+/);
+    const rowH = hMatch ? lineH * (1.45 - hMatch[1].length * 0.06) : lineH;
+    const tMatch = line.match(TASK_LINE_RE);
+
+    if (tMatch) {
+      const indentPx = tMatch[1].length * (fontSize * 0.5);
+      const boxSize = Math.max(16, fontSize * 1.15);
+      const boxX = b.x + padX + indentPx - 4;
+      const boxY = curY;
+      if (
+        lp.x >= boxX &&
+        lp.x <= boxX + boxSize + 8 &&
+        lp.y >= boxY - 2 &&
+        lp.y <= boxY + rowH + 2
+      ) {
+        return {
+          obj: o,
+          line: i,
+          checked: tMatch[2].toLowerCase() === 'x'
+        };
+      }
+    }
+    curY += rowH;
+  }
+  return null;
+}
+
+/**
+ * Topmost interactive Markdown task checkbox at world point `p`, or null.
+ */
+export function taskCheckboxAt(store, p, tol = 6) {
+  const order = store.doc.order;
+  for (let i = order.length - 1; i >= 0; i--) {
+    const o = store.doc.objects[order[i]];
+    if (!o || o.locked || ghost(o)) continue;
+    if (!hitObject(o, p, tol)) continue;
+    const hit = hitTaskCheckbox(o, p);
+    if (hit) return hit;
+    // Topmost non-stroke object intercepts the click
+    if (o.type !== 'stroke') return null;
+  }
+  return null;
+}
+
+/**
+ * Convenience helper: if `p` hits a Markdown task checkbox on the canvas,
+ * toggles `- [ ]` <-> `- [x]` directly in `store` as an undoable transaction.
+ */
+export function toggleTaskAtPoint(store, p, tol = 6) {
+  const hit = taskCheckboxAt(store, p, tol);
+  if (!hit) return false;
+  const res = toggleTaskAtLine(hit.obj.text, hit.line);
+  if (!res.toggled) return false;
+  store.update(hit.obj.id, { text: res.text }, 'toggle task');
+  return true;
+}
+
+/**
+ * Topmost object at `p`, or null.
  */
 export function pick(store, p, tol = 6, { includeLocked = true } = {}) {
   const order = store.doc.order;
@@ -119,10 +191,6 @@ export function inLasso(store, poly) {
 
 /**
  * The answer cover a tap at `p` would land on, or null.
- *
- * Ink is looked straight through: a teacher who circled the cover, or wrote
- * "Q1" on it, still expects a tap there to toggle it. Anything else sitting on
- * top - a note, a picture - is what the tap is really on, so it wins.
  */
 export function curtainAt(store, p, tol = 6) {
   const order = store.doc.order;
@@ -139,8 +207,6 @@ export function curtainAt(store, p, tol = 6) {
 export function strokesAlong(store, a, b, radius) {
   const hits = [];
   const box = normalizeBox({ x: Math.min(a.x, b.x) - radius, y: Math.min(a.y, b.y) - radius, w: Math.abs(a.x - b.x) + radius * 2, h: Math.abs(a.y - b.y) + radius * 2 });
-  // In place, not through the `objects` getter: that copies the whole document
-  // into a fresh array, and this runs on every single pointer move of a scrub.
   const objs = store.doc.objects;
   for (const id of store.doc.order) {
     const o = objs[id];

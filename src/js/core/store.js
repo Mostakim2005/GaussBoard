@@ -13,6 +13,15 @@ import { t } from '../i18n.js';
 
 export const CLIENT_ID = uid('c');
 
+/** Ensure text and sticky note objects carry the additive `markdown` property (default: true). */
+function normalizeTextObject(o) {
+  if (!o || typeof o !== 'object') return o;
+  if ((o.type === 'text' || o.type === 'note') && o.markdown === undefined) {
+    o.markdown = true;
+  }
+  return o;
+}
+
 export function emptyDoc(name = t('Untitled board')) {
   return {
     id: uid('b'), name, schema: 2,
@@ -66,6 +75,7 @@ export class Store {
     const d = this.doc;
     switch (op.t) {
       case 'add': {
+        normalizeTextObject(op.obj);
         d.objects[op.obj.id] = op.obj;
         if (!d.order.includes(op.obj.id)) {
           if (op.index == null || op.index >= d.order.length) d.order.push(op.obj.id);
@@ -137,6 +147,7 @@ export class Store {
    * state and issue a real commit() when the gesture ends.               */
   rawInsert(obj, index) {
     this.rev++;
+    normalizeTextObject(obj);
     this.doc.objects[obj.id] = obj;
     if (index == null || index >= this.doc.order.length) this.doc.order.push(obj.id);
     else this.doc.order.splice(index, 0, obj.id);
@@ -176,8 +187,12 @@ export class Store {
   get canRedo() { return this.redoStack.length > 0; }
 
   /* ---------------- convenience mutations ---------------- */
-  add(obj, label = 'add') { this.commit(label, [{ t: 'add', obj }]); return obj; }
-  addMany(objs, label = 'add') { this.commit(label, objs.map((obj) => ({ t: 'add', obj }))); return objs; }
+  add(obj, label = 'add') { normalizeTextObject(obj); this.commit(label, [{ t: 'add', obj }]); return obj; }
+  addMany(objs, label = 'add') {
+    for (const o of objs) normalizeTextObject(o);
+    this.commit(label, objs.map((obj) => ({ t: 'add', obj })));
+    return objs;
+  }
 
   update(id, patch, label = 'update') {
     const o = this.get(id); if (!o) return;
@@ -365,7 +380,11 @@ export class Store {
     const list = Array.isArray(data.objects) ? data.objects
       : Array.isArray(data.objectList) ? data.objectList
         : data.objects ? Object.values(data.objects) : [];
-    for (const o of list) { d.objects[o.id] = o; d.order.push(o.id); }
+    for (const o of list) {
+      normalizeTextObject(o);
+      d.objects[o.id] = o;
+      d.order.push(o.id);
+    }
     this.doc = d;
     this.rev++;
     this.undoStack.length = 0; this.redoStack.length = 0; this.log.length = 0;
@@ -415,23 +434,7 @@ export function worldBounds(o) {
 export function centerOf(o) { const b = boundsOf(o); return { x: b.x + b.w / 2, y: b.y + b.h / 2 }; }
 
 /**
- * Ids of anything drawn onto `ids` while they were locked.
- *
- * Locking a page and annotating it is the normal way to mark up an import.
- * Whiteboard treats those annotations as part of the page: unlock it, move it,
- * and the notes travel with it. `attachedTo` records that, and every transform
- * expands its selection through here so the two never come apart.
- */
-/**
  * Everything that shares a group with the given ids.
- *
- * A group is not a container object. It is a name that several objects agree
- * to share, which is why grouping costs nothing at draw time, survives a save
- * without a new file format, and cannot end up holding a member that was
- * deleted out from under it. Selecting is where it becomes real: touch one
- * member and the whole group comes along, and every tool that already works
- * on a selection - move, resize, delete, order, export - then works on the
- * group without knowing groups exist.
  */
 export function withGroups(store, ids, exceptGroup = null) {
   const groups = new Set();

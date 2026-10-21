@@ -19,8 +19,20 @@
 // and still reads as the name of what is missing.
 
 export const REF_RE = /@\[([^\]\n]{1,200})\]\(b:([A-Za-z0-9_-]{1,128})(?:#(\d{1,4}))?\)/g;
+export const WIKILINK_RE = /\[\[([^\]|#\n]+)(?:#(\d{1,4}))?(?:\|([^\]\n]+))?\]\]/g;
 
 const clean = (s) => String(s ?? '').replace(/[\]\n\r]/g, ' ').trim().slice(0, 200) || '?';
+
+/** Safe fallback id derived from a board title when the target board does not exist locally yet. */
+function fallbackIdFromTitle(title) {
+  const slug = String(title ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 96);
+  return 'wl_' + (slug || 'board');
+}
 
 /** The text form of a link, for putting into words. */
 export function refToken(ref) {
@@ -28,25 +40,82 @@ export function refToken(ref) {
   return `@[${clean(ref.name)}](b:${ref.id}${page})`;
 }
 
+/**
+ * Convert Obsidian-style [[Board Name#Page|Alias]] wikilinks into native
+ * @[Label](b:boardId#page) tokens by resolving board names against the local directory.
+ */
+export function wikilinksToRefs(text) {
+  const s = String(text ?? '');
+  if (!s.includes('[[')) return s;
+  return s.replace(WIKILINK_RE, (_, rawTitle, rawPage, rawAlias) => {
+    const title = String(rawTitle || '').trim();
+    if (!title) return _;
+    const page = rawPage ? Number(rawPage) : 0;
+    const alias = rawAlias ? String(rawAlias).trim() : '';
+    const match = lookupBoard({ name: title });
+    const id = match ? match.id : fallbackIdFromTitle(title);
+    const displayName = alias || (match && match.name) || title;
+    return refToken({ id, name: displayName, page });
+  });
+}
+
+/**
+ * Convert native @[Label](b:boardId#page) tokens into Obsidian [[Board Name#Page|Alias]] syntax.
+ */
+export function refsToWikilinks(text) {
+  const s = String(text ?? '');
+  if (!s.includes('](b:')) return s;
+  return s.replace(REF_RE, (_, label, id, page) => {
+    const b = lookupBoard({ id, name: label });
+    const boardName = (b && b.name) || label;
+    const pagePart = page ? `#${page}` : '';
+    const aliasPart = label && label !== boardName ? `|${label}` : '';
+    return `[[${boardName}${pagePart}${aliasPart}]]`;
+  });
+}
+
 /** Every link in a stretch of text: [{start, end, id, name, page}]. Pages count from 1. */
 export function refSpans(text) {
   const out = [];
   const s = String(text ?? '');
-  if (!s.includes('](b:')) return out;
-  REF_RE.lastIndex = 0;
-  let m;
-  while ((m = REF_RE.exec(s))) {
-    out.push({ start: m.index, end: m.index + m[0].length, name: m[1], id: m[2], page: m[3] ? Number(m[3]) : 0 });
+  if (s.includes('](b:')) {
+    REF_RE.lastIndex = 0;
+    let m;
+    while ((m = REF_RE.exec(s))) {
+      out.push({ start: m.index, end: m.index + m[0].length, name: m[1], id: m[2], page: m[3] ? Number(m[3]) : 0 });
+    }
+  }
+  if (s.includes('[[')) {
+    WIKILINK_RE.lastIndex = 0;
+    let m;
+    while ((m = WIKILINK_RE.exec(s))) {
+      const title = String(m[1] || '').trim();
+      const page = m[2] ? Number(m[2]) : 0;
+      const alias = m[3] ? String(m[3]).trim() : '';
+      const found = lookupBoard({ name: title });
+      out.push({
+        start: m.index,
+        end: m.index + m[0].length,
+        name: alias || title,
+        boardName: title,
+        id: found ? found.id : fallbackIdFromTitle(title),
+        page,
+        wikilink: true
+      });
+    }
+    out.sort((a, b) => a.start - b.start);
   }
   return out;
 }
 
-export const hasRefs = (text) => typeof text === 'string' && text.includes('](b:') && refSpans(text).length > 0;
+export const hasRefs = (text) =>
+  typeof text === 'string' && (text.includes('](b:') || text.includes('[[')) && refSpans(text).length > 0;
 
 /** The words with every link written the way a person would: "@Week 5". For copying out to other apps. */
 export function refsAsWords(text) {
   if (!hasRefs(text)) return String(text ?? '');
-  return String(text).replace(REF_RE, (_, name, id, page) => '@' + (directoryName(id) || name) + (page ? ' › ' + page : ''));
+  const withRefs = wikilinksToRefs(text);
+  return String(withRefs).replace(REF_RE, (_, name, id, page) => '@' + (directoryName(id) || name) + (page ? ' › ' + page : ''));
 }
 
 /* ------------------------------------------------------------------ *
@@ -104,7 +173,7 @@ export function lookupBoard(ref) {
     const came = [...byId.values()].filter((b) => typeof b.origin === 'string' && b.origin.startsWith('sync:') && b.origin.endsWith(tail));
     if (came.length === 1) return came[0];
   }
-  const name = String(ref.name || '').trim().toLowerCase();
+  const name = String(ref.boardName || ref.name || '').trim().toLowerCase();
   if (!name) return null;
   const same = allBoards().filter((b) => String(b.name || '').trim().toLowerCase() === name);
   return same.length === 1 ? same[0] : null;

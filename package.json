@@ -1,7 +1,7 @@
 {
   "name": "gazboard",
   "productName": "GazBoard",
-  "version": "4.8.11",
+  "version": "4.8.12",
   "description": "A free-form digital whiteboard - offline replica of the classic Microsoft Whiteboard 21.x experience, with Word / PowerPoint / PDF import.",
   "main": "main.js",
   "scripts": {
@@ -149,7 +149,7 @@
       "artifactName": "GazBoard-Setup-${version}.exe"
     },
     "portable": {
-      "artifactName": "GazBoard-${version}-portable.exe"
+      "artifactName": "GazBoard-v${version}-Portable.exe"
     },
     "fileAssociations": [
       {

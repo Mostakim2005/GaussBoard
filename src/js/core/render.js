@@ -8,6 +8,7 @@ import { objectRuns, layoutRich, fitRichSize, drawRichLines, needsRich, watchChi
 import { mathEntry, hasMaths } from './maths.js';
 import { drawArrowhead, drawConnector } from './connectors.js';
 import { lookupBoard, refLabel, refMissing } from './boardrefs.js';
+import { isMarkdown, buildMarkdownSvgDataUri } from './markdown.js';
 
 import { fontStack } from '../ui/palettes.js';
 import { t, currentLanguage, direction } from '../i18n.js';
@@ -34,24 +35,97 @@ export function getImage(src, onload) {
   return rec.ready ? rec.img : null;
 }
 
+/* ---------- Markdown SVG <foreignObject> cache ---------- */
+const mdSvgCache = new Map();
+const MAX_MD_CACHE = 250;
+
+function resolveWikilinkForRender(target, anchor, alias) {
+  const page = anchor && /^\d+$/.test(anchor) ? Number(anchor) : 0;
+  const b = lookupBoard({ name: target });
+  const label = alias || refLabel({ id: b?.id, name: target, page });
+  return {
+    id: b?.id || '',
+    href: `b:${b?.id || target}${anchor ? '#' + anchor : ''}`,
+    label
+  };
+}
+
+/**
+ * Renders an Obsidian/GFM Markdown block onto the Canvas2D context using an
+ * off-screen SVG <foreignObject> image cache for vector sharpness at any zoom.
+ * While the SVG image decodes on its first frame, falls back to drawTextBlock
+ * so text never flickers.
+ */
+export function drawMarkdownBlock(ctx, o, hideText = false, onload = null, boxOverride = null) {
+  if (hideText || !o || !o.text) return;
+  const x = boxOverride ? boxOverride.x : o.x;
+  const y = boxOverride ? boxOverride.y : o.y;
+  const w = Math.max(24, boxOverride ? boxOverride.w : (o.w || 200));
+  const h = Math.max(20, boxOverride ? boxOverride.h : (o.h || 80));
+
+  const isNote = o.type === 'note';
+  const color = isNote
+    ? (o.textColor || readableText(o.color || '#ffd94a'))
+    : inkPaint(o.color);
+  const fontSize = o.fontSize || (isNote ? Math.min(24, noteTypeRange(o).max) : 24);
+  const fontFamily = faceOf(o.font);
+  const align = o.align || 'left';
+
+  const key = `${o.text}\u0000${Math.round(w)}\u0000${Math.round(h)}\u0000${color}\u0000${fontSize}\u0000${fontFamily}\u0000${align}`;
+  let entry = mdSvgCache.get(key);
+
+  if (!entry && typeof Image !== 'undefined') {
+    if (mdSvgCache.size >= MAX_MD_CACHE) {
+      const oldestKey = mdSvgCache.keys().next().value;
+      mdSvgCache.delete(oldestKey);
+    }
+    const uri = buildMarkdownSvgDataUri(o.text, {
+      width: w,
+      height: h,
+      color,
+      fontSize,
+      fontFamily,
+      align,
+      resolveWikilink: resolveWikilinkForRender
+    });
+    const img = new Image();
+    entry = { img, ready: false, error: false };
+    mdSvgCache.set(key, entry);
+    img.onload = () => {
+      entry.ready = true;
+      if (onload) onload();
+    };
+    img.onerror = () => {
+      entry.error = true;
+    };
+    img.src = uri;
+  }
+
+  if (entry && entry.ready && entry.img) {
+    ctx.drawImage(entry.img, x, y, w, h);
+    return;
+  }
+
+  // Synchronous first-frame or headless fallback
+  drawTextBlock(ctx, o.text, x, y, w, h, {
+    runs: objectRuns(o),
+    paint: isNote ? undefined : (c) => inkPaint(c),
+    ownInk: isNote,
+    color,
+    size: fontSize,
+    align,
+    valign: isNote ? 'middle' : (o.valign || 'top'),
+    family: fontFamily,
+    weight: o.bold ? '600' : '400',
+    italic: o.italic,
+    underline: o.underline,
+    onload
+  });
+}
+
 /* =================================================================== *
  *  Backgrounds
  * =================================================================== */
-/**
- * Paints in SCREEN space, in CSS pixels. The caller must already have applied
- * the device-pixel-ratio transform - resetting to the identity matrix here
- * would paint CSS-pixel coordinates into a device-pixel buffer and leave the
- * right and bottom of the canvas unpainted on any HiDPI display.
- */
-/**
- * The sheets, when the board is a pad rather than an infinite canvas.
- *
- * Drawn in screen space, like the background they sit on: white rectangles
- * with a soft shadow over a dimmed surround. The ruling belongs to the paper,
- * so it is anchored to each sheet's own top-left corner and clipped to it -
- * a continuous world grid would meet every page at a different offset and
- * look nothing like a pad.
- */
 export function pageRects(pages, cam) {
   return worldPageRects(pages).map((r) => ({
     x: r.x * cam.z + cam.x, y: r.y * cam.z + cam.y, w: r.w * cam.z, h: r.h * cam.z
@@ -66,31 +140,11 @@ export function pageRect(pages, cam) {
 /** First grid line at or after `from`, on the lattice `origin + k*step`. */
 const lineFrom = (origin, step, from) => origin + Math.ceil((from - origin) / step) * step;
 
-/**
- * How far apart the lines, squares and dots of a pattern are, in world units
- * (96 to the inch): about 5, 7.5, 10.5 and 15 mm on a printed sheet. 40 is
- * what every board had before there was a choice, and what a board with no
- * setting still gets.
- */
 export const PATTERN_SPACINGS = [19, 28, 40, 56];   // ~5, 7.5, 10.5 and 15 mm on paper; 19 matches Xournal++'s 5 mm graph paper
 
-/* ---------- notebook paper ----------
- *
- * Pale blue rules, a red margin down the left and a clear strip across the
- * top where the date the sheet was started sits, small and grey. Everything
- * is measured in millimetres of paper so it prints the size it looks. The
- * board itself never mirrors - Arabic only moves the date to the other end of
- * the strip, because text belongs to the reader but the paper belongs to the
- * board and has to look the same to everyone who opens it.
- */
 export const NOTEBOOK = { line: '#8db6e2', margin: '#e0707f', date: '#8a8886', marginMm: 25, headMm: 22, dateMm: 3.8, edgeMm: 15 };
 const MM = 96 / 25.4;
 
-/**
- * Where everything on one sheet of notebook paper goes, in screen pixels.
- * Exported so the suite can check the date really lands in the strip.
- * @param {{x:number,y:number,w:number,h:number}} sheet  the sheet on screen
- */
 export function notebookLayout(sheet, base, z, rtl = false) {
   const head = Math.max(3 * base, NOTEBOOK.headMm * MM) * z;
   const top = sheet.y + head;                                // the first rule
@@ -104,12 +158,6 @@ export function notebookLayout(sheet, base, z, rtl = false) {
 const LOCALE_FOR = { en: null, bn: 'bn-BD', ar: 'ar-u-nu-arab', 'zh-Hans': 'zh-CN', 'zh-Hant': 'zh-TW', es: 'es', 'pt-BR': 'pt-BR' };
 const dateFormats = new Map();
 
-/**
- * "2026-10-06" as the reader's language writes it: Tue, October 6, 2026 /
- * মঙ্গল, ৬ অক্টোবর, ২০২৬ / الثلاثاء، ٦ أكتوبر ٢٠٢٦. The stored day never
- * changes; only the way it is written does. English follows the computer's
- * own English (US or UK order).
- */
 export function formatPageDate(iso, lang = currentLanguage()) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
   if (!m) return '';
@@ -173,12 +221,6 @@ function drawPattern(ctx, bg, cam, w, h, anchor, bounds, page, exact = false) {
   const base = PATTERN_SPACINGS.includes(bg.spacing) ? bg.spacing : 40;   // world spacing
   let step = base * cam.z;
   if (anchor || exact) {
-    /*
-     * A sheet of paper has its ruling printed on it: true to size at every
-     * zoom, so the lines sit the same distance apart on screen, in a PDF and
-     * on the printout, and handwriting keeps its proportion to them. They are
-     * only thinned out once they would run together.
-     */
     while (step < 6) step *= 2;
   } else {
     while (step < 14) step *= 2;          // keep it readable when zoomed out
@@ -190,9 +232,6 @@ function drawPattern(ctx, bg, cam, w, h, anchor, bounds, page, exact = false) {
   const oy = ((ay % step) + step) % step;
   const color = bg.patternColor || '#c8c6c4';
 
-  // Only sweep the part of the canvas this sheet actually covers. Running the
-  // full width and height once per sheet and leaning on the clip meant a pad
-  // paid for its whole ruling as many times as it had visible pages.
   const x0 = bounds ? Math.max(0, bounds.x) : 0;
   const y0 = bounds ? Math.max(0, bounds.y) : 0;
   const x1 = bounds ? Math.min(w, bounds.x + bounds.w) : w;
@@ -233,12 +272,6 @@ function drawPattern(ctx, bg, cam, w, h, anchor, bounds, page, exact = false) {
   ctx.restore();
 }
 
-/**
- * Paints in SCREEN space, in CSS pixels. The caller must already have applied
- * the device-pixel-ratio transform - resetting to the identity matrix here
- * would paint CSS-pixel coordinates into a device-pixel buffer and leave the
- * right and bottom of the canvas unpainted on any HiDPI display.
- */
 export function drawBackground(ctx, bg, cam, w, h, pages = null) {
   ctx.save();
 
@@ -277,17 +310,10 @@ export function drawBackground(ctx, bg, cam, w, h, pages = null) {
   ctx.restore();
 }
 
-/**
- * Just the ruling, for an export: the lines, squares, dots or notebook paper
- * the board shows, without the desk, shadows and page edges that only make
- * sense on screen. A pad is ruled sheet by sheet from each sheet's own corner,
- * exactly as it is drawn on screen, so the printout matches what was written on.
- */
 export function drawRuling(ctx, bg, cam, w, h, pages = null) {
   if (!bg || !bg.pattern || bg.pattern === 'none') return;
   ctx.save();
   const sheets = pages && pages.length ? pageRects(pages, cam) : [];
-  // an export is printed, so even an infinite board's ruling comes out true to size
   if (!sheets.length) drawPattern(ctx, bg, cam, w, h, null, null, null, true);
   else sheets.forEach((sheet, i) => {
     if (sheet.x > w || sheet.y > h || sheet.x + sheet.w < 0 || sheet.y + sheet.h < 0) return;
@@ -301,22 +327,6 @@ export function drawRuling(ctx, bg, cam, w, h, pages = null) {
 
 /* =================================================================== *
  *  Light and dark
- *
- *  A dark board is a screen decision, not a document one. The file on disk is
- *  unchanged: a stroke drawn in the default black is still #201f1e in the JSON,
- *  in the PDF, in the PNG and in a board sent to somebody else. Only the
- *  painting of it on THIS screen, right now, is allowed to differ.
- *
- *  That is what makes a dark board safe. The obvious approach - have the black
- *  pen write white - produces white ink in a white-backgrounded export: a page
- *  that looks blank. And it would only help work drawn after the switch, while
- *  every board already written would stay invisible on the dark canvas.
- *  Mapping at paint time fixes both at once and risks neither.
- *
- *  The mapping applies to DEFAULT ink only. A colour somebody chose on purpose
- *  is theirs and is painted as chosen; red stays red. Default black and the
- *  default black of text are the two that flip, because on a dark board they
- *  are the difference between writing and not.
  * =================================================================== */
 
 const DEFAULT_INK = '#201f1e';
@@ -325,36 +335,24 @@ const DARK_BOARD = '#1f1e1d';
 
 let darkBoard = false;
 
-/**
- * Paint the board dark from here on - screen only.
- *
- * Export deliberately turns this OFF around its own rendering rather than
- * trusting the current value, so a PDF is white paper with black ink whatever
- * the screen happens to be doing while it is generated.
- */
 export function setDarkBoard(on) { darkBoard = !!on; }
 export function isDarkBoard() { return darkBoard; }
 
-/** The colour to actually paint with, once the theme has had its say. */
 export function inkPaint(color, fallback = DEFAULT_INK) {
   const c = color || fallback;
   if (!darkBoard) return c;
   return String(c).toLowerCase() === DEFAULT_INK ? DARK_INK : c;
 }
 
-/** The board's own colour, once the theme has had its say. */
 export function boardPaint(color) {
   const c = color || '#ffffff';
   if (!darkBoard) return c;
-  // A colour somebody chose for this board is kept - they wanted that board
-  // yellow. Only the default white sheet becomes a dark sheet.
   return String(c).toLowerCase() === '#ffffff' ? DARK_BOARD : c;
 }
 
 /* =================================================================== *
  *  Ink
  * =================================================================== */
-/** Gradient down the stroke for the rainbow and galaxy inks. */
 function inkStyle(ctx, o) {
   if (!o.effect || o.effect === 'none') return inkPaint(o.color);
   const pts = o.points;
@@ -394,42 +392,18 @@ export function drawStroke(ctx, o) {
   ctx.lineJoin = 'round';
   ctx.strokeStyle = inkStyle(ctx, o);
 
-  /*
-   * Two ways to lay this down, and which one is used is decided by the ink
-   * itself rather than by a setting.
-   *
-   * A stroke that carries real pressure - a pen, on a machine with pressure
-   * switched on - is drawn as runs of varying width, so pressing harder in the
-   * middle of a word thickens the middle of the word. That is the thing people
-   * mean by pressure sensitivity, and it did not used to happen: the mean of
-   * the whole stroke set one width for the lot.
-   *
-   * Everything else goes down exactly as it always did, in one call. A mouse
-   * reports no pressure, a finger reports none worth having, the highlighter
-   * is translucent and would darken where a stroke crossed itself, and every
-   * stroke saved before today has 0.5 written at every point. Those must not
-   * change - a board drawn last year has to open looking like itself.
-   */
   const varying = !highlighter && o.pressure !== false && hasPressureVariation(pts);
   if (varying) {
-    /*
-     * How big this stroke actually is on the glass, not in the document.
-     *
-     * Splitting a stroke into runs is only worth paying for when somebody can
-     * see the result. Pulled back to a bird's-eye view the whole swing of a
-     * pen is a fraction of one screen pixel, and paying for it on every object
-     * at once is what made a big board crawl.
-     */
     let scale = 1;
     try {
       const m = ctx.getTransform();
       scale = Math.hypot(m.a, m.b) || 1;
-    } catch { scale = 1; }               // an old canvas without getTransform
+    } catch { scale = 1; }
     const runs = inkRuns(o, scale);
     for (const r of runs) { ctx.lineWidth = r.width; ctx.stroke(r.path); }
   } else {
     ctx.lineWidth = highlighter ? (o.width || 20) : strokeWeight(pts, o.width || 4, o.pressure !== false);
-    ctx.stroke(path);                     // one call: no seams, no overlap darkening
+    ctx.stroke(path);
   }
 
   if (o.effect === 'galaxy') {
@@ -487,30 +461,11 @@ export function shapePath(ctx, kind, x, y, w, h) {
   }
 }
 
-/*
- * A cloud, drawn as one outline.
- *
- * It used to be five whole circles stroked on top of each other, which is why
- * every overlap showed through and the result looked like a diagram of
- * intersecting sets rather than weather. Here the bumps are still circles, but
- * only the outside of each is drawn: where two neighbours cross, the crossing
- * point on the far side from the middle becomes the seam, and each arc runs
- * from the seam behind it to the seam ahead. The path closes on itself, so a
- * fill has nothing to bleed through and a dashed stroke runs round the edge
- * the way it does on every other shape.
- *
- * Bumps are sized from the gap to their neighbours rather than from the box.
- * Sizing them from the box was the thing that fell apart on a wide flat cloud:
- * the bumps stayed small while the gaps stretched, until the underside came
- * apart into a row of loose circles.
- */
 function cloud(ctx, x, y, w, h) {
   const aw = Math.abs(w), ah = Math.abs(h);
   if (aw < 1 || ah < 1) return;
   const ox = w < 0 ? x + w : x, oy = h < 0 ? y + h : y;
   const cx = ox + aw / 2, cy = oy + ah / 2;
-  // Position in the box, then relative size. Large and overlapping along the
-  // crown, smaller and lower underneath, so the base sits flatter than the top.
   const SPEC = [
     [0.20, 0.58, 1.15], [0.35, 0.36, 1.30], [0.58, 0.32, 1.35], [0.78, 0.50, 1.20],
     [0.84, 0.70, 0.92], [0.62, 0.78, 1.00], [0.38, 0.80, 0.98], [0.16, 0.72, 0.90]
@@ -522,7 +477,6 @@ function cloud(ctx, x, y, w, h) {
     const gap = (Math.hypot(c[i].x - p.x, c[i].y - p.y) + Math.hypot(c[i].x - q.x, c[i].y - q.y)) / 2;
     c[i].r = gap * 0.66 * SPEC[i][2];
   }
-  // Where two neighbouring bumps cross, on the outside of the cloud.
   const seam = (a, b) => {
     const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
     if (!d || d >= a.r + b.r || d <= Math.abs(a.r - b.r)) return null;
@@ -538,9 +492,6 @@ function cloud(ctx, x, y, w, h) {
   let open = false;
   for (let i = 0; i < n; i++) {
     const back = seams[(i - 1 + n) % n], fwd = seams[i], b = c[i];
-    // Neighbours that somehow do not meet: draw the whole bump rather than
-    // leave a hole. Nothing in the shipped proportions reaches this, but a
-    // shape dragged to a freakish aspect should still look like something.
     if (!back || !fwd) {
       ctx.moveTo(b.x + b.r, b.y);
       ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
@@ -571,10 +522,6 @@ export function drawShape(ctx, o, hideText = false) {
     ctx.fill(o.kind === 'cloud' ? 'nonzero' : 'nonzero');
   }
   if (o.stroke && o.stroke !== 'none') {
-    // The outline is ink like any other: the default one follows the theme
-    // (light on a dark board, exactly as the colour picker promises), a colour
-    // somebody chose is left alone. It used to be painted as stored, so every
-    // default shape came out black on a dark board.
     const outline = inkPaint(o.stroke);
     ctx.strokeStyle = outline;
     ctx.lineWidth = o.lineWidth || 3;
@@ -612,19 +559,13 @@ export function drawTextBlock(ctx, text, x, y, w, h, opt = {}) {
   if (!text) return;
   const family = opt.family || FONT;
   const weight = opt.weight || '400';
-  /*
-   * Words with styles of their own go the rich way (see richtext.js). Plain
-   * text - every board made before rich text, and every box nobody has
-   * formatted - takes exactly the path below that it always has.
-   */
-  // Maths in the words ($...$) is drawn by the rich path too, which knows how to set it.
   const runs = opt.runs || (needsRich(text) ? [{ t: text }] : null);
   if (runs) {
     const base = { family, weight: '400', bold: weight === '600', italic: !!opt.italic, underline: !!opt.underline, color: opt.color, size: opt.size,
       onload: opt.onload, lineHeight: opt.lineHeight };
     if (!base.size) base.size = fitRichSize(ctx, runs, w, h, base, opt.maxSize || 72, opt.minSize || 10);
     const lines = layoutRich(ctx, runs, w, base);
-    drawRichLines(ctx, lines, x, y, w, h, base, { align: opt.align, valign: opt.valign, lineHeight: opt.lineHeight, // plain words with maths in them keep the colours the plain path gives them
+    drawRichLines(ctx, lines, x, y, w, h, base, { align: opt.align, valign: opt.valign, lineHeight: opt.lineHeight,
       paint: opt.paint || (opt.runs || opt.ownInk ? undefined : (c) => inkPaint(c)), onload: opt.onload, paper: !!opt.ownInk });
     return;
   }
@@ -633,8 +574,6 @@ export function drawTextBlock(ctx, text, x, y, w, h, opt = {}) {
   if (!size) size = fitFontSize(ctx, text, w, h, family, weight, opt.maxSize || 72, opt.minSize || 10);
   ctx.save();
   ctx.font = `${italic}${weight} ${size}px ${family}`;
-  // Words on a paper of their own (a sticky note, a table, a filled shape) keep
-  // their ink in the dark theme: light letters on a yellow note cannot be read.
   ctx.fillStyle = opt.ownInk ? (opt.color || '#201f1e') : inkPaint(opt.color);
   ctx.textBaseline = 'top';
   const lines = wrapText(ctx, text, w);
@@ -663,27 +602,12 @@ export function drawTextBlock(ctx, text, x, y, w, h, opt = {}) {
 /* =================================================================== *
  *  Notes / text / images / tables
  * =================================================================== */
-/*
- * How big a note is allowed to set its own type.
- *
- * A note's SIZE is chosen in screen pixels and converted to board units, so a
- * new note looks the same whatever the board is zoomed to - at 50% it is twice
- * as many board units across, and comes out the same size on screen. The type
- * inside it was capped at a flat 46 board units, which is not a screen measure
- * at all: at 50% that cap is 23 screen pixels inside a note that still looks
- * 200 wide, and at 200% it is 92. Same note, same words, type that changed size
- * with the zoom the note happened to be made at.
- *
- * Tying the cap to the note's own width fixes that, because the width is where
- * the zoom already went. The ratios are the old numbers at the old default
- * size, so a note made at 100% is unchanged to the pixel.
- */
 export function noteTypeRange(o) {
   const w = Math.max(40, o.w || 200);
   return { max: Math.max(12, w * (46 / 200)), min: Math.max(6, w * (10 / 200)) };
 }
 
-export function drawNote(ctx, o, hideText = false) {
+export function drawNote(ctx, o, hideText = false, onload = null) {
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.22)';
   ctx.shadowBlur = 10;
@@ -704,6 +628,17 @@ export function drawNote(ctx, o, hideText = false) {
   ctx.fill();
 
   const pad = Math.max(10, o.w * 0.08);
+  if (o.markdown !== false && !o.runs && isMarkdown(o.text)) {
+    drawMarkdownBlock(ctx, o, hideText, onload, {
+      x: o.x + pad,
+      y: o.y + pad,
+      w: o.w - pad * 2,
+      h: o.h - pad * 2
+    });
+    ctx.restore();
+    return;
+  }
+
   const type = noteTypeRange(o);
   drawTextBlock(ctx, hideText ? '' : o.text, o.x + pad, o.y + pad, o.w - pad * 2, o.h - pad * 2, {
     runs: objectRuns(o),
@@ -711,12 +646,13 @@ export function drawNote(ctx, o, hideText = false) {
     size: o.fontSize || 0, maxSize: type.max, minSize: type.min,
     align: o.align || 'center', valign: 'middle',
     family: faceOf(o.font),
-    weight: o.bold ? '600' : '400', italic: o.italic, underline: o.underline
+    weight: o.bold ? '600' : '400', italic: o.italic, underline: o.underline,
+    onload
   });
   ctx.restore();
 }
 
-export function drawText(ctx, o, hideText = false) {
+export function drawText(ctx, o, hideText = false, onload = null) {
   if (o.background && o.background !== 'none') {
     ctx.save();
     ctx.fillStyle = o.background;
@@ -725,55 +661,25 @@ export function drawText(ctx, o, hideText = false) {
     ctx.fill();
     ctx.restore();
   }
+  if (o.markdown !== false && !o.runs && isMarkdown(o.text)) {
+    drawMarkdownBlock(ctx, o, hideText, onload);
+    return;
+  }
   drawTextBlock(ctx, hideText ? '' : o.text, o.x, o.y, o.w, o.h, {
     runs: objectRuns(o), paint: (c) => inkPaint(c),
     color: inkPaint(o.color), size: o.fontSize || 24,
     align: o.align || 'left', valign: o.valign || 'top',
     family: faceOf(o.font),
-    weight: o.bold ? '600' : '400', italic: o.italic, underline: o.underline
+    weight: o.bold ? '600' : '400', italic: o.italic, underline: o.underline,
+    onload
   });
 }
 
-/*
- * Whatever emoji font the machine already has.
- *
- * Nothing is bundled and nothing is fetched, so this keeps working on a plane
- * like the rest of the app. The cost is that the same character is drawn in
- * each platform's own style - a board made on Windows and opened on a phone
- * shows Samsung's version of the smile. Every app that leans on the system
- * font has this, and the alternative is shipping a ten-megabyte font to make
- * a smiley look identical everywhere, which is not a trade worth making.
- */
-/*
- * Emoji are drawn from a font we ship, not the one the machine happens to own.
- *
- * The system fonts are not equal. Windows draws emoji from outlines, so they
- * stay sharp however big you make them. Android's are photographs - one
- * picture per emoji, about a hundred pixels across, and nothing larger to fall
- * back on - so a big one on a dense phone screen is a small picture stretched,
- * and it looks it. Bundling outlines fixes that, and has a second effect worth
- * as much: a board now shows the same artwork to everyone who opens it,
- * instead of a different rocket on each machine.
- *
- * The system fonts stay in the list behind ours, so a character the bundle
- * does not carry still draws rather than turning into an empty box.
- */
 const EMOJI_FONT = '"GazBoard Emoji","Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla","EmojiOne Color",sans-serif';
 const EMOJI_BASE = 100;
 const emojiInk = new Map();
 let emojiRuler = null;
 
-/**
- * How much room a character's ink actually takes, measured once and kept.
- *
- * Emoji are not square. A face is round, a rocket is long, a prohibition sign
- * is wider than it is tall, and the advance width a font reports is not the
- * same as the ink. Measuring is what stops one landing stretched, and the
- * answer never changes for a given character, so it is worth remembering.
- *
- * Falls back to a square when there is no canvas to measure with - during a
- * board rebuild, say - which is a fair guess and never a crash.
- */
 export function emojiInkSize(ch) {
   const key = ch || '';
   const hit = emojiInk.get(key);
@@ -799,38 +705,16 @@ export function emojiInkSize(ch) {
   return out;
 }
 
-/**
- * Throw the measurements away.
- *
- * Sizes are measured once and kept, which is right while the font stays put.
- * The bundled emoji font arrives a moment after start-up, though, and anything
- * measured before it landed describes the machine's own artwork instead of
- * ours - a slightly different width, so a slightly wrong box. Called once the
- * font is in, so the next measurement is the real one.
- */
 export function forgetEmojiMetrics() {
   emojiInk.clear();
   emojiRuler = null;
 }
 
-/** The shape of a character: wider than tall is above 1. */
 export function emojiAspect(ch) {
   const { w, h } = emojiInkSize(ch);
   return w / h;
 }
 
-/**
- * An emoji, sitting in its box without being squashed into it.
- *
- * It used to stretch to fill, on the reasoning that shapes do and handles
- * should never look broken. That was wrong here: a rectangle stretched is
- * still a rectangle, but a face stretched is a face with something wrong with
- * it, and every emoji dropped on a square box arrived subtly wrong because
- * almost none of them are square. So the glyph is scaled by whichever of the
- * two fits, keeping its proportions, and centred in whatever room is left.
- * New ones are given a box shaped like the character in the first place, so
- * there is usually no room left over to notice.
- */
 export function drawEmoji(ctx, o) {
   const ch = o.ch || '\u{1F642}';
   const aw = Math.abs(o.w), ah = Math.abs(o.h);
@@ -846,17 +730,10 @@ export function drawEmoji(ctx, o) {
   ctx.textBaseline = 'alphabetic';
   ctx.translate(x + aw / 2, y + ah / 2);
   ctx.scale(k, k);
-  // Emoji sit high on the line, so putting the baseline on the middle leaves
-  // them low in the box; this puts the ink's middle there instead.
   ctx.fillText(ch, 0, (asc - desc) / 2);
   ctx.restore();
 }
 
-/**
- * A maths box: its formula as a picture, as large as fits the box and centred
- * in it. Until the picture is ready (the first time a board with maths opens)
- * the LaTeX itself stands in, faintly, so nothing jumps about unexplained.
- */
 export function drawMath(ctx, o, onload) {
   const aw = Math.abs(o.w), ah = Math.abs(o.h);
   if (aw < 1 || ah < 1) return;
@@ -917,9 +794,6 @@ export function drawImage(ctx, o, onload) {
       ctx.drawImage(img, o.x, o.y, o.w, o.h);
     }
   } else if (o.missing) {
-    // The board points at a picture whose file is not there - most likely the
-    // board travelled without the assets folder beside it. Say so, and hold the
-    // space: the reference is kept, so putting the file back brings it back.
     ctx.fillStyle = '#faf9f8';
     ctx.fillRect(o.x, o.y, o.w, o.h);
     ctx.strokeStyle = '#c8c6c4';
@@ -989,24 +863,11 @@ export function drawTable(ctx, o, hideCell = null) {
 export const CURTAIN_COLOR = '#5b5fc7';
 export const CURTAIN_LABEL = t('Tap to reveal');
 
-/**
- * A card laid over part of the board, the way a teacher slides a sheet of
- * paper down an overhead to show one line at a time.
- *
- * Solid on purpose, and the same on a light board and a dark one: its whole
- * job is that nothing underneath shows through, and a see-through cover is a
- * spoiler. Faint stripes and a label say "there is something under here" so
- * nobody mistakes it for a coloured box they are meant to read.
- *
- * Once revealed it remains as a faint outline, so it can be tapped to cover
- * the answer again. Its attached answer content becomes visible underneath.
- */
 export function drawCurtain(ctx, o) {
-  // Freehand Marker Study Tape (drawn with points)
   if (Array.isArray(o.points) && o.points.length >= 2) {
     const pts = o.points;
     const w = o.width || 34;
-    const tapeColor = o.color || '#a855f7'; // Violet default per user inspiration
+    const tapeColor = o.color || '#a855f7';
     const neonOutline = o.neonColor || '#c084fc';
 
     ctx.save();
@@ -1014,7 +875,6 @@ export function drawCurtain(ctx, o) {
     ctx.lineJoin = 'round';
 
     if (o.revealed) {
-      // REVEALED (Image 5): Transparent fill + crisp faint neon outline so text beneath is crystal clear
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
@@ -1022,7 +882,6 @@ export function drawCurtain(ctx, o) {
       ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
       ctx.stroke();
 
-      // Outer delicate neon border
       ctx.lineWidth = w + 2;
       ctx.strokeStyle = 'rgba(192, 132, 252, 0.55)';
       ctx.stroke();
@@ -1030,8 +889,6 @@ export function drawCurtain(ctx, o) {
       return;
     }
 
-    // CONCEALED (Image 4): Solid base + diagonal hatched stripes pattern + neon outline
-    // 1. Create clipping mask along the thick stroke
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
@@ -1039,19 +896,16 @@ export function drawCurtain(ctx, o) {
     ctx.strokeStyle = tapeColor;
     ctx.stroke();
 
-    // 2. Draw diagonal hatched stripes across the bounding box
     const b = bboxOfPoints(pts);
     const pad = w / 2;
     const minX = b.x - pad, minY = b.y - pad, bw = b.w + pad * 2, bh = b.h + pad * 2;
 
     ctx.save();
-    // Clip inside the stroke path
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.lineWidth = w - 1;
     ctx.stroke();
-    // Use canvas clip with stroke if supported, or overlay 45-deg hatched stripes
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
     ctx.lineWidth = 3.5;
     const gap = 12;
@@ -1063,7 +917,6 @@ export function drawCurtain(ctx, o) {
     ctx.stroke();
     ctx.restore();
 
-    // 3. Crisp neon outline along edge
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
@@ -1076,7 +929,6 @@ export function drawCurtain(ctx, o) {
     return;
   }
 
-  // Rectangular Curtain or Tape Card
   if (o.revealed) {
     const { x, y, w, h } = o;
     const r = Math.min(Math.abs(w), Math.abs(h)) * 0.13;
@@ -1108,7 +960,6 @@ export function drawCurtain(ctx, o) {
   ctx.fill();
   ctx.clip();
 
-  // Diagonal hatched stripes
   ctx.strokeStyle = isTape ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.09)';
   ctx.lineWidth = isTape ? Math.max(3, unit * 0.08) : unit * 0.09;
   const gap = isTape ? Math.max(8, unit * 0.2) : Math.max(1e-6, unit * 0.25);
@@ -1116,7 +967,6 @@ export function drawCurtain(ctx, o) {
   for (let d = -ah; d < aw; d += gap) { ctx.moveTo(x + d, y + ah); ctx.lineTo(x + d + ah, y); }
   ctx.stroke();
 
-  // Neon contour outline for tape
   if (isTape) {
     ctx.restore();
     ctx.save();
@@ -1141,13 +991,6 @@ export function drawCurtain(ctx, o) {
   ctx.restore();
 }
 
-/**
- * How big the label on a cover is, in board units: 30% of the card's height,
- * or smaller if that would not fit across 86% of its width. Measured rather
- * than guessed, because the label is translated and "Tap to reveal" is a
- * very different length in Bangla, Arabic and Chinese. No fixed floor or
- * ceiling in board units - see drawCurtain() for why that was the bug.
- */
 export function curtainLabelSize(ctx, o, label = o.label ?? CURTAIN_LABEL) {
   const aw = Math.abs(o.w), ah = Math.abs(o.h);
   let size = ah * 0.3;
@@ -1163,15 +1006,6 @@ export function curtainLabelSize(ctx, o, label = o.label ?? CURTAIN_LABEL) {
 /* =================================================================== *
  *  Dispatch
  * =================================================================== */
-/**
- * @param {object|null} editing  the object whose text is currently being typed
- *   into, as { id, cell }. Its text is left OFF the canvas, because a textarea
- *   is showing the same words in the same place at the same size - and two
- *   copies a pixel or two apart read as a smeared double image. This used to be
- *   hidden by accident: the editor was an opaque white panel, so the canvas
- *   copy underneath was simply covered up. Making the panel see-through, which
- *   is what a text box should be, uncovered it.
- */
 export function drawObject(ctx, o, onload, editing = null) {
   if (o.hidden) return;
   const mine = !!editing && editing.id === o.id;
@@ -1188,8 +1022,8 @@ export function drawObject(ctx, o, onload, editing = null) {
   switch (o.type) {
     case 'stroke': drawStroke(ctx, o); break;
     case 'shape': drawShape(ctx, o, hideText); break;
-    case 'note': drawNote(ctx, o, hideText); break;
-    case 'text': drawText(ctx, o, hideText); break;
+    case 'note': drawNote(ctx, o, hideText, onload); break;
+    case 'text': drawText(ctx, o, hideText, onload); break;
     case 'image': drawImage(ctx, o, onload); break;
     case 'emoji': drawEmoji(ctx, o); break;
     case 'math': drawMath(ctx, o, onload); break;
@@ -1205,12 +1039,6 @@ export function drawObject(ctx, o, onload, editing = null) {
 /* =================================================================== *
  *  Links to other boards
  * =================================================================== */
-/*
- * A card for another board: its picture, and its name underneath, the way My
- * boards shows it. The picture is the one My boards keeps, so it is as fresh
- * as the last time that board was saved. A board that is not on this computer
- * gets a grey, dashed card that still says what it was.
- */
 export function drawBoardLink(ctx, o, onload) {
   const ref = o.board || {};
   const b = lookupBoard(ref);
@@ -1222,7 +1050,6 @@ export function drawBoardLink(ctx, o, onload) {
   const showThumb = o.showThumb !== false;
   const labelH = showThumb ? Math.max(18, Math.min(h * 0.24, 44)) : (h - pad * 2);
   ctx.save();
-  // the card
   ctx.shadowColor = 'rgba(0,0,0,0.16)';
   ctx.shadowBlur = 8; ctx.shadowOffsetY = 2;
   ctx.fillStyle = dark ? '#2d2c2b' : '#ffffff';
@@ -1235,7 +1062,6 @@ export function drawBoardLink(ctx, o, onload) {
   if (missing) ctx.setLineDash([6, 4]);
   ctx.stroke();
   ctx.setLineDash([]);
-  // the picture (if thumbnail enabled)
   if (showThumb) {
     const px = x + pad, py = y + pad, pw = Math.max(1, w - pad * 2), ph = Math.max(1, h - pad * 2 - labelH);
     ctx.save();
@@ -1246,7 +1072,6 @@ export function drawBoardLink(ctx, o, onload) {
     ctx.fillRect(px, py, pw, ph);
     const img = !missing && b && b.thumb ? getImage(b.thumb, onload) : null;
     if (img) {
-      // fill the frame, cropping what does not fit, as the gallery does
       const k = Math.max(pw / img.width, ph / img.height);
       const dw = img.width * k, dh = img.height * k;
       ctx.drawImage(img, px + (pw - dw) / 2, py + (ph - dh) / 2, dw, dh);
@@ -1258,21 +1083,18 @@ export function drawBoardLink(ctx, o, onload) {
       ctx.fillText(missing ? t('Not on this computer') : t('No picture yet'), px + pw / 2, py + ph / 2, pw - 8);
     }
     ctx.restore();
-    // a hairline round the picture, so a white page still reads as a page
     ctx.lineWidth = 1;
     ctx.strokeStyle = dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)';
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(px + 0.5, py + 0.5, pw - 1, ph - 1, Math.max(2, r - pad / 2)); else ctx.rect(px + 0.5, py + 0.5, pw - 1, ph - 1);
     ctx.stroke();
   }
-  // the name, with a little arrow saying it goes somewhere
   const fs = Math.max(8, Math.min(labelH * 0.46, 16));
   const ly = showThumb ? (y + h - pad - labelH / 2) : (y + h / 2);
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   const ink = missing ? (dark ? '#a19f9d' : '#8a8886') : (dark ? '#8ccbff' : '#0f6cbd');
   ctx.fillStyle = ink; ctx.strokeStyle = ink;
-  // the arrow: a short stroke up and to the right, with its head
   const ax = x + pad + fs * 0.15, ay = ly, as = fs * 0.62;
   ctx.lineWidth = Math.max(1, fs / 9); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.beginPath();
@@ -1291,10 +1113,6 @@ export function drawBoardLink(ctx, o, onload) {
   ctx.restore();
 }
 
-/**
- * A card for an audio recording inserted into the board: shows a play button,
- * track title, and duration badge.
- */
 export function drawAudioCard(ctx, o) {
   const { x, y, w, h } = o;
   const dark = darkBoard;
@@ -1312,14 +1130,12 @@ export function drawAudioCard(ctx, o) {
   ctx.strokeStyle = dark ? '#00e5ff' : '#0078d4';
   ctx.stroke();
 
-  // Play button circle
   const cx = x + 30, cy = y + h / 2, cr = 16;
   ctx.fillStyle = dark ? '#00e5ff' : '#0078d4';
   ctx.beginPath();
   ctx.arc(cx, cy, cr, 0, Math.PI * 2);
   ctx.fill();
 
-  // Play triangle
   ctx.fillStyle = dark ? '#000000' : '#ffffff';
   ctx.beginPath();
   ctx.moveTo(cx - 3, cy - 7);
@@ -1328,7 +1144,6 @@ export function drawAudioCard(ctx, o) {
   ctx.closePath();
   ctx.fill();
 
-  // Track title
   ctx.fillStyle = dark ? '#f0f6fc' : '#1f2328';
   ctx.font = `600 13px ${FONT}`;
   ctx.textAlign = 'left';
@@ -1336,7 +1151,6 @@ export function drawAudioCard(ctx, o) {
   const name = o.name || 'Audio Recording';
   ctx.fillText(name, x + 56, y + h / 2 - 8, Math.max(20, w - 66));
 
-  // Duration
   ctx.fillStyle = dark ? '#8b949e' : '#656d76';
   ctx.font = `500 11.5px ${FONT}`;
   const totalSec = Math.floor((o.durationMs || 0) / 1000);
@@ -1347,15 +1161,6 @@ export function drawAudioCard(ctx, o) {
   ctx.restore();
 }
 
-/*
- * Where an object's links are on the board, as four corners each.
- *
- * A card is a link all over. Links inside words have no object of their own,
- * so the words are laid out again - on a scrap of canvas nobody sees, at the
- * board's own scale - and the pills are noted as they are drawn. That is the
- * same code that draws them for real, so a link is found exactly where it is
- * seen, whatever the box's size, wrapping, alignment or turn.
- */
 let probe = null;
 export function linkRectsOf(o) {
   if (!o || o.hidden) return [];
@@ -1365,18 +1170,22 @@ export function linkRectsOf(o) {
     const turn = (px, py) => (a ? { x: c.x + (px - c.x) * Math.cos(a) - (py - c.y) * Math.sin(a), y: c.y + (px - c.x) * Math.sin(a) + (py - c.y) * Math.cos(a) } : { x: px, y: py });
     return [{ ref: o.board, quad: [turn(b.x, b.y), turn(b.x + b.w, b.y), turn(b.x + b.w, b.y + b.h), turn(b.x, b.y + b.h)] }];
   }
-  const has = (v) => typeof v === 'string' && v.includes('](b:');
+  const has = (v) => typeof v === 'string' && (v.includes('](b:') || v.includes('[['));
   if (!has(o.text) && !(o.cells && Object.values(o.cells).some(has))) return [];
   if (typeof document === 'undefined') return [];
   probe = probe || document.createElement('canvas').getContext('2d');
   probe.setTransform(1, 0, 0, 1, 0, 0);
   const list = [];
   watchChips(list);
-  try { drawObject(probe, o, null, null); } finally { watchChips(null); }
+  try {
+    // Temporarily force drawTextBlock path so watchChips collects link quads
+    const prevMd = o.markdown;
+    o.markdown = false;
+    try { drawObject(probe, o, null, null); } finally { o.markdown = prevMd; }
+  } finally { watchChips(null); }
   return list;
 }
 
-/** Is world point p inside a four-cornered shape? */
 export function inQuad(q, p) {
   let sign = 0;
   for (let i = 0; i < 4; i++) {
@@ -1403,7 +1212,6 @@ export function handlePositions(box) {
   };
 }
 
-/** A hairline around the sheet so the boundary reads even on a white board. */
 function strokePageEdge(ctx, sheet) {
   ctx.save();
   ctx.strokeStyle = 'rgba(32,31,30,.22)';
@@ -1412,7 +1220,6 @@ function strokePageEdge(ctx, sheet) {
   ctx.restore();
 }
 
-/** A touch darker than the paper, for the surround. */
 function shadeOf(hex) {
   const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(String(hex).trim());
   if (!m) return '#e8e6e3';
@@ -1421,7 +1228,6 @@ function shadeOf(hex) {
   return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
 }
 
-/** Screen space, CSS pixels - see the note on drawBackground. */
 export function drawSelection(ctx, screenBox, opts = {}) {
   const { x, y, w, h } = screenBox;
   ctx.save();
@@ -1450,21 +1256,10 @@ export function drawSelection(ctx, screenBox, opts = {}) {
   ctx.restore();
 }
 
-/** Small padlock at the top-left of a locked object, drawn in screen space. */
-/**
- * A dashed ring round a group, so grouping is something you can see.
- *
- * Without it, a group is invisible until you touch it and four things light up
- * at once, which is a surprise rather than an explanation. It is drawn only
- * for a group that is selected or under the cursor - ringing every group on
- * the board all the time would turn a diagram into a pile of boxes.
- */
 export function drawGroupHint(ctx, cam, b, active = true, name = '') {
   const p = cam.toScreen(b.x, b.y);
   const w = b.w * cam.z, h = b.h * cam.z;
   ctx.save();
-  // Faint for a group merely sitting there, clearer for the one being touched.
-  // A poster made of six groups should read as a poster, not as six boxes.
   ctx.strokeStyle = active ? 'rgba(0, 120, 212, 0.55)' : 'rgba(0, 120, 212, 0.22)';
   ctx.lineWidth = active ? 1.5 : 1;
   ctx.setLineDash(active ? [7, 5] : [4, 6]);
@@ -1474,13 +1269,6 @@ export function drawGroupHint(ctx, cam, b, active = true, name = '') {
   else ctx.rect(x, y, rw, rh);
   ctx.stroke();
   ctx.setLineDash([]);
-  /*
-   * The name sits on the ring itself, top-left, the way a labelled box is
-   * labelled on paper. It is drawn on a slab of the board's own colour so it
-   * stays readable over whatever it crosses, and it is left off entirely when
-   * the group is too small to hold it - a label wider than the thing it names
-   * is worse than no label.
-   */
   if (name && rw > 54) {
     ctx.font = '11px ' + FONT;
     ctx.textAlign = 'left';
@@ -1499,14 +1287,6 @@ export function drawGroupHint(ctx, cam, b, active = true, name = '') {
   ctx.restore();
 }
 
-/**
- * A dotted ring round something locked.
- *
- * The padlock badge says which object is locked once you have found it; this
- * says where its edges are, which is the part that matters when you are
- * wondering why a drag is doing nothing. Grey rather than blue, because it is
- * not a selection and should not look like one.
- */
 export function drawLockedOutline(ctx, cam, o) {
   const b = worldBounds(o);
   const p = cam.toScreen(b.x, b.y);
@@ -1534,11 +1314,11 @@ export function drawLockBadge(ctx, cam, o) {
   ctx.lineWidth = 1.4;
   ctx.lineCap = 'round';
   const cx = x + (s + 7) / 2, cy = y + (s + 5) / 2;
-  ctx.beginPath();                       // shackle
+  ctx.beginPath();
   ctx.arc(cx, cy - 1.2, 3, Math.PI, 0);
   ctx.stroke();
   ctx.fillStyle = '#ffffff';
-  ctx.beginPath();                       // body
+  ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(cx - 4.5, cy - 1, 9, 6.5, 1.4); else ctx.rect(cx - 4.5, cy - 1, 9, 6.5);
   ctx.fill();
   ctx.restore();
