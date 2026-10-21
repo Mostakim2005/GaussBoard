@@ -1,23 +1,33 @@
 // Document model + operation log.
-//
-// Every mutation goes through an op ({t:'add'|'del'|'set'|'order'|'doc'}).
-// Ops are (a) applied to the doc, (b) pushed onto the undo stack as a
-// transaction, and (c) broadcast on the op channel. The op channel is the
-// seam a future sync/collaboration layer plugs into: replaying a remote
-// peer's ops through `applyRemote()` is all that is needed - nothing else
-// in the app mutates the document directly.
 
 import { uid, unionBox } from './util.js';
 import { pagesFrom, pageRects, cleanPage, DATE_RE } from './pages.js';
+import { countTags } from './markdown.js';
 import { t } from '../i18n.js';
 
 export const CLIENT_ID = uid('c');
 
-/** Ensure text and sticky note objects carry the additive `markdown` property (default: true). */
+export const CARD_STYLES = ['canvas', 'window', 'minimal', 'transparent'];
+
+let _defaultCardStyle = 'canvas';
+
+export function setDefaultCardStyle(s) {
+  if (CARD_STYLES.includes(s)) _defaultCardStyle = s;
+}
+
+export function getDefaultCardStyle() {
+  return _defaultCardStyle;
+}
+
+/**
+ * Every text and note object defaults to `markdown: true`.
+ * Text objects also default to `cardStyle: 'canvas'` (Obsidian Canvas card look).
+ */
 function normalizeTextObject(o) {
   if (!o || typeof o !== 'object') return o;
-  if ((o.type === 'text' || o.type === 'note') && o.markdown === undefined) {
-    o.markdown = true;
+  if (o.type === 'text' || o.type === 'note') {
+    if (o.markdown === undefined) o.markdown = true;
+    if (o.type === 'text' && !o.cardStyle) o.cardStyle = _defaultCardStyle;
   }
   return o;
 }
@@ -32,7 +42,7 @@ export function emptyDoc(name = t('Untitled board')) {
     objects: {},   // id -> object
     order: [],      // z-order, back to front
     audioTracks: [],
-    properties: { tags: [], aliases: [] }
+    properties: { tags: [], aliases: [], tagCounts: {} }
   };
 }
 
@@ -45,8 +55,6 @@ export class Store {
     this._subs = new Set();
     this._opSubs = new Set();
     this._muted = 0;
-    // Bumped on every mutation. The renderer uses it to tell whether a cached
-    // frame is still good, which is cheaper and safer than comparing documents.
     this.rev = 0;
     this.maxUndo = 200;
     this.maxLog = 5000;
@@ -68,6 +76,52 @@ export class Store {
     let b = null;
     for (const o of this.objects) b = unionBox(b, boundsOf(o));
     return b;
+  }
+
+  /**
+   * Scans all text/note/table objects in the document for `#hashtag` tokens,
+   * updates `doc.properties.tagCounts` with frequency counts, and merges any
+   * discovered inline tags into `doc.properties.tags` (keeping `tags` as an Array
+   * so existing UI chips and dialogs remain 100% compatible).
+   */
+  syncDocumentTags() {
+    const d = this.doc;
+    if (!d.properties) d.properties = { tags: [], aliases: [], tagCounts: {} };
+    const counts = {};
+
+    // Preserve manually added board-level tags with at least count 1
+    const existingList = Array.isArray(d.properties.tags) ? d.properties.tags : [];
+    for (const tg of existingList) {
+      if (typeof tg === 'string' && tg.trim()) counts[tg.trim()] = counts[tg.trim()] || 0;
+    }
+
+    for (const id of d.order) {
+      const o = d.objects[id];
+      if (!o) continue;
+      if (typeof o.text === 'string') {
+        const c = countTags(o.text);
+        for (const [k, v] of Object.entries(c)) counts[k] = (counts[k] || 0) + v;
+      }
+      if (o.cells && typeof o.cells === 'object') {
+        for (const cellText of Object.values(o.cells)) {
+          const c = countTags(cellText);
+          for (const [k, v] of Object.entries(c)) counts[k] = (counts[k] || 0) + v;
+        }
+      }
+    }
+
+    d.properties.tagCounts = counts;
+    const mergedTags = Object.keys(counts).sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
+    d.properties.tags = mergedTags;
+    return counts;
+  }
+
+  /** Returns all known tags on this board with their frequencies: `[{ tag, count }]`. */
+  allTags() {
+    const counts = this.syncDocumentTags();
+    return Object.entries(counts)
+      .map(([tag, count]) => ({ tag, count: Math.max(1, count) }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
   }
 
   /* ---------------- op application ---------------- */
@@ -125,26 +179,16 @@ export class Store {
       for (const f of this._opSubs) f(op);
     }
     if (this.log.length > this.maxLog) this.log.splice(0, this.log.length - this.maxLog);
+    this.syncDocumentTags();
     this.emit(label);
   }
 
-  /**
-   * Sync seam: take a full snapshot of the document and reset the op log.
-   * A future collaboration layer exchanges one checkpoint per peer, then
-   * streams the ops that follow it - `peer.load(checkpoint)` followed by
-   * `peer.applyRemote(ops)` reproduces this board exactly.
-   */
   checkpoint() {
     const snap = this.toJSON();
     this.log.length = 0;
     return snap;
   }
 
-  /* ---------------- live-gesture scratch ----------------
-   * rawInsert / rawRemove change the document WITHOUT logging an op or
-   * touching the undo stack. They exist so a gesture (partial erase) can show
-   * its result while it is in progress; the caller must rewind to the pristine
-   * state and issue a real commit() when the gesture ends.               */
   rawInsert(obj, index) {
     this.rev++;
     normalizeTextObject(obj);
@@ -163,13 +207,14 @@ export class Store {
   }
 
   /** Apply ops from a remote peer - no undo entry, no rebroadcast. */
-  applyRemote(ops) { for (const op of ops) this._apply(op); this.emit('remote'); }
+  applyRemote(ops) { for (const op of ops) this._apply(op); this.syncDocumentTags(); this.emit('remote'); }
 
   undo() {
     const tx = this.undoStack.pop();
     if (!tx) return false;
     for (const op of tx.inverse) this._apply(op);
     this.redoStack.push(tx);
+    this.syncDocumentTags();
     this.emit('undo');
     return true;
   }
@@ -179,6 +224,7 @@ export class Store {
     if (!tx) return false;
     for (const op of tx.ops) this._apply(op);
     this.undoStack.push(tx);
+    this.syncDocumentTags();
     this.emit('redo');
     return true;
   }
@@ -221,26 +267,17 @@ export class Store {
     this.commit(label, ops);
   }
 
-  /** The first sheet, or null on an infinite board. */
   get page() { return this.doc.pages[0] || null; }
   get pages() { return this.doc.pages; }
   get pageCount() { return this.doc.pages.length; }
   get pageRects() { return pageRects(this.doc.pages); }
 
-  /**
-   * The board is infinite by default. Giving it pages draws sheets stacked top
-   * to bottom from the origin; ink is then clipped to the paper, the way it is
-   * on a real pad. An empty array puts the infinite canvas back.
-   *
-   * @param {Array<{w:number,h:number}>} pages  world units
-   */
   setPages(pages, label = 'page size') {
     const before = this.doc.pages.map((p) => ({ ...p }));
     const after = (pages || []).map(cleanPage);
     this.commit(label, [{ t: 'doc', before: { pages: before }, after: { pages: after } }]);
   }
 
-  /** An op that swaps the page list - for callers batching page edits with object moves. */
   pagesOp(pages) {
     return { t: 'doc', before: { pages: this.doc.pages.map((p) => ({ ...p })) },
       after: { pages: (pages || []).map(cleanPage) } };
@@ -281,24 +318,12 @@ export class Store {
     this.commit('reorder', [{ t: 'order', before, after }]);
   }
 
-  /* ---------------- live drag helpers ---------------- *
-   * Mutate objects freely between snapshot() and commitSnapshot() so the
-   * whole gesture collapses into a single undo entry.                    */
   snapshot(ids) {
     const snap = new Map();
     for (const id of ids) { const o = this.get(id); if (o) snap.set(id, structuredCloneSafe(o)); }
     return snap;
   }
 
-  /**
-   * Put everything back the way the snapshot found it, and record nothing.
-   *
-   * The counterpart to commitSnapshot: that one keeps the change and files it
-   * as a single undo entry, this one throws the change away. Used when a drag
-   * is abandoned mid-flight, where the objects have already been moved on
-   * screen but nothing should be remembered - not the move, and not an undo
-   * step for a move that never happened.
-   */
   restoreSnapshot(snap) {
     if (!snap || !snap.size) return false;
     let touched = false;
@@ -324,7 +349,7 @@ export class Store {
         if (JSON.stringify(before[k]) !== JSON.stringify(now[k])) { b[k] = before[k]; a[k] = structuredCloneSafe(now[k]); changed = true; }
       }
       if (changed) {
-        Object.assign(now, before);          // rewind so commit() can re-apply cleanly
+        Object.assign(now, before);
         ops.push({ t: 'set', id, before: b, after: a });
       }
     }
@@ -335,12 +360,6 @@ export class Store {
 
   toJSON(extra) {
     const d = this.doc;
-    // `page` is written alongside `pages` so a board saved here still opens on
-    // a build from before multi-page: it sees the first sheet and ignores the
-    // rest, which beats falling back to an infinite canvas.
-    // `origin` is the file this board was opened from. It belongs to THIS
-    // machine and is stripped on the way out - see exportable() in export.js.
-    // Left undefined when there is none, so it never appears in the JSON.
     return { id: d.id, name: d.name, schema: 2, created: d.created, modified: d.modified,
       origin: d.origin || undefined,
       pageDates: d.pageDates && d.pageDates.length ? d.pageDates.slice() : undefined,
@@ -351,7 +370,6 @@ export class Store {
       objects: d.order.map((id) => d.objects[id]).filter(Boolean), ...extra };
   }
 
-  /** Start a brand new empty document. */
   reset(name) {
     this.doc = emptyDoc(name);
     this.rev++;
@@ -368,14 +386,13 @@ export class Store {
     if (data.origin) d.origin = data.origin;
     d.background = { ...d.background, ...(data.background || {}) };
     d.pages = pagesFrom(data);
-    // the days the sheets were started, kept while the board is an infinite canvas (see App.setPageSize)
     if (Array.isArray(data.pageDates)) d.pageDates = data.pageDates.map((x) => (typeof x === 'string' && DATE_RE.test(x) ? x : null));
     d.camera = data.camera || d.camera;
     if (Array.isArray(data.audioTracks)) {
       d.audioTracks = data.audioTracks.map((a) => ({ ...a }));
     }
     if (data.properties) {
-      d.properties = { ...data.properties };
+      d.properties = { tags: [], aliases: [], tagCounts: {}, ...data.properties };
     }
     const list = Array.isArray(data.objects) ? data.objects
       : Array.isArray(data.objectList) ? data.objectList
@@ -386,6 +403,7 @@ export class Store {
       d.order.push(o.id);
     }
     this.doc = d;
+    this.syncDocumentTags();
     this.rev++;
     this.undoStack.length = 0; this.redoStack.length = 0; this.log.length = 0;
     this.emit('load');
@@ -400,14 +418,10 @@ function structuredCloneSafe(v) {
 /* --------------------------------------------------------------- *
  * Object geometry - shared by hit-testing, rendering and export.
  * --------------------------------------------------------------- */
-/*
- * An arrow's box depends on where the things it holds on to are, which only
- * the arrow module can work out - and that module needs this one. It hands
- * its answer in here when the app starts, rather than the two importing each
- * other.
- */
 let connectorBox = null;
 export function setConnectorBounds(fn) { connectorBox = fn; }
+
+export const WINDOW_HEADER_H = 26;
 
 export function boundsOf(o) {
   if (!o) return { x: 0, y: 0, w: 0, h: 0 };
@@ -416,6 +430,9 @@ export function boundsOf(o) {
     const b = o.bbox || { x: 0, y: 0, w: 0, h: 0 };
     const pad = (o.width || 4) / 2 + 1;
     return { x: b.x - pad, y: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 };
+  }
+  if (o.type === 'text' && o.cardStyle === 'window' && o.collapsed) {
+    return { x: o.x, y: o.y, w: o.w, h: WINDOW_HEADER_H };
   }
   return { x: o.x, y: o.y, w: o.w, h: o.h };
 }
@@ -433,9 +450,6 @@ export function worldBounds(o) {
 
 export function centerOf(o) { const b = boundsOf(o); return { x: b.x + b.w / 2, y: b.y + b.h / 2 }; }
 
-/**
- * Everything that shares a group with the given ids.
- */
 export function withGroups(store, ids, exceptGroup = null) {
   const groups = new Set();
   for (const id of ids) {
@@ -448,7 +462,6 @@ export function withGroups(store, ids, exceptGroup = null) {
   return [...set];
 }
 
-/** The ids in one group, in board order. */
 export function groupMembers(store, gid) {
   return store.objects.filter((o) => o?.groupId === gid).map((o) => o.id);
 }

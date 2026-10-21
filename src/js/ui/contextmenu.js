@@ -84,7 +84,6 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     if (editable) menu.appendChild(item(t('Edit text'), 'text', () => app.beginTextEdit(one), { key: 'F2' }));
     menu.appendChild(item(t('Cut'), 'copy', () => app.command('edit.cut'), { key: 'Ctrl+X' }));
     menu.appendChild(item(t('Copy'), 'copy', () => app.command('edit.copy'), { key: 'Ctrl+C' }));
-    // Out of the board and into another app. Ctrl+C above keeps objects in here.
     menu.appendChild(item(t('Copy as picture'), 'image', () => app.command('edit.copyPicture')));
     if (app.selected.some((o) => ['text', 'note', 'shape', 'table'].includes(o.type) && (o.text || (o.cells && Object.keys(o.cells).length))))
       menu.appendChild(item(t('Copy text'), 'text', () => app.command('edit.copyText')));
@@ -115,19 +114,19 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(h('div', { class: 'menu-sep' }));
     menu.appendChild(item(t('Delete'), 'trash', () => app.command('edit.delete'), { key: 'Del', danger: true }));
   } else {
-    // Pasted where you pressed, not back where the originals were - which is
-    // the whole point of asking for it at a particular spot.
     menu.appendChild(item(t('Paste'), 'copy', () => app.pasteAt(wp), { key: 'Ctrl+V' }));
     menu.appendChild(item(t('Select all'), 'select', () => app.command('edit.selectAll'), { key: 'Ctrl+A' }));
     menu.appendChild(h('div', { class: 'menu-sep' }));
     menu.appendChild(item(t('Sticky note here'), 'note', () => app.addNoteAt(wp)));
     menu.appendChild(item(t('Text here'), 'text', () => app.addTextAt(wp)));
+    menu.appendChild(item(t('Insert Markdown'), 'text', () => (app.insertMarkdownCardAt ? app.insertMarkdownCardAt(wp) : app.addTextAt(wp))));
     menu.appendChild(item(t('Insert image…'), 'image', () => app.command('insert.image')));
     menu.appendChild(item(t('Insert maths'), 'maths', () => app.command('insert.math')));
     menu.appendChild(item(t('Insert document…'), 'doc', () => app.command('insert.document')));
     menu.appendChild(h('div', { class: 'menu-sep' }));
     menu.appendChild(item(t('Templates…'), 'template', () => app.panels.templates()));
     menu.appendChild(item(t('Canvas…'), 'palette', () => app.panels.background()));
+    menu.appendChild(item(t('Page margins…'), 'palette', () => app.openPageMarginDialog?.()));
     menu.appendChild(item(t('Clear canvas'), 'trash', () => app.command('edit.clear'), { danger: true }));
   }
   openPopover({ x: posX, y: posY }, menu, popOpts);
@@ -174,11 +173,6 @@ export function updateSelectionBar(app, targetObj = null) {
   bar.innerHTML = '';
   const types = new Set(sel.map((o) => o.type));
   const allLocked = sel.every((o) => o.locked);
-  /*
-   * An answer cover gets a Reveal button with its name on it rather than an
-   * icon alone: it is pressed in front of a class, and a teacher hunting for
-   * the right little eye is the pause this whole feature exists to remove.
-   */
   const covers = sel.filter((o) => o.type === 'curtain' && !o.revealed);
   const revealBtn = () => {
     const b = h('button', { title: t('Reveal what is underneath'), class: 'reveal-btn', html: icon('eye', 17) });
@@ -218,7 +212,6 @@ export function updateSelectionBar(app, targetObj = null) {
     const swatch = h('button', { class: 'colour-btn', title: t('Colour') });
     const dot = h('span', {});
     const currentColor = type === 'shape' || type === 'connector' ? sel[0].stroke : sel[0].color;
-    // the dot shows the colour as it is drawn: default ink is light on a dark board, so the dot is too
     const shownColor = FOLLOWS_BOARD.has(type) ? inkPaint(currentColor) : (currentColor || '#201f1e');
     dot.style.cssText = `width:17px;height:17px;border-radius:50%;background:${shownColor};box-shadow:inset 0 0 0 1px rgba(128,128,128,.45)`;
     dot.dataset.colour = shownColor;
@@ -246,7 +239,6 @@ export function updateSelectionBar(app, targetObj = null) {
       bar.appendChild(h('span', { class: 'bar-sep' }));
     }
 
-    // Heads: Plain line, Single arrow, Both ways arrow
     const currentHeads = sel[0].heads || (sel[0].kind === 'line' ? 'none' : sel[0].kind === 'doubleArrow' ? 'both' : 'end');
     const headsList = [
       ['none', t('Plain line'), 'line'],
@@ -274,7 +266,6 @@ export function updateSelectionBar(app, targetObj = null) {
     }
     bar.appendChild(h('span', { class: 'bar-sep' }));
 
-    // Body thickness controls
     bar.appendChild(mk(t('Decrease thickness'), 'minus', () => {
       app.stepLineWidth(-1.5);
       updateSelectionBar(app);
@@ -284,7 +275,6 @@ export function updateSelectionBar(app, targetObj = null) {
       updateSelectionBar(app);
     }));
 
-    // Arrowhead size scale
     bar.appendChild(mk(t('Arrowhead size'), 'arrowSize', () => {
       app.cycleArrowScale();
       updateSelectionBar(app);
@@ -292,11 +282,42 @@ export function updateSelectionBar(app, targetObj = null) {
     bar.appendChild(h('span', { class: 'bar-sep' }));
   }
 
-  if ([...types].every((t) => ['note', 'text', 'shape', 'table'].includes(t)) && sel.length === 1)
+  if ([...types].every((t) => ['note', 'text', 'shape', 'table'].includes(t)) && sel.length === 1) {
     bar.appendChild(mk(t('Edit text (F2)'), 'text', () => app.beginTextEdit(sel[0])));
+    if (sel[0].type === 'text' || sel[0].type === 'note') {
+      const mdBtn = h('button', {
+        title: t('Markdown'),
+        class: sel[0].markdown !== false ? 'on' : '',
+        style: 'font-weight:700;font-size:12px;width:auto;padding:0 8px;'
+      }, 'M↓');
+      mdBtn.addEventListener('click', () => {
+        const next = sel[0].markdown === false;
+        app.store.update(sel[0].id, { markdown: next }, 'markdown mode');
+        app.surface.invalidate();
+        updateSelectionBar(app);
+      });
+      bar.appendChild(mdBtn);
+      if (sel[0].type === 'text' && sel[0].markdown !== false) {
+        const curStyle = sel[0].cardStyle || 'canvas';
+        const styleBtn = h('button', {
+          title: t('Card model: {style} (Click to cycle Canvas, Window, Minimal, Transparent)', { style: curStyle }),
+          style: 'font-weight:600;font-size:11px;width:auto;padding:0 7px;text-transform:capitalize;',
+          class: 'fmt-btn'
+        }, curStyle);
+        styleBtn.addEventListener('click', () => {
+          const styles = ['canvas', 'window', 'minimal', 'transparent'];
+          const idx = styles.indexOf(sel[0].cardStyle || 'canvas');
+          const next = styles[(idx + 1) % styles.length];
+          app.store.update(sel[0].id, { cardStyle: next }, 'card style');
+          app.surface.invalidate();
+          updateSelectionBar(app);
+        });
+        bar.appendChild(styleBtn);
+      }
+    }
+  }
   if (sel.length === 1 && sel[0].type === 'math')
     bar.appendChild(mk(t('Edit maths (F2)'), 'maths', () => app.beginMathEdit(sel[0])));
-  // a card for another board: open it, or point it at a different one
   if (sel.length === 1 && sel[0].type === 'boardlink') {
     const card = sel[0];
     bar.appendChild(mk(t('Open the board'), 'board', () => app.openBoardRef(card.board)));
@@ -329,7 +350,6 @@ export function updateSelectionBar(app, targetObj = null) {
     bar.appendChild(h('span', { class: 'bar-sep' }));
   }
 
-  // Touchscreens have no Ctrl to hold, so gathering several up is a mode here.
   if (matchMedia('(pointer: coarse)').matches) {
     const more = mk(app.multiSelect ? t('Done adding') : t('Add more to the selection'),
       app.multiSelect ? 'check' : 'select', () => app.setMultiSelect(!app.multiSelect));
@@ -354,23 +374,16 @@ export function updateSelectionBar(app, targetObj = null) {
 }
 
 function appendMoreActions(app, bar) {
-  // Android still needs this route when a mouse changes the primary pointer.
   if (document.documentElement?.dataset.platform !== 'android'
       && !(typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches)) return;
   const button = h('button', { title: t('More actions'), html: icon('more', 17) });
   button.addEventListener('click', () => {
     const r = bar.getBoundingClientRect();
-    // This button acts on the selection, not an object behind the toolbar.
     showContextMenu(app, { clientX: r.left + r.width - 12, clientY: r.bottom + 4 }, true);
   });
   bar.appendChild(button);
 }
 
-/*
- * Above the selection, clear of its rotate handle - and, when the selection
- * has arrow dots, clear of the top dot too, which sits above that handle
- * (and of the bottom dot, when there is no room above and the bar goes below).
- */
 function placeBar(bar, box, dots = false) {
   bar.classList.add('show');
   const stage = document.getElementById('stage').getBoundingClientRect();
@@ -389,7 +402,6 @@ function openColorPopover(app, anchor, type, sel) {
   const grid = h('div', { class: 'swatches' });
   for (const c of colors) {
     const b = h('button', { class: 'sw', title: c });
-    // same as the toolbar's own picker: the default ink is shown as it draws, ringed to say it follows the board
     const shown = FOLLOWS_BOARD.has(type) ? inkPaint(c) : c;
     b.style.background = shown;
     if (shown !== c) {
@@ -398,14 +410,6 @@ function openColorPopover(app, anchor, type, sel) {
     }
     b.addEventListener('click', () => {
       const key = type === 'shape' || type === 'connector' ? 'stroke' : 'color';
-      /*
-       * Only the selection changes. Recolouring one sticky note, one line of
-       * text or one stroke used to quietly become the colour of the NEXT one
-       * too - and a recoloured stroke even changed the pen in your hand - so
-       * fixing one word's colour left every later word that colour until you
-       * noticed. What comes next is set where you choose what comes next: the
-       * tool's own picker on the toolbar.
-       */
       app.store.updateMany(sel.map((o) => o.id), { [key]: c }, 'recolour');
       closePopover();
       app.surface.invalidate();
@@ -434,14 +438,6 @@ function openColorPopover(app, anchor, type, sel) {
 
 /* ------------------------------------------------------------------ *
  *  The same bar, while typing: bold, italic, underline and colour
- *
- *  One bar in one place. When a box is selected it does what it always did;
- *  the moment you are typing into it, it turns into the format bar, so a
- *  second bar never pops up over the words. Whatever is highlighted gets the
- *  style; with nothing highlighted, it is what the next letters come out as.
- *
- *  Nothing in it may take the focus: the box commits the moment it loses it.
- *  So every press is swallowed at mousedown and the work is done on click.
  * ------------------------------------------------------------------ */
 function formatBar(app, bar) {
   const te = app.textEditor;
@@ -480,18 +476,43 @@ function formatBar(app, bar) {
     }
     bar.appendChild(colours);
     bar.appendChild(h('span', { class: 'bar-sep' }));
+    const wlBtn = h('button', {
+      title: t('Insert Wikilink'),
+      class: 'fmt-btn',
+      'data-wikilink': '1',
+      style: 'width:auto;padding:0 7px;font-weight:600;font-size:12px;'
+    }, '[[]]');
+    wlBtn.addEventListener('click', () => { te.insertWikilinkSyntax(); });
+    bar.appendChild(wlBtn);
+
+    const mdBtn = h('button', {
+      title: t('Markdown'),
+      class: 'fmt-btn',
+      'data-md-preview': '1',
+      style: 'width:auto;padding:0 7px;font-weight:700;font-size:12px;'
+    }, 'M↓');
+    mdBtn.addEventListener('click', () => {
+      te.toggleLivePreview();
+      syncFormat(app, bar);
+    });
+    bar.appendChild(mdBtn);
+
+    bar.appendChild(h('span', { class: 'bar-sep' }));
     const paste = h('button', { title: t('Paste with formatting'), 'data-paste': '1', html: icon('paste', 17) });
     paste.addEventListener('click', () => te.pasteFromClipboard());
     bar.appendChild(paste);
   }
   syncFormat(app, bar);
   const stage = document.getElementById('stage').getBoundingClientRect();
-  const r = el.getBoundingClientRect();
+  const activeDom = (te.previewMode && te.previewEl) ? te.previewEl : el;
+  const r = activeDom.getBoundingClientRect();
   placeBar(bar, { x: r.left - stage.left, y: r.top - stage.top + 36, w: r.width, h: r.height });
 }
 
 function syncFormat(app, bar) {
   for (const b of bar.querySelectorAll('[data-fmt]')) b.classList.toggle('on', app.textEditor.state(b.dataset.fmt));
+  const mdBtn = bar.querySelector('[data-md-preview]');
+  if (mdBtn) mdBtn.classList.toggle('on', !!app.textEditor?.previewMode);
 }
 
 export function startImageCrop(app, imgObj) {
@@ -632,4 +653,3 @@ export function finishImageAnnotate(app, imgObj) {
     app.toast(t('Annotation mode finished'));
   }
 }
-

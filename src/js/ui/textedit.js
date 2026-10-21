@@ -20,6 +20,12 @@ import { t } from '../i18n.js';
 
 const BLOCK = new Set(['DIV', 'P', 'LI']);
 
+/*
+ * The box's contents as a flat list: each text node, each line break, and the
+ * line break implied by a new block (the browser sometimes makes one). A line
+ * break that is the very last thing in the box is the browser's placeholder
+ * for an empty last line, not a character, so it is left out.
+ */
 function flatten(root, keepTail = false) {
   const items = [];
   let pos = 0;
@@ -28,6 +34,7 @@ function flatten(root, keepTail = false) {
       if (ch.nodeType === 3) {
         if (ch.data) { items.push({ kind: 'text', node: ch, from: pos, to: pos + ch.data.length }); pos += ch.data.length; }
       } else if (ch.nodeType === 1) {
+        // a link to a board is one piece, whatever its label says: its text is the link itself
         const ref = ch.getAttribute && ch.getAttribute('data-ref');
         if (ref) { items.push({ kind: 'ref', node: ch, token: ref, from: pos, to: pos + ref.length }); pos += ref.length; }
         else if (ch.tagName === 'BR') { items.push({ kind: 'br', node: ch, from: pos, to: pos + 1 }); pos += 1; }
@@ -309,6 +316,22 @@ export class TextEditor {
         this.insertWikilinkSyntax();
         return;
       }
+      if (isMd && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        if (e.key === 'b' || e.key === 'B') {
+          if (isMarkdown(ta.value)) {
+            e.preventDefault();
+            this.wrapMarkdownSelection('**', '**');
+            return;
+          }
+        }
+        if (e.key === 'i' || e.key === 'I') {
+          if (isMarkdown(ta.value)) {
+            e.preventDefault();
+            this.wrapMarkdownSelection('*', '*');
+            return;
+          }
+        }
+      }
       if (e.key === 'Escape') { e.preventDefault(); this.cancel(); app.surface.canvas.focus(); }
       else if (e.key === 'Enter' && !(e.ctrlKey || e.metaKey) && !e.isComposing) {
         e.preventDefault();
@@ -328,6 +351,24 @@ export class TextEditor {
       ta.setSelectionRange(end, end);
     }, 0);
     app.surface.invalidate();
+  }
+
+  /**
+   * Wraps the current selection in Markdown tokens (e.g. `**` for bold, `*` for italic).
+   */
+  wrapMarkdownSelection(prefix, suffix = prefix) {
+    if (!this.el) return;
+    const start = this.el.selectionStart;
+    const end = this.el.selectionEnd;
+    const val = this.el.value;
+    const selected = val.slice(start, end);
+    this._insertPlain?.(`${prefix}${selected}${suffix}`);
+    if (!selected) {
+      const caret = start + prefix.length;
+      this.el.setSelectionRange(caret, caret);
+    }
+    this.place();
+    this.app.surface.invalidate();
   }
 
   /**
@@ -353,7 +394,6 @@ export class TextEditor {
             }
             return;
           }
-          // Clicking anywhere else in preview switches back to editable source
           this.toggleLivePreview();
         });
         this.previewEl = pv;
@@ -376,7 +416,7 @@ export class TextEditor {
   }
 
   /**
-   * Inserts `[[board]]` or wraps current selection in `[selection](url)` on Ctrl+K.
+   * Inserts `[[board]]` or wraps current selection in `[[selection]]` on Ctrl+K.
    */
   insertWikilinkSyntax() {
     if (!this.el) return;
@@ -386,8 +426,7 @@ export class TextEditor {
     const val = this.el.value;
     const selected = val.slice(a, b);
     if (selected) {
-      const wrapped = `[[${selected}]]`;
-      this._insertPlain?.(wrapped);
+      this._insertPlain?.(`[[${selected}]]`);
     } else {
       this._insertPlain?.('[[');
       this.watchMention();

@@ -1557,3 +1557,105 @@ body.presenting.show-tools #toolbar { translate: 0 0; opacity: 1; pointer-events
 .mx-key.typeset .katex { font-size: 1em; }
 .mx-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
 .mx-tip { flex: 1; font-size: 11.5px; color: var(--text-2); }
+/* =================================================================== *
+ *  v4.8.12 — Obsidian-Style Markdown & Live Preview Overlay
+ * =================================================================== */
+#editLayer .rt.markdown-mode {
+  line-height: 1.45;
+}
+#editLayer .gb-live-preview {
+  cursor: pointer;
+  overflow-y: auto;
+  padding: 6px 8px !important;
+  outline: 1.5px solid var(--accent-2, #0078d4);
+}
+.gb-markdown-body .gb-md-h { margin: 0.35em 0 0.25em; font-weight: 700; line-height: 1.25; }
+.gb-markdown-body .gb-md-h1 { font-size: 1.6em; border-bottom: 1px solid rgba(128,128,128,0.25); padding-bottom: 0.15em; }
+.gb-markdown-body .gb-md-h2 { font-size: 1.38em; }
+.gb-markdown-body .gb-md-h3 { font-size: 1.2em; }
+.gb-markdown-body .gb-md-h4,
+.gb-markdown-body .gb-md-h5,
+.gb-markdown-body .gb-md-h6 { font-size: 1.05em; }
+.gb-markdown-body .gb-md-p { margin: 0.3em 0; }
+.gb-markdown-body .gb-md-hr { border: 0; border-top: 1px solid rgba(128,128,128,0.35); margin: 0.6em 0; }
+.gb-markdown-body .gb-inline-code {
+  font-family: 'GazBoard Cascadia Mono', Consolas, monospace;
+  font-size: 0.88em;
+  background: rgba(128,128,128,0.16);
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+}
+.gb-markdown-body .gb-codeblock-wrap {
+  position: relative;
+  margin: 0.45em 0;
+  background: rgba(15, 23, 42, 0.07);
+  border: 1px solid rgba(128,128,128,0.22);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.gb-markdown-body .gb-code-lang {
+  font-family: 'GazBoard Cascadia Mono', Consolas, monospace;
+  font-size: 0.7em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  padding: 2px 8px;
+  border-bottom: 1px solid rgba(128,128,128,0.15);
+}
+.gb-markdown-body .gb-codeblock {
+  margin: 0;
+  padding: 8px 10px;
+  font-family: 'GazBoard Cascadia Mono', Consolas, monospace;
+  font-size: 0.85em;
+  white-space: pre-wrap;
+}
+.gb-markdown-body .gb-hl-kw { font-weight: 600; color: #7c3aed; }
+.gb-markdown-body .gb-blockquote {
+  margin: 0.4em 0;
+  padding: 0.2em 0.75em;
+  border-left: 4px solid rgba(100,116,139,0.6);
+  opacity: 0.9;
+}
+.gb-markdown-body .callout {
+  margin: 0.45em 0;
+  padding: 8px 12px;
+  border-left: 4px solid #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 4px 6px 6px 4px;
+}
+.gb-markdown-body .callout-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.gb-markdown-body .callout-tip,
+.gb-markdown-body .callout-success { border-left-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+.gb-markdown-body .callout-warning { border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
+.gb-markdown-body .callout-danger,
+.gb-markdown-body .callout-bug { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.12); }
+.gb-markdown-body .callout-info { border-left-color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
+.gb-markdown-body .gb-md-list { margin: 0.35em 0; padding-left: 1.4em; }
+.gb-markdown-body .gb-task-list { list-style: none; padding-left: 0.2em; }
+.gb-markdown-body .gb-task-item { display: flex; align-items: baseline; gap: 0.45em; margin: 0.2em 0; }
+.gb-markdown-body .gb-task-item.is-checked .gb-task-label { text-decoration: line-through; opacity: 0.65; }
+.gb-markdown-body .gb-task-checkbox { width: 0.95em; height: 0.95em; margin: 0; cursor: pointer; accent-color: var(--accent-2, #0078d4); }
+.gb-markdown-body .gb-md-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.45em 0;
+  font-size: 0.92em;
+}
+.gb-markdown-body .gb-md-table th,
+.gb-markdown-body .gb-md-table td {
+  border: 1px solid rgba(128,128,128,0.35);
+  padding: 4px 8px;
+}
+.gb-markdown-body .gb-md-table th { background: rgba(128,128,128,0.12); font-weight: 700; }
+.gb-markdown-body .gb-wikilink,
+.gb-markdown-body .gb-obsidian-uri,
+.gb-markdown-body .gb-ext-link {
+  color: var(--accent-2, #0078d4);
+  text-decoration: underline;
+  font-weight: 500;
+}

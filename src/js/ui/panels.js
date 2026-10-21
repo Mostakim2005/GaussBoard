@@ -1594,6 +1594,50 @@ export function createPanels(app) {
             t('On (default): folders down the side, coloured folder tiles and a picture of every board. Off: a simple list in the side panel.')),
           row(t('Autosave'), mkToggle(() => s.autosave, (v) => (s.autosave = v)), t('Boards are stored locally on this computer.'))
         ),
+        h('div', { class: 'section' },
+          h('h5', {}, t('Markdown & Links')),
+          row(t('Default text mode'),
+            mkChoice([
+              ['markdown', t('Markdown')],
+              ['plain', t('Plain text')]
+            ], () => (s.textMarkdown !== false ? 'markdown' : 'plain'), (v) => {
+              s.textMarkdown = (v === 'markdown');
+              app.saveSettings();
+              rerender();
+            }),
+            t('New text boxes start in Markdown mode with Obsidian card styling, tags, and wikilink parsing.')),
+          row(t('Default markdown card style'),
+            mkChoice([
+              ['canvas', t('Canvas')],
+              ['window', t('Window')],
+              ['minimal', t('Minimal')],
+              ['transparent', t('Transparent')]
+            ], () => s.defaultCardStyle || 'canvas', (v) => {
+              s.defaultCardStyle = v;
+              app.saveSettings();
+              rerender();
+            }),
+            t('Card model for markdown boxes: Obsidian canvas container, collapsible window, minimal border, or transparent.')),
+          row(t('Double-clicking a wikilink'),
+            mkChoice([
+              ['ask', t('Ask each time')],
+              ['embed', t('Embed in place')],
+              ['split', t('Open in split view')],
+              ['navigate', t('Navigate to board')],
+              ['edit', t('Edit link')]
+            ], () => s.wikilinkDblClick || 'ask', (v) => {
+              s.wikilinkDblClick = v;
+              app.saveSettings();
+              rerender();
+            }),
+            t('Action to perform immediately on double-clicking [[wikilinks]] or ![[embeds]]. Setting an action avoids popover prompts.')),
+          row(t('Quick-action popovers'),
+            mkToggle(() => s.quickActionPopovers !== false, (v) => {
+              s.quickActionPopovers = v;
+              app.saveSettings();
+            }),
+            t('Show interactive choice popovers on links and gestures. Turn off to execute default actions directly without popover fatigue.'))
+        ),
         /*
          * Back to how it shipped.
          *

@@ -27,6 +27,7 @@ export class SplitWorkspace {
     this.primaryCanvas = null;
     this.originalCanvasParent = null;
     this.originalCanvasNextSibling = null;
+    this.reparentedNodes = [];
   }
 
   get active() {
@@ -51,7 +52,19 @@ export class SplitWorkspace {
 
     this.ratio = Math.max(0.2, Math.min(0.8, ratio));
 
-    // Stash original parent & sibling to restore on disable
+    // Stash original elements to reparent and restore on disable
+    const toReparent = [
+      this.primaryCanvas,
+      document.getElementById('inkNib'),
+      document.getElementById('editLayer'),
+      document.getElementById('ctxbar')
+    ].filter(Boolean);
+
+    this.reparentedNodes = toReparent.map(node => ({
+      node,
+      parent: node.parentNode,
+      nextSibling: node.nextSibling
+    }));
     this.originalCanvasParent = this.primaryCanvas.parentNode;
     this.originalCanvasNextSibling = this.primaryCanvas.nextSibling;
 
@@ -127,7 +140,9 @@ export class SplitWorkspace {
     });
 
     // Reparent primary canvas into right pane
-    this.rightPane.appendChild(this.primaryCanvas);
+    for (const rec of this.reparentedNodes) {
+      this.rightPane.appendChild(rec.node);
+    }
 
     this.wrapper.appendChild(this.leftPane);
     this.wrapper.appendChild(this.divider);
@@ -171,7 +186,18 @@ export class SplitWorkspace {
     }
     this.leftStore = null;
 
-    if (this.primaryCanvas && this.originalCanvasParent) {
+    if (this.reparentedNodes?.length) {
+      for (const rec of this.reparentedNodes) {
+        if (rec.node && rec.parent) {
+          if (rec.nextSibling && rec.parent.contains(rec.nextSibling)) {
+            rec.parent.insertBefore(rec.node, rec.nextSibling);
+          } else if (typeof rec.parent.appendChild === 'function') {
+            rec.parent.appendChild(rec.node);
+          }
+        }
+      }
+      this.reparentedNodes = [];
+    } else if (this.primaryCanvas && this.originalCanvasParent) {
       if (this.originalCanvasNextSibling && typeof this.originalCanvasParent.insertBefore === 'function') {
         this.originalCanvasParent.insertBefore(this.primaryCanvas, this.originalCanvasNextSibling);
       } else if (typeof this.originalCanvasParent.appendChild === 'function') {

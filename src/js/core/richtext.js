@@ -158,8 +158,8 @@ function paragraphs(runs) {
  */
 function mathTokens(pieces) {
   const text = pieces.map((p) => p.t).join('');
-  // Links to boards are cut out the same way. Where the two overlap, the one
-  // that starts first wins - nobody writes a link inside a formula.
+  // Links to boards (including [[wikilinks]]) are cut out the same way.
+  // Where the two overlap, the one that starts first wins.
   const all = [...mathSpans(text), ...refSpans(text).map((r) => ({ start: r.start, end: r.end, ref: r }))]
     .sort((a, b) => a.start - b.start);
   const spans = [];
@@ -499,18 +499,6 @@ export function runsToHtml(runs, text, base = {}) {
 /** The board's own ink: black on a light board, light on a dark one. */
 export const AUTO_INK = '#201f1e';
 
-/*
- * What a colour from somebody else's page becomes on the board.
- *
- * Black (or near-black grey, or Word's "automatic") becomes the board's own
- * ink - it stays black here, where it was black there, and still turns light
- * on a dark board instead of vanishing. It used to be dropped altogether,
- * which left those words in whatever colour GazBoard's text happened to be
- * set to last: black words from Word arrived red. White or near-white grey -
- * copied from a dark web page - is dropped, or it would vanish on a white
- * board. Every real colour is kept exactly, however dark: a navy heading is
- * navy, not black.
- */
 function keepColour(hex) {
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
   if (!m) return null;
@@ -565,8 +553,6 @@ export function htmlToRuns(html) {
       if (ch.nodeType === 3) {
         let t = ch.data;
         if (!pre) {
-          // Ordinary white space collapses the way a page shows it; a
-          // non-breaking space is somebody's deliberate space and stays.
           t = t.replace(/[ \t\r\n\f]+/g, ' ');
           if (/\s/.test(lastChar()) || endsWithBreak()) t = t.replace(/^ +/, '');
           t = t.replace(/\u00a0/g, ' ');
@@ -586,13 +572,6 @@ export function htmlToRuns(html) {
         const c = keepColour(toHexColour(ch.getAttribute('color')));
         if (c) next.c = c; else delete next.c;
       }
-      /*
-       * The look can come from the page's own style sheet rather than the
-       * element: Word on a phone, and some web editors, write
-       * <span class="c3"> and put "c3 { font-weight: bold }" in a <style>
-       * block. Those rules are applied first, then the element's own style,
-       * so the nearer one wins the way it does on the page.
-       */
       const looks = [];
       for (const rule of rules) { try { if (ch.matches(rule.selectorText)) looks.push(rule.style); } catch { /* a selector the browser cannot test */ } }
       if (ch.style) looks.push(ch.style);
@@ -612,7 +591,6 @@ export function htmlToRuns(html) {
     }
   };
   walk(doc.body || doc.documentElement, {}, false);
-  // No trailing new lines or spaces: a pasted paragraph ends where its words do.
   while (out.length && /^[\s]*$/.test(out[out.length - 1].t)) out.pop();
   if (out.length) out[out.length - 1].t = out[out.length - 1].t.replace(/\s+$/, '');
   const runs = normalizeRuns(out);

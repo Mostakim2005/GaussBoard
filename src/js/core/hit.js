@@ -1,7 +1,7 @@
 // Hit testing: which object is under the pointer, what falls inside a
 // marquee or lasso, and which stroke a point eraser touches.
 
-import { boundsOf, worldBounds } from './store.js';
+import { boundsOf, worldBounds, WINDOW_HEADER_H } from './store.js';
 import { distToSegment, pointInBox, pointInPolygon, rotatePoint, boxesIntersect, boxContains } from './util.js';
 import { shapePath, noteTypeRange } from './render.js';
 import { hitConnector } from './connectors.js';
@@ -16,8 +16,6 @@ export function toLocal(o, p) {
   return rotatePoint(p.x, p.y, b.x + b.w / 2, b.y + b.h / 2, -o.rotation);
 }
 
-// Revealed covers remain visible as a faint outline and hittable so another
-// tap can conceal them again. Content attached to a cover is hidden separately.
 export const ghost = (o) => !!o && !!o.hidden;
 
 export function hitObject(o, p, tol = 6) {
@@ -54,18 +52,65 @@ export function hitObject(o, p, tol = 6) {
     return hit;
   }
 
-  return pointInBox(lp, { x: b.x - tol / 2, y: b.y - tol / 2, w: b.w + tol, h: b.h + tol });
+  // Include 12px card padding when text object uses a visible card container
+  const cardPad = (o.type === 'text' && o.markdown !== false && o.cardStyle !== 'transparent') ? 12 : 0;
+  return pointInBox(lp, {
+    x: b.x - cardPad - tol / 2,
+    y: b.y - cardPad - tol / 2,
+    w: b.w + cardPad * 2 + tol,
+    h: b.h + cardPad * 2 + tol
+  });
+}
+
+/**
+ * Tests whether world point `p` lands on the collapse/expand toggle button (`▲` / `▼`)
+ * of an Obsidian `'window'` style Markdown card.
+ */
+export function hitWindowHeaderCollapse(o, p) {
+  if (!o || ghost(o) || o.type !== 'text' || o.markdown === false || o.cardStyle !== 'window') return null;
+  const lp = toLocal(o, p);
+  const pad = 12;
+  const hx = o.x - pad;
+  const hy = o.y - pad;
+  const hw = o.w + pad * 2;
+  if (
+    lp.x >= hx + hw - 34 &&
+    lp.x <= hx + hw &&
+    lp.y >= hy &&
+    lp.y <= hy + WINDOW_HEADER_H
+  ) {
+    return { obj: o, collapsed: !o.collapsed };
+  }
+  return null;
+}
+
+/**
+ * Toggles collapse state if `p` lands on a `'window'` card's header toggle button.
+ */
+export function toggleCardCollapseAtPoint(store, p, tol = 6) {
+  const order = store.doc.order;
+  for (let i = order.length - 1; i >= 0; i--) {
+    const o = store.doc.objects[order[i]];
+    if (!o || o.locked || ghost(o)) continue;
+    if (!hitObject(o, p, tol)) continue;
+    const hit = hitWindowHeaderCollapse(o, p);
+    if (hit) {
+      store.update(o.id, { collapsed: hit.collapsed }, 'toggle card collapse');
+      return true;
+    }
+    if (o.type !== 'stroke') return false;
+  }
+  return false;
 }
 
 /**
  * Tests whether a world point `p` lands on an interactive Markdown task
  * checkbox (`- [ ]` or `- [x]`) inside a text or note object `o`.
- *
- * @returns {{ obj: object, line: number, checked: boolean } | null}
  */
 export function hitTaskCheckbox(o, p) {
   if (!o || ghost(o) || o.markdown === false) return null;
   if (o.type !== 'text' && o.type !== 'note') return null;
+  if (o.type === 'text' && o.cardStyle === 'window' && o.collapsed) return null;
   if (typeof o.text !== 'string' || !/[-*+]\s+\[[ xX]\]/.test(o.text)) return null;
 
   const lp = toLocal(o, p);
@@ -73,8 +118,9 @@ export function hitTaskCheckbox(o, p) {
   if (!pointInBox(lp, b)) return null;
 
   const isNote = o.type === 'note';
+  const isWindow = o.type === 'text' && o.cardStyle === 'window';
   const padX = isNote ? Math.max(10, o.w * 0.08) + 10 : 10;
-  const padY = isNote ? Math.max(10, o.w * 0.08) + 8 : 8;
+  const padY = (isNote ? Math.max(10, o.w * 0.08) + 8 : 8) + (isWindow ? WINDOW_HEADER_H - 6 : 0);
   const fontSize = o.fontSize || (isNote ? Math.min(24, noteTypeRange(o).max) : 24);
   const lineH = fontSize * 1.45;
 
@@ -121,7 +167,6 @@ export function taskCheckboxAt(store, p, tol = 6) {
     if (!hitObject(o, p, tol)) continue;
     const hit = hitTaskCheckbox(o, p);
     if (hit) return hit;
-    // Topmost non-stroke object intercepts the click
     if (o.type !== 'stroke') return null;
   }
   return null;
@@ -140,9 +185,6 @@ export function toggleTaskAtPoint(store, p, tol = 6) {
   return true;
 }
 
-/**
- * Topmost object at `p`, or null.
- */
 export function pick(store, p, tol = 6, { includeLocked = true } = {}) {
   const order = store.doc.order;
   for (let i = order.length - 1; i >= 0; i--) {
@@ -159,7 +201,6 @@ export function pickAll(store, p, tol = 6, { includeLocked = true } = {}) {
   return out.reverse();
 }
 
-/** Objects intersecting (or fully inside, when `contain`) a world rect. */
 export function inBox(store, box, contain = false) {
   const b = normalizeBox(box);
   return store.objects.filter((o) => {
@@ -169,7 +210,6 @@ export function inBox(store, box, contain = false) {
   });
 }
 
-/** Objects whose centre (or any stroke point) falls inside a lasso polygon. */
 export function inLasso(store, poly) {
   if (poly.length < 3) return [];
   return store.objects.filter((o) => {
@@ -189,9 +229,6 @@ export function inLasso(store, poly) {
   });
 }
 
-/**
- * The answer cover a tap at `p` would land on, or null.
- */
 export function curtainAt(store, p, tol = 6) {
   const order = store.doc.order;
   for (let i = order.length - 1; i >= 0; i--) {
@@ -203,7 +240,6 @@ export function curtainAt(store, p, tol = 6) {
   return null;
 }
 
-/** Strokes crossed by an eraser segment. */
 export function strokesAlong(store, a, b, radius) {
   const hits = [];
   const box = normalizeBox({ x: Math.min(a.x, b.x) - radius, y: Math.min(a.y, b.y) - radius, w: Math.abs(a.x - b.x) + radius * 2, h: Math.abs(a.y - b.y) + radius * 2 });

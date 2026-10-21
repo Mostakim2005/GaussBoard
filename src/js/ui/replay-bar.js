@@ -25,7 +25,9 @@ export class ReplayBar {
       tape: true,
       split: true,
       video: true,
-      scratch: true
+      scratch: true,
+      markdown: true,
+      pagemargin: true
     };
 
     this.loadState();
@@ -251,6 +253,28 @@ export class ReplayBar {
       }
     });
 
+    // Markdown Note Button
+    this.btnMarkdown = h('button', {
+      class: 'rb-btn rb-markdown',
+      title: t('Insert Markdown note (Obsidian format with tags, wikilinks, and math)'),
+      style: 'display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:600;color:inherit;transition:background 0.15s;',
+      html: '<span style="font-family:monospace;font-weight:900;font-size:12px;border:1px solid currentColor;border-radius:4px;padding:0 3px;line-height:1.1;">M↓</span><span>Markdown</span>'
+    });
+    this.btnMarkdown.addEventListener('click', () => {
+      this.app.insertMarkdownCard?.();
+    });
+
+    // Page Margin Button
+    this.btnPageMargin = h('button', {
+      class: 'rb-btn rb-pagemargin',
+      title: t('Adjust Page Margins (Set printable/writable page margins)'),
+      style: 'display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:18px;font-size:12.5px;font-weight:500;color:inherit;transition:background 0.15s;',
+      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" stroke-dasharray="2 2"/></svg><span>Margin</span>'
+    });
+    this.btnPageMargin.addEventListener('click', () => {
+      this.app.openPageMarginDialog?.();
+    });
+
     // 7. Video Export Button
     this.btnVideo = h('button', {
       class: 'rb-btn rb-video',
@@ -297,7 +321,7 @@ export class ReplayBar {
       id: 'replayBar',
       class: 'replay-bar-hud',
       style: 'position:absolute;z-index:9000;display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.14));border-radius:30px;box-shadow:0 6px 20px rgba(0,0,0,0.18);font-family:inherit;font-size:13px;backdrop-filter:blur(8px);'
-    }, handle, this.btnOverview, this.btnSearch, this.btnAudio, this.btnPlayBar, this.btnMode, this.btnTape, this.btnSplit, this.btnVideo, this.btnScratch, this.btnMenu);
+    }, handle, this.btnOverview, this.btnSearch, this.btnAudio, this.btnPlayBar, this.btnMode, this.btnTape, this.btnSplit, this.btnMarkdown, this.btnPageMargin, this.btnVideo, this.btnScratch, this.btnMenu);
 
     this.updateVisibility();
   }
@@ -312,6 +336,8 @@ export class ReplayBar {
     if (this.btnSplit) this.btnSplit.style.display = this.visibleTools.split ? 'flex' : 'none';
     if (this.btnVideo) this.btnVideo.style.display = this.visibleTools.video ? 'flex' : 'none';
     if (this.btnScratch) this.btnScratch.style.display = this.visibleTools.scratch ? 'flex' : 'none';
+    if (this.btnMarkdown) this.btnMarkdown.style.display = this.visibleTools.markdown !== false ? 'flex' : 'none';
+    if (this.btnPageMargin) this.btnPageMargin.style.display = this.visibleTools.pagemargin !== false ? 'flex' : 'none';
   }
 
   syncReadingMode() {
@@ -464,6 +490,8 @@ export class ReplayBar {
     menu.appendChild(toolToggle('split', t('Split Workspace')));
     menu.appendChild(toolToggle('video', t('Export Video')));
     menu.appendChild(toolToggle('scratch', t('Scratch Eraser Info')));
+    menu.appendChild(toolToggle('markdown', t('Markdown Note')));
+    menu.appendChild(toolToggle('pagemargin', t('Page Margins')));
 
     const closeHandler = (ev) => {
       if (!menu.contains(ev.target) && ev.target !== this.btnMenu) {

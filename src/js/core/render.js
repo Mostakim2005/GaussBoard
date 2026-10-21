@@ -1,6 +1,6 @@
 // Canvas painting: backgrounds, every object type, and the selection chrome.
 
-import { boundsOf, worldBounds } from './store.js';
+import { boundsOf, worldBounds, WINDOW_HEADER_H } from './store.js';
 import { pageRects as worldPageRects } from './pages.js';
 import { hexToRgba, readableText, wrapText, fitFontSize, clamp, bboxOfPoints } from './util.js';
 import { inkPath, inkRuns, strokeWeight, hasPressureVariation } from './ink.js';
@@ -51,17 +51,118 @@ function resolveWikilinkForRender(target, anchor, alias) {
 }
 
 /**
+ * Draws the toggleable Obsidian Card Window container around a Markdown text object.
+ * Supports 4 models: 'canvas' | 'window' | 'minimal' | 'transparent'.
+ */
+export function drawMarkdownCardContainer(ctx, o, isDark = darkBoard) {
+  const style = o.cardStyle || (o.background && o.background !== 'none' ? 'canvas' : 'canvas');
+  if (style === 'transparent') {
+    if (o.background && o.background !== 'none') {
+      ctx.save();
+      ctx.fillStyle = o.background;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(o.x - 4, o.y - 4, o.w + 8, o.h + 8, 4);
+      else ctx.rect(o.x - 4, o.y - 4, o.w + 8, o.h + 8);
+      ctx.fill();
+      ctx.restore();
+    }
+    return;
+  }
+
+  const pad = 12;
+  const x = o.x - pad;
+  const y = o.y - pad;
+  const w = o.w + pad * 2;
+  const h = (style === 'window' && o.collapsed ? WINDOW_HEADER_H : o.h) + pad * 2;
+  const r = 10;
+
+  ctx.save();
+
+  // 1. Background fill
+  ctx.fillStyle = o.background && o.background !== 'none'
+    ? o.background
+    : (isDark ? '#23252a' : '#ffffff');
+
+  // 2. Card Shadow (for 'canvas' and 'window' styles)
+  if (style === 'canvas' || style === 'window') {
+    ctx.shadowColor = isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.08)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+  }
+
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+  else ctx.rect(x, y, w, h);
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+
+  // 3. Border stroke
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)';
+  ctx.stroke();
+
+  // 4. Style-specific Header / Badge decorations
+  if (style === 'window') {
+    const headerH = WINDOW_HEADER_H;
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, headerH, o.collapsed ? r : [r, r, 0, 0]);
+    else ctx.rect(x, y, w, headerH);
+    ctx.fill();
+
+    if (!o.collapsed) {
+      ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+      ctx.beginPath();
+      ctx.moveTo(x, y + headerH);
+      ctx.lineTo(x + w, y + headerH);
+      ctx.stroke();
+    }
+
+    ctx.font = `600 11px ${FONT}`;
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.72)';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const rawFirst = o.title || (o.text ? o.text.split('\n')[0].replace(/^#+\s*/, '').trim() : '');
+    const titleText = (rawFirst || t('Markdown')).slice(0, 28);
+    ctx.fillText(titleText, x + 12, y + headerH / 2);
+
+    ctx.textAlign = 'right';
+    ctx.fillText(o.collapsed ? '▼' : '▲', x + w - 12, y + headerH / 2);
+  } else if (style === 'canvas') {
+    const pillW = 28, pillH = 14;
+    const px = x + w - pillW - 8;
+    const py = y + 6;
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,120,212,0.1)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(px, py, pillW, pillH, 4);
+    else ctx.rect(px, py, pillW, pillH);
+    ctx.fill();
+
+    ctx.font = `600 9px ${FONT}`;
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,120,212,0.9)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('MD', px + pillW / 2, py + pillH / 2);
+  }
+
+  ctx.restore();
+}
+
+/**
  * Renders an Obsidian/GFM Markdown block onto the Canvas2D context using an
  * off-screen SVG <foreignObject> image cache for vector sharpness at any zoom.
- * While the SVG image decodes on its first frame, falls back to drawTextBlock
- * so text never flickers.
  */
 export function drawMarkdownBlock(ctx, o, hideText = false, onload = null, boxOverride = null) {
   if (hideText || !o || !o.text) return;
+  const isWindow = o.type === 'text' && o.cardStyle === 'window';
+  if (isWindow && o.collapsed) return;
+
+  const headerOffset = isWindow ? WINDOW_HEADER_H - 6 : 0;
   const x = boxOverride ? boxOverride.x : o.x;
-  const y = boxOverride ? boxOverride.y : o.y;
+  const y = (boxOverride ? boxOverride.y : o.y) + headerOffset;
   const w = Math.max(24, boxOverride ? boxOverride.w : (o.w || 200));
-  const h = Math.max(20, boxOverride ? boxOverride.h : (o.h || 80));
+  const h = Math.max(20, (boxOverride ? boxOverride.h : (o.h || 80)) - headerOffset);
 
   const isNote = o.type === 'note';
   const color = isNote
@@ -106,7 +207,6 @@ export function drawMarkdownBlock(ctx, o, hideText = false, onload = null, boxOv
     return;
   }
 
-  // Synchronous first-frame or headless fallback
   drawTextBlock(ctx, o.text, x, y, w, h, {
     runs: objectRuns(o),
     paint: isNote ? undefined : (c) => inkPaint(c),
@@ -132,22 +232,20 @@ export function pageRects(pages, cam) {
   }));
 }
 
-/** Kept for the single-sheet callers: the first sheet in screen space. */
 export function pageRect(pages, cam) {
   return pageRects(pages, cam)[0] || null;
 }
 
-/** First grid line at or after `from`, on the lattice `origin + k*step`. */
 const lineFrom = (origin, step, from) => origin + Math.ceil((from - origin) / step) * step;
 
-export const PATTERN_SPACINGS = [19, 28, 40, 56];   // ~5, 7.5, 10.5 and 15 mm on paper; 19 matches Xournal++'s 5 mm graph paper
+export const PATTERN_SPACINGS = [19, 28, 40, 56];
 
 export const NOTEBOOK = { line: '#8db6e2', margin: '#e0707f', date: '#8a8886', marginMm: 25, headMm: 22, dateMm: 3.8, edgeMm: 15 };
 const MM = 96 / 25.4;
 
 export function notebookLayout(sheet, base, z, rtl = false) {
   const head = Math.max(3 * base, NOTEBOOK.headMm * MM) * z;
-  const top = sheet.y + head;                                // the first rule
+  const top = sheet.y + head;
   const marginX = sheet.x + NOTEBOOK.marginMm * MM * z;
   const fontPx = NOTEBOOK.dateMm * MM * z;
   const baseline = top - Math.max(0.3 * base, 2.5 * MM) * z;
@@ -173,7 +271,6 @@ export function formatPageDate(iso, lang = currentLanguage()) {
     catch { f = new Intl.DateTimeFormat('en', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }); }
     dateFormats.set(loc, f);
   }
-  // noon, so no timezone can tip it into the day before or after
   return f.format(new Date(+m[1], +m[2] - 1, +m[3], 12));
 }
 
@@ -182,7 +279,6 @@ function drawNotebook(ctx, bg, cam, base, step, anchor, bounds, page, x0, y0, x1
   ctx.strokeStyle = NOTEBOOK.line;
   ctx.globalAlpha = 0.9;
   if (!anchor) {
-    // the infinite canvas has no top and no left edge: just the blue rules
     const oy = ((cam.y % step) + step) % step;
     ctx.beginPath();
     for (let y = lineFrom(oy, step, y0); y < y1; y += step) { ctx.moveTo(x0, Math.round(y) + 0.5); ctx.lineTo(x1, Math.round(y) + 0.5); }
@@ -201,7 +297,6 @@ function drawNotebook(ctx, bg, cam, base, step, anchor, bounds, page, x0, y0, x1
   ctx.moveTo(L.marginX, y0); ctx.lineTo(L.marginX, y1);
   ctx.stroke();
 
-  // the day the sheet was started - never today's date standing in for it
   if (bg.pageDate === false || !page?.date || L.fontPx < 6) return;
   const text = formatPageDate(page.date);
   if (!text) return;
@@ -218,12 +313,12 @@ function drawPattern(ctx, bg, cam, w, h, anchor, bounds, page, exact = false) {
   const pattern = bg.pattern || 'none';
   if (pattern === 'none') return;
 
-  const base = PATTERN_SPACINGS.includes(bg.spacing) ? bg.spacing : 40;   // world spacing
+  const base = PATTERN_SPACINGS.includes(bg.spacing) ? bg.spacing : 40;
   let step = base * cam.z;
   if (anchor || exact) {
     while (step < 6) step *= 2;
   } else {
-    while (step < 14) step *= 2;          // keep it readable when zoomed out
+    while (step < 14) step *= 2;
     while (step > 120) step /= 2;
   }
   const ax = anchor ? anchor.x : cam.x;
@@ -284,17 +379,17 @@ export function drawBackground(ctx, bg, cam, w, h, pages = null) {
     return;
   }
 
-  // the desk the pad sits on
   ctx.fillStyle = shadeOf(boardPaint(bg.color));
   ctx.fillRect(0, 0, w, h);
 
   sheets.forEach((sheet, i) => {
     if (sheet.x > w || sheet.y > h || sheet.x + sheet.w < 0 || sheet.y + sheet.h < 0) return;
+    const pg = pages[i] || {};
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,.20)';
     ctx.shadowBlur = Math.min(26, 10 + cam.z * 8);
     ctx.shadowOffsetY = 2;
-    ctx.fillStyle = boardPaint(bg.color);
+    ctx.fillStyle = pg.bg ? boardPaint(pg.bg) : boardPaint(bg.color);
     ctx.fillRect(sheet.x, sheet.y, sheet.w, sheet.h);
     ctx.restore();
 
@@ -302,7 +397,23 @@ export function drawBackground(ctx, bg, cam, w, h, pages = null) {
     ctx.beginPath();
     ctx.rect(sheet.x, sheet.y, sheet.w, sheet.h);
     ctx.clip();
-    drawPattern(ctx, bg, cam, w, h, { x: sheet.x, y: sheet.y }, sheet, pages[i]);
+    drawPattern(ctx, bg, cam, w, h, { x: sheet.x, y: sheet.y }, sheet, pg);
+
+    // Draw custom page margin guides if defined on the page
+    if (pg.margins) {
+      const m = pg.margins;
+      const mx = sheet.x + (m.left || 0) * cam.z;
+      const my = sheet.y + (m.top || 0) * cam.z;
+      const mw = Math.max(0, sheet.w - ((m.left || 0) + (m.right || 0)) * cam.z);
+      const mh = Math.max(0, sheet.h - ((m.top || 0) + (m.bottom || 0)) * cam.z);
+      if (mw > 0 && mh > 0) {
+        ctx.strokeStyle = 'rgba(0, 120, 212, 0.28)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(mx + 0.5, my + 0.5, mw, mh);
+        ctx.setLineDash([]);
+      }
+    }
     ctx.restore();
 
     strokePageEdge(ctx, sheet);
@@ -618,7 +729,6 @@ export function drawNote(ctx, o, hideText = false, onload = null) {
   ctx.fill();
   ctx.shadowColor = 'transparent';
 
-  // subtle paper fold
   const g = ctx.createLinearGradient(o.x, o.y, o.x, o.y + o.h);
   g.addColorStop(0, 'rgba(255,255,255,0.28)');
   g.addColorStop(1, 'rgba(0,0,0,0.05)');
@@ -653,7 +763,10 @@ export function drawNote(ctx, o, hideText = false, onload = null) {
 }
 
 export function drawText(ctx, o, hideText = false, onload = null) {
-  if (o.background && o.background !== 'none') {
+  if (o.markdown !== false) {
+    drawMarkdownCardContainer(ctx, o, darkBoard);
+    if (o.cardStyle === 'window' && o.collapsed) return;
+  } else if (o.background && o.background !== 'none') {
     ctx.save();
     ctx.fillStyle = o.background;
     ctx.beginPath();
@@ -661,11 +774,15 @@ export function drawText(ctx, o, hideText = false, onload = null) {
     ctx.fill();
     ctx.restore();
   }
+
   if (o.markdown !== false && !o.runs && isMarkdown(o.text)) {
     drawMarkdownBlock(ctx, o, hideText, onload);
     return;
   }
-  drawTextBlock(ctx, hideText ? '' : o.text, o.x, o.y, o.w, o.h, {
+
+  const isWindow = o.markdown !== false && o.cardStyle === 'window';
+  const yOff = isWindow ? WINDOW_HEADER_H - 6 : 0;
+  drawTextBlock(ctx, hideText ? '' : o.text, o.x, o.y + yOff, o.w, Math.max(10, o.h - yOff), {
     runs: objectRuns(o), paint: (c) => inkPaint(c),
     color: inkPaint(o.color), size: o.fontSize || 24,
     align: o.align || 'left', valign: o.valign || 'top',
@@ -1178,7 +1295,6 @@ export function linkRectsOf(o) {
   const list = [];
   watchChips(list);
   try {
-    // Temporarily force drawTextBlock path so watchChips collects link quads
     const prevMd = o.markdown;
     o.markdown = false;
     try { drawObject(probe, o, null, null); } finally { o.markdown = prevMd; }

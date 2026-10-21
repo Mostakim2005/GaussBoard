@@ -30,6 +30,7 @@ export function onMathArrived(fn) { arrived = fn; }
 /** KaTeX itself, loaded on first use. Its stylesheet comes with it, for the editor's preview. */
 export function loadKatex() {
   if (typeof window !== 'undefined' && window.katex) return Promise.resolve(window.katex);
+  if (typeof document === 'undefined') return Promise.resolve(null);
   if (!katexP) {
     katexP = new Promise((resolve, reject) => {
       const link = document.createElement('link');
@@ -39,12 +40,28 @@ export function loadKatex() {
       document.head.appendChild(link);
       const s = document.createElement('script');
       s.src = ROOT + 'katex.min.js';
-      s.onload = () => css.then(() => resolve(window.katex));
+      s.onload = () => css.then(() => {
+        try { arrived?.(); } catch { /* ignore */ }
+        resolve(window.katex);
+      });
       s.onerror = () => { katexP = null; reject(new Error('KaTeX could not be loaded')); };
       document.head.appendChild(s);
     });
   }
   return katexP;
+}
+
+/**
+ * Ensures the offline KaTeX bundle is loaded when Markdown text contains `$...$` or `$$...$$`,
+ * and invokes `onload` when ready so the Markdown SVG cache refreshes with full typeset math.
+ */
+export function ensureKatexLoaded(onload) {
+  if (typeof window !== 'undefined' && window.katex) return true;
+  if (typeof document === 'undefined') return false;
+  loadKatex().then(() => {
+    if (onload) { try { onload(); } catch { /* ignore */ } }
+  }).catch(() => {});
+  return false;
 }
 
 /** KaTeX's stylesheet, split into its layout rules and its @font-face rules by family. */
@@ -262,6 +279,9 @@ export function hasMaths(text) {
   INLINE_MATH.lastIndex = 0;
   const yes = INLINE_MATH.test(text);
   INLINE_MATH.lastIndex = 0;
+  if (yes && typeof window !== 'undefined' && !window.katex) {
+    ensureKatexLoaded();
+  }
   return yes;
 }
 

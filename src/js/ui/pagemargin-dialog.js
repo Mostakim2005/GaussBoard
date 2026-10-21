@@ -2,10 +2,17 @@
 // Allows users to visually configure page margins with 8 draggable blue control handles,
 // layout templates (Cornell notes, wide margins, header), background colors, and apply to
 // either the current page or the entire note.
+//
+// Kinematics:
+// Outward handle dragging expands margins; inward dragging shrinks margins.
+// Max margin limit expanded to 2000px.
+// Pointer capture prevents premature modal closure when mouse drifts outside card.
 
 import { h } from './popover.js';
 import { t } from '../i18n.js';
 import { pageRects, todayStamp } from '../core/pages.js';
+
+export const MAX_MARGIN = 2000;
 
 export class PageMarginDialog {
   /**
@@ -47,12 +54,14 @@ export class PageMarginDialog {
     const pages = this.app.pages.map((p, idx) => {
       if (this.scope === 'single' && idx !== curIdx) return p;
       // Adjust page width/height with margin expansion
-      const baseW = p.w || 794;
-      const baseH = p.h || 1122;
+      const baseW = p.baseW || p.w || 794;
+      const baseH = p.baseH || p.h || 1122;
       const extraW = Math.max(0, this.margins.left + this.margins.right - 80);
       const extraH = Math.max(0, this.margins.top + this.margins.bottom - 80);
       return {
         ...p,
+        baseW,
+        baseH,
         w: baseW + extraW,
         h: baseH + extraH,
         margins: { ...this.margins },
@@ -76,6 +85,8 @@ export class PageMarginDialog {
   }
 
   build() {
+    let isDragging = false;
+
     const backdrop = h('div', {
       id: 'pageMarginModal',
       class: 'modal-backdrop',
@@ -140,7 +151,7 @@ export class PageMarginDialog {
     );
     card.appendChild(colorRow);
 
-    // 4. Template presets (5 icons matching Image 3)
+    // 4. Template presets
     const templates = [
       { id: 'standard', title: 'Standard (Equal)', m: { left: 40, right: 40, top: 40, bottom: 40 }, icon: '◻' },
       { id: 'cornell', title: 'Cornell (Wide Left)', m: { left: 130, right: 30, top: 40, bottom: 40 }, icon: '▍◻' },
@@ -169,20 +180,20 @@ export class PageMarginDialog {
     );
     card.appendChild(tplRow);
 
-    // 5. Interactive Visual Preview with 8 Draggable Blue Control Handles (Turnout Style)
+    // 5. Interactive Visual Preview with 8 Draggable Blue Control Handles
     const previewContainer = h('div', {
       class: 'margin-preview-viewport',
       style: 'background:rgba(128,128,128,0.12);border-radius:12px;height:240px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;'
     });
 
-    // The white page box inside
+    // The page box inside
     const pageBox = h('div', {
-      style: 'background:#ffffff;border:1px solid rgba(0,0,0,0.18);box-shadow:0 4px 14px rgba(0,0,0,0.1);position:absolute;transition:all 0.05s ease;'
+      style: 'background:#ffffff;border:1px solid rgba(0,0,0,0.18);box-shadow:0 4px 14px rgba(0,0,0,0.1);position:relative;transition:all 0.05s ease;'
     });
 
-    // Inner content area
+    // Inner writing content area
     const contentArea = h('div', {
-      style: 'position:absolute;inset:0;background:rgba(0,120,212,0.06);border:1px dashed rgba(0,120,212,0.4);display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(0,120,212,0.8);font-weight:600;'
+      style: 'position:absolute;background:rgba(0,120,212,0.06);border:1px dashed rgba(0,120,212,0.4);display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(0,120,212,0.8);font-weight:600;'
     }, t('Writing Area'));
     pageBox.appendChild(contentArea);
 
@@ -205,63 +216,81 @@ export class PageMarginDialog {
     previewContainer.appendChild(marginLabels);
 
     const updatePreviewBox = () => {
-      const pw = 180, ph = 210;
+      // Content writing base dimensions in preview
+      const contentW = 100, contentH = 130;
+      const previewScale = 0.12;
+
+      const leftPad = Math.max(2, Math.min(60, this.margins.left * previewScale));
+      const rightPad = Math.max(2, Math.min(60, this.margins.right * previewScale));
+      const topPad = Math.max(2, Math.min(45, this.margins.top * previewScale));
+      const bottomPad = Math.max(2, Math.min(45, this.margins.bottom * previewScale));
+
+      const pw = contentW + leftPad + rightPad;
+      const ph = contentH + topPad + bottomPad;
+
       pageBox.style.width = `${pw}px`;
       pageBox.style.height = `${ph}px`;
       pageBox.style.backgroundColor = this.color === '#212529' ? '#25292e' : this.color;
 
-      const scale = 0.35;
-      const leftPad = Math.max(6, Math.min(60, this.margins.left * scale));
-      const rightPad = Math.max(6, Math.min(60, this.margins.right * scale));
-      const topPad = Math.max(6, Math.min(60, this.margins.top * scale));
-      const bottomPad = Math.max(6, Math.min(60, this.margins.bottom * scale));
-
       contentArea.style.left = `${leftPad}px`;
-      contentArea.style.right = `${rightPad}px`;
       contentArea.style.top = `${topPad}px`;
-      contentArea.style.bottom = `${bottomPad}px`;
+      contentArea.style.width = `${contentW}px`;
+      contentArea.style.height = `${contentH}px`;
 
-      // Position the 8 handles around contentArea
-      handles.nw.style.left = `${leftPad}px`; handles.nw.style.top = `${topPad}px`;
-      handles.n.style.left = `${pw / 2}px`; handles.n.style.top = `${topPad}px`;
-      handles.ne.style.left = `${pw - rightPad}px`; handles.ne.style.top = `${topPad}px`;
-      handles.e.style.left = `${pw - rightPad}px`; handles.e.style.top = `${ph / 2}px`;
-      handles.se.style.left = `${pw - rightPad}px`; handles.se.style.top = `${ph - bottomPad}px`;
-      handles.s.style.left = `${pw / 2}px`; handles.s.style.top = `${ph - bottomPad}px`;
-      handles.sw.style.left = `${leftPad}px`; handles.sw.style.top = `${ph - bottomPad}px`;
-      handles.w.style.left = `${leftPad}px`; handles.w.style.top = `${ph / 2}px`;
+      // Position the 8 handles at outer page perimeter (intuitive outward dragging)
+      handles.nw.style.left = `0px`; handles.nw.style.top = `0px`;
+      handles.n.style.left = `${pw / 2}px`; handles.n.style.top = `0px`;
+      handles.ne.style.left = `${pw}px`; handles.ne.style.top = `0px`;
+      handles.e.style.left = `${pw}px`; handles.e.style.top = `${ph / 2}px`;
+      handles.se.style.left = `${pw}px`; handles.se.style.top = `${ph}px`;
+      handles.s.style.left = `${pw / 2}px`; handles.s.style.top = `${ph}px`;
+      handles.sw.style.left = `0px`; handles.sw.style.top = `${ph}px`;
+      handles.w.style.left = `0px`; handles.w.style.top = `${ph / 2}px`;
 
       marginLabels.textContent = `Left: ${this.margins.left}px · Right: ${this.margins.right}px · Top: ${this.margins.top}px · Bottom: ${this.margins.bottom}px`;
     };
 
-    // Wire dragging logic for the 8 handles
+    // Wire dragging logic for the 8 handles:
+    // Outward dragging EXPANDS margins; inward dragging SHRINKS margins.
     for (const [pos, handleEl] of Object.entries(handles)) {
       let startX = 0, startY = 0;
       let startM = { ...this.margins };
 
       const onPointerMove = (e) => {
-        const dx = (e.clientX - startX) * 1.5;
-        const dy = (e.clientY - startY) * 1.5;
-        if (pos.includes('w')) this.margins.left = Math.max(10, Math.min(200, Math.round(startM.left - dx)));
-        if (pos.includes('e')) this.margins.right = Math.max(10, Math.min(200, Math.round(startM.right + dx)));
-        if (pos.includes('n')) this.margins.top = Math.max(10, Math.min(180, Math.round(startM.top - dy)));
-        if (pos.includes('s')) this.margins.bottom = Math.max(10, Math.min(180, Math.round(startM.bottom + dy)));
+        if (!isDragging) return;
+        const dx = (e.clientX - startX);
+        const dy = (e.clientY - startY);
+        const dragScale = 0.5; // Smooth dragging sensitivity
+
+        // Outward drag adds margin; inward subtracts
+        if (pos.includes('w')) this.margins.left = Math.max(0, Math.min(MAX_MARGIN, Math.round(startM.left - dx / dragScale)));
+        if (pos.includes('e')) this.margins.right = Math.max(0, Math.min(MAX_MARGIN, Math.round(startM.right + dx / dragScale)));
+        if (pos.includes('n')) this.margins.top = Math.max(0, Math.min(MAX_MARGIN, Math.round(startM.top - dy / dragScale)));
+        if (pos.includes('s')) this.margins.bottom = Math.max(0, Math.min(MAX_MARGIN, Math.round(startM.bottom + dy / dragScale)));
+
         updatePreviewBox();
       };
 
-      const onPointerUp = () => {
+      const onPointerUp = (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        try { handleEl.releasePointerCapture(e.pointerId); } catch {}
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerUp);
       };
 
       handleEl.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         e.preventDefault();
+        isDragging = true;
+        try { handleEl.setPointerCapture(e.pointerId); } catch {}
         startX = e.clientX;
         startY = e.clientY;
         startM = { ...this.margins };
         window.addEventListener('pointermove', onPointerMove);
         window.addEventListener('pointerup', onPointerUp);
+        window.addEventListener('pointercancel', onPointerUp);
       });
     }
 
@@ -291,6 +320,8 @@ export class PageMarginDialog {
 
     backdrop.appendChild(card);
     backdrop.addEventListener('click', (e) => {
+      // Guard: do not close if user is dragging or just released drag
+      if (isDragging) return;
       if (e.target === backdrop) this.close();
     });
 

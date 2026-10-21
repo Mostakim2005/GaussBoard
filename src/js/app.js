@@ -3,7 +3,7 @@
 import './platform/platform.js';
 import { t, translatePage, currentLanguage } from './i18n.js';
 import { loadInstalled, onFontsChanged, packFor, isInstalled, download as downloadFontPack, sizeLabel } from './fontpack.js';
-import { Store, withAttached, withGroups, groupMembers, worldBounds, boundsOf, setConnectorBounds, emptyDoc } from './core/store.js';
+import { Store, withAttached, withGroups, groupMembers, worldBounds, boundsOf, setConnectorBounds, emptyDoc, setDefaultCardStyle } from './core/store.js';
 import { useConnectorStore, connectorBounds, ROUTES, holds } from './core/connectors.js';
 import { setBoardDirectory, setCurrentBoard, lookupBoard, onDirectoryChange, refLabel, refsAsWords, linkedRefs, allBoards, remapBoardIds } from './core/boardrefs.js';
 import { exportBoards } from './board-export.js';
@@ -82,6 +82,7 @@ export const DEFAULT_SETTINGS = {
   showGroupOutlines: true,
   edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, laserColor: '#ff2d2d',
   penOpacityEnabled: false, penOpacity: 1, laserTrailDuration: 520, boardLinkThumb: true,
+  textMarkdown: true, defaultCardStyle: 'canvas', wikilinkDblClick: 'ask', quickActionPopovers: true,
   // My boards' folders: a catalogue on this device, never inside a board (core/folders.js)
   folders: [], boardFolders: {},
   /*
@@ -347,11 +348,13 @@ class App {
       // one that gets filed into.
       s.folders = Array.isArray(s.folders) ? s.folders.map((f) => ({ ...f })) : [];
       s.boardFolders = s.boardFolders && typeof s.boardFolders === 'object' ? { ...s.boardFolders } : {};
+      setDefaultCardStyle(s.defaultCardStyle || 'canvas');
       return s;
     } catch { return { ...DEFAULT_SETTINGS }; }
   }
   saveSettings() {
     try { localStorage.setItem('gazboard.settings', JSON.stringify(this.settings)); } catch {}
+    setDefaultCardStyle(this.settings?.defaultCardStyle || 'canvas');
     this.applyTheme();
     this.syncUI();
     this.queueCatalogue();
@@ -1501,6 +1504,7 @@ class App {
     this.beginTextEdit(o);
   }
 
+
   /*
    * Stamp an emoji where the board was tapped.
    *
@@ -1564,6 +1568,42 @@ class App {
     if (this.tool !== 'select') this.setTool('select');
     this.setSelection([o.id]);
     this.beginTextEdit(o);
+  }
+
+  insertMarkdownCardAt(wp, cardStyle = null) {
+    const fontSize = this.worldSize(this.settings.textSize || 32);
+    const wrapW = this.textWrapWidthAt(wp.x);
+    const o = {
+      id: uid('t'),
+      type: 'text',
+      x: wp.x,
+      y: wp.y - fontSize,
+      w: wrapW,
+      wrapW,
+      h: fontSize * 2.5,
+      text: '# ' + t('New Markdown Note') + '\n\n',
+      rotation: 0,
+      color: this.settings.textColor || '#201f1e',
+      fontSize,
+      align: 'left',
+      valign: 'top',
+      font: this.settings.textFont || 'hand',
+      background: 'none',
+      markdown: true,
+      cardStyle: cardStyle || this.settings.defaultCardStyle || 'canvas'
+    };
+    this.store.add(o, 'text');
+    this.armToolRestore();
+    if (this.tool !== 'select') this.setTool('select');
+    this.setSelection([o.id]);
+    this.beginTextEdit(o);
+    return o;
+  }
+
+  insertMarkdownCard(cardStyle = null) {
+    const view = this.surface.cam.viewport(this.surface.width, this.surface.height);
+    const wp = { x: view.x + view.w / 2 - 160, y: view.y + view.h / 2 - 80 };
+    return this.insertMarkdownCardAt(wp, cardStyle);
   }
 
   addTable() {
@@ -2344,6 +2384,8 @@ class App {
       case 'insert.curtain': this.addCurtain(); break;
       case 'insert.tape': this.addTape(); break;
       case 'insert.boardlink': this.pickBoardLink(); break;
+      case 'insert.markdown': this.insertMarkdownCard(); break;
+      case 'page.margin': this.openPageMarginDialog(); break;
       case 'board.back': this.goBack(); break;
       case 'curtain.reveal': this.revealSelectedCurtains(); break;
       case 'curtain.coverAll': this.coverAllCurtains(); break;

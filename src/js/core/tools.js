@@ -3,7 +3,7 @@
 import { uid, bboxOfPoints, clamp, dist, simplify, unionBox } from './util.js';
 import { isScratchGesture } from './scratch.js';
 import { boundsOf, worldBounds, withAttached, withGroups} from './store.js';
-import { pick, pickAll, inBox, inLasso, strokesAlong, normalizeBox, curtainAt, toLocal } from './hit.js';
+import { pick, pickAll, inBox, inLasso, strokesAlong, normalizeBox, curtainAt, toLocal, taskCheckboxAt, toggleTaskAtPoint, toggleCardCollapseAtPoint } from './hit.js';
 import { handlePositions, HANDLE, HANDLES, drawShape, inkPaint, linkRectsOf, inQuad } from './render.js';
 import { translateObject, scaleObject, rotateObjectAround, normalizeRect, anchorFor, CURSORS } from './transform.js';
 import { recognize, fitError, MAX_FIT_ERROR } from './recognize.js';
@@ -15,6 +15,7 @@ import { t, currentLanguage } from '../i18n.js';
 import { SHAPE_LABELS } from '../ui/palettes.js';
 import { route as connectorRoute, midPoint, bendThrough, targetAt, sameTarget, dotsFor, drawConnector, endBox } from './connectors.js';
 import { audioInkClock } from './replay-clock.js';
+import { handleWikilinkDoubleClick } from './boardrefs.js';
 
 const TAP_SLOP = 4;
 /*
@@ -487,6 +488,10 @@ export class Interaction {
         break;
       }
       case 'text': case 'note': {
+        if (toggleTaskAtPoint(this.store, wp, 6 / this.surface.cam.z)) {
+          this.surface.invalidate();
+          return;
+        }
         // clicking something that is already there should get hold of it,
         // not drop a new note or text box on top of it
         const hit = pick(this.store, wp, 8 / this.surface.cam.z);
@@ -531,7 +536,12 @@ export class Interaction {
      * onUp decides whether it was a tap or a drag.
      */
     const hitCurtain = curtainAt(this.store, wp, 10 / this.surface.cam.z);
+    const hitTask = taskCheckboxAt(this.store, wp, 8 / this.surface.cam.z);
     if (this.action && !this.spaceDown && e.button === 0) {
+      if (hitTask && tool === 'select') {
+        this.action.taskHit = hitTask;
+        this.action.downSp = sp;
+      }
       if (tool === 'laser' || tool === 'mousePointer' || (hitCurtain && tool === 'select')) {
         this.action.cover = hitCurtain;
         this.action.downSp = sp;
@@ -958,6 +968,15 @@ export class Interaction {
       follow = a.link.ref;
     }
 
+    if (a.taskHit && a.downSp && Math.hypot(sp.x - a.downSp.x, sp.y - a.downSp.y) < TAP_SLOP) {
+      if (a.type === 'move') { this.store.restoreSnapshot(a.snap); }
+      this.action = null;
+      this.actionId = null;
+      toggleTaskAtPoint(this.store, wp, 8 / this.surface.cam.z);
+      this.app.syncUI();
+      this.surface.invalidate();
+      return;
+    }
     if (a.cover && a.downSp && Math.hypot(sp.x - a.downSp.x, sp.y - a.downSp.y) < TAP_SLOP) {
       // A tap, not a drag: whatever the pointer nudged on its way down goes
       // back where it was, and the only change is the cover coming off.
@@ -1648,6 +1667,11 @@ export class Interaction {
      * Making them go and find the Select tool first would turn a reveal into
      * a fumble. The pen only loses its full stop, and only on a cover.
      */
+    if (toggleTaskAtPoint(this.store, p0, 8 / z)) {
+      this.discardTapMark();
+      this.surface.invalidate();
+      return true;
+    }
     const cover = curtainAt(this.store, p0, 8 / z);
     if (cover) {
       this.discardTapMark();
@@ -2757,6 +2781,15 @@ export class Interaction {
     if (this.app.readingMode) { e.preventDefault(); return; }
     if (this.fitTextToWords(this.surface.screenPoint(e))) return;
     const wp = this.surface.toWorld(e);
+    const link = this.linkAt(wp);
+    if (link) {
+      handleWikilinkDoubleClick(this.app, link.ref, { x: e.clientX, y: e.clientY });
+      return;
+    }
+    if (toggleCardCollapseAtPoint(this.store, wp, 8 / this.surface.cam.z)) {
+      this.surface.invalidate();
+      return;
+    }
     const hit = pick(this.store, wp, 8 / this.surface.cam.z);
     if (!hit) {
       if (this.tool === 'select') { this.app.setTool('text'); this.action = null; }

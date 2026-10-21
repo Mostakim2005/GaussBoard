@@ -1,29 +1,15 @@
-// Links from one board to another.
-//
-// A link lives in two places. Inside words - a text box, a note, a shape's
-// label, a table cell - it is a short piece of text:
-//
-//     @[Week 5](b:b3k9x2)        the board whose id is b3k9x2
-//     @[Notes](b:b77aa1#3)       page 3 of that board
-//
-// so it is saved, undone, synced and copied along with the words around it,
-// exactly as $...$ maths is. On the board itself it is a card (type
-// 'boardlink') that carries the same three things: { id, name, page }.
-//
-// The id is what a link follows. The name is only what it was called when the
-// link was made: the label always shows the board's name NOW, so renaming a
-// board never breaks or dates a link to it. The name earns its keep when the
-// id is not on this computer - a board sent over the network, or opened from
-// a file, can arrive with a different id - and then a board with exactly that
-// name is the one meant. When neither is found, the link says so, greyed out,
-// and still reads as the name of what is missing.
+// Links from one board to another (native @[Title](b:id#page), embeds @![Title](b:id#page),
+// and Obsidian [[Board#Page|Alias]] / ![[Board#Page|Alias]] wikilinks).
 
+import { t } from '../i18n.js';
+
+export const EMBED_REF_RE = /@!\[([^\]\n]{1,200})\]\(b:([A-Za-z0-9_-]{1,128})(?:#(\d{1,4}))?\)/g;
 export const REF_RE = /@\[([^\]\n]{1,200})\]\(b:([A-Za-z0-9_-]{1,128})(?:#(\d{1,4}))?\)/g;
-export const WIKILINK_RE = /\[\[([^\]|#\n]+)(?:#(\d{1,4}))?(?:\|([^\]\n]+))?\]\]/g;
+export const EMBED_WIKILINK_RE = /!\[\[([^\]|#\n]+)(?:#(\d{1,4}))?(?:\|([^\]\n]+))?\]\]/g;
+export const WIKILINK_RE = /(?<!!)\[\[([^\]|#\n]+)(?:#(\d{1,4}))?(?:\|([^\]\n]+))?\]\]/g;
 
 const clean = (s) => String(s ?? '').replace(/[\]\n\r]/g, ' ').trim().slice(0, 200) || '?';
 
-/** Safe fallback id derived from a board title when the target board does not exist locally yet. */
 function fallbackIdFromTitle(title) {
   const slug = String(title ?? '')
     .trim()
@@ -34,77 +20,113 @@ function fallbackIdFromTitle(title) {
   return 'wl_' + (slug || 'board');
 }
 
-/** The text form of a link, for putting into words. */
+/** The text form of a link, for putting into words. Supports `ref.embed` (`@![...](b:...)`). */
 export function refToken(ref) {
   const page = ref.page > 0 ? '#' + Math.floor(ref.page) : '';
-  return `@[${clean(ref.name)}](b:${ref.id}${page})`;
+  const prefix = ref.embed ? '@![' : '@[';
+  const label = ref.alias || ref.name;
+  return `${prefix}${clean(label)}](b:${ref.id}${page})`;
+}
+
+/** Format an Obsidian wikilink or embed (`[[Board#Page|Alias]]` or `![[Board#Page|Alias]]`). */
+export function wikilinkToken(ref) {
+  const b = lookupBoard(ref);
+  const boardName = clean(ref.boardName || (b && b.name) || ref.name || '?');
+  const pagePart = ref.page > 0 ? `#${Math.floor(ref.page)}` : '';
+  const alias = ref.alias ? clean(ref.alias) : (ref.name && ref.name !== boardName ? clean(ref.name) : '');
+  const aliasPart = alias && alias !== boardName ? `|${alias}` : '';
+  return `${ref.embed ? '!' : ''}[[${boardName}${pagePart}${aliasPart}]]`;
 }
 
 /**
- * Convert Obsidian-style [[Board Name#Page|Alias]] wikilinks into native
- * @[Label](b:boardId#page) tokens by resolving board names against the local directory.
+ * Convert Obsidian-style `![[Board#Page|Alias]]` and `[[Board#Page|Alias]]`
+ * into native `@![Label](b:boardId#page)` and `@[Label](b:boardId#page)` tokens.
  */
 export function wikilinksToRefs(text) {
-  const s = String(text ?? '');
+  let s = String(text ?? '');
   if (!s.includes('[[')) return s;
-  return s.replace(WIKILINK_RE, (_, rawTitle, rawPage, rawAlias) => {
+
+  const replaceFn = (isEmbed) => (whole, rawTitle, rawPage, rawAlias) => {
     const title = String(rawTitle || '').trim();
-    if (!title) return _;
+    if (!title) return whole;
     const page = rawPage ? Number(rawPage) : 0;
     const alias = rawAlias ? String(rawAlias).trim() : '';
     const match = lookupBoard({ name: title });
     const id = match ? match.id : fallbackIdFromTitle(title);
     const displayName = alias || (match && match.name) || title;
-    return refToken({ id, name: displayName, page });
-  });
+    return refToken({ id, name: displayName, page, embed: isEmbed });
+  };
+
+  s = s.replace(EMBED_WIKILINK_RE, replaceFn(true));
+  s = s.replace(WIKILINK_RE, replaceFn(false));
+  return s;
 }
 
 /**
- * Convert native @[Label](b:boardId#page) tokens into Obsidian [[Board Name#Page|Alias]] syntax.
+ * Convert native `@![Label](b:boardId#page)` and `@[Label](b:boardId#page)` tokens
+ * into Obsidian `![[Board Name#Page|Alias]]` and `[[Board Name#Page|Alias]]` syntax.
  */
 export function refsToWikilinks(text) {
-  const s = String(text ?? '');
+  let s = String(text ?? '');
   if (!s.includes('](b:')) return s;
-  return s.replace(REF_RE, (_, label, id, page) => {
+
+  const toWl = (isEmbed) => (_, label, id, page) => {
     const b = lookupBoard({ id, name: label });
     const boardName = (b && b.name) || label;
     const pagePart = page ? `#${page}` : '';
     const aliasPart = label && label !== boardName ? `|${label}` : '';
-    return `[[${boardName}${pagePart}${aliasPart}]]`;
-  });
+    return `${isEmbed ? '!' : ''}[[${boardName}${pagePart}${aliasPart}]]`;
+  };
+
+  s = s.replace(EMBED_REF_RE, toWl(true));
+  s = s.replace(REF_RE, toWl(false));
+  return s;
 }
 
-/** Every link in a stretch of text: [{start, end, id, name, page}]. Pages count from 1. */
+/** Every link in a stretch of text: [{start, end, id, name, page, embed, alias}]. Pages count from 1. */
 export function refSpans(text) {
   const out = [];
   const s = String(text ?? '');
+
   if (s.includes('](b:')) {
+    EMBED_REF_RE.lastIndex = 0;
+    let m;
+    while ((m = EMBED_REF_RE.exec(s))) {
+      out.push({ start: m.index, end: m.index + m[0].length, name: m[1], id: m[2], page: m[3] ? Number(m[3]) : 0, embed: true });
+    }
     REF_RE.lastIndex = 0;
-    let m;
     while ((m = REF_RE.exec(s))) {
-      out.push({ start: m.index, end: m.index + m[0].length, name: m[1], id: m[2], page: m[3] ? Number(m[3]) : 0 });
+      out.push({ start: m.index, end: m.index + m[0].length, name: m[1], id: m[2], page: m[3] ? Number(m[3]) : 0, embed: false });
     }
   }
+
   if (s.includes('[[')) {
-    WIKILINK_RE.lastIndex = 0;
-    let m;
-    while ((m = WIKILINK_RE.exec(s))) {
-      const title = String(m[1] || '').trim();
-      const page = m[2] ? Number(m[2]) : 0;
-      const alias = m[3] ? String(m[3]).trim() : '';
-      const found = lookupBoard({ name: title });
-      out.push({
-        start: m.index,
-        end: m.index + m[0].length,
-        name: alias || title,
-        boardName: title,
-        id: found ? found.id : fallbackIdFromTitle(title),
-        page,
-        wikilink: true
-      });
-    }
-    out.sort((a, b) => a.start - b.start);
+    const collectWl = (re, isEmbed) => {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(s))) {
+        const title = String(m[1] || '').trim();
+        const page = m[2] ? Number(m[2]) : 0;
+        const alias = m[3] ? String(m[3]).trim() : '';
+        const found = lookupBoard({ name: title });
+        out.push({
+          start: m.index,
+          end: m.index + m[0].length,
+          name: alias || title,
+          boardName: title,
+          alias,
+          id: found ? found.id : fallbackIdFromTitle(title),
+          page,
+          embed: isEmbed,
+          wikilink: true
+        });
+      }
+    };
+    collectWl(EMBED_WIKILINK_RE, true);
+    collectWl(WIKILINK_RE, false);
   }
+
+  if (out.length > 1) out.sort((a, b) => a.start - b.start);
   return out;
 }
 
@@ -115,7 +137,9 @@ export const hasRefs = (text) =>
 export function refsAsWords(text) {
   if (!hasRefs(text)) return String(text ?? '');
   const withRefs = wikilinksToRefs(text);
-  return String(withRefs).replace(REF_RE, (_, name, id, page) => '@' + (directoryName(id) || name) + (page ? ' › ' + page : ''));
+  return String(withRefs)
+    .replace(EMBED_REF_RE, (_, name, id, page) => '@!' + (directoryName(id) || name) + (page ? ' › ' + page : ''))
+    .replace(REF_RE, (_, name, id, page) => '@' + (directoryName(id) || name) + (page ? ' › ' + page : ''));
 }
 
 /* ------------------------------------------------------------------ *
@@ -123,11 +147,10 @@ export function refsAsWords(text) {
  * ------------------------------------------------------------------ */
 
 const byId = new Map();          // id -> { id, name, thumb, modified }
-let known = false;               // has the list been read at all yet?
+let known = false;
 let current = { id: null, name: '' };
 const listeners = new Set();
 
-/** The board list, as the board store gives it. */
 export function setBoardDirectory(list) {
   byId.clear();
   for (const b of list || []) if (b && b.id) byId.set(b.id, { id: b.id, name: b.name || '', thumb: b.thumb || null, modified: b.modified || 0, origin: b.origin || null });
@@ -135,7 +158,6 @@ export function setBoardDirectory(list) {
   for (const fn of listeners) { try { fn(); } catch { /* a listener's problem is its own */ } }
 }
 
-/** The board that is open, whose name is the one being typed in the title box - not the one last saved. */
 export function setCurrentBoard(id, name) {
   current = { id, name: name || '' };
 }
@@ -144,7 +166,6 @@ export const currentBoardId = () => current.id;
 export const directoryKnown = () => known;
 export function onDirectoryChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 
-/** Every board on this computer, the open one included. */
 export function allBoards() {
   const list = [...byId.values()];
   if (current.id && !byId.has(current.id)) list.push({ id: current.id, name: current.name, thumb: null, modified: Date.now() });
@@ -156,18 +177,11 @@ function directoryName(id) {
   return byId.get(id)?.name || null;
 }
 
-/**
- * The board a link means here: by its id, or - when that id is not on this
- * computer - by its name, if exactly one board has that name.
- * @returns {{id, name, thumb}|null}
- */
 export function lookupBoard(ref) {
   if (!ref) return null;
   if (ref.id && ref.id === current.id) return { id: current.id, name: current.name, thumb: byId.get(current.id)?.thumb || null };
   const e = ref.id && byId.get(ref.id);
   if (e) return e;
-  // A board that came over the network remembers the id it had on the computer
-  // it came from (origin "sync:<device>/<id>"), so links made over there find it here.
   if (ref.id) {
     const tail = '/' + ref.id;
     const came = [...byId.values()].filter((b) => typeof b.origin === 'string' && b.origin.startsWith('sync:') && b.origin.endsWith(tail));
@@ -179,17 +193,15 @@ export function lookupBoard(ref) {
   return same.length === 1 ? same[0] : null;
 }
 
-/** Is this link to a board that is not here? Only said once the list has been read. */
 export const refMissing = (ref) => known && !lookupBoard(ref);
 
-/** What a link reads as: the board's name now, and the page if it points at one. */
 export function refLabel(ref) {
+  if (ref?.alias) return ref.page > 0 ? `${ref.alias} › ${ref.page}` : ref.alias;
   const b = lookupBoard(ref);
-  const name = (b && b.name) || ref.name || '?';
-  return ref.page > 0 ? `${name} › ${ref.page}` : name;
+  const name = (b && b.name) || ref?.name || '?';
+  return ref?.page > 0 ? `${name} › ${ref.page}` : name;
 }
 
-/** The links in a list of objects (an array, or a board's id -> object map), each board once, in the order met. */
 export function linkedRefs(objects) {
   const seen = new Map();
   const add = (ref) => { if (ref && ref.id && !seen.has(ref.id)) seen.set(ref.id, { id: ref.id, name: ref.name || '' }); };
@@ -204,18 +216,14 @@ export function linkedRefs(objects) {
   return [...seen.values()];
 }
 
-/**
- * The same objects with their links pointed at new board ids: `map` is old id
- * -> new id. Used when boards arrive together and some of them have to be given
- * new ids here - their links to each other must follow. A styled run that a
- * link happens to straddle cannot be rewritten safely, so those words lose
- * their styling rather than show anything but their own text.
- */
 export function remapBoardIds(objects, map) {
   if (!map || !map.size) return objects;
-  const swap = (s) => (typeof s === 'string' && s.includes('](b:')
-    ? s.replace(REF_RE, (whole, name, id, page) => (map.has(id) ? `@[${name}](b:${map.get(id)}${page ? '#' + page : ''})` : whole))
-    : s);
+  const swap = (s) => {
+    if (typeof s !== 'string' || !s.includes('](b:')) return s;
+    return s
+      .replace(EMBED_REF_RE, (whole, name, id, page) => (map.has(id) ? `@![${name}](b:${map.get(id)}${page ? '#' + page : ''})` : whole))
+      .replace(REF_RE, (whole, name, id, page) => (map.has(id) ? `@[${name}](b:${map.get(id)}${page ? '#' + page : ''})` : whole));
+  };
   const runsFor = (runs, text) => {
     if (!Array.isArray(runs)) return runs;
     const next = runs.map((r) => ({ ...r, t: swap(r.t) }));
@@ -239,4 +247,226 @@ export function remapBoardIds(objects, map) {
     return n;
   };
   return Array.isArray(objects) ? objects.map(one) : Object.fromEntries(Object.entries(objects || {}).map(([k, o]) => [k, one(o)]));
+}
+
+/* ------------------------------------------------------------------ *
+ *  Settings-Driven Wikilink Actions & Link Editor Modal
+ * ------------------------------------------------------------------ */
+
+export function executeWikilinkAction(app, ref, action, ownerObj = null) {
+  if (!app || !ref) return;
+  switch (action) {
+    case 'embed': {
+      if (ownerObj && typeof ownerObj.text === 'string') {
+        const nextRef = { ...ref, embed: !ref.embed };
+        const oldTok = refToken(ref);
+        const newTok = refToken(nextRef);
+        const nextText = ownerObj.text.includes(oldTok)
+          ? ownerObj.text.replace(oldTok, newTok)
+          : ownerObj.text;
+        app.store.update(ownerObj.id, { text: nextText }, 'toggle embed');
+        app.surface?.invalidate();
+      } else if (ownerObj && ownerObj.type === 'boardlink') {
+        app.store.update(ownerObj.id, { showThumb: true, board: { ...ref, embed: true } }, 'embed board');
+        app.surface?.invalidate();
+      } else if (typeof app.openBoardLink === 'function') {
+        app.openBoardLink(ref);
+      }
+      break;
+    }
+    case 'split': {
+      if (app.splitWorkspace && typeof app.splitWorkspace.openBoardInSplit === 'function') {
+        app.splitWorkspace.openBoardInSplit(ref);
+      } else if (typeof app.openBoardInSplit === 'function') {
+        app.openBoardInSplit(ref);
+      } else if (typeof app.followBoardLink === 'function') {
+        app.followBoardLink(ref);
+      }
+      break;
+    }
+    case 'edit': {
+      openLinkEditorPopover(app, ref, null, ownerObj);
+      break;
+    }
+    case 'navigate':
+    default: {
+      if (typeof app.followBoardLink === 'function') {
+        app.followBoardLink(ref);
+      } else if (typeof app.openBoard === 'function' && ref.id) {
+        app.openBoard(ref.id, ref.page);
+      }
+      break;
+    }
+  }
+}
+
+export function handleWikilinkDoubleClick(app, ref, anchorPoint = null, ownerObj = null) {
+  if (!app || !ref) return;
+  const pref = app.settings?.wikilinkDblClick || 'ask';
+  const showPop = app.settings?.quickActionPopovers !== false;
+
+  if (pref !== 'ask') {
+    executeWikilinkAction(app, ref, pref, ownerObj);
+    return;
+  }
+
+  if (!showPop) {
+    executeWikilinkAction(app, ref, 'split', ownerObj);
+    return;
+  }
+
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('.gb-wikilink-popover').forEach((el) => el.remove());
+
+  const pop = document.createElement('div');
+  pop.className = 'pop gb-wikilink-popover';
+  const x = anchorPoint?.x ?? window.innerWidth / 2 - 130;
+  const y = anchorPoint?.y ?? window.innerHeight / 2 - 90;
+  pop.style.cssText = `position:fixed;left:${Math.max(12, Math.min(window.innerWidth - 260, x))}px;top:${Math.max(12, Math.min(window.innerHeight - 240, y))}px;z-index:9999;min-width:240px;padding:10px;border-radius:10px;background:var(--panel,#fff);box-shadow:0 8px 28px rgba(0,0,0,0.22);border:1px solid rgba(128,128,128,0.22);display:flex;flex-direction:column;gap:6px;`;
+
+  const title = document.createElement('div');
+  title.style.cssText = 'font-weight:700;font-size:12.5px;margin-bottom:4px;';
+  title.textContent = t('Choose Action for {name}', { name: refLabel(ref) });
+  pop.appendChild(title);
+
+  let rememberChk = null;
+  const runChoice = (act) => {
+    if (rememberChk?.checked && app.settings) {
+      app.settings.wikilinkDblClick = act;
+      app.saveSettings?.();
+    }
+    pop.remove();
+    executeWikilinkAction(app, ref, act, ownerObj);
+  };
+
+  const actions = [
+    ['embed', t('Embed in Place (![[...]])')],
+    ['split', t('Open in Split View')],
+    ['navigate', t('Navigate to Board')],
+    ['edit', t('Edit Link & Aliases...')]
+  ];
+  for (const [act, label] of actions) {
+    const b = document.createElement('button');
+    b.className = 'menu-item';
+    b.style.cssText = 'text-align:left;padding:6px 8px;border-radius:6px;cursor:pointer;';
+    b.textContent = label;
+    b.addEventListener('click', () => runChoice(act));
+    pop.appendChild(b);
+  }
+
+  const remLabel = document.createElement('label');
+  remLabel.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11.5px;margin-top:4px;opacity:0.85;cursor:pointer;';
+  rememberChk = document.createElement('input');
+  rememberChk.type = 'checkbox';
+  const remSpan = document.createElement('span');
+  remSpan.textContent = t('Remember choice (changeable in Settings)');
+  remLabel.append(rememberChk, remSpan);
+  pop.appendChild(remLabel);
+
+  document.body.appendChild(pop);
+  const closeOnOutside = (ev) => {
+    if (!pop.contains(ev.target)) {
+      pop.remove();
+      document.removeEventListener('pointerdown', closeOnOutside, true);
+    }
+  };
+  setTimeout(() => document.addEventListener('pointerdown', closeOnOutside, true), 0);
+}
+
+/**
+ * Opens the Link & Embed Editor popover for right-click or long-press on a wikilink/boardlink.
+ */
+export function openLinkEditorPopover(app, ref, anchorPoint = null, ownerObj = null, onSave = null) {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('.gb-link-editor-popover').forEach((el) => el.remove());
+
+  const b = lookupBoard(ref);
+  const pop = document.createElement('div');
+  pop.className = 'pop gb-link-editor-popover';
+  const x = anchorPoint?.x ?? window.innerWidth / 2 - 140;
+  const y = anchorPoint?.y ?? window.innerHeight / 2 - 120;
+  pop.style.cssText = `position:fixed;left:${Math.max(12, Math.min(window.innerWidth - 290, x))}px;top:${Math.max(12, Math.min(window.innerHeight - 280, y))}px;z-index:9999;width:270px;padding:12px;border-radius:10px;background:var(--panel,#fff);box-shadow:0 8px 28px rgba(0,0,0,0.24);border:1px solid rgba(128,128,128,0.24);display:flex;flex-direction:column;gap:8px;`;
+
+  const header = document.createElement('div');
+  header.style.cssText = 'font-weight:700;font-size:13px;';
+  header.textContent = t('Edit Link / Embed');
+  pop.appendChild(header);
+
+  const mkInput = (labelText, initialValue, type = 'text', placeholder = '') => {
+    const wrap = document.createElement('label');
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:3px;font-size:11.5px;';
+    const lbl = document.createElement('span');
+    lbl.textContent = labelText;
+    const inp = document.createElement('input');
+    inp.type = type;
+    inp.value = initialValue ?? '';
+    inp.placeholder = placeholder;
+    inp.style.cssText = 'padding:5px 7px;border-radius:5px;border:1px solid rgba(128,128,128,0.35);font-size:12.5px;';
+    wrap.append(lbl, inp);
+    pop.appendChild(wrap);
+    return inp;
+  };
+
+  const titleInput = mkInput(t('Target Board'), (b && b.name) || ref?.boardName || ref?.name || '', 'text', t('Board name'));
+  const pageInput = mkInput(t('Page Number (optional)'), ref?.page > 0 ? String(ref.page) : '', 'number', '1');
+  const aliasInput = mkInput(t('Display Alias (optional)'), ref?.alias || '', 'text', t('Custom label'));
+
+  const embedWrap = document.createElement('label');
+  embedWrap.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-top:2px;';
+  const embedChk = document.createElement('input');
+  embedChk.type = 'checkbox';
+  embedChk.checked = !!ref?.embed;
+  const embedLbl = document.createElement('span');
+  embedLbl.textContent = t('Embed in place (![[...]])');
+  embedWrap.append(embedChk, embedLbl);
+  pop.appendChild(embedWrap);
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;justify-content: flex-end;gap:6px;margin-top:6px;';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn';
+  cancelBtn.textContent = t('Cancel');
+  cancelBtn.addEventListener('click', () => pop.remove());
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'btn primary';
+  saveBtn.textContent = t('Save');
+  saveBtn.addEventListener('click', () => {
+    const newBoardName = titleInput.value.trim() || '?';
+    const newPage = Math.max(0, parseInt(pageInput.value, 10) || 0);
+    const newAlias = aliasInput.value.trim();
+    const isEmbed = embedChk.checked;
+    const found = lookupBoard({ name: newBoardName });
+    const updatedRef = {
+      id: found ? found.id : (ref?.id || fallbackIdFromTitle(newBoardName)),
+      name: newAlias || newBoardName,
+      boardName: newBoardName,
+      alias: newAlias,
+      page: newPage,
+      embed: isEmbed
+    };
+
+    if (typeof onSave === 'function') {
+      onSave(updatedRef);
+    } else if (ownerObj && app?.store) {
+      if (ownerObj.type === 'boardlink') {
+        app.store.update(ownerObj.id, { board: updatedRef }, 'edit link');
+      } else if (typeof ownerObj.text === 'string') {
+        const nextTok = refToken(updatedRef);
+        const spans = refSpans(ownerObj.text);
+        const targetSpan = spans.find((sp) => sp.id === ref.id || sp.name === ref.name);
+        if (targetSpan) {
+          const nextText = ownerObj.text.slice(0, targetSpan.start) + nextTok + ownerObj.text.slice(targetSpan.end);
+          app.store.update(ownerObj.id, { text: nextText }, 'edit link');
+        }
+      }
+      app.surface?.invalidate();
+    }
+    pop.remove();
+  });
+
+  btnRow.append(cancelBtn, saveBtn);
+  pop.appendChild(btnRow);
+  document.body.appendChild(pop);
+  setTimeout(() => titleInput.focus(), 0);
 }

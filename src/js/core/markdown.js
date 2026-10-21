@@ -1,17 +1,20 @@
 /**
- * GazBoard v4.8.12 — Pure-JS Obsidian Markdown & Wikilinks Engine
+ * GazBoard v4.8.13 — Pure-JS Obsidian Markdown, Embeds, Hashtags & Wikilinks Engine
  * Zero native dependencies. Produces strict XHTML for SVG <foreignObject>
  * Canvas2D caching and interactive Live Preview DOM overlays.
  */
 
-export const WIKILINK_RE = /\[\[([^\]|#\n]+)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
+export const EMBED_WIKILINK_RE = /!\[\[([^\]|#\n]+)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
+export const WIKILINK_RE = /(?<!!)\[\[([^\]|#\n]+)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
+export const EMBED_BOARDREF_RE = /@!\[([^\]\n]+)\]\(b:([a-zA-Z0-9_-]+)(?:#(\d{1,4}))?\)/g;
 export const BOARDREF_RE = /@\[([^\]\n]+)\]\(b:([a-zA-Z0-9_-]+)(?:#(\d{1,4}))?\)/g;
 export const CALLOUT_HEADER_RE = /^\[!([A-Za-z]+)\]([+-])?\s*(.*)$/;
 export const TASK_LINE_RE = /^([ \t]*)[-*+]\s+\[([ xX])\]\s+(.*)$/;
 export const DISPLAY_MATH_RE = /\$\$([\s\S]+?)\$\$/g;
 export const INLINE_MATH_RE = /(?:^|(?<=[^$\\]))\$([^\$\n]+?)\$/g;
+export const HASHTAG_RE = /(?:^|(?<=[\s(\[{"']))#([a-zA-Z][a-zA-Z0-9_\-/]*)/g;
 
-const CALLOUT_TYPES = new Set([
+export const CALLOUT_TYPES = new Set([
   'note', 'tip', 'warning', 'danger', 'info', 'success',
   'question', 'bug', 'example', 'quote', 'abstract', 'todo'
 ]);
@@ -31,7 +34,7 @@ const CALLOUT_ICONS = {
   todo: '☑️'
 };
 
-const MD_HEURISTIC_RE = /(?:^|\n)\s*(?:#{1,6}\s+|>\s+|[-*+]\s+(?:[[ xX]]\s+)?|\d+\.\s+|\|.+\|)|(?:\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~]+~~|`[^`\n]+`|<u>[\s\S]+?<\/u>|\$\$[\s\S]+?\$\$|\$[^$\n]+\$|\[\[[^\]]+\]\]|@\[[^\]]+\]\(b:)/;
+const MD_HEURISTIC_RE = /(?:^|\n)\s*(?:#{1,6}\s+|>\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+\.\s+|\|.+\|)|(?:\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~]+~~|`[^`\n]+`|<u>[\s\S]+?<\/u>|\$\$[\s\S]+?\$\$|\$[^$\n]+\$|!?\[\[[^\]]+\]\]|@!?\[[^\]]+\]\(b:|(?:^|[\s(\[{"'])#[a-zA-Z][a-zA-Z0-9_\-/]*)/;
 
 /**
  * Fast check to determine if a text string contains Markdown or Obsidian syntax.
@@ -59,6 +62,43 @@ export function escapeXhtml(str) {
 }
 
 /**
+ * Extracts all `#hashtag` tokens from a Markdown string (ignoring fenced code blocks
+ * and inline code spans) and returns their frequency counts.
+ *
+ * @param {string} markdownText
+ * @returns {Record<string, number>}
+ */
+export function countTags(markdownText) {
+  const counts = {};
+  if (!markdownText || typeof markdownText !== 'string') return counts;
+
+  // Strip fenced code blocks and inline code before scanning for tags
+  const cleaned = markdownText
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`\n]+`/g, ' ')
+    .replace(/\$\$[\s\S]*?\$\$/g, ' ')
+    .replace(/\$[^$\n]+\$/g, ' ');
+
+  HASHTAG_RE.lastIndex = 0;
+  let m;
+  while ((m = HASHTAG_RE.exec(cleaned))) {
+    const tag = m[1];
+    counts[tag] = (counts[tag] || 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * Extracts unique `#hashtag` strings from Markdown text, ordered by frequency.
+ * @param {string} markdownText
+ * @returns {string[]}
+ */
+export function extractTags(markdownText) {
+  const counts = countTags(markdownText);
+  return Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+}
+
+/**
  * Renders TeX math via bundled offline KaTeX if available, or clean XHTML fallback.
  * @param {string} tex
  * @param {boolean} displayMode
@@ -74,7 +114,6 @@ export function renderMathToXhtml(tex, displayMode = false) {
         throwOnError: false,
         output: 'htmlAndMathml'
       });
-      // Ensure self-closing tags for strict XML inside <foreignObject>
       return html.replace(/<(img|br|hr|input|col|area|base|link|meta|param|source|track|wbr)([^>]*?)(?<!\/)>/gi, '<$1$2 />');
     } catch (_) {
       // Fall through to safe fallback
@@ -86,18 +125,29 @@ export function renderMathToXhtml(tex, displayMode = false) {
 }
 
 /**
+ * Renders an embedded board transclusion block (`![[Board#Page|Alias]]` or `@![Label](b:id#page)`).
+ */
+function renderEmbedCardXhtml({ boardId = '', target = '', page = '', label = '' }) {
+  const displayLabel = label || (page ? `${target} › Page ${page}` : target);
+  const pageBadge = page ? `<span class="gb-embed-page">P${escapeXhtml(page)}</span>` : '';
+  const dataId = boardId ? ` data-board-id="${escapeXhtml(boardId)}"` : '';
+  const dataPage = page ? ` data-page="${escapeXhtml(page)}"` : '';
+  const dataTarget = target ? ` data-wikilink="${escapeXhtml(target)}"` : '';
+  return (
+    `<span class="gb-embed-card" data-embed="true"${dataId}${dataPage}${dataTarget}>` +
+      `<span class="gb-embed-icon">⊞</span>` +
+      `<span class="gb-embed-title">${escapeXhtml(displayLabel)}</span>` +
+      pageBadge +
+    `</span>`
+  );
+}
+
+/**
  * Parses inline Markdown tokens into strict XHTML.
- * Order of precedence:
- * 1. Escaped characters & Inline Code (`code`)
- * 2. Inline Math ($...$)
- * 3. Native Board Refs (@[Label](b:id#page)) & Obsidian Wikilinks ([[Board#Page|Alias]])
- * 4. Standard Markdown Links ([label](url)), including obsidian:// protocol
- * 5. Safe <u>...</u> underline tags
- * 6. Bold (**...**), Italic (*...*), Strikethrough (~~...~~)
  *
  * @param {string} text
  * @param {Object} [options]
- * @param {(title: string, page?: string, alias?: string) => {id?: string, href?: string, label: string}} [options.resolveWikilink]
+ * @param {(title: string, page?: string, alias?: string, embed?: boolean) => {id?: string, href?: string, label: string}} [options.resolveWikilink]
  * @returns {string}
  */
 export function renderInlineMarkdown(text, options = {}) {
@@ -125,7 +175,35 @@ export function renderInlineMarkdown(text, options = {}) {
     stash(renderMathToXhtml(tex, false))
   );
 
-  // 3a. Native GazBoard tokens: @[Label](b:boardId#page)
+  // 3a. Native GazBoard Embed tokens: @![Label](b:boardId#page)
+  src = src.replace(EMBED_BOARDREF_RE, (_, label, boardId, page) =>
+    stash(renderEmbedCardXhtml({ boardId, target: label, page: page || '', label }))
+  );
+
+  // 3b. Obsidian Embed Wikilinks: ![[Board Name#Page|Alias]]
+  src = src.replace(EMBED_WIKILINK_RE, (_, rawTarget, rawAnchor, rawAlias) => {
+    const target = rawTarget.trim();
+    const anchor = rawAnchor ? rawAnchor.trim() : '';
+    const alias = rawAlias ? rawAlias.trim() : '';
+
+    if (typeof options.resolveWikilink === 'function') {
+      const resolved = options.resolveWikilink(target, anchor, alias, true);
+      if (resolved) {
+        return stash(
+          renderEmbedCardXhtml({
+            boardId: resolved.id || '',
+            target,
+            page: anchor,
+            label: alias || resolved.label || target
+          })
+        );
+      }
+    }
+    const defaultLabel = alias || (anchor ? `${target} › ${anchor}` : target);
+    return stash(renderEmbedCardXhtml({ target, page: anchor, label: defaultLabel }));
+  });
+
+  // 3c. Native GazBoard link tokens: @[Label](b:boardId#page)
   src = src.replace(BOARDREF_RE, (_, label, boardId, page) => {
     const pageSuffix = page ? `#${escapeXhtml(page)}` : '';
     const dataPage = page ? ` data-page="${escapeXhtml(page)}"` : '';
@@ -134,14 +212,14 @@ export function renderInlineMarkdown(text, options = {}) {
     );
   });
 
-  // 3b. Obsidian Wikilinks: [[Board Name#Page|Alias]]
+  // 3d. Obsidian Wikilinks: [[Board Name#Page|Alias]]
   src = src.replace(WIKILINK_RE, (_, rawTarget, rawAnchor, rawAlias) => {
     const target = rawTarget.trim();
     const anchor = rawAnchor ? rawAnchor.trim() : '';
     const alias = rawAlias ? rawAlias.trim() : '';
 
     if (typeof options.resolveWikilink === 'function') {
-      const resolved = options.resolveWikilink(target, anchor, alias);
+      const resolved = options.resolveWikilink(target, anchor, alias, false);
       if (resolved) {
         const boardAttr = resolved.id ? ` data-board-id="${escapeXhtml(resolved.id)}"` : '';
         const anchorAttr = anchor ? ` data-anchor="${escapeXhtml(anchor)}"` : '';
@@ -152,7 +230,7 @@ export function renderInlineMarkdown(text, options = {}) {
     }
 
     const defaultLabel = alias || (anchor ? `${target} > ${anchor}` : target);
-    const href = `b:${ target }${anchor ? '#' + anchor : ''}`;
+    const href = `b:${target}${anchor ? '#' + anchor : ''}`;
     const anchorAttr = anchor ? ` data-anchor="${escapeXhtml(anchor)}"` : '';
     return stash(
       `<a class="gb-wikilink" href="${escapeXhtml(href)}" data-wikilink="${escapeXhtml(target)}"${anchorAttr}>${escapeXhtml(defaultLabel)}</a>`
@@ -167,7 +245,7 @@ export function renderInlineMarkdown(text, options = {}) {
     const isObsidianUri = /^obsidian:\/\//i.test(trimmedUrl);
     const cls = isObsidianUri ? 'gb-obsidian-uri' : 'gb-ext-link';
     return stash(
-      `<a class="${cls}" href="${safeHref}">${ renderInlineMarkdown(label, options) }</a>`
+      `<a class="${cls}" href="${safeHref}">${renderInlineMarkdown(label, options)}</a>`
     );
   });
 
@@ -176,10 +254,15 @@ export function renderInlineMarkdown(text, options = {}) {
     stash(`<u>${renderInlineMarkdown(inner, options)}</u>`)
   );
 
+  // 6. Hashtags: #tag
+  src = src.replace(HASHTAG_RE, (_, tag) =>
+    stash(`<span class="gb-hashtag" data-tag="${escapeXhtml(tag)}">#${escapeXhtml(tag)}</span>`)
+  );
+
   // Escape any remaining raw XML characters before applying emphasis
   src = escapeXhtml(src);
 
-  // 6. Bold + Italic (***text***)
+  // 7. Bold + Italic (***text***)
   src = src.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
   // Bold (**text**)
   src = src.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
@@ -196,8 +279,6 @@ export function renderInlineMarkdown(text, options = {}) {
 
 /**
  * Splits a GFM table row into cells.
- * @param {string} line
- * @returns {string[]}
  */
 function splitTableCells(line) {
   let trimmed = line.trim();
@@ -207,9 +288,7 @@ function splitTableCells(line) {
 }
 
 /**
- * Checks if a line is a valid GFM table delimiter row (e.g., | :--- | :---: | ---: |).
- * @param {string} line
- * @returns {Array<'left'|'center'|'right'|null>|null}
+ * Checks if a line is a valid GFM table delimiter row.
  */
 function parseTableDelimiter(line) {
   if (!line || !line.includes('|')) return null;
@@ -228,9 +307,6 @@ function parseTableDelimiter(line) {
 
 /**
  * Minimal pure-JS syntax highlighter for fenced code blocks.
- * Emits strict XHTML spans.
- * @param {string} code
- * @returns {string}
  */
 function highlightCodeXhtml(code) {
   const escaped = escapeXhtml(code);
@@ -242,8 +318,6 @@ function highlightCodeXhtml(code) {
 
 /**
  * Parses a full Markdown document into an AST with line numbers preserved.
- * @param {string} markdownText
- * @returns {Array<Object>}
  */
 export function parseMarkdownAST(markdownText) {
   const raw = String(markdownText ?? '').replace(/\r\n?/g, '\n');
@@ -271,7 +345,7 @@ export function parseMarkdownAST(markdownText) {
         codeLines.push(lines[i]);
         i++;
       }
-      if (i < lines.length) i++; // skip closing fence
+      if (i < lines.length) i++;
       ast.push({
         type: 'codeblock',
         lang,
@@ -377,7 +451,7 @@ export function parseMarkdownAST(markdownText) {
       if (aligns) {
         const startLine = i;
         const headers = splitTableCells(line);
-        i += 2; // advance past header and delimiter
+        i += 2;
         const rows = [];
         while (i < lines.length && lines[i].includes('|') && !/^\s*$/.test(lines[i])) {
           rows.push(splitTableCells(lines[i]));
@@ -482,12 +556,7 @@ export function parseMarkdownAST(markdownText) {
 }
 
 /**
- * Renders parsed Markdown AST or string into strict XHTML suitable for both
- * SVG <foreignObject> and Live Preview DOM overlays.
- *
- * @param {string} markdownText
- * @param {Object} [options]
- * @returns {string}
+ * Renders parsed Markdown AST into strict XHTML.
  */
 export function renderMarkdownToHtml(markdownText, options = {}) {
   const ast = parseMarkdownAST(markdownText);
@@ -618,10 +687,6 @@ export function renderMarkdownToHtml(markdownText, options = {}) {
 
 /**
  * Extracts all task checklist items with their 0-based line indices.
- * Used by hit.js and textedit.js to toggle checkboxes on canvas tap.
- *
- * @param {string} markdownText
- * @returns {Array<{line: number, checked: boolean, indent: number, text: string}>}
  */
 export function extractTaskItems(markdownText) {
   const lines = String(markdownText ?? '').replace(/\r\n?/g, '\n').split('\n');
@@ -642,10 +707,6 @@ export function extractTaskItems(markdownText) {
 
 /**
  * Toggles a Markdown task item (`- [ ]` <-> `- [x]`) at a specific 0-based line index.
- *
- * @param {string} markdownText
- * @param {number} lineIndex
- * @returns {{text: string, toggled: boolean, checked?: boolean}}
  */
 export function toggleTaskAtLine(markdownText, lineIndex) {
   const raw = String(markdownText ?? '');
@@ -673,8 +734,6 @@ export function toggleTaskAtLine(markdownText, lineIndex) {
 
 /**
  * Generates self-contained inline CSS for the SVG <foreignObject> renderer.
- * Having styles inline prevents Chromium security restrictions from stripping
- * styles inside an HTMLImageElement data URI.
  */
 export function getMarkdownInlineCss({
   color = '#1e293b',
@@ -754,10 +813,11 @@ export function getMarkdownInlineCss({
       font-weight: 700;
       margin-bottom: 4px;
     }
-    .callout-tip, .callout-success { border-left-color: #10b981; background: rgba(16, 185, 129, 0.1); }
-    .callout-warning { border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
+    .callout-tip, .callout-success, .callout-todo { border-left-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+    .callout-warning, .callout-question { border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
     .callout-danger, .callout-bug { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.12); }
-    .callout-info { border-left-color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
+    .callout-info, .callout-abstract { border-left-color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
+    .callout-example, .callout-quote { border-left-color: #8b5cf6; background: rgba(139, 92, 246, 0.1); }
     .gb-md-list { margin: 0.35em 0; padding-left: 1.4em; }
     .gb-task-list { list-style: none; padding-left: 0.2em; }
     .gb-task-item { display: flex; align-items: baseline; gap: 0.45em; margin: 0.2em 0; }
@@ -779,6 +839,34 @@ export function getMarkdownInlineCss({
       text-decoration: underline;
       font-weight: 500;
     }
+    .gb-embed-card {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      margin: 2px 0;
+      border-radius: 6px;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      background: rgba(99, 102, 241, 0.1);
+      color: #4f46e5;
+      font-weight: 600;
+      font-size: 0.9em;
+    }
+    .gb-embed-page {
+      font-size: 0.8em;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(99, 102, 241, 0.18);
+    }
+    .gb-hashtag {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 10px;
+      background: rgba(0, 120, 212, 0.12);
+      color: #0078d4;
+      font-size: 0.88em;
+      font-weight: 600;
+    }
     .gb-math-block, .gb-mathblock-wrap {
       margin: 0.4em 0;
       text-align: center;
@@ -793,17 +881,6 @@ export function getMarkdownInlineCss({
 
 /**
  * Builds an SVG <foreignObject> data URI for sharp Canvas2D rendering.
- *
- * @param {string} markdownText
- * @param {Object} options
- * @param {number} options.width
- * @param {number} options.height
- * @param {string} [options.color]
- * @param {number} [options.fontSize]
- * @param {string} [options.fontFamily]
- * @param {'left'|'center'|'right'} [options.align]
- * @param {Function} [options.resolveWikilink]
- * @returns {string}
  */
 export function buildMarkdownSvgDataUri(markdownText, options = {}) {
   const width = Math.max(40, Math.ceil(options.width || 320));
