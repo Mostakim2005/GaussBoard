@@ -593,6 +593,118 @@ body.presenting #backPill { top: 12px; }
 .menu-item.danger { color: var(--danger); }
 .menu-item.active-mode { background: var(--accent-soft); color: var(--accent); }
 
+/* Glassmorphism Extended Ribbon Menu Card Styles */
+.menu-glass {
+  background: var(--surface-glass, rgba(28, 32, 38, 0.92)) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--stroke-glass, rgba(255, 255, 255, 0.12)) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4) !important;
+  padding: 8px !important;
+}
+
+.menu-card-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  background: var(--card-glass-bg, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--card-glass-border, rgba(255, 255, 255, 0.06));
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.menu-card-row:hover {
+  background: var(--card-glass-hover, rgba(255, 255, 255, 0.08));
+  border-color: var(--card-glass-hover-border, rgba(255, 255, 255, 0.16));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.menu-action-zone {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--text);
+  border-radius: 9px 0 0 9px;
+  transition: background 0.15s ease;
+}
+
+.menu-action-zone.standalone {
+  border-radius: 9px;
+  width: 100%;
+}
+
+.menu-action-zone:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.menu-action-zone:active {
+  transform: scale(0.985);
+}
+
+.menu-action-zone .k {
+  margin-left: auto;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: var(--text-2);
+  background: rgba(128, 128, 128, 0.18);
+  padding: 1px 5px;
+  border-radius: 6px;
+}
+
+.menu-card-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--stroke-glass, rgba(255, 255, 255, 0.1));
+  flex-shrink: 0;
+}
+
+.menu-pin-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 36px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 0 9px 9px 0;
+  font-size: 14px;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
+}
+
+.menu-pin-zone.pinned {
+  background: rgba(0, 229, 255, 0.12);
+  color: #00e5ff;
+}
+
+.menu-pin-zone:not(.pinned) {
+  opacity: 0.45;
+}
+
+.menu-pin-zone:hover {
+  opacity: 1 !important;
+  transform: scale(1.18);
+  background: rgba(0, 229, 255, 0.2);
+}
+
+.menu-pin-zone:active {
+  transform: scale(0.92);
+}
+
 .toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
 .toggle input { appearance: none; width: 34px; height: 18px; border-radius: 10px; background: var(--stroke-2); position: relative; transition: background .15s; }
 .toggle input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .15s; }

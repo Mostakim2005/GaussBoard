@@ -149,16 +149,18 @@ export function initToolbar(app) {
 
   /* ---- the pen tray ---- */
   for (const pen of PENS) {
-    const b = h('button', { class: 'pen', title: t('{pen} ({n}) \u2014 click again for thickness', { pen: pen.label, n: PENS.indexOf(pen) + 1 }) });
+    const penIndex = PENS.indexOf(pen) + 1;
+    const penRibbonId = 'pen:' + pen.id;
+    const b = h('button', { class: 'pen', title: t('{pen} ({n}) \u2014 click again for thickness', { pen: pen.label, n: penIndex }) });
     b.dataset.pen = pen.id;
-    b.dataset.ribbonId = 'pen';
+    b.dataset.ribbonId = penRibbonId;
     if (pen.id === 'black') b.dataset.tool = 'pen';       // the canonical pen button
     // every pen wears its own number: 1-6 reach them directly, which is the
     // whole point of putting the keys on the buttons
     const now = penById(app.settings, pen.id) || pen;
     // the barrel is a preview of the ink, so it follows it onto a dark board
     b.innerHTML = penIcon(inkPaint(now.color), now.effect) + '<span class="size-dot"></span>'
-      + `<span class="kbd">${PENS.indexOf(pen) + 1}</span>`;
+      + `<span class="kbd">${penIndex}</span>`;
     b.dataset.paint = now.color + '|' + now.effect;
     b.addEventListener('click', () => choosePen(app, pen.id, b));
     bar.appendChild(b);
@@ -182,9 +184,11 @@ export function initToolbar(app) {
   sep('2');
 
   iconTool({ ribbonId: 'ruler', cmd: 'ruler', icon: 'ruler', title: t('Ruler (Ctrl+R)'), onClick: () => app.command('ruler') });
-  iconTool({ ribbonId: 'text', tool: 'text', icon: 'text', dot: true, key: 'T', title: t('Text (T) \u2014 click again for font and size'),
+  iconTool({ ribbonId: 'text', tool: 'text', icon: 'text', dot: true, key: 'T',
+    title: t('Text Box (T) \u2014 click canvas to write notes or markdown; click again for font & size'),
     onClick: toggleTool('text') });
-  iconTool({ ribbonId: 'note', tool: 'note', icon: 'note', dot: true, key: 'N', title: t('Sticky note (N) \u2014 click again for colours'),
+  iconTool({ ribbonId: 'note', tool: 'note', icon: 'note', dot: true, key: 'N',
+    title: t('Sticky Note (N) \u2014 click canvas to place a note card; click again for colours'),
     onClick: toggleTool('note') });
   iconTool({ ribbonId: 'shape', tool: 'shape', icon: 'shapes', dot: true, key: 'S', title: t('Shapes (S)'),
     onClick: (e, b) => { app.setTool('shape'); app.syncUI(); openToolPopover(app, b, 'shape'); } });
@@ -260,7 +264,9 @@ export function syncRibbonTools(app) {
 
   bar.querySelectorAll('[data-ribbon-id]').forEach((el) => {
     const id = el.dataset.ribbonId;
-    el.style.display = hidden.has(id) ? 'none' : '';
+    const isPen = id.startsWith('pen:');
+    const isHidden = hidden.has(id) || (isPen && hidden.has('pen'));
+    el.style.display = isHidden ? 'none' : '';
   });
 
   const slot = document.getElementById('pinnedToolsSlot');
@@ -272,7 +278,8 @@ export function syncRibbonTools(app) {
   const sep1 = bar.querySelector('[data-sep="1"]');
   if (sep1) sep1.style.display = group1 ? '' : 'none';
 
-  const group2 = ['pen', 'highlighter', 'tape', 'eraser'].some((id) => !hidden.has(id));
+  const hasVisiblePen = PENS.some((p) => !hidden.has('pen:' + p.id) && !hidden.has('pen'));
+  const group2 = hasVisiblePen || ['highlighter', 'tape', 'eraser'].some((id) => !hidden.has(id));
   const sep2 = bar.querySelector('[data-sep="2"]');
   if (sep2) sep2.style.display = group2 ? '' : 'none';
 }
@@ -1145,33 +1152,45 @@ export function openToolPopover(app, anchor, tool) {
 
 /* ------------------------------------------------------------------ */
 function menuItem(label, iconName, onClick, opts = {}) {
-  let pinBtn = null;
-  if (opts.pinKey) {
-    pinBtn = h('span', {
-      class: 'menu-pin' + (opts.isPinned ? ' pinned' : ''),
-      title: opts.isPinned ? t('Unpin from ribbon') : t('Pin to ribbon'),
-      style: `margin-left:auto;padding:2px 6px;cursor:pointer;opacity:${opts.isPinned ? '1' : '0.35'};font-size:13px;display:flex;align-items:center;transition:opacity .15s;`
-    }, opts.isPinned ? '📌' : '📍');
-    pinBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      opts.onTogglePin?.(pinBtn);
-    });
-  }
-
-  const b = h('button', { class: 'menu-item' + (opts.danger ? ' danger' : '') },
-    h('span', { html: icon(iconName, 17), style: 'display:flex' }),
-    h('span', {}, label),
-    opts.key ? h('span', { class: 'k' }, opts.key) : null,
-    pinBtn
+  const actionBtn = h('button', {
+    type: 'button',
+    class: 'menu-action-zone' + (opts.pinKey ? '' : ' standalone') + (opts.danger ? ' danger' : ''),
+    title: label
+  },
+    h('span', { html: icon(iconName, 17), style: 'display:flex;align-items:center;' }),
+    h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' }, label),
+    opts.key ? h('span', { class: 'k' }, opts.key) : null
   );
-  if (opts.disabled) b.setAttribute('disabled', '');
-  b.addEventListener('click', (e) => {
-    if (e.target.closest('.menu-pin')) return;
+  if (opts.disabled) actionBtn.setAttribute('disabled', '');
+  actionBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     closePopover();
     onClick();
   });
-  return b;
+
+  if (!opts.pinKey) {
+    const card = h('div', { class: 'menu-card-row' }, actionBtn);
+    return card;
+  }
+
+  const pinBtn = h('button', {
+    type: 'button',
+    class: 'menu-pin-zone' + (opts.isPinned ? ' pinned' : ''),
+    title: opts.isPinned ? t('Unpin from ribbon') : t('Pin to ribbon'),
+  }, opts.isPinned ? '📌' : '📍');
+
+  pinBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    opts.onTogglePin?.(pinBtn);
+  });
+
+  const card = h('div', { class: 'menu-card-row' },
+    actionBtn,
+    h('div', { class: 'menu-card-sep' }),
+    pinBtn
+  );
+  return card;
 }
 
 /** The teaching kit, the same three wherever a menu offers them. */
@@ -1256,8 +1275,8 @@ export function openInsertPopover(app, anchor) {
     });
   };
 
-  const body = h('div', { class: 'menu', style: 'max-height:80vh;overflow-y:auto;' },
-    h('div', { class: 'menu-title', style: 'padding:4px 8px;font-size:11px;font-weight:700;color:var(--text-3,rgba(0,0,0,0.5));text-transform:uppercase;letter-spacing:0.5px;' }, t('Insert objects')),
+  const body = h('div', { class: 'menu menu-glass', style: 'max-height:82vh;overflow-y:auto;min-width:280px;' },
+    h('div', { class: 'menu-title', style: 'padding:4px 8px;font-size:11px;font-weight:700;color:var(--text-3,rgba(128,128,128,0.7));text-transform:uppercase;letter-spacing:0.5px;' }, t('Insert objects')),
     insertItem(t('Markdown note…'), 'text', () => app.insertMarkdownCard?.(), 'insert.markdown'),
     insertItem(t('Page margins…'), 'palette', () => app.openPageMarginDialog?.(), 'page.margin'),
     insertItem(t('Image…'), 'image', () => app.command('insert.image'), 'insert.image'),
@@ -1273,18 +1292,27 @@ export function openInsertPopover(app, anchor) {
     h('div', { class: 'menu-sep' }),
     menuItem(t('Paste from clipboard'), 'copy', () => app.command('edit.paste'), { key: 'Ctrl+V' }),
     h('div', { class: 'menu-sep' }),
-    h('div', { class: 'menu-title', style: 'padding:4px 8px;font-size:11px;font-weight:700;color:var(--text-3,rgba(0,0,0,0.5));text-transform:uppercase;letter-spacing:0.5px;' }, t('Ribbon tools')),
+    h('div', { class: 'menu-title', style: 'padding:4px 8px;font-size:11px;font-weight:700;color:var(--text-3,rgba(128,128,128,0.7));text-transform:uppercase;letter-spacing:0.5px;' }, t('Ribbon tools')),
     ribbonToolItem(t('Select'), 'select', () => app.setTool('select'), 'select', 'V'),
     ribbonToolItem(t('Lasso select'), 'lasso', () => app.setTool('lasso'), 'lasso', 'L'),
     ribbonToolItem(t('Pan canvas'), 'hand', () => app.setTool('pan'), 'pan', 'G'),
     ribbonToolItem(t('Laser pointer'), 'laser', () => app.setTool('laser'), 'laser', 'X'),
-    ribbonToolItem(t('Pens'), 'pen', () => app.setTool('pen'), 'pen', '1-6'),
+    ...PENS.map((pen, idx) => {
+      const penId = 'pen:' + pen.id;
+      return ribbonToolItem(
+        t('Pen {n} ({color})', { n: idx + 1, color: t(pen.label) }),
+        'pen',
+        () => choosePen(app, pen.id),
+        penId,
+        String(idx + 1)
+      );
+    }),
     ribbonToolItem(t('Highlighter'), 'highlighter', () => { app.setTool('highlighter'); app.syncUI(); }, 'highlighter', 'H'),
     ribbonToolItem(t('Study Tape'), 'curtain', () => { app.setTool('tape'); app.syncUI(); }, 'tape'),
     ribbonToolItem(t('Eraser'), 'eraser', () => { app.setTool('eraser'); app.syncUI(); }, 'eraser', 'E'),
     ribbonToolItem(t('Ruler'), 'ruler', () => app.command('ruler'), 'ruler', 'Ctrl+R'),
-    ribbonToolItem(t('Text'), 'text', () => { app.setTool('text'); app.syncUI(); }, 'text', 'T'),
-    ribbonToolItem(t('Sticky note'), 'note', () => { app.setTool('note'); app.syncUI(); }, 'note', 'N'),
+    ribbonToolItem(t('Text Box'), 'text', () => { app.setTool('text'); app.syncUI(); }, 'text', 'T'),
+    ribbonToolItem(t('Sticky Note'), 'note', () => { app.setTool('note'); app.syncUI(); }, 'note', 'N'),
     ribbonToolItem(t('Shapes'), 'shapes', () => { app.setTool('shape'); app.syncUI(); openToolPopover(app, anchor, 'shape'); }, 'shape', 'S'),
     ribbonToolItem(t('Emoji'), 'emoji', () => { app.setTool('emoji'); app.syncUI(); openToolPopover(app, anchor, 'emoji'); }, 'emoji')
   );
@@ -1292,7 +1320,7 @@ export function openInsertPopover(app, anchor) {
 }
 
 export function openMorePopover(app, anchor) {
-  const body = h('div', { class: 'menu' },
+  const body = h('div', { class: 'menu menu-glass' },
     menuItem(t('Templates…'), 'template', () => app.panels.templates()),
     menuItem(t('Canvas…'), 'palette', () => app.panels.background()),
     menuItem(app.ruler.visible ? t('Hide ruler') : t('Show ruler'), 'ruler', () => app.command('ruler'), { key: 'Ctrl+R' }),
@@ -1316,7 +1344,7 @@ export function openMorePopover(app, anchor) {
 }
 
 export function openExportPopover(app, anchor) {
-  const body = h('div', { class: 'menu' },
+  const body = h('div', { class: 'menu menu-glass' },
     menuItem(t('Export board as PNG…'), 'image', () => app.command('export.png')),
     menuItem(t('Export selection as PNG…'), 'image', () => app.command('export.pngSelection'), { disabled: !app.surface.selection.size }),
     menuItem(t('Export as PDF…'), 'doc', () => app.command('export.pdf')),

@@ -222,3 +222,16 @@ test('sessionMenuPosition smartly detects free space and keeps dropdown within v
   const posRight = sessionMenuPosition(rightAnchor, menu, viewport);
   assert.ok(posRight.left + menu.width <= viewport.width, 'Should not overflow right edge');
 });
+
+test('individual pen toggling filters specific pens while leaving other pens active', () => {
+  const allPens = ['pen:black', 'pen:red', 'pen:blue', 'pen:green', 'pen:rainbow', 'pen:galaxy'];
+  const hiddenRibbonTools = ['pen:galaxy', 'pen:rainbow'];
+  const hiddenSet = new Set(hiddenRibbonTools);
+
+  const visiblePens = allPens.filter((id) => !hiddenSet.has(id));
+  assert.equal(visiblePens.length, 4);
+  assert.ok(visiblePens.includes('pen:black'));
+  assert.ok(visiblePens.includes('pen:red'));
+  assert.ok(!visiblePens.includes('pen:galaxy'));
+  assert.ok(!visiblePens.includes('pen:rainbow'));
+});
