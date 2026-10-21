@@ -289,7 +289,7 @@ export class ReplayBar {
     // 8. Scratch-Out Toggle Button
     this.btnScratch = h('button', {
       class: 'rb-btn rb-scratch',
-      title: t('Gesture Scratch-Out Eraser (Click to toggle on/off)'),
+      title: t('Gesture Scratch-Out Eraser (Click to toggle on/off, right-click for settings)'),
       style: 'display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:18px;font-size:12px;color:var(--text-2,rgba(128,128,128,0.85));transition:all 0.15s;',
       html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15l4-5 4 6 4-7 5 6"/><path d="M19 19l-4-4"/></svg>'
     });
@@ -297,13 +297,20 @@ export class ReplayBar {
       const active = this.app.settings?.scratchOut !== false;
       this.btnScratch.style.background = active ? 'rgba(0,120,212,0.14)' : 'none';
       this.btnScratch.style.color = active ? '#0078d4' : 'var(--text-2,rgba(128,128,128,0.45))';
-      this.btnScratch.title = active ? t('Scratch-Out Eraser: ON (Click to disable)') : t('Scratch-Out Eraser: OFF (Click to enable)');
+      this.btnScratch.title = active
+        ? t('Scratch-Out Eraser: ON (Click to toggle, right-click for settings & targets)')
+        : t('Scratch-Out Eraser: OFF (Click to toggle, right-click for settings & targets)');
     };
     this.btnScratch.addEventListener('click', () => {
       this.app.settings.scratchOut = !(this.app.settings?.scratchOut !== false);
       this.app.saveSettings();
       updateScratchUI();
       this.app.toast(this.app.settings.scratchOut ? t('Scratch-Out Eraser enabled') : t('Scratch-Out Eraser disabled'));
+    });
+    this.btnScratch.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.app?.panels?.settings?.();
     });
     setTimeout(updateScratchUI, 100);
 

@@ -4,8 +4,24 @@ export const SCRATCH_MIN_REVERSALS = 5;       // Digits '2', '3' and letters 'w'
 export const SCRATCH_MIN_DENSITY = 3.5;         // Scribbles retrace densely over same space (L / diagonal >= 3.5)
 export const SCRATCH_MAX_NET_PROGRESS = 0.35;   // Writing translates forward; scribbles stay in place
 
-export function isScratchGesture(points) {
-  if (!points || points.length < 12) return false;
+export function isScratchGesture(points, sensitivity = 'medium') {
+  if (!points) return false;
+
+  let minReversals = SCRATCH_MIN_REVERSALS; // 5
+  let minDensity = SCRATCH_MIN_DENSITY;     // 3.5
+  let minPoints = 12;
+
+  if (sensitivity === 'low') {
+    minReversals = 7;
+    minDensity = 4.5;
+    minPoints = 15;
+  } else if (sensitivity === 'high') {
+    minReversals = 4;
+    minDensity = 2.8;
+    minPoints = 10;
+  }
+
+  if (points.length < minPoints) return false;
   const first = points[0];
   const last = points[points.length - 1];
 
@@ -49,8 +65,8 @@ export function isScratchGesture(points) {
   const revD2 = countReversals((p) => (p.x - p.y) * 0.7071);
 
   const maxReversals = Math.max(revX, revY, revD1, revD2);
-  // Real scribbles require at least 5 back-and-forth zig-zags
-  if (maxReversals < SCRATCH_MIN_REVERSALS) return false;
+  // Real scribbles require back-and-forth zig-zags based on sensitivity
+  if (maxReversals < minReversals) return false;
 
   let totalPathLength = 0;
   for (let i = 1; i < points.length; i++) {
@@ -61,7 +77,7 @@ export function isScratchGesture(points) {
   if (diagonal < 14) return false;
 
   const density = totalPathLength / Math.max(1, diagonal);
-  if (density < SCRATCH_MIN_DENSITY) return false;
+  if (density < minDensity) return false;
 
   // Measure net spatial progression from start to end vs total path length
   // Handwriting moves forward across the word; scribbles stay centered over the ink being erased

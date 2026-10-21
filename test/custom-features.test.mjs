@@ -235,3 +235,47 @@ test('individual pen toggling filters specific pens while leaving other pens act
   assert.ok(!visiblePens.includes('pen:galaxy'));
   assert.ok(!visiblePens.includes('pen:rainbow'));
 });
+
+test('scribble targets guard text boxes and notes by default', () => {
+  const targets = { stroke: true, text: false, note: false, shape: false };
+  const mockObjects = [
+    { id: '1', type: 'stroke' },
+    { id: '2', type: 'text' },
+    { id: '3', type: 'note' },
+    { id: '4', type: 'shape' }
+  ];
+
+  const erasable = mockObjects.filter((o) => {
+    if (o.type === 'stroke') return targets.stroke !== false;
+    if (o.type === 'text') return !!targets.text;
+    if (o.type === 'note') return !!targets.note;
+    if (o.type === 'shape') return !!targets.shape;
+    return false;
+  });
+
+  assert.equal(erasable.length, 1);
+  assert.equal(erasable[0].id, '1');
+
+  // When text is explicitly enabled
+  targets.text = true;
+  const withText = mockObjects.filter((o) => {
+    if (o.type === 'stroke') return targets.stroke !== false;
+    if (o.type === 'text') return !!targets.text;
+    if (o.type === 'note') return !!targets.note;
+    if (o.type === 'shape') return !!targets.shape;
+    return false;
+  });
+  assert.equal(withText.length, 2);
+});
+
+test('scribble gesture honors sensitivity configuration', () => {
+  const moderateScratch = [];
+  for (let i = 0; i <= 10; i++) {
+    moderateScratch.push({ x: i % 2 ? 40 : 0, y: i * 4, t: i * 100 });
+  }
+
+  // Under 'low' sensitivity (strict), 10 points is insufficient
+  assert.equal(isScratchGesture(moderateScratch, 'low'), false);
+  // Under 'high' sensitivity (permissive), it passes
+  assert.equal(isScratchGesture(moderateScratch, 'high'), true);
+});

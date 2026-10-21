@@ -1791,13 +1791,24 @@ export class Interaction {
 
   offerScratchOut(a, e) {
     if (this.app?.settings?.scratchOut === false) return false;
+    const sensitivity = this.app?.settings?.scratchSensitivity || 'medium';
     // Support stylus, mouse, and touch for scratch-out gesture
-    if (!a.obj?.points || !isScratchGesture(a.obj.points)) return false;
+    if (!a.obj?.points || !isScratchGesture(a.obj.points, sensitivity)) return false;
 
     const box = bboxOfPoints(a.obj.points);
     const expand = 8;
     const hitBox = { x: box.x - expand, y: box.y - expand, w: box.w + expand * 2, h: box.h + expand * 2 };
-    const hits = inBox(this.store, hitBox, false).filter((o) => !o.locked && o.id !== a.obj.id);
+
+    const targets = this.app?.settings?.scratchTargets || { stroke: true, text: false, note: false, shape: false };
+    const hits = inBox(this.store, hitBox, false).filter((o) => {
+      if (o.locked || o.id === a.obj.id) return false;
+      const type = o.type;
+      if (type === 'stroke') return targets.stroke !== false;
+      if (type === 'text') return !!targets.text;
+      if (type === 'note') return !!targets.note;
+      if (type === 'shape') return !!targets.shape;
+      return false;
+    });
     if (!hits.length) return false;
 
     this.discardTapMark(); // Throw away the scribble mark without saving to store

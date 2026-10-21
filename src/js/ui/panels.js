@@ -1508,8 +1508,89 @@ export function createPanels(app) {
                   app.interaction.hideInkPointer(); }),
                 t('Off (default): drawing with a finger shows no pen nib, because your fingertip is already on the spot and the nib only hides under your hand. A stylus or a mouse on this machine still gets one. Switch on if you are on a Surface or another touchscreen PC and want the nib under your finger too.'))
             : null,
-          row(t('Gesture scratch-out eraser'), mkToggle(() => s.scratchOut !== false, (v) => (s.scratchOut = v)),
-            t('Scribble rapidly back and forth across strokes or text to erase them (StarNote style).')),
+          // Interactive Scribble-to-Erase Configuration Card
+          (() => {
+            const card = h('div', {
+              class: 'scribble-config-card',
+              style: 'margin-bottom:18px;padding:12px 14px;border-radius:14px;background:var(--surface-2,rgba(128,128,128,0.06));border:1px solid var(--stroke,rgba(128,128,128,0.15));display:flex;flex-direction:column;gap:10px;'
+            });
+
+            // Master switch row
+            const topRow = h('div', { style: 'display:flex;align-items:center;justify-content:space-between;' },
+              h('div', { style: 'display:flex;flex-direction:column;gap:2px;' },
+                h('span', { style: 'font-weight:600;font-size:13.5px;' }, t('Gesture scratch-out eraser')),
+                h('span', { style: 'font-size:11.5px;color:var(--text-2);' }, t('Scribble rapidly back and forth across objects to erase in place'))
+              ),
+              mkToggle(() => s.scratchOut !== false, (v) => {
+                s.scratchOut = v;
+                app.saveSettings();
+                bodyWrap.style.display = v ? 'flex' : 'none';
+              })
+            );
+            card.appendChild(topRow);
+
+            const bodyWrap = h('div', {
+              style: `display:${s.scratchOut !== false ? 'flex' : 'none'};flex-direction:column;gap:10px;margin-top:4px;padding-top:10px;border-top:1px solid var(--stroke,rgba(128,128,128,0.12));`
+            });
+
+            // Sensitivity row
+            const sensRow = h('div', { style: 'display:flex;flex-direction:column;gap:6px;' },
+              h('div', { style: 'font-size:12px;font-weight:600;color:var(--text-2);' }, t('Trigger sensitivity')),
+              mkChoice([
+                ['low', t('Low (Harder)')],
+                ['medium', t('Medium (Default)')],
+                ['high', t('High (Quick)')]
+              ], () => s.scratchSensitivity || 'medium', (v) => {
+                s.scratchSensitivity = v;
+                app.saveSettings();
+              })
+            );
+            bodyWrap.appendChild(sensRow);
+
+            // Targets row
+            if (!s.scratchTargets) s.scratchTargets = { stroke: true, text: false, note: false, shape: false };
+            const chipRow = h('div', { style: 'display:flex;flex-direction:column;gap:6px;' },
+              h('div', { style: 'font-size:12px;font-weight:600;color:var(--text-2);' }, t('Erasable targets (protects text & sticky notes by default)')),
+              h('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;' },
+                ...[
+                  { id: 'stroke', label: t('Ink Strokes') },
+                  { id: 'text', label: t('Text Boxes') },
+                  { id: 'note', label: t('Sticky Notes') },
+                  { id: 'shape', label: t('Shapes') }
+                ].map(({ id, label }) => {
+                  const isChecked = id === 'stroke' ? (s.scratchTargets.stroke !== false) : !!s.scratchTargets[id];
+                  const chip = h('button', {
+                    type: 'button',
+                    class: 'btn' + (isChecked ? ' primary' : ''),
+                    style: 'padding:3px 9px;font-size:11.5px;border-radius:12px;display:flex;align-items:center;gap:4px;'
+                  }, `${isChecked ? '✓ ' : ''}${label}`);
+                  chip.addEventListener('click', () => {
+                    const next = !((id === 'stroke') ? (s.scratchTargets.stroke !== false) : !!s.scratchTargets[id]);
+                    s.scratchTargets[id] = next;
+                    app.saveSettings();
+                    chip.classList.toggle('primary', next);
+                    chip.textContent = `${next ? '✓ ' : ''}${label}`;
+                  });
+                  return chip;
+                })
+              )
+            );
+            bodyWrap.appendChild(chipRow);
+
+            // Visual guide banner with SVG zig-zag demonstration
+            const guide = h('div', {
+              style: 'display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:8px;background:rgba(0,120,212,0.06);border:1px dashed rgba(0,120,212,0.25);font-size:11px;color:var(--text-2);'
+            },
+              h('svg', { viewBox: '0 0 60 24', width: '50', height: '20', fill: 'none', stroke: '#0078d4', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', style: 'flex-shrink:0;' },
+                h('path', { d: 'M4 12 L12 4 L20 20 L28 4 L36 20 L44 4 L52 20 L56 12' })
+              ),
+              h('span', {}, t('Example: Scribble 5+ quick back-and-forth zig-zags over ink to vaporize it without switching to the eraser tool.'))
+            );
+            bodyWrap.appendChild(guide);
+
+            card.appendChild(bodyWrap);
+            return card;
+          })(),
           row(t('Pen opacity'), h('div', { style: 'display:flex;align-items:center;gap:8px' },
             mkToggle(() => s.penOpacityEnabled === true, (v) => (s.penOpacityEnabled = v)),
             h('input', {
