@@ -1,7 +1,7 @@
 # GazBoard v4.8.13 — Advanced Obsidian Markdown Ecosystem, Margin Overhaul & Split Workspace Architecture Specification
 
 > **Target Audience**: Frontier AI Engineering Models (Gemini for Argon, Gemini 1.5 Pro, Claude 3.5 Sonnet, GPT-4o) and Systems Architects.  
-> **Scope**: Implement full Obsidian-style Markdown parity (UI buttons, Obsidian Canvas card styling, wikilinks/embeds `![[...]` editing, hashtag `#` autocomplete/indexing), overhaul the Page Margin dialog (fix inverted drag kinematics, increase margin limits up to 2000px, fix mouse-drift auto-dismiss), and repair the dual-viewport Split Workspace.  
+> **Scope**: Implement full Obsidian-style Markdown parity (default Markdown for all text, toggleable Obsidian card window models, wikilinks/embeds `![[...]` with configurable double-click action menu, hashtag `#` autocomplete/indexing), overhaul the Page Margin dialog (fix inverted drag kinematics, increase margin limits up to 2000px, fix mouse-drift auto-dismiss), and repair the dual-viewport Split Workspace.  
 > **Base Version**: GazBoard **v4.8.12** (commit `6b74f72` on branch `feat/markdown-text-boxes-v4.8.12`).  
 > **Target Version**: **v4.8.13** (branch `feat/markdown-obsidian-margin-v4.8.13`).  
 
@@ -23,32 +23,43 @@ GazBoard is a high-performance, local-first digital whiteboard for Windows 10/11
 
 ## 2. Requirements Matrix & Problem Diagnostics
 
-### 2.1. Markdown UI Buttons & Obsidian Canvas Card Styling
-* **Current State (v4.8.12)**: Markdown formatting is only accessible on `#textFormatBar` when a text box is actively being edited, or via the `#ctxmenu` context menu. Text boxes appear as standard borderless text blocks unless explicitly styled as notes.
-* **Target State (v4.8.13)**:
-  1. **Top Ribbon (`ReplayBar` / `src/js/ui/replay-bar.js`)**: Add a toggleable Markdown button (`btnMarkdown` / "MD") that lets users insert a new Markdown card directly onto the canvas or toggle default Markdown mode.
-  2. **Floating Overlay / Format Bar (`src/js/ui/toolbar.js`)**: Add rich Markdown buttons: Heading levels (`H1`, `H2`, `H3`), Callout (`[!NOTE]`, `[!TIP]`, `[!WARNING]`, `[!DANGER]`), Checklists (`- [ ]`), Inline/Block Math (`$`, `$$`), and Board Wikilinks (`[[...]]`). Provide a toggle to show/hide the extended markdown button strip.
-  3. **Right-Click Menu (`src/js/ui/contextmenu.js`)**: Add "Insert Markdown", "Toggle Markdown Mode", and "Edit Link / Embed...".
-  4. **Obsidian Canvas Card Styling**: When `o.markdown === true`, render the card with an Obsidian Canvas card container:
-     - Rounded corner rectangular border (`border-radius: 8px`).
-     - Distinct card background (`#ffffff` in light theme, `#252529` in dark theme) with subtle drop shadow (`box-shadow: 0 4px 12px rgba(0,0,0,0.08)`).
-     - Subtle top-left badge/pill ("MD" or "Markdown") indicating card type.
-  5. **Pasted Text Handling**: When "Insert Markdown" is chosen or Markdown mode is enabled, clipboard-pasted text automatically creates a Markdown-enabled card (`o.markdown = true`).
+### 2.1. Markdown UI Buttons, Default Markdown & Toggleable Card Window Models
+* **Default Markdown for All Text**:
+  - Every new text object created (via text tool, double-clicking canvas, pasting from clipboard, or toolbar buttons) strictly defaults to **`markdown: true`**.
+  - Plain text remains an explicit backward-compatibility option, but Markdown is the default state for the entire app.
+* **Toggleable Obsidian Card Window Models**:
+  - Users are not locked into one fixed card look. Each card supports a selectable `cardStyle`:
+    1. **`canvas`** (Default Obsidian Canvas style): Rounded card rectangle (`border-radius: 10px`), card background with subtle border, shadow, and sleek corner "MD" type badge.
+    2. **`window`** (Full Obsidian Window Header model): Dedicated title/header bar with window drag handle, editable title, and collapse/expand toggle button (`▲` / `▼`).
+    3. **`minimal`** (Minimalist border): Clean rounded border, subtle background tint, no header or badges.
+    4. **`transparent`** (Borderless): Raw canvas text with no card boundary (classic whiteboard look).
+  - Toggling between these styles is accessible directly from the floating format bar (`#textFormatBar`), selection bar (`#ctxbar`), and right-click context menu.
+* **Markdown UI Buttons**:
+  1. **Top Ribbon (`ReplayBar` / `src/js/ui/replay-bar.js`)**: Add a toggleable Markdown button (`btnMarkdown` / "MD") to insert a new Markdown card directly onto the canvas.
+  2. **Floating Overlay / Format Bar (`src/js/ui/toolbar.js`)**: Add rich Markdown buttons: Heading levels (`H1`, `H2`, `H3`), Callout (`[!NOTE]`, `[!TIP]`, `[!WARNING]`, `[!DANGER]`), Checklists (`- [ ]`), Inline/Block Math (`$`, `$$`), Board Wikilinks (`[[...]]`), and Card Style Selector.
+  3. **Right-Click Menu (`src/js/ui/contextmenu.js`)**: Add "Insert Markdown Card", "Card Style ▾", "Toggle Markdown Mode", and "Edit Link / Embed...".
 
 ### 2.2. Wikilinks, Embeds (`![[...]]`), Aliases & Tag Autocomplete
-* **Current State (v4.8.12)**: Supports reading `[[Board#Page|Alias]]` and converting to internal `@[Label](b:id)`. However, there is no UI to edit an existing link or alias, no support for transclusion/embeds `![[...]]`, and typing `#` does not trigger tag suggestions.
-* **Target State (v4.8.13)**:
-  1. **Embed Syntax (`![[Board#Page|Alias]]`)**: An exclamation prefix denotes an embed/transclusion. In Live Preview and canvas rendering, an embedded board card displays an interactive summary preview or thumbnail of that target board.
-  2. **Double-Click Interaction**: Double-clicking a wikilink or board ref card activates embedding (converts `[[...]]` to `![[...]]` or opens the board in split view).
-  3. **Hold-and-Click (Long-Press) or Right-Click Interaction**: Long-pressing or right-clicking a wikilink or board reference opens a Link Editor popover:
-     - Target Board selection (dropdown/search).
-     - Target Page (numeric input).
-     - Display Alias (text input for `|Alias`).
-     - Embed Toggle checkbox (`![[...]]`).
-  4. **Hashtag (`#`) Tag Autocomplete & Indexing**:
-     - When typing `#` inside `TextEditor` (`textedit.js`), a tag autocomplete dropdown appears showing existing tags from `store.doc.properties.tags` and across all workspace boards.
-     - Selecting a tag completes `#tagname`.
-     - When text objects are edited or created with tags (`#tag`), the tag registry updates the frequency count of tags in `store.doc.properties.tags`.
+* **Embed Syntax (`![[Board#Page|Alias]]`)**:
+  - An exclamation prefix denotes an embed/transclusion. In Live Preview and canvas rendering, an embedded board card displays an interactive summary preview or thumbnail of that target board.
+* **Configurable Double-Click Action (No Regrets)**:
+  - Double-clicking a wikilink or board reference opens a non-blocking Quick Action Popover (unless the user has configured an automatic default):
+    1. **Embed in Place (`![[...]]`)**: Switch or toggle to rich embedded board preview.
+    2. **Open in Split Study View**: Open the linked board side-by-side in dual workspace.
+    3. **Navigate Directly**: Switch current canvas to the target board.
+    4. **Edit Link & Aliases**: Open the link editing modal.
+    - Includes a checkbox: *"Always perform this action on double-click (can be changed anytime in Settings)"*.
+    - This ensures users are never locked into a single choice they might regret later.
+* **Hold-and-Click (Long-Press) or Right-Click Interaction**:
+  - Long-pressing or right-clicking a wikilink or board reference opens the Link Editor popover:
+    - Target Board selection (dropdown/search).
+    - Target Page (numeric input).
+    - Display Alias (text input for `|Alias`).
+    - Embed Toggle checkbox (`![[...]]`).
+* **Hashtag (`#`) Tag Autocomplete & Indexing**:
+  - Typing `#` inside `TextEditor` (`textedit.js`) triggers a tag autocomplete dropdown showing existing tags from `store.doc.properties.tags` and across all workspace boards.
+  - Selecting a tag completes `#tagname `.
+  - When text objects are edited or created with tags (`#tag`), the tag registry updates the frequency count of tags in `store.doc.properties.tags`.
 
 ### 2.3. Page Margin Overhaul (`pagemargin-dialog.js`)
 * **Bug 1: Inverted Handle Kinematics**:
@@ -85,13 +96,13 @@ GazBoard is a high-performance, local-first digital whiteboard for Windows 10/11
 │ File Path                    │ Specific Modification Scope                       │
 ├──────────────────────────────┼───────────────────────────────────────────────────┤
 │ src/js/core/markdown.js      │ Embeds `![[...]]`, tag extractor `#tag`, styling │
-│ src/js/core/render.js        │ Obsidian Canvas card styling (border, background) │
+│ src/js/core/render.js        │ 4 selectable card window styles, collapse state   │
 │ src/js/core/boardrefs.js     │ Embed support, alias piping, link metadata parser │
-│ src/js/core/store.js         │ Tag counting, default markdown preference setting │
+│ src/js/core/store.js         │ `markdown: true` default, `cardStyle`, tag counts │
 │ src/js/ui/textedit.js        │ `#` tag autocomplete popup, `![[...]]` embedding  │
-│ src/js/ui/toolbar.js         │ Extended Markdown button ribbon, format controls  │
+│ src/js/ui/toolbar.js         │ Markdown ribbon, card style picker, format tools  │
 │ src/js/ui/replay-bar.js      │ Top ribbon "MD" button, "Page Margin" button      │
-│ src/js/ui/contextmenu.js     │ Context menu items: "Insert MD", "Page Margin"    │
+│ src/js/ui/contextmenu.js     │ "Insert MD", "Card Style", "Page Margin", Links   │
 │ src/js/ui/pagemargin-dialog.js│ Kinematics fix, 2000px limits, pointer capture   │
 │ src/js/ui/split-workspace.js │ Fix `#editLayer` & `#ctxbar` reparenting/align    │
 │ src/locales/*.json           │ 7 translation dictionaries (all new strings)      │
@@ -187,55 +198,91 @@ apply() {
 
 ---
 
-### 4.2. Obsidian Canvas Card Styling (`src/js/core/render.js`)
+### 4.2. Toggleable Obsidian Card Window Models (`src/js/core/render.js`)
 
-When rendering a Markdown text box (`o.markdown === true`), draw an Obsidian Canvas-inspired card container before rendering the SVG text overlay:
+Each text card carries `cardStyle: 'canvas' | 'window' | 'minimal' | 'transparent'` (default: `'canvas'`).
 
 ```javascript
 export function drawMarkdownCardContainer(ctx, o, isDark = false) {
+  const style = o.cardStyle || 'canvas';
+  if (style === 'transparent') return;
+
   const pad = 12;
   const x = o.x - pad;
   const y = o.y - pad;
   const w = o.w + pad * 2;
   const h = o.h + pad * 2;
-  const r = 10; // Rounded corners
+  const r = 10;
 
   ctx.save();
-  // Card Shadow
-  ctx.shadowColor = isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.08)';
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetY = 4;
 
-  // Background
+  // 1. Background fill
   ctx.fillStyle = o.background && o.background !== 'none'
     ? o.background
     : (isDark ? '#23252a' : '#ffffff');
-  
+
+  // 2. Card Shadow (for 'canvas' and 'window' styles)
+  if (style === 'canvas' || style === 'window') {
+    ctx.shadowColor = isDark ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.08)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+  }
+
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
   else ctx.rect(x, y, w, h);
   ctx.fill();
 
-  // Reset shadow for border
+  // Reset shadow for borders & headers
   ctx.shadowColor = 'transparent';
 
-  // Card Border (subtle outline, highlight if selected)
+  // 3. Border stroke
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)';
   ctx.stroke();
 
-  // Subtle Header Pill ("Markdown")
-  const pillW = 32, pillH = 14;
-  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,120,212,0.1)';
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(x + 10, y + 8, pillW, pillH, 4);
-  ctx.fill();
+  // 4. Style-specific Header decorations
+  if (style === 'window') {
+    // Obsidian Window Header bar
+    const headerH = 26;
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, headerH, [r, r, 0, 0]);
+    else ctx.rect(x, y, w, headerH);
+    ctx.fill();
 
-  ctx.font = '600 9px sans-serif';
-  ctx.fillStyle = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,120,212,0.9)';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('MD', x + 10 + pillW / 2, y + 8 + pillH / 2);
+    // Bottom border of header
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    ctx.beginPath();
+    ctx.moveTo(x, y + headerH);
+    ctx.lineTo(x + w, y + headerH);
+    ctx.stroke();
+
+    // Card Title / Breadcrumb
+    ctx.font = '600 11px sans-serif';
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const titleText = o.title || (o.text ? o.text.split('\n')[0].replace(/^#+\s*/, '').slice(0, 24) : 'Markdown');
+    ctx.fillText(titleText, x + 12, y + headerH / 2);
+
+    // Collapse toggle button indicator
+    ctx.textAlign = 'right';
+    ctx.fillText(o.collapsed ? '▼' : '▲', x + w - 12, y + headerH / 2);
+  } else if (style === 'canvas') {
+    // Obsidian Canvas subtle type pill ("MD")
+    const pillW = 32, pillH = 14;
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,120,212,0.1)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x + 10, y + 8, pillW, pillH, 4);
+    ctx.fill();
+
+    ctx.font = '600 9px sans-serif';
+    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,120,212,0.9)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('MD', x + 10 + pillW / 2, y + 8 + pillH / 2);
+  }
 
   ctx.restore();
 }
@@ -252,8 +299,33 @@ export function drawMarkdownCardContainer(ctx, o, isDark = false) {
 export const EMBED_WIKILINK_RE = /!\[\[([^\]|#\n]+)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
 ```
 
+#### Configurable Double-Click Action Popover (No Regrets):
+When double-clicking a wikilink or board reference on canvas:
+```javascript
+export function openWikilinkDoubleAction(app, ref, anchorPoint) {
+  const pref = app.storage?.getPreference('wikilinkDblClick') || 'ask';
+  if (pref !== 'ask') {
+    executeWikilinkAction(app, ref, pref);
+    return;
+  }
+
+  const pop = h('div', { class: 'wikilink-action-popover' },
+    h('div', { class: 'title' }, t('Choose Action for {name}', { name: ref.name })),
+    h('button', { onclick: () => { executeWikilinkAction(app, ref, 'embed'); pop.remove(); } }, t('Embed in Place (![[...]])')),
+    h('button', { onclick: () => { executeWikilinkAction(app, ref, 'split'); pop.remove(); } }, t('Open in Split View')),
+    h('button', { onclick: () => { executeWikilinkAction(app, ref, 'navigate'); pop.remove(); } }, t('Navigate to Board')),
+    h('button', { onclick: () => { executeWikilinkAction(app, ref, 'edit'); pop.remove(); } }, t('Edit Link & Aliases...')),
+    h('label', {},
+      h('input', { type: 'checkbox', id: 'chkRememberDblClick' }),
+      t('Remember choice (changeable in Settings)')
+    )
+  );
+  showPopover(pop, anchorPoint);
+}
+```
+
 #### Link Editor Popover:
-When the user right-clicks or long-presses a wikilink or board ref card:
+When right-clicking or long-pressing a wikilink or board ref card:
 * Shows a clean popover with:
   - Input: Board Title (with autocomplete from board directory)
   - Input: Page number (optional)
@@ -318,7 +390,7 @@ disable() {
 ### 5.1. Top Ribbon (`src/js/ui/replay-bar.js`)
 * **Markdown Button (`btnMarkdown`)**:
   - Icon: Markdown `M↓` icon.
-  - Action: Creates a new Markdown card at canvas center, or toggles default Markdown insertion mode.
+  - Action: Creates a new Markdown card at canvas center.
   - Title: `t('Insert Markdown Note')`.
 * **Page Margin Button (`btnPageMargin`)**:
   - Icon: Margin icon (square with dashed margin lines).
@@ -328,6 +400,7 @@ disable() {
 ### 5.2. Floating Selection Toolbar (`src/js/ui/toolbar.js` / `#ctxbar`)
 * **Markdown Sub-Ribbon**:
   - When a text or markdown card is selected, show formatting buttons:
+    - Card Style Selector (`Canvas` / `Window` / `Minimal` / `Transparent`)
     - `H1`, `H2`, `H3`
     - Bold (`**`), Italic (`*`), Strikethrough (`~~`)
     - Callout dropdown (`[!NOTE]`, `[!TIP]`, `[!WARNING]`)
@@ -338,7 +411,8 @@ disable() {
 
 ### 5.3. Right-Click Context Menu (`src/js/ui/contextmenu.js`)
 * Add:
-  - `Insert Markdown` (invokes `app.insertMarkdown(clientX, clientY)`)
+  - `Insert Markdown Card` (invokes `app.insertMarkdown(clientX, clientY)`)
+  - `Card Style ▾` submenu (`Canvas`, `Window`, `Minimal`, `Transparent`)
   - `Page Margin...` (invokes `app.pageMarginDialog.open()`)
   - `Edit Link / Embed...` (when right-clicking over a link)
 
@@ -355,6 +429,9 @@ disable() {
 3. **i18n Parity (`node scripts/i18n-check.js`)**:
    - Ensure 100% string coverage across all 7 locales (`ar`, `bn`, `de`, `es`, `pt-BR`, `zh-Hans`, `zh-Hant`).
 4. **Interactive Manual Testing**:
+   - Default text creation -> verifies `markdown: true` and card model container appear immediately.
+   - Switch card styles (`canvas` -> `window` -> `minimal` -> `transparent`) -> updates instantly on canvas.
+   - Double-click wikilink -> shows Action Chooser modal with "Remember choice" option.
    - Open Page Margin dialog: drag handle `e` right -> page margin expands rightward smoothly.
    - Drag cursor past modal boundary -> modal remains open until pointer is released.
    - Set margin to 1500px -> canvas visibly expands by 1500px.
