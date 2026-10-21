@@ -1,6 +1,6 @@
 # GazBoard Replay — Developer Handover & Future Agent Guide
 
-> **Current release and documentation routing:** v4.8.8 is the consolidated source release. Start with [`INDEX.md`](INDEX.md); use [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md) for baseline-only features and [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) for later additions, fixes, source mapping, and known limitations. Historical plans describe proposals/analysis and should not override current source evidence. User preferences call for keeping multiple choices available when feasible; inking trade-offs are in `layers/02-inking-and-gestures.md`.
+> **Current handover snapshot (2026-10-18):** working source is v4.8.11 at tagged commit `f01e1b30e57a8d28b680b504a44cc651160a6fe4`, plus the post-tag live replay wiring correction in the working tree. Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-4.8.11.md`](releases/RELEASE-4.8.11.md) for the root cause, final checks, artifact hashes, and archive copy. This file is the primary human/AI handover; the quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
 
 > **Important**: This document is the primary onboarding manual for any future AI assistant, software engineer, or contributor picking up this project in a new session or clean environment. It details the complete architecture, data models, state flows, invariant guardrails, and build instructions.
 
@@ -18,6 +18,26 @@
   5. *Dual Study Workspace*: Side-by-side split screen for simultaneous textbook viewing and scratch-pad note taking.
   6. *Pluggable Inking Pipeline*: Hardware DirectInk low-latency pen trail paired with pure-JS velocity-weighted cubic Bézier curve fitting (`Windows Ink` mode).
   7. *Deterministic Video Exporter*: Multi-session WebM animation pipeline with stitched audio tracks.
+
+## 1.1 Current Worktree and Release State (2026-10-18)
+
+- **Working repository:** `C:\Users\kazir\Documents\OpenCode\GazBoard`.
+- **Current source version:** `4.8.11`; `package.json` version is `4.8.11`.
+- **Git state at handover:** branch `feat/m5-hardening-release`, HEAD `f01e1b30e57a8d28b680b504a44cc651160a6fe4`, local tag `v4.8.11`; source and documentation have intentional post-tag working-tree changes. Preserve the user-provided untracked `docs/MASTER_ALL_FEATURES_CATALOG_AND_ARCHITECTURE.md`.
+- **Verified archive:** `C:\Users\kazir\Documents\Antigravity\GazBoard\V-4.8.11`. It is a release archive, not a working tree. The user authorized copying the refreshed relevant source/docs and rebuilt Windows binaries into this snapshot; record the final sync result in the release dossier.
+- **Latest release scope:** delayed-seek authority, visible live replay/highlighter outline, recording rename persistence/undo, adaptive recording action-menu placement, replay camera viewport/center/dead-zone framing, timestamped Windows-safe video export names, and live Surface-to-App replay wiring. The live/export discrepancy and Reading/Writing mode distinction are explained in BUG-023 and the v4.8.11 dossier.
+- **Latest release verification:** full regression passed 1,240/1,240 after the replay code correction; custom-only smoke passed all 45 checks across six groups; locale coverage passed 1,395/1,395 in all seven locales. Windows x64 artifacts were rebuilt to `dist-replay-fix/` because the user's running portable app held the usual output open. Exact hashes and archive synchronization details are in the v4.8.11 dossier.
+- **Important verification limit:** the user confirmed live replay highlight/animation works on their board after the wiring correction. Automated replay/export checks also passed. No real-board export speed/quality/file-size benchmark was completed.
+- **Audit attribution supplied by the project owner:** initial audit — Codex 4.6 Medium in Cursor; secondary audit/fixes — GPT-6 Luna High using Codex.
+- **Collaboration preferences:** the owner uses dictated English and may need intent rephrased in plain language when a request is ambiguous. When feasible, retain user-selectable alternatives rather than forcing a binary choice (especially for inking engines). The feature request is the product source of truth; propose trade-offs before removing or simplifying requested behavior.
+
+### Suggested next-session opening
+
+1. Read `AGENTS.md`, then `AI_BOOTSTRAP.md` and `docs/INDEX.md` to choose one layer dossier. Consult [`AI_DOCS_MAP.md`](AI_DOCS_MAP.md) only if document scope or authority is unclear. Read this handover only for current state, owner preferences, archive policy, or verification limits.
+2. Ask what the user wants to tackle next if the prompt does not specify a concrete next change. Do not infer a release, tag, EXE build, or archive update from a documentation/audit request.
+3. For a reported replay defect, start with `docs/layers/01-audio-and-replay.md`; for video-export behavior/performance, start with `docs/layers/07-video-export.md`. Confirm whether the issue is reproducible with provided/test data before changing behavior.
+4. Keep mandatory regression, custom-feature, replay, and video suites distinct. The current repository `AGENTS.md` explicitly requires `node scripts/smoke.js` and `node scripts/i18n-check.js`; run both before reporting completion. The earlier translation deferral predates the current explicit repository instruction.
+5. Update the release dossier, release ledger, feature record, bug log, and both documentation trees only when their content is affected. Archive only a completed and verified release snapshot.
 
 ---
 
@@ -64,7 +84,7 @@ GazBoard/
 │   │       └── toolbar.js          # Bottom/top toolbars, zoom presets popover, highlighter menu
 │   └── locales/             # 7 synchronized translation files (ar, bn, de, es, pt-BR, zh-Hans, zh-Hant)
 ├── docs/
-│   ├── FEATURE_RECORD.md    # Master feature index (F-101 to F-119) and invariants
+    │   ├── FEATURE_RECORD.md    # Master feature index (F-101 to F-120) and invariants
 │   ├── BUG_FIX_LOG.md       # Root-cause breakdown of all fixed bugs
 │   ├── DEVELOPER_HANDOVER.md# This onboarding manual
 │   └── plan/                # 8-phase architectural blueprint and specs
@@ -150,7 +170,7 @@ Before creating any release or commit, verify the entire test suite passes:
 # 1. Run the full smoke test suite (1,240 tests)
 node scripts/smoke.js
 
-# 2. Verify all 7 translation dictionaries are 100% complete (1,368 strings)
+# 2. Verify all 7 translation dictionaries; use the checker's current count rather than a hardcoded historical total
 node scripts/i18n-check.js
 
 # 3. Build Windows Executables (NSIS installer, portable exe, unpacked directory)
@@ -164,3 +184,11 @@ npm run dist:win
 * **Layer System (On Standby)**:
   * The user requested to put the multi-layer feature on hold.
   * When resuming, follow the architecture detailed in Phase 4 of `docs/plan/04-quality.md`: add `layerId` to objects, maintain `doc.layers = [{ id, name, visible, locked }]`, and add visibility filtering to `render.js:drawScene()`.
+
+## 7. Handover Authority and Evidence
+
+- For what is in the v4.8.1 baseline, use [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md).
+- For v4.8.2–v4.8.8 evolution, use [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md); for v4.8.9 onward, use the per-release dossiers linked from [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md).
+- For current implementation entry points and test commands, use `docs/INDEX.md` and the single relevant `docs/layers/*.md` dossier. Plans are historical proposals, not proof that a feature shipped.
+- For final package identities, checksums, and archive path, use [`releases/RELEASE-4.8.11.md`](releases/RELEASE-4.8.11.md). The portable and installer artifacts are under `dist/` in the working tree and the verified snapshot under the archive path above.
+- Current exporter remains Chromium `canvas.captureStream()` + `MediaRecorder` (VP9/Opus with WebM fallback). WebCodecs and native FFmpeg were assessed but not integrated; a performance claim requires representative real-board benchmarks.

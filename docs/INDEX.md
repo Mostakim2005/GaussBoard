@@ -1,17 +1,16 @@
 # GazBoard Replay — Master Feature Index & Layered TOC
 
 > **CRITICAL DIRECTIVE FOR NEW AI SESSIONS**:
-> **DO NOT read all files in this repository at once.** Doing so will exhaust your context window.
-> 1. Use the **Master Lookup Table** below to identify the feature or domain the user wants to work on.
-> 2. Open **ONLY** the designated Tier 1 Layer Dossier in `docs/layers/`.
-> 3. That dossier will give you the exact 1–2 source files to edit, the data schema, and the invariant rules to follow.
+> **DO NOT read all files in `docs/` at once.** Start with `AGENTS.md` and `AI_BOOTSTRAP.md`, then use [`AI_DOCS_MAP.md`](AI_DOCS_MAP.md) for document roles and this index to select one subsystem dossier. Read only that dossier and the source/tests it names.
 
 ## Documentation authority and lookup
 
 | Need | Start here | Purpose |
 | :--- | :--- | :--- |
+| Understand documentation structure or find the right document | [`AI_DOCS_MAP.md`](AI_DOCS_MAP.md) | Directory roles, source-of-truth rules, and token-light reading paths. |
+| Start a fresh AI/contributor session | [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md), then this index; open [`DEVELOPER_HANDOVER.md`](DEVELOPER_HANDOVER.md) when current state/preferences are needed | Project mental model, task routing, current branch/release, owner preferences, verified state, and known limitations. |
 | Understand only the original baseline | [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md) | Base features, source locations, and improvement checkpoints, excluding later custom additions. |
-| Trace custom changes from v4.8.2 through v4.8.11 | [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) | Version-by-version feature and fix record, source mapping, verification notes, and known limitations; v4.8.9 through v4.8.11 patch details are in their release dossiers. |
+| Trace custom release history | [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md) | Select one release dossier; the evolution file is historical and covers v4.8.2–v4.8.8. |
 | Find an implementation area | Layer dossiers below | Current architecture and source entry points; read only the relevant dossier for code work. |
 | See release claims and package registry | [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md) | Release ledger and binary/archive references. Current patch dossier: [`releases/RELEASE-4.8.11.md`](releases/RELEASE-4.8.11.md). |
 | See individual change records | [`FEATURE_RECORD.md`](FEATURE_RECORD.md), [`BUG_FIX_LOG.md`](BUG_FIX_LOG.md), `releases/RELEASE-*.md` | Feature IDs, bug resolutions, and per-release notes. |
@@ -20,13 +19,15 @@
 
 The initial audit was performed with **Codex 4.6 Medium in Cursor**. The secondary audit and fixes were applied with **GPT-6 Luna High using Codex**. Release dossiers and plans can include historical or proposed claims; verify shipped behavior in current source and feature-focused tests.
 
+**Current snapshot:** v4.8.11, commit `f01e1b30e57a8d28b680b504a44cc651160a6fe4`, local tag `v4.8.11`, with a post-tag live replay wiring correction and refreshed Windows build in the working tree/archive. The release snapshot is archived at `C:\Users\kazir\Documents\Antigravity\GazBoard\V-4.8.11`; the OpenCode directory remains the working repository. Do not treat the archive as an active development tree.
+
 ---
 
 ## 1. Master Feature & Subsystem Lookup Table
 
 | Feature / Task Domain | Brief Description | Layer Dossier | Primary Source Files |
 | :--- | :--- | :--- | :--- |
-| **Audio-Ink Sync & Replay** | Audio recording with millisecond-timestamped strokes (`p.t`), visible live replay outline, robust seeking, and optional viewport/center/dead-zone camera follow | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/core/audio-recorder.js`<br>`src/js/core/replay.js`<br>`src/js/core/surface.js` |
+| **Audio-Ink Sync & Replay** | Audio recording with millisecond-timestamped strokes (`p.t`), live animated replay overlay, robust seeking, and optional viewport/center/dead-zone camera follow | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/app.js`<br>`src/js/core/audio-recorder.js`<br>`src/js/core/replay.js`<br>`src/js/core/surface.js` |
 | **Reading/Writing Playback Modes** | Playback defaults to read-only pan/navigation; Writing mode allows new replay-timestamped ink. Sync, camera follow, and replay outline appearance can be changed from AudioBar. | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/app.js`<br>`src/js/core/tools.js`<br>`src/js/core/surface.js`<br>`src/js/ui/replay-bar.js`<br>`src/js/ui/audio-bar.js` |
 | **AudioBar, Scrubber & Bookmarks** | Waveform density scrubber, skip intervals (5s, 10s, 15s, 30s), named bookmark editor, recording rename and adaptive action menu | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/ui/audio-bar.js`<br>`src/js/ui/density-canvas.js` |
 | **Canvas Audio Player Cards** | Interactive `type: 'audio'` cards placed on canvas with direct tap-to-play | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/core/render.js`<br>`src/js/core/tools.js` |
@@ -52,17 +53,14 @@ The initial audit was performed with **Codex 4.6 Medium in Cursor**. The seconda
 | **Replay reliability checks** | Unit checks for delayed seek, play lifecycle, ordered recording chunks, replay-clock ink, and sync rendering gate | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `test/replay-reading.test.mjs`; run `npm run smoke:replay` |
 | **Video framing checks** | Fixed/whole-board bounds, active replay stroke selection, camera follow easing, and export dialog choices | [`layers/07-video-export.md`](layers/07-video-export.md) | `test/video-framing.test.mjs`; run `npm run smoke:video` |
 
-Replay camera follow and video framing changes are documented in [`releases/RELEASE-4.8.10.md`](releases/RELEASE-4.8.10.md); replay/UI/export workflow fixes are in [`releases/RELEASE-4.8.11.md`](releases/RELEASE-4.8.11.md); the video-driven Study Tape changes remain in [`releases/RELEASE-4.8.9.md`](releases/RELEASE-4.8.9.md).
+Replay camera follow and video framing changes are documented in [`releases/RELEASE-4.8.10.md`](releases/RELEASE-4.8.10.md); replay/UI/export workflow fixes and the live Surface-to-App wiring correction are in [`releases/RELEASE-4.8.11.md`](releases/RELEASE-4.8.11.md); the video-driven Study Tape changes remain in [`releases/RELEASE-4.8.9.md`](releases/RELEASE-4.8.9.md).
 
 ---
 
 ## 2. Progressive Navigation Protocol
 
-When handling any coding request:
+When handling a coding request, keep the context path narrow:
 ```
-Step 1: Check Master Table above -> Find the Layer Dossier in docs/layers/
-Step 2: Read ONLY that Layer Dossier (< 1,000 tokens)
-Step 3: Edit ONLY the files listed in Section 2 of that Dossier
-Step 4: Verify against Section 4 (Invariants) and Section 6 (Test Commands)
-Step 5: Run "node scripts/smoke.js" to guarantee 0 regressions
+AGENTS.md -> AI_BOOTSTRAP.md -> docs/INDEX.md -> one layer dossier -> named source and focused tests
 ```
+Read handover, release notes, feature catalogs, or plans only when the task needs them. Do not open neighboring dossiers “for context.” If the requested work spans multiple subsystems, route each independently and read only the smallest relevant part of each dossier.

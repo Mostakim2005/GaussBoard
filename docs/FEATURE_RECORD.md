@@ -1,6 +1,6 @@
 # GazBoard Replay — Master Feature & Fixes Record
 
-> **Current source of release-by-release truth:** [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) plus the v4.8.9 patch dossier. The catalog of original v4.8.1-only capabilities is [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md). This record retains detailed feature IDs and historical implementation notes; check the linked evolution record when an older entry conflicts with current source.
+> **Current source of release-by-release truth:** [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) covers v4.8.2–v4.8.8; see the v4.8.9–v4.8.11 release dossiers for subsequent changes. The catalog of original v4.8.1-only capabilities is [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md). This record retains detailed feature IDs and historical implementation notes; check current source and release tests when older entries conflict.
 
 This document serves as the master registry of all features, enhancements, bug fixes, algorithmic parameters, and regression invariants implemented in GazBoard Replay (Windows-first fork). Every entry lists its purpose, source files, acceptance criteria, and regression test invariants.
 
@@ -29,6 +29,7 @@ This document serves as the master registry of all features, enhancements, bug f
 | **F-117** | Named Bookmarks Inline Label Editor | `src/js/ui/density-canvas.js`<br>`src/js/ui/audio-bar.js` | Verified | Expanding inline rename field on bookmark pin tooltip card (hidden by default). Immediate persistence to `doc.audioTracks`. |
 | **F-118** | PDF Import Mode & Auto-Alignment | `src/js/ui/pagepicker.js`<br>`src/js/insert.js` | Verified | Choice between `Movable objects` (printouts) and `Page background` (locked native pad sheets). Auto-alignment presets (`Fit width`, `Fit height`, `Fit page`). |
 | **F-119** | Turnout Page Margin Adjustment Dialog | `src/js/ui/pagemargin-dialog.js`<br>`src/js/ui/panels.js`<br>`src/js/app.js` | Verified | Turnout-inspired modal with 8 draggable blue control handles, presets (Cornell wide left, wide right, top header, 2-col), background colors, and scope toggle (`Apply to entire note` vs `Apply to current page`). |
+| **F-120** | Live Board Replay Surface Wiring | `src/js/app.js`<br>`src/js/core/surface.js`<br>`src/js/core/replay.js` | Verified | Connects the primary board Surface to its owning App so live drawing can access ReplayEngine and render progressively reanimated/highlighted session strokes. Reading/Writing mode remains a gesture/editing policy; sync and replay state govern the overlay. See BUG-023 and the v4.8.11 release dossier. |
 
 ---
 
@@ -188,6 +189,13 @@ This document serves as the master registry of all features, enhancements, bug f
 - Adds settings opacity range, template tag filtering, video export presets, visible page margin guides, and arrowhead style selection; see `docs/releases/RELEASE-4.8.8.md` for behavior boundaries and known limitations.
 - Adds custom feature checks separately from the mandatory regression suite: `npm run smoke:custom` and `npm run smoke:features:4.8.8`.
 - Initial audit: Codex 4.6 Medium in Cursor. Secondary audit and fixes: GPT-6 Luna High using Codex.
+
+### V 4.8.9–4.8.11 Follow-up Releases
+
+- **v4.8.9:** study tape and rectangular answer covers persist and toggle on tap; see `docs/releases/RELEASE-4.8.9.md`.
+- **v4.8.10:** optional live replay camera follow and stationary/follow-strokes export framing; see `docs/releases/RELEASE-4.8.10.md`.
+- **v4.8.11:** reliable pending seek state, visible live replay outline, application-native undoable recording rename, adaptive recording menu placement, camera viewport/center/dead-zone modes, unique safe export names, and a follow-up correction wiring the primary live Surface to the App/ReplayEngine; see `docs/releases/RELEASE-4.8.11.md`.
+- **Current source:** v4.8.11 (`f01e1b3`, local tag `v4.8.11`) plus the documented post-tag live-surface wiring correction. The user confirmed the live replay highlight/animation works on the board; automated checks and build details are in the release dossier.
 
 ### V 4.8.4.1 — Audit Follow-up
 

@@ -45,6 +45,7 @@ stroke.points = [{ x, y, p, t: 1240 }, ...]; // p: pressure, t: relative timesta
 9. **Live Camera Follow**: `settings.replayCameraFollow` controls whether replay follows the active reanimated stroke after it leaves the viewport. The AudioBar toggle persists this choice; disabling it cancels an in-progress replay camera glide.
 10. **Seek Authority**: While a media seek is pending, the requested timeline position remains the replay clock source until the media element confirms the seek. `seeked`, `loadedmetadata`, and `canplay` events resolve or retry pending seeks; an old media clock must not overwrite a new scrub position.
 11. **Camera Framing Modes**: With camera follow enabled, `settings.replayCameraMode` chooses `viewport` (legacy fit when the full stroke leaves view), `center` (keep the active point centered), or `dead-zone` (keep the active point inside the central 40% of the viewport and pan only when it exits). These modes preserve the current zoom; the legacy viewport mode retains its previous fit behavior.
+12. **Live Surface App Wiring**: The primary board `Surface` must receive `{ app: this }`. Its draw path uses that reference to reach the app's `ReplayEngine`; omitting it silently disables live replay rendering even though export may work, because export constructs its own Surface with the app reference.
 
 ## 5. Relevant Bug Fixes
 * **BUG-005**: `#btnTopRecord` was disconnected from `audioRecorder` state and persistence $\rightarrow$ fixed in `toolbar.js`.
@@ -52,6 +53,7 @@ stroke.points = [{ x, y, p, t: 1240 }, ...]; // p: pressure, t: relative timesta
 * **BUG-007**: Session dropdown was destroyed mid-click by 100ms polling $\rightarrow$ replaced with custom floating glassmorphic popover.
 * **v4.8.11 replay regression:** pending seeks could be overwritten by the media element's previous time before seeking completed. The replay clock now holds the requested time through the media seek lifecycle.
 * **v4.8.11 live outline visibility:** highlighter replay outlines inherited multiply blending and could vanish against the board. The feedback pass now draws as a source-over overlay while the original stroke keeps its normal appearance.
+* **v4.8.11 live replay wiring correction:** export worked because its Surface received the app, while the primary board Surface did not. Passing the app into the live Surface restores ReplayEngine access. Reading/Writing mode controls gestures and editing; `settings.audioInkSync` gates replay stroke separation/overlay rendering, and neither replaces the Surface-to-app reference.
 
 ## 6. Verification Commands
 ```powershell

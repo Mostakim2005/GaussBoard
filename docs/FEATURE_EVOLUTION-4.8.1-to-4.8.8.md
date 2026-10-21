@@ -1,8 +1,8 @@
 # GazBoard Feature Evolution: v4.8.1 to v4.8.8
 
-This is the current, source-checked map of the product changes layered over the v4.8.1 baseline. It ties each version to its Git tag, primary code areas, implementation approach, audit corrections, and remaining limitations. It supersedes conflicting claims in older planning notes; those notes remain as records of what was proposed at the time.
+This is the source-checked map of the v4.8.2–v4.8.8 changes layered over the v4.8.1 baseline. It ties each version to its Git tag, primary code areas, implementation approach, audit corrections, and remaining limitations. The current release is v4.8.11; follow-up patches v4.8.9–v4.8.11 are recorded in their separate dossiers and the release ledger. It supersedes conflicting claims in older planning notes; those notes remain as records of what was proposed at the time.
 
-For the original product surface, see [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md). For automated checks and the current status of audit findings, see [`releases/AUDIT-CUSTOM-FEATURES-4.8.1-to-4.8.7.md`](releases/AUDIT-CUSTOM-FEATURES-4.8.1-to-4.8.7.md) and [`releases/RELEASE-4.8.8.md`](releases/RELEASE-4.8.8.md).
+For the original product surface, see [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md). For automated checks and the current status of audit findings, see [`releases/AUDIT-CUSTOM-FEATURES-4.8.1-to-4.8.7.md`](releases/AUDIT-CUSTOM-FEATURES-4.8.1-to-4.8.7.md), [`releases/RELEASE-4.8.8.md`](releases/RELEASE-4.8.8.md), and the later release dossiers. Fresh AI sessions should start with [`DEVELOPER_HANDOVER.md`](DEVELOPER_HANDOVER.md).
 
 ## How to read this record
 

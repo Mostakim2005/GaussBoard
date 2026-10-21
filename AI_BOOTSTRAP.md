@@ -1,16 +1,17 @@
 # GazBoard Replay — Fast AI Bootstrap & Context Router
 
 > **CRITICAL DIRECTIVE FOR FUTURE AI AGENTS**:
-> **DO NOT ingest or read all documentation files in `docs/` at once.** Doing so will consume over 100,000 tokens of your context window and degrade reasoning capability.
-> This repository is strictly modular. Read **only** this bootstrap document first, then look up **only** the specific section or file relevant to the user's immediate request from the **On-Demand Reading Matrix** below.
+> **DO NOT ingest or read all documentation files in `docs/` at once.** Read repository `AGENTS.md` when present, then this bootstrap, then [`docs/INDEX.md`](docs/INDEX.md) to route to one subsystem dossier. Consult [`docs/AI_DOCS_MAP.md`](docs/AI_DOCS_MAP.md) only when you need to understand the documentation structure or resolve which record is authoritative. Read only the selected dossier and the source/tests it names.
 
 ---
 
 ## 1. Quick Repository Facts & Mental Model
 
-* **Project**: **GazBoard Replay** (Windows-first fork of GazBoard v4.8.1); current working release **v4.8.11** (replay seek/outline fixes, live camera framing modes, recording actions, and unique export names, following v4.8.10).
+* **Project**: **GazBoard Replay** (Windows-first fork of GazBoard v4.8.1); current working release **v4.8.11** (replay seek/outline fixes, live camera framing modes, recording actions, unique export names, and a live Surface-to-ReplayEngine wiring correction, following v4.8.10).
+  * **Current repo snapshot:** branch `feat/m5-hardening-release`, commit `f01e1b30e57a8d28b680b504a44cc651160a6fe4`, local tag `v4.8.11`. Full onboarding, user preferences, verification limits, archive rules, and next-session protocol: [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md).
+  * **Verified archive:** `C:\Users\kazir\Documents\Antigravity\GazBoard\V-4.8.11`. Treat this as an archival release snapshot; work in the OpenCode repository and only synchronize a verified release.
   * Base-only behavior and source entry points: [`docs/BASE_FEATURE_CATALOG-4.8.1.md`](docs/BASE_FEATURE_CATALOG-4.8.1.md).
-  * Custom feature and fix history through v4.8.11: [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md), including v4.8.9 through v4.8.11 release dossiers.
+  * Custom feature and fix history through v4.8.11: [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) covers v4.8.2–v4.8.8; see the v4.8.9, v4.8.10, and v4.8.11 release dossiers for later patches.
   * Treat plans as proposals/history, not proof of shipped behavior. Verify current behavior against source and focused tests.
 * **Base Architecture**: Pure Vanilla JavaScript (ES6 Modules), HTML5 Canvas 2D, Electron 43.
   * **Zero Frontend Frameworks**: No React, Vue, Angular, or Svelte. Pure DOM manipulation and raw Canvas2D rendering.
@@ -30,7 +31,7 @@
 
 ## 2. On-Demand Subsystem Reading Matrix
 
-> **Fast Navigation Tip**: For a detailed feature-by-feature lookup chart, see [`docs/INDEX.md`](docs/INDEX.md).
+> **Fast Navigation Tip**: For document roles, authority, and token-light browsing rules, see [`docs/AI_DOCS_MAP.md`](docs/AI_DOCS_MAP.md). For the feature-by-feature lookup chart, see [`docs/INDEX.md`](docs/INDEX.md).
 > Open **ONLY** the designated Tier 1 Layer Dossier corresponding to your task:
 
 | Subsystem | If working on... | Read ONLY these files before modifying code |
@@ -103,5 +104,7 @@ npm run dist:win
 ```
 
 Current patch release notes and verification state: [`docs/releases/RELEASE-4.8.11.md`](docs/releases/RELEASE-4.8.11.md).
+
+Current repository status, release snapshot, owner preferences, and verification limitations: [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md).
 
 See [`docs/INDEX.md`](docs/INDEX.md) for feature-to-test navigation and [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) for release-specific scope.

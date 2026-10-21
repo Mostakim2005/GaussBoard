@@ -228,7 +228,10 @@ class App {
     // Before the Surface exists, so the very first frame is already the right
     // colour rather than a white flash that corrects itself a moment later.
     this.applyTheme();
-    this.surface = new Surface(document.getElementById('c'), this.store, { lowLatency: !!this.settings.lowLatencyInk });
+    this.surface = new Surface(document.getElementById('c'), this.store, {
+      app: this,
+      lowLatency: !!this.settings.lowLatencyInk
+    });
     this.surface.showGroupOutlines = this.settings.showGroupOutlines !== false;
     // Windows paints the last sliver of pen ink itself when this is on. Off
     // by default while it is an experiment; see inktrail.js.

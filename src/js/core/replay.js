@@ -19,6 +19,7 @@ export class ReplayEngine {
     this.loadGeneration = 0;
     this.playGeneration = 0;
     this.lastError = null;
+    this._centerFollowAt = null;
     if (this.audio) {
       this.audio.addEventListener('timeupdate', () => this.syncClock());
       this.audio.addEventListener('ended', () => this.onEnded());
@@ -46,6 +47,7 @@ export class ReplayEngine {
   loadTrack(track) {
     const generation = ++this.loadGeneration;
     this.pause();
+    this._centerFollowAt = null;
     this.track = track;
     this.audioBuffer = null;
     this.lastError = null;
@@ -92,6 +94,10 @@ export class ReplayEngine {
     if ((dur > 0 && this.currentTimeMs >= dur - 150) || (this.audio && this.audio.ended)) {
       this.seek(0);
     }
+    if (this.pendingSeekMs != null && this.audio) {
+      const seekReady = await this.waitForPendingSeek(request);
+      if (!seekReady || request !== this.playGeneration) return false;
+    }
     if (this.surface) {
       this.surface._ink = null;
       this.surface.invalidate();
@@ -119,6 +125,37 @@ export class ReplayEngine {
     this.active = true;
     this.loop();
     return true;
+  }
+
+  waitForPendingSeek(request) {
+    const audio = this.audio;
+    const target = this.pendingSeekMs;
+    if (!audio || target == null) return Promise.resolve(true);
+    if (typeof audio.addEventListener !== 'function' || typeof audio.removeEventListener !== 'function') {
+      return Promise.resolve(true);
+    }
+    const atTarget = () => this.pendingSeekMs == null && !audio.seeking
+      && Math.abs((audio.currentTime || 0) * 1000 - target) < 50;
+    if (atTarget()) return Promise.resolve(true);
+
+    return new Promise((resolve) => {
+      let timer = null;
+      const events = ['loadedmetadata', 'canplay', 'seeked', 'error'];
+      const finish = (ok) => {
+        if (timer != null) clearTimeout(timer);
+        for (const event of events) audio.removeEventListener(event, check);
+        resolve(ok);
+      };
+      const check = (event) => {
+        if (request !== this.playGeneration || audio !== this.audio) return finish(false);
+        if (event?.type === 'error') return finish(false);
+        if (this.pendingSeekMs != null) this.applyPendingSeek();
+        if (atTarget()) finish(true);
+      };
+      for (const event of events) audio.addEventListener(event, check);
+      timer = setTimeout(() => finish(atTarget()), 3000);
+      check();
+    });
   }
 
   pause() {
@@ -215,6 +252,7 @@ export class ReplayEngine {
   setCameraMode(mode) {
     if (!['viewport', 'center', 'dead-zone'].includes(mode)) return;
     this.followMode = mode;
+    this._centerFollowAt = null;
     this._replayFollowTarget = null;
     this.surface?.cam?.cancelGlide?.();
     if (this.autoFollow) this.followActiveStroke();
@@ -305,6 +343,9 @@ export class ReplayEngine {
     this._replayFollowTarget = stroke?.id || null;
     const screen = cam.toScreen(point.x, point.y);
     const width = this.surface.width, height = this.surface.height;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const elapsed = this._centerFollowAt == null ? 16 : Math.max(1, now - this._centerFollowAt);
+    this._centerFollowAt = now;
     let dx = 0, dy = 0;
     if (this.followMode === 'center') {
       dx = width / 2 - screen.x;
@@ -320,7 +361,16 @@ export class ReplayEngine {
       else if (screen.y > bottom) dy = bottom - screen.y;
     }
     if (dx || dy) {
-      cam.panBy(dx, dy);
+      if (this.followMode === 'center') {
+        // Smooth center-follow across playback frames so sampled point jitter
+        // does not translate directly into a shaky camera.
+        const blend = 1 - Math.exp(-elapsed / 180);
+        const moveX = Math.abs(dx) < 0.75 ? 0 : dx * blend;
+        const moveY = Math.abs(dy) < 0.75 ? 0 : dy * blend;
+        if (moveX || moveY) cam.panBy(moveX, moveY);
+      } else {
+        cam.panBy(dx, dy);
+      }
       this.surface.invalidate();
     }
   }

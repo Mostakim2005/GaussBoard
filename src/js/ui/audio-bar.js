@@ -27,6 +27,19 @@ export function trackMenuPosition(anchor, menu, viewport) {
   return { left, top, maxHeight };
 }
 
+export function sessionMenuPosition(anchor, menu, viewport) {
+  const margin = 10;
+  const below = viewport.height - anchor.bottom - margin;
+  const above = anchor.top - margin;
+  const placeBelow = below >= Math.min(menu.height, 220) || below >= above;
+  const maxHeight = Math.max(80, Math.min(menu.height, placeBelow ? below : above, viewport.height - margin * 2));
+  const top = placeBelow
+    ? Math.min(viewport.height - maxHeight - margin, anchor.bottom + 8)
+    : Math.max(margin, anchor.top - maxHeight - 8);
+  const left = Math.max(margin, Math.min(viewport.width - menu.width - margin, anchor.left));
+  return { left, top, maxHeight };
+}
+
 export class AudioBar {
   /**
    * @param {object} app Main application instance
@@ -300,11 +313,13 @@ export class AudioBar {
 
   async renameTrack(tr) {
     if (!tr) return;
+    const store = this.app?.store;
+    const tracks = store?.doc?.audioTracks || [];
+    const current = tracks.find((item) => item.id === tr.id) || tr;
     const newName = await this.app?.askText?.(t('Rename recording'), '', {
-      value: tr.name || '', placeholder: tr.name || '', ok: t('Save')
+      value: current.name || '', placeholder: current.name || '', ok: t('Save')
     });
-    if (newName && newName.trim() && newName.trim() !== (tr.name || '')) {
-      const store = this.app?.store;
+    if (newName && newName.trim() && newName.trim() !== (current.name || '')) {
       const before = store?.doc?.audioTracks || [];
       const after = before.map((item) => ({ ...item, bookmarks: item.bookmarks?.map((bookmark) => ({ ...bookmark })) }))
         .map((item) => item.id === tr.id ? { ...item, name: newName.trim() } : item);
@@ -396,7 +411,7 @@ export class AudioBar {
 
     const panel = h('div', {
       class: 'ab-session-dropdown',
-      style: 'position:absolute;bottom:calc(100% + 10px);left:12px;z-index:1020;background:var(--surface,#1f2328);color:var(--text,#ffffff);border:1px solid var(--line,rgba(255,255,255,0.15));border-radius:16px;box-shadow:0 10px 28px rgba(0,0,0,0.38);padding:14px;min-width:270px;display:flex;flex-direction:column;gap:10px;user-select:none;'
+      style: 'position:fixed;z-index:1020;background:var(--surface,#1f2328);color:var(--text,#ffffff);border:1px solid var(--line,rgba(255,255,255,0.15));border-radius:16px;box-shadow:0 10px 28px rgba(0,0,0,0.38);padding:14px;min-width:min(270px,calc(100vw - 20px));max-width:calc(100vw - 20px);max-height:calc(100vh - 20px);overflow-y:auto;display:flex;flex-direction:column;gap:10px;user-select:none;'
     });
 
     // Header matching Image 5
@@ -484,6 +499,13 @@ export class AudioBar {
     window.addEventListener('pointerdown', onDismiss);
 
     this.el.appendChild(panel);
+    const anchor = this.btnSession?.getBoundingClientRect?.() || this.el.getBoundingClientRect();
+    const fitted = sessionMenuPosition(anchor,
+      { width: panel.offsetWidth || 300, height: panel.offsetHeight || 420 },
+      { width: window.innerWidth, height: window.innerHeight });
+    panel.style.left = `${fitted.left}px`;
+    panel.style.top = `${fitted.top}px`;
+    panel.style.maxHeight = `${fitted.maxHeight}px`;
     this._sessionMenuEl = panel;
   }
 

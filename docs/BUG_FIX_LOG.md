@@ -25,6 +25,11 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 | **BUG-015** | Front Ribbon Tool Non-Configurability & Plus Menu Separation | Medium | UI / Ribbon Customization | Resolved |
 | **BUG-016** | Mouse Wheel Zoom vs Scroll Ambiguity & Arrow Key Navigation | High | Interaction / Navigation | Resolved |
 | **BUG-017** | Smoke Test Title Assertion Failure from Toolbar Tooltip Suffix | Low | Testing / i18n | Resolved |
+| **BUG-018** | Replay Seek Reverted to Stale Media Position | High | Audio / Replay | Resolved in v4.8.11 |
+| **BUG-019** | Live Highlighter Replay Outline Was Not Visible | High | Replay Rendering | Resolved in v4.8.11 |
+| **BUG-020** | Recording Rename Dialog Did Not Work Reliably | Medium | Audio / UI | Resolved in v4.8.11 |
+| **BUG-021** | Recording Action Menu Could Overflow the Viewport | Medium | Audio / UI | Resolved in v4.8.11 |
+| **BUG-022** | Video Export Suggested Names Could Collide or Be Invalid on Windows | Low | Video Export | Resolved in v4.8.11 |
 
 ---
 
@@ -238,4 +243,44 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 * **Symptom**: Out-of-bounds or partial crop values could reach `drawImage()` unchanged.
 * **Fix**: Clamp the source origin and dimensions to the image bounds.
 * **Files Touched**: `src/js/core/render.js`.
+
+### BUG-018: Replay Seek Reverted to Stale Media Position (v4.8.11)
+* **Symptom**: Immediately after recording or after an initial play, seeking/skip controls could appear unresponsive or jump back to the previous media time. Toggling replay sometimes cleared the condition.
+* **Root Cause**: The media element's pre-seek `currentTime` remained stale while the browser completed an asynchronous seek and could overwrite the user's requested replay time.
+* **Fix**: Keep the requested seek authoritative until media seek lifecycle confirmation; retry/resolve pending seeks on relevant media events.
+* **Verification**: `test/replay-reading.test.mjs`; see `docs/releases/RELEASE-4.8.11.md` for test counts and boundaries.
+* **Files Touched**: `src/js/core/replay.js`.
+
+### BUG-019: Live Highlighter Replay Outline Was Not Visible (v4.8.11)
+* **Symptom**: Video export rendered synchronized ink replay, while the live board failed to show the active outline for some strokes/highlighters.
+* **Root Cause**: The feedback outline reused blending behavior that could multiply into an invisible/dark result; a one-point stroke prefix also had no drawable segment.
+* **Fix**: Draw the replay feedback in a visible source-over pass, retaining regular source ink behavior, and use a tiny render-only segment at stroke start.
+* **Verification**: `test/replay-reading.test.mjs`; this is automated rendering coverage, not a user-board E2E validation.
+* **Files Touched**: `src/js/core/surface.js`.
+
+### BUG-020: Recording Rename Dialog Did Not Work Reliably (v4.8.11)
+* **Symptom**: Rename from the audio recording menu could fail to show or persist the new name.
+* **Root Cause**: The action used the browser `prompt()` path, which is unreliable in the Electron application shell and did not provide the desired document operation semantics.
+* **Fix**: Use GazBoard's own text dialog and commit the value as an undoable `audioTracks` Store operation.
+* **Verification**: `test/audio-bar.test.mjs` covers dialog wiring and persistence logic; see the release dossier.
+* **Files Touched**: `src/js/ui/audio-bar.js`.
+
+### BUG-021: Recording Action Menu Could Overflow the Viewport (v4.8.11)
+* **Symptom**: The recording three-dot menu could render offscreen when its anchor was near the top or bottom of the recording list.
+* **Fix**: Measure available space, choose the better side of the anchor, and constrain menu height so its contents scroll within the viewport.
+* **Verification**: `test/audio-bar.test.mjs` includes placement checks.
+* **Files Touched**: `src/js/ui/audio-bar.js`.
+
+### BUG-022: Video Export Suggested Names Could Collide or Be Invalid on Windows (v4.8.11)
+* **Symptom**: Repeated exports using the board title could suggest duplicate names, and invalid Windows filename characters could reach the save dialog.
+* **Fix**: Append a UTC timestamp to the suggested name and sanitize Windows-reserved filename characters.
+* **Verification**: `test/replay-reading.test.mjs` includes filename rules; video output quality/throughput was not benchmarked on representative user boards.
+* **Files Touched**: `src/js/export-video.js`.
+
+### BUG-023: Live Board Replay Did Not Render Animated Stroke Highlights (v4.8.11 follow-up)
+* **Symptom**: Exported replay showed progressive stroke animation/highlighting, but replaying on the live board did not. Changing Reading/Writing mode did not restore the live overlay.
+* **Root Cause**: Video export constructs its temporary `Surface` with `{ app: this.app }`, but the primary board `Surface` was constructed without the app reference. `Surface` therefore held `this.app === null`; live drawing could not reach `ReplayEngine`, so the replay overlay did not render. Export had the required reference and continued working. Reading/Writing mode controls board gestures, not replay rendering.
+* **Fix**: Pass `app: this` into the primary `Surface` constructor in `src/js/app.js`, aligning live and export surface wiring. The existing replay renderer can then access `ReplayEngine`, keep session strokes out of the frozen base scene, and draw the progressive overlay.
+* **Verification**: Focused replay/custom checks and the full regression smoke run passed after the fix. The user also confirmed live-board behavior works. See `docs/releases/RELEASE-4.8.11.md` for final build/check details.
+* **Files Touched**: `src/js/app.js` (wiring correction); renderer behavior remains in `src/js/core/surface.js` and `src/js/core/replay.js`.
 

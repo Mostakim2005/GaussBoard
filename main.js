@@ -137,9 +137,9 @@ if (process.env.GAZBOARD_USER_DATA) {
   // unless a test deliberately makes it one
   app.setPath('userData', portableUserData());
 } else if (process.argv.includes('--smoke')) {
-  const tmp = path.join(os.tmpdir(), 'gazboard-smoke');
-  fs.rmSync(tmp, { recursive: true, force: true });
-  fs.mkdirSync(tmp, { recursive: true });
+  // Never delete a shared smoke profile: another Electron test process may
+  // still have Chromium databases inside it open on Windows.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gazboard-smoke-'));
   app.setPath('userData', tmp);
 }
 

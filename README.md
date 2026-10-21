@@ -106,9 +106,13 @@ while the app release label and Windows artifacts use the requested `4.8.4.1` na
 [`docs/releases/RELEASE-4.8.4.1.md`](docs/releases/RELEASE-4.8.4.1.md) for the audit record,
 fixes, attribution and comparison with v4.8.5–v4.8.7.
 
-The consolidated **v4.8.8** Windows release carries the audited custom-feature fixes from
-the v4.8.2–v4.8.7 line. See [`docs/releases/RELEASE-4.8.8.md`](docs/releases/RELEASE-4.8.8.md)
-for the feature summary, audit attribution, known limitations, test results and artifact hashes.
+The current audited source and Windows release is **v4.8.11**, following the v4.8.8 consolidation
+and v4.8.9–v4.8.10 replay/study updates. A post-tag correction wires the live board Surface to
+ReplayEngine, restoring progressive replay highlights on the board; the export path already had
+that connection. See [`docs/releases/RELEASE-4.8.11.md`](docs/releases/RELEASE-4.8.11.md)
+for the root cause, changes, verification results, artifact hashes, and limitations. The release ledger is
+[`docs/releases/RELEASES_INDEX.md`](docs/releases/RELEASES_INDEX.md); fresh contributors and AI sessions
+should start with [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md).
 
 On Linux, the AppImage needs FUSE 2 to run. Most desktops already have it; on newer Ubuntu
 it is `sudo apt install libfuse2`. Otherwise `./GazBoard-*.AppImage --appimage-extract`
@@ -417,7 +421,7 @@ The V 4.8.4.1 feature smoke runs separately from `npm run smoke`. It exercises c
 cancel/apply/reset and undo, crop source bounds, and single/stitched video export duration,
 replay-clock isolation, timeout handling and cleanup. It does not run translation checks.
 
-The 4.8.8 custom-feature suite is separate from the mandatory regression suite. It covers
+The historical 4.8.8 custom-feature suite is separate from the mandatory regression suite. It covers
 the added inking, opacity, connector, template-tag, video-preset, margin geometry, audio,
 crop, zoom, and app-protocol security checks. Run `npm run smoke:custom` for the focused suite.
 
