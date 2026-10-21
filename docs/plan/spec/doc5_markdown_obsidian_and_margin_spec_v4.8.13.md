@@ -1,7 +1,7 @@
 # GazBoard v4.8.13 — Advanced Obsidian Markdown Ecosystem, Margin Overhaul & Split Workspace Architecture Specification
 
 > **Target Audience**: Frontier AI Engineering Models (Gemini for Argon, Gemini 1.5 Pro, Claude 3.5 Sonnet, GPT-4o) and Systems Architects.  
-> **Scope**: Implement full Obsidian-style Markdown parity (default Markdown for all text, toggleable Obsidian card window models, wikilinks/embeds `![[...]` with configurable double-click action menu, hashtag `#` autocomplete/indexing), overhaul the Page Margin dialog (fix inverted drag kinematics, increase margin limits up to 2000px, fix mouse-drift auto-dismiss), and repair the dual-viewport Split Workspace.  
+> **Scope**: Implement full Obsidian-style Markdown parity (default Markdown for all text, toggleable Obsidian card window models, persistent Settings for double-click wikilink behavior and quick-action popovers, hashtag `#` autocomplete/indexing), overhaul the Page Margin dialog (fix inverted drag kinematics, increase margin limits up to 2000px, fix mouse-drift auto-dismiss), and repair the dual-viewport Split Workspace.  
 > **Base Version**: GazBoard **v4.8.12** (commit `6b74f72` on branch `feat/markdown-text-boxes-v4.8.12`).  
 > **Target Version**: **v4.8.13** (branch `feat/markdown-obsidian-margin-v4.8.13`).  
 
@@ -39,17 +39,20 @@ GazBoard is a high-performance, local-first digital whiteboard for Windows 10/11
   2. **Floating Overlay / Format Bar (`src/js/ui/toolbar.js`)**: Add rich Markdown buttons: Heading levels (`H1`, `H2`, `H3`), Callout (`[!NOTE]`, `[!TIP]`, `[!WARNING]`, `[!DANGER]`), Checklists (`- [ ]`), Inline/Block Math (`$`, `$$`), Board Wikilinks (`[[...]]`), and Card Style Selector.
   3. **Right-Click Menu (`src/js/ui/contextmenu.js`)**: Add "Insert Markdown Card", "Card Style ▾", "Toggle Markdown Mode", and "Edit Link / Embed...".
 
-### 2.2. Wikilinks, Embeds (`![[...]]`), Aliases & Tag Autocomplete
+### 2.2. Wikilinks, Embeds (`![[...]]`), Aliases & Settings Configuration
 * **Embed Syntax (`![[Board#Page|Alias]]`)**:
   - An exclamation prefix denotes an embed/transclusion. In Live Preview and canvas rendering, an embedded board card displays an interactive summary preview or thumbnail of that target board.
-* **Configurable Double-Click Action (No Regrets)**:
-  - Double-clicking a wikilink or board reference opens a non-blocking Quick Action Popover (unless the user has configured an automatic default):
-    1. **Embed in Place (`![[...]]`)**: Switch or toggle to rich embedded board preview.
-    2. **Open in Split Study View**: Open the linked board side-by-side in dual workspace.
-    3. **Navigate Directly**: Switch current canvas to the target board.
-    4. **Edit Link & Aliases**: Open the link editing modal.
-    - Includes a checkbox: *"Always perform this action on double-click (can be changed anytime in Settings)"*.
-    - This ensures users are never locked into a single choice they might regret later.
+* **Persistent Settings Configuration (No Regrets, No Fatigue)**:
+  - Users can configure their preference once in **Settings › Markdown & Links**, and it is permanently remembered in `app.settings` across app restarts:
+    1. **`wikilinkDblClick`** (Double-click wikilink action):
+       - `'ask'` (Always ask via action popover — default when unconfigured)
+       - `'embed'` (Always embed in place `![[...]]`)
+       - `'split'` (Always open in split study view side-by-side)
+       - `'navigate'` (Always navigate directly to target board)
+       - `'edit'` (Always open the Link Editor modal)
+    2. **`quickActionPopovers`** (Quick-action popovers toggle):
+       - `true` (default): Show quick-action confirmation popovers.
+       - `false`: Disable popovers completely to prevent fatigue. Double-clicking or interacting executes the configured setting directly without any intermediate modal interruptions.
 * **Hold-and-Click (Long-Press) or Right-Click Interaction**:
   - Long-pressing or right-clicking a wikilink or board reference opens the Link Editor popover:
     - Target Board selection (dropdown/search).
@@ -103,6 +106,7 @@ GazBoard is a high-performance, local-first digital whiteboard for Windows 10/11
 │ src/js/ui/toolbar.js         │ Markdown ribbon, card style picker, format tools  │
 │ src/js/ui/replay-bar.js      │ Top ribbon "MD" button, "Page Margin" button      │
 │ src/js/ui/contextmenu.js     │ "Insert MD", "Card Style", "Page Margin", Links   │
+│ src/js/ui/panels.js          │ Settings › Markdown & Links preferences UI        │
 │ src/js/ui/pagemargin-dialog.js│ Kinematics fix, 2000px limits, pointer capture   │
 │ src/js/ui/split-workspace.js │ Fix `#editLayer` & `#ctxbar` reparenting/align    │
 │ src/locales/*.json           │ 7 translation dictionaries (all new strings)      │
@@ -114,7 +118,50 @@ GazBoard is a high-performance, local-first digital whiteboard for Windows 10/11
 
 ## 4. Subsystem Implementation Specifications
 
-### 4.1. Page Margin Overhaul (`src/js/ui/pagemargin-dialog.js`)
+### 4.1. Settings Panel Integration (`src/js/ui/panels.js`)
+
+In `panels.js` under the `settings` panel:
+```javascript
+// Markdown & Links Settings Section
+h('div', { class: 'section' },
+  h('h5', {}, t('Markdown & Links')),
+  row(t('Double-click link action'),
+    mkChoice([
+      ['ask', t('Always ask')],
+      ['embed', t('Embed in place')],
+      ['split', t('Open in split view')],
+      ['navigate', t('Navigate to board')],
+      ['edit', t('Edit link')]
+    ],
+    () => app.settings.wikilinkDblClick || 'ask',
+    (v) => { app.settings.wikilinkDblClick = v; app.saveSettings(); }
+  ),
+  t('Choose what happens when double-clicking a board link or wikilink on canvas')),
+
+  row(t('Quick-action popovers'),
+    mkToggle(
+      () => app.settings.quickActionPopovers !== false,
+      (v) => { app.settings.quickActionPopovers = v; app.saveSettings(); }
+    ),
+    t('Show floating confirmation popovers on canvas actions (disable for instant direct execution)')),
+
+  row(t('Default card model'),
+    mkChoice([
+      ['canvas', t('Canvas')],
+      ['window', t('Window')],
+      ['minimal', t('Minimal')],
+      ['transparent', t('Plain')]
+    ],
+    () => app.settings.defaultCardStyle || 'canvas',
+    (v) => { app.settings.defaultCardStyle = v; app.saveSettings(); }
+  ),
+  t('Appearance of newly created Markdown text boxes'))
+)
+```
+
+---
+
+### 4.2. Page Margin Overhaul (`src/js/ui/pagemargin-dialog.js`)
 
 #### Kinematics Derivation:
 In Turnout / Page Margin UI, the preview box represents the page boundary, and the handles on the margins adjust the writing area margins.
@@ -198,7 +245,7 @@ apply() {
 
 ---
 
-### 4.2. Toggleable Obsidian Card Window Models (`src/js/core/render.js`)
+### 4.3. Toggleable Obsidian Card Window Models (`src/js/core/render.js`)
 
 Each text card carries `cardStyle: 'canvas' | 'window' | 'minimal' | 'transparent'` (default: `'canvas'`).
 
@@ -290,7 +337,7 @@ export function drawMarkdownCardContainer(ctx, o, isDark = false) {
 
 ---
 
-### 4.3. Wikilinks, Embeds & Tag Autocomplete
+### 4.4. Wikilinks, Embeds & Tag Autocomplete
 
 #### Embed Syntax (`boardrefs.js` & `markdown.js`):
 * Wikilink: `[[Target Board#Page|Alias]]`
@@ -299,13 +346,21 @@ export function drawMarkdownCardContainer(ctx, o, isDark = false) {
 export const EMBED_WIKILINK_RE = /!\[\[([^\]|#\n]+)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
 ```
 
-#### Configurable Double-Click Action Popover (No Regrets):
+#### Settings-Driven Double-Click Execution:
 When double-clicking a wikilink or board reference on canvas:
 ```javascript
-export function openWikilinkDoubleAction(app, ref, anchorPoint) {
-  const pref = app.storage?.getPreference('wikilinkDblClick') || 'ask';
+export function handleWikilinkDoubleClick(app, ref, anchorPoint) {
+  const pref = app.settings?.wikilinkDblClick || 'ask';
+  const showPop = app.settings?.quickActionPopovers !== false;
+
   if (pref !== 'ask') {
     executeWikilinkAction(app, ref, pref);
+    return;
+  }
+
+  if (!showPop) {
+    // Fatigue prevention: execute default split/navigation immediately
+    executeWikilinkAction(app, ref, 'split');
     return;
   }
 
@@ -347,7 +402,7 @@ When right-clicking or long-pressing a wikilink or board ref card:
 
 ---
 
-### 4.4. Split Workspace Repair (`src/js/ui/split-workspace.js`)
+### 4.5. Split Workspace Repair (`src/js/ui/split-workspace.js`)
 
 #### Viewport Synchronization Fix:
 In `enable()`:
@@ -431,7 +486,8 @@ disable() {
 4. **Interactive Manual Testing**:
    - Default text creation -> verifies `markdown: true` and card model container appear immediately.
    - Switch card styles (`canvas` -> `window` -> `minimal` -> `transparent`) -> updates instantly on canvas.
-   - Double-click wikilink -> shows Action Chooser modal with "Remember choice" option.
+   - Open Settings › Markdown & Links -> change double-click to "Open in split view" -> double-clicking wikilink opens split view directly without popover.
+   - Toggle "Quick-action popovers" off in Settings -> verifies no popovers interrupt interaction.
    - Open Page Margin dialog: drag handle `e` right -> page margin expands rightward smoothly.
    - Drag cursor past modal boundary -> modal remains open until pointer is released.
    - Set margin to 1500px -> canvas visibly expands by 1500px.
