@@ -458,8 +458,8 @@ export class SearchDialog {
           [5000, '5.0s'],
           [10000, '10s']
         ],
-        get: () => s.laserTrailDuration ?? 520,
-        set: (v) => { s.laserTrailDuration = v; app.saveSettings(); }
+        get: () => Number(s.laserTrailDuration ?? 520),
+        set: (v) => { s.laserTrailDuration = Number(v); app.saveSettings(); if (app.surface) app.surface.dirty = true; }
       },
       {
         id: 'penOpacity',
@@ -509,14 +509,16 @@ export class SearchDialog {
         });
         for (const [val, label] of item.options) {
           const opt = document.createElement('option');
-          opt.value = val;
+          opt.value = String(val);
           opt.textContent = label;
-          if (val === curVal) opt.selected = true;
+          if (String(val) === String(curVal)) opt.selected = true;
           select.appendChild(opt);
         }
         select.addEventListener('change', (e) => {
           e.stopPropagation();
-          item.set(select.value);
+          const matched = item.options.find(([v]) => String(v) === select.value);
+          const finalVal = (matched && typeof matched[0] === 'number') ? Number(select.value) : (matched ? matched[0] : select.value);
+          item.set(finalVal);
         });
         control = select;
       } else if (item.type === 'action') {

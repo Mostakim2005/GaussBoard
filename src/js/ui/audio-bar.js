@@ -28,15 +28,37 @@ export function trackMenuPosition(anchor, menu, viewport) {
 }
 
 export function sessionMenuPosition(anchor, menu, viewport) {
-  const margin = 10;
-  const below = viewport.height - anchor.bottom - margin;
-  const above = anchor.top - margin;
-  const placeBelow = below >= Math.min(menu.height, 220) || below >= above;
-  const maxHeight = Math.max(80, Math.min(menu.height, placeBelow ? below : above, viewport.height - margin * 2));
-  const top = placeBelow
-    ? Math.min(viewport.height - maxHeight - margin, anchor.bottom + 8)
-    : Math.max(margin, anchor.top - maxHeight - 8);
-  const left = Math.max(margin, Math.min(viewport.width - menu.width - margin, anchor.left));
+  const margin = 12;
+  const vw = viewport?.width || 1024;
+  const vh = viewport?.height || 768;
+  const mw = menu?.width || 300;
+  const mh = menu?.height || 420;
+
+  const spaceBelow = vh - anchor.bottom - margin;
+  const spaceAbove = anchor.top - margin;
+
+  // Decide whether to place below or above based on available free space
+  let placeBelow = true;
+  if (spaceBelow < 180 && spaceAbove > spaceBelow) {
+    placeBelow = false;
+  } else if (spaceBelow >= 180) {
+    placeBelow = true;
+  } else {
+    placeBelow = spaceBelow >= spaceAbove;
+  }
+
+  const availableHeight = placeBelow ? spaceBelow : spaceAbove;
+  const maxHeight = Math.max(100, Math.min(mh, Math.max(availableHeight, 160), vh - margin * 2));
+
+  let top = placeBelow ? anchor.bottom + 6 : anchor.top - maxHeight - 6;
+  top = Math.max(margin, Math.min(vh - maxHeight - margin, top));
+
+  let left = anchor.left;
+  if (left + mw > vw - margin) {
+    left = Math.max(margin, anchor.right - mw);
+  }
+  left = Math.max(margin, Math.min(vw - mw - margin, left));
+
   return { left, top, maxHeight };
 }
 
@@ -491,18 +513,18 @@ export class AudioBar {
     const onDismiss = (e) => {
       const trackMenu = document.getElementById('abTrackMenu');
       if (trackMenu && trackMenu.contains(e.target)) return;
-      if (!panel.contains(e.target) && e.target !== this.btnSession) {
+      if (!panel.contains(e.target) && e.target !== this.btnSession && !this.btnSession?.contains(e.target)) {
         this.closeSessionMenu();
         window.removeEventListener('pointerdown', onDismiss);
       }
     };
-    window.addEventListener('pointerdown', onDismiss);
+    setTimeout(() => window.addEventListener('pointerdown', onDismiss), 0);
 
-    this.el.appendChild(panel);
+    document.body.appendChild(panel);
     const anchor = this.btnSession?.getBoundingClientRect?.() || this.el.getBoundingClientRect();
     const fitted = sessionMenuPosition(anchor,
       { width: panel.offsetWidth || 300, height: panel.offsetHeight || 420 },
-      { width: window.innerWidth, height: window.innerHeight });
+      { width: window.innerWidth || 1024, height: window.innerHeight || 768 });
     panel.style.left = `${fitted.left}px`;
     panel.style.top = `${fitted.top}px`;
     panel.style.maxHeight = `${fitted.maxHeight}px`;

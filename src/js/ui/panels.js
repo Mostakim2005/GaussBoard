@@ -1094,16 +1094,19 @@ export function createPanels(app) {
         hint ? h('div', { style: 'font-size:12px;color:var(--text-2);margin-top:4px' }, hint) : null);
 
       const mkChoice = (options, get, set) => {
-        const wrap = h('div', { style: 'display:flex;gap:4px' });
+        const wrap = h('div', {
+          style: 'display:flex;flex-wrap:wrap;gap:6px;max-width:100%;align-items:center;justify-content:flex-end;'
+        });
         const buttons = [];
         for (const [value, label] of options) {
-          const b = h('button', { class: 'btn' + (get() === value ? ' primary' : '') }, label);
-          b.style.cssText += 'padding:4px 10px;font-size:12.5px';
+          const isActive = String(get()) === String(value);
+          const b = h('button', { class: 'btn' + (isActive ? ' primary' : '') }, label);
+          b.style.cssText += 'padding:4px 10px;font-size:12px;border-radius:12px;white-space:nowrap;flex:0 0 auto;';
           buttons.push({ b, value });
           b.addEventListener('click', () => {
             set(value);
             for (const item of buttons) {
-              item.b.classList.toggle('primary', item.value === value);
+              item.b.classList.toggle('primary', String(item.value) === String(value));
             }
           });
           wrap.appendChild(b);
@@ -1302,16 +1305,19 @@ export function createPanels(app) {
         hint ? h('div', { style: 'font-size:12px;color:var(--text-2);margin-top:4px' }, hint) : null);
 
       const mkChoice = (options, get, set) => {
-        const wrap = h('div', { style: 'display:flex;gap:4px' });
+        const wrap = h('div', {
+          style: 'display:flex;flex-wrap:wrap;gap:6px;max-width:100%;align-items:center;justify-content:flex-end;'
+        });
         const buttons = [];
         for (const [value, label] of options) {
-          const b = h('button', { class: 'btn' + (get() === value ? ' primary' : '') }, label);
-          b.style.cssText += 'padding:4px 10px;font-size:12.5px';
+          const isActive = String(get()) === String(value);
+          const b = h('button', { class: 'btn' + (isActive ? ' primary' : '') }, label);
+          b.style.cssText += 'padding:4px 10px;font-size:12px;border-radius:12px;white-space:nowrap;flex:0 0 auto;';
           buttons.push({ b, value });
           b.addEventListener('click', () => {
             set(value);
             for (const item of buttons) {
-              item.b.classList.toggle('primary', item.value === value);
+              item.b.classList.toggle('primary', String(item.value) === String(value));
             }
           });
           wrap.appendChild(b);
@@ -1521,8 +1527,8 @@ export function createPanels(app) {
             t('Allow drawing translucent pen strokes for layering effects.')),
           row(t('Laser trail duration'), mkChoice(
             [[0, t('Instant')], [300, '300ms'], [520, t('520ms')], [1200, '1.2s'], [2500, '2.5s'], [5000, '5.0s'], [10000, '10s']],
-            () => s.laserTrailDuration ?? 520,
-            (v) => { s.laserTrailDuration = v; app.saveSettings(); }
+            () => Number(s.laserTrailDuration ?? 520),
+            (v) => { s.laserTrailDuration = Number(v); app.saveSettings(); if (app.surface) app.surface.dirty = true; }
           ), t('How long the laser pointer trail lingers on screen before melting away.')),
           row(t('Ruler snapping'), mkToggle(() => app.ruler.snap, (v) => (app.ruler.snap = v)))
         ),

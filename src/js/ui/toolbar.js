@@ -122,11 +122,6 @@ export function initToolbar(app) {
     if (opts.pop) b.dataset.pop = opts.pop;
     if (opts.ribbonId) {
       b.dataset.ribbonId = opts.ribbonId;
-      b.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        moveRibbonToolToPlus(app, opts.ribbonId);
-      });
     }
     b.innerHTML = icon(opts.icon, 20);
     if (opts.dot) b.appendChild(h('span', { class: 'dot' }));
@@ -148,8 +143,8 @@ export function initToolbar(app) {
   iconTool({ ribbonId: 'lasso', tool: 'lasso', icon: 'lasso', key: 'L', title: t('Lasso select (L)'), onClick: () => app.setTool('lasso') });
   iconTool({ ribbonId: 'pan', tool: 'pan', icon: 'hand', key: 'G', title: t('Pan the canvas (G) \u2014 drag to move around. Space, the middle mouse button and the scroll wheel do this too'),
     onClick: () => app.setTool('pan') });
-  iconTool({ ribbonId: 'laser', tool: 'laser', icon: 'laser', key: 'X', title: t('Laser pointer (X) \u2014 leaves a trail that fades; nothing is saved'),
-    onClick: () => app.setTool('laser') });
+  iconTool({ ribbonId: 'laser', tool: 'laser', icon: 'laser', key: 'X', title: t('Laser pointer (X) \u2014 click again for duration options'),
+    onClick: toggleTool('laser') });
   sep('1');
 
   /* ---- the pen tray ---- */
@@ -166,11 +161,6 @@ export function initToolbar(app) {
       + `<span class="kbd">${PENS.indexOf(pen) + 1}</span>`;
     b.dataset.paint = now.color + '|' + now.effect;
     b.addEventListener('click', () => choosePen(app, pen.id, b));
-    b.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      moveRibbonToolToPlus(app, 'pen');
-    });
     bar.appendChild(b);
   }
 
@@ -179,11 +169,6 @@ export function initToolbar(app) {
   hl.dataset.ribbonId = 'highlighter';
   hl.innerHTML = penIcon(app.settings.highlighterColor, 'none', 'highlighter') + '<span class="kbd">H</span>';
   hl.addEventListener('click', (e) => toggleTool('highlighter')(e, hl));
-  hl.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    moveRibbonToolToPlus(app, 'highlighter');
-  });
   bar.appendChild(hl);
   iconTool({ ribbonId: 'tape', tool: 'tape', icon: 'curtain', title: t('Study Tape'),
     onClick: () => { app.setTool('tape'); app.syncUI(); closePopover(); } });
@@ -193,11 +178,6 @@ export function initToolbar(app) {
   er.dataset.ribbonId = 'eraser';
   er.innerHTML = penIcon('#f7a8c4', 'none', 'eraser') + '<span class="kbd">E</span>';
   er.addEventListener('click', (e) => toggleTool('eraser')(e, er));
-  er.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    moveRibbonToolToPlus(app, 'eraser');
-  });
   bar.appendChild(er);
   sep('2');
 
@@ -1124,6 +1104,39 @@ export function openToolPopover(app, anchor, tool) {
       h('h4', { style: 'margin-top:12px' }, t('Fill')), fills,
       h('h4', { style: 'margin-top:12px' }, t('Line width')),
       sizeRow([1, 2, 3, 5, 8], s.shapeLineWidth, (v) => { s.shapeLineWidth = v; app.saveSettings(); app.applyToSelection({ lineWidth: v }, 'shape'); }, s.shapeStroke)
+    );
+  } else if (tool === 'laser') {
+    const curDur = Number(s.laserTrailDuration ?? 520);
+    const durOptions = [
+      [0, t('Instant')],
+      [300, '300ms'],
+      [520, '520ms'],
+      [1200, '1.2s'],
+      [2500, '2.5s'],
+      [5000, '5.0s'],
+      [10000, '10s']
+    ];
+    const durRow = h('div', { class: 'row', style: 'display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;' });
+    for (const [durMs, durLabel] of durOptions) {
+      const b = h('button', {
+        class: 'btn' + (Number(durMs) === curDur ? ' primary' : ''),
+        style: 'padding:4px 9px;font-size:12px;border-radius:12px;'
+      }, durLabel);
+      b.addEventListener('click', () => {
+        s.laserTrailDuration = Number(durMs);
+        app.saveSettings();
+        for (const child of durRow.children) child.classList.remove('primary');
+        b.classList.add('primary');
+        if (app.surface) app.surface.dirty = true;
+      });
+      durRow.appendChild(b);
+    }
+    body = h('div', { style: 'max-width:240px;' },
+      h('h4', {}, t('Laser trail duration')),
+      durRow,
+      h('div', { style: 'font-size:11px;color:var(--text-2,rgba(128,128,128,0.8));margin-top:8px;' },
+        t('Fades smoothly after drawing. Nothing is saved to board.')
+      )
     );
   }
 

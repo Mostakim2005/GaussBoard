@@ -11,7 +11,7 @@ import { clampImageCrop } from '../src/js/core/render.js';
 import { Camera } from '../src/js/core/camera.js';
 import { PageMarginDialog } from '../src/js/ui/pagemargin-dialog.js';
 import { Store } from '../src/js/core/store.js';
-import { AudioBar } from '../src/js/ui/audio-bar.js';
+import { AudioBar, sessionMenuPosition } from '../src/js/ui/audio-bar.js';
 import { parseSubtitles, findActiveCue } from '../src/js/ui/subtitles.js';
 import { VIDEO_EXPORT_PRESETS } from '../src/js/export-video.js';
 import { pageMarginRects } from '../src/js/core/pages.js';
@@ -198,4 +198,27 @@ test('subtitle cues parse and sort; markup is removed from cue text', () => {
   assert.deepEqual(cues.map((cue) => [cue.startMs, cue.text]), [[1000, 'earlier'], [2000, 'later']]);
   assert.equal(findActiveCue(cues, 1500).text, 'earlier');
   assert.equal(findActiveCue(cues, 3500), null);
+});
+
+test('sessionMenuPosition smartly detects free space and keeps dropdown within viewport', () => {
+  const viewport = { width: 1024, height: 768 };
+  const menu = { width: 300, height: 420 };
+
+  // Near top of screen: must place below
+  const topAnchor = { left: 50, right: 150, top: 20, bottom: 50 };
+  const posTop = sessionMenuPosition(topAnchor, menu, viewport);
+  assert.ok(posTop.top >= topAnchor.bottom, 'Should position below when anchor is near top');
+  assert.ok(posTop.top + posTop.maxHeight <= viewport.height, 'Should not overflow bottom of viewport');
+  assert.ok(posTop.left >= 12, 'Left should be >= margin');
+
+  // Near bottom of screen: must place above
+  const bottomAnchor = { left: 50, right: 150, top: 720, bottom: 750 };
+  const posBottom = sessionMenuPosition(bottomAnchor, menu, viewport);
+  assert.ok(posBottom.top < bottomAnchor.top, 'Should position above when anchor is near bottom');
+  assert.ok(posBottom.top >= 12, 'Top should be >= margin');
+
+  // Near right edge: must not overflow right viewport border
+  const rightAnchor = { left: 950, right: 1010, top: 300, bottom: 330 };
+  const posRight = sessionMenuPosition(rightAnchor, menu, viewport);
+  assert.ok(posRight.left + menu.width <= viewport.width, 'Should not overflow right edge');
 });
