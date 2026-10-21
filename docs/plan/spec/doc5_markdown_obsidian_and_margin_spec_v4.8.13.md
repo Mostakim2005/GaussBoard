@@ -475,10 +475,14 @@ disable() {
 
 ## 6. Verification & Test Plan
 
-1. **Unit Testing (`test/markdown.test.mjs`)**:
+> [!NOTE]
+> **Temporary Fast Iteration Instruction**: Skip the 1,240-assertion base feature smoke suite during active development iterations. Only execute targeted tests for the additional features (`node --test test/custom-features.test.mjs test/markdown.test.mjs test/replay-reading.test.mjs test/video-framing.test.mjs`).
+
+1. **Targeted Feature Unit Testing (`test/markdown.test.mjs` & `test/custom-features.test.mjs`)**:
    - Verify `![[Board#Page|Alias]]` parse and serialize.
    - Verify `#tag` extraction and frequency count.
    - Verify callout rendering for all 12 types.
+   - Verify page margin kinematics and expanded limits (runs in ~250ms).
 2. **Regression Smoke Suite (`node scripts/smoke.js`)**:
    - Ensure all **1,240 assertions** pass with 0 errors.
 3. **i18n Parity (`node scripts/i18n-check.js`)**:
