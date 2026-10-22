@@ -131,3 +131,18 @@ Wave functions and probability density.`;
   assert.match(html, /<h1 class="gb-md-h gb-md-h1" data-line="0">Lecture 3<\/h1>/);
   assert.ok(!html.includes('title: Quantum Mechanics'));
 });
+
+test('YAML frontmatter supports Obsidian block lists and quoted commas', () => {
+  const md = `---
+tags:
+  - lecture
+  - "math, physics"
+aliases: ["Quantum, level 2", 'QM: advanced']
+---
+Body`;
+  const { attributes, body } = parseFrontmatter(md);
+  assert.deepEqual(attributes.tags, ['lecture', 'math, physics']);
+  assert.deepEqual(attributes.aliases, ['Quantum, level 2', 'QM: advanced']);
+  assert.deepEqual(countTags(md), { lecture: 1, 'math, physics': 1 });
+  assert.equal(body, 'Body');
+});

@@ -1,6 +1,6 @@
 # GazBoard Replay — Master Feature & Fixes Record
 
-> **Current source of release-by-release truth:** [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) covers v4.8.2–v4.8.8; see the v4.8.9–v4.8.11 release dossiers for subsequent changes. The catalog of original v4.8.1-only capabilities is [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md). This record retains detailed feature IDs and historical implementation notes; check current source and release tests when older entries conflict.
+> **Current source of release-by-release truth:** [`FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) covers v4.8.2–v4.8.8; later additions are cataloged in [`MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md`](MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md) and `docs/releases/RELEASE-*.md`. The catalog of original v4.8.1-only capabilities is [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md). This record retains detailed feature IDs and historical implementation notes; check current source and release tests when older entries conflict.
 
 This document serves as the master registry of all features, enhancements, bug fixes, algorithmic parameters, and regression invariants implemented in GazBoard Replay (Windows-first fork). Every entry lists its purpose, source files, acceptance criteria, and regression test invariants.
 
@@ -30,6 +30,7 @@ This document serves as the master registry of all features, enhancements, bug f
 | **F-118** | PDF Import Mode & Auto-Alignment | `src/js/ui/pagepicker.js`<br>`src/js/insert.js` | Verified | Choice between `Movable objects` (printouts) and `Page background` (locked native pad sheets). Auto-alignment presets (`Fit width`, `Fit height`, `Fit page`). |
 | **F-119** | Turnout Page Margin Adjustment Dialog | `src/js/ui/pagemargin-dialog.js`<br>`src/js/ui/panels.js`<br>`src/js/app.js` | Verified | Turnout-inspired modal with 8 draggable blue control handles, presets (Cornell wide left, wide right, top header, 2-col), background colors, and scope toggle (`Apply to entire note` vs `Apply to current page`). |
 | **F-120** | Live Board Replay Surface Wiring | `src/js/app.js`<br>`src/js/core/surface.js`<br>`src/js/core/replay.js` | Verified | Connects the primary board Surface to its owning App so live drawing can access ReplayEngine and render progressively reanimated/highlighted session strokes. Reading/Writing mode remains a gesture/editing policy; sync and replay state govern the overlay. See BUG-023 and the v4.8.11 release dossier. |
+| **F-121** | Obsidian YAML Block-List Metadata | `src/js/core/markdown.js`<br>`test/markdown.test.mjs` | Verified | Extracts tags and aliases from standard YAML block lists and parses quoted inline list entries with commas or colons without splitting their values. |
 
 ---
 

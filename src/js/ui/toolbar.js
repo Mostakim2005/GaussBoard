@@ -1058,10 +1058,11 @@ export function openToolPopover(app, anchor, tool) {
 
     const softnessRow = h('div', { class: 'row', style: 'display:flex;gap:4px;margin-top:6px;' },
       ...['light', 'medium', 'strong'].map((mode) => {
+        const labels = { light: t('Light'), medium: t('Medium'), strong: t('Strong') };
         const b = h('button', {
           class: 'btn' + ((s.brushSoftness || 'medium') === mode ? ' primary' : ''),
           style: 'padding:4px 10px;font-size:12px;text-transform:capitalize;'
-        }, t(mode));
+        }, labels[mode]);
         b.addEventListener('click', () => {
           markActive(softnessRow, b, 'primary');
           s.brushSoftness = mode;
@@ -1117,10 +1118,11 @@ export function openToolPopover(app, anchor, tool) {
 
     const flexRow = h('div', { class: 'row', style: 'display:flex;gap:4px;margin-top:6px;' },
       ...['subtle', 'normal', 'expressive'].map((mode) => {
+        const labels = { subtle: t('Subtle'), normal: t('Normal'), expressive: t('Expressive') };
         const b = h('button', {
           class: 'btn' + ((s.fountainFlex || 'normal') === mode ? ' primary' : ''),
           style: 'padding:4px 10px;font-size:12px;text-transform:capitalize;'
-        }, t(mode));
+        }, labels[mode]);
         b.addEventListener('click', () => {
           markActive(flexRow, b, 'primary');
           s.fountainFlex = mode;
@@ -1525,7 +1527,7 @@ export function openInsertPopover(app, anchor) {
     ...PENS.map((pen, idx) => {
       const penId = 'pen:' + pen.id;
       return ribbonToolItem(
-        t('Pen {n} ({color})', { n: idx + 1, color: t(pen.label) }),
+        t('Pen {n} ({color})', { n: idx + 1, color: pen.label }),
         'pen',
         () => choosePen(app, pen.id),
         penId,

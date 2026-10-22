@@ -123,10 +123,18 @@ const browserChecks = String.raw`(async () => {
     ribbonTape?.click();
     const ribbonActivatesDrawingTool = app.tool === 'tape';
     app.setTool('select');
-    document.querySelector('#toolbar [data-cmd="insert"]')?.click();
-    const addTapeItem = [...document.querySelectorAll('.menu-item')].find((el) => el.textContent.includes('Study Tape'));
+    const { closePopover } = await import('app://board/js/ui/popover.js');
+    closePopover();
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = (query) => ({ matches: query === '(pointer: coarse)' || query === '(max-width: 760px)' });
+    const { initToolbar } = await import('app://board/js/ui/toolbar.js');
+    initToolbar(app);
+    document.querySelector('#toolbar [data-pop="add"]')?.click();
+    const addTapeItem = [...document.querySelectorAll('.pop .menu-action-zone')].find((el) => el.textContent.includes('Study Tape'));
     addTapeItem?.click();
     const addMenuActivatesDrawingTool = app.tool === 'tape';
+    window.matchMedia = originalMatchMedia;
+    initToolbar(app);
     app.settings.autosave = savedAutosave;
     app.newBoard(true);
     out.rectangularCoverTogglesAndKeepsAnswer = coverRevealed && coverConcealedAgain ||
@@ -155,7 +163,7 @@ async function run(win, app) {
     videoFixedWholeBoardSelectionReturnsBoardFrame: 'video export dialog returns fixed whole-board framing',
     rectangularCoverTogglesAndKeepsAnswer: 'rectangular cover toggles on and off with its answer restored',
     freehandStudyTapeTogglesTwice: 'freehand study tape toggles revealed and concealed',
-    ribbonAndAddMenuActivateTapeTool: 'ribbon and add menu activate the study tape drawing tool'
+    ribbonAndAddMenuActivateTapeTool: 'desktop ribbon and phone Add menu activate the study tape drawing tool'
   };
   let passed = 0, failed = 0;
   const lines = [];

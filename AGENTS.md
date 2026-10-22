@@ -26,13 +26,13 @@
      * Video Export & Audio Stitching $\rightarrow$ [`docs/layers/07-video-export.md`](docs/layers/07-video-export.md)
      * Multi-Layer System (On Standby) $\rightarrow$ [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md) (§6)
 5. **Fourth Step — Edit ONLY the Specified Files**:
-   * Touch only the 1–2 files listed in Section 2 of that layer dossier.
+   * For a focused feature task, touch only the files listed in that layer dossier. For a user-requested cross-subsystem audit, security review, or documentation refresh, route each affected subsystem independently and make only changes supported by source evidence.
    * **Documentation-only exception:** if the user explicitly requests a documentation refresh across the project, inspect and update only the project-authored Markdown files that match the requested subject and each file's purpose. Use [`docs/INDEX.md`](docs/INDEX.md) for routing; do not bulk-ingest or indiscriminately rewrite `docs/`.
    * The v4.8.1 base catalog and cumulative custom-feature record are separate: [`docs/BASE_FEATURE_CATALOG-4.8.1.md`](docs/BASE_FEATURE_CATALOG-4.8.1.md) and [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md).
 
 ## 1A. Current Documentation Map
 
-The repository's current consolidated release is v4.8.8. Use `docs/INDEX.md` to route documentation work, `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md` for source-checked release history, and `docs/BASE_FEATURE_CATALOG-4.8.1.md` for baseline-only behavior. Historical plans document intent and analysis at the time; they are not authoritative statements of current implementation. Preserve user choices as additive selectable options where practical, and record their effects on other subsystems.
+The current release and source snapshot are recorded in `package.json`, `docs/INDEX.md`, and `docs/DEVELOPER_HANDOVER.md`; verify them at the start of each task. `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md` is historical, and `docs/BASE_FEATURE_CATALOG-4.8.1.md` describes baseline-only behavior. Historical plans document intent, not current implementation. Preserve user choices as additive selectable options where practical, and record effects on other subsystems.
 
 ---
 
@@ -58,9 +58,9 @@ The repository's current consolidated release is v4.8.8. Use `docs/INDEX.md` to 
 Before reporting completion to the user, run these verification commands in PowerShell:
 
 ```powershell
-# 1. Full regression smoke test suite (Must pass 1,240 / 1,240):
+# 1. Full regression smoke test suite (report the actual current count):
 node scripts/smoke.js
 
-# 2. Strict 100% translation coverage check (Must pass 1,368 / 1,368):
+# 2. Strict 100% translation coverage check (report the actual current count):
 node scripts/i18n-check.js
 ```

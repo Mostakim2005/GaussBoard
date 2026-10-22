@@ -37,6 +37,31 @@ const CALLOUT_ICONS = {
 
 const MD_HEURISTIC_RE = /(?:^|\n)\s*(?:#{1,6}\s+|>\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+\.\s+|\|.+\|)|^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)|(?:\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~]+~~|`[^`\n]+`|<u>[\s\S]+?<\/u>|\$\$[\s\S]+?\$\$|(?<=[^\$\\\w])\$[^\s\$\n](?:[^\$\n]*?[^\s\$\n])?\$|!?\[\[[^\]]+\]\]|@!?\[[^\]]+\]\(b:|(?:^|[\s(\[{"'])#[a-zA-Z][a-zA-Z0-9_\-/]*)/;
 
+function parseFrontmatterScalar(raw) {
+  const value = String(raw || '').trim();
+  if (value.startsWith('[') && value.endsWith(']')) {
+    const items = [];
+    let part = '', quote = '', escaped = false;
+    for (const char of value.slice(1, -1)) {
+      if (escaped) { part += char; escaped = false; continue; }
+      if (char === '\\' && quote === '"') { part += char; escaped = true; continue; }
+      if ((char === '"' || char === "'") && (!quote || quote === char)) { quote = quote ? '' : char; part += char; continue; }
+      if (char === ',' && !quote) { if (part.trim()) items.push(parseFrontmatterScalar(part)); part = ''; continue; }
+      part += char;
+    }
+    if (part.trim()) items.push(parseFrontmatterScalar(part));
+    return items;
+  }
+  if (value.length >= 2 && ((value[0] === '"' && value.at(-1) === '"') || (value[0] === "'" && value.at(-1) === "'"))) {
+    const inner = value.slice(1, -1);
+    if (value[0] === '"') {
+      try { return JSON.parse(value); } catch { return inner.replace(/\\(["\\])/g, '$1'); }
+    }
+    return inner.replace(/''/g, "'");
+  }
+  return value;
+}
+
 /**
  * Parses Obsidian YAML frontmatter from the beginning of a document.
  * @param {string} markdownText
@@ -51,17 +76,25 @@ export function parseFrontmatter(markdownText) {
   const body = markdownText.slice(match[0].length);
   const attributes = {};
 
+  let listKey = null;
   for (const line of rawYaml.split(/\r?\n/)) {
-    const colonIdx = line.indexOf(':');
-    if (colonIdx === -1) continue;
-    const key = line.slice(0, colonIdx).trim();
-    let val = line.slice(colonIdx + 1).trim();
-    if (val.startsWith('[') && val.endsWith(']')) {
-      val = val.slice(1, -1).split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
-    } else {
-      val = val.replace(/^['"]|['"]$/g, '');
+    const listItem = line.match(/^\s+-\s+(.*)$/);
+    if (listKey && listItem) {
+      attributes[listKey].push(parseFrontmatterScalar(listItem[1]));
+      continue;
     }
-    attributes[key] = val;
+    const colonIdx = line.indexOf(':');
+    if (colonIdx === -1) { listKey = null; continue; }
+    const key = line.slice(0, colonIdx).trim();
+    if (!key) { listKey = null; continue; }
+    const rawValue = line.slice(colonIdx + 1).trim();
+    if (!rawValue) {
+      attributes[key] = [];
+      listKey = key;
+    } else {
+      attributes[key] = parseFrontmatterScalar(rawValue);
+      listKey = null;
+    }
   }
   return { attributes, body };
 }

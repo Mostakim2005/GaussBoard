@@ -83,15 +83,21 @@ export class DensityCanvas {
     const sec = Math.floor(bm.t / 1000);
     const m = Math.floor(sec / 60), s = sec % 60;
     const timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    const nameStr = bm.name ? ` · ${bm.name}` : '';
-
     this.tooltipEl.innerHTML = '';
     this.tooltipEl.style.flexDirection = 'column';
     this.tooltipEl.style.alignItems = 'flex-start';
 
     const label = document.createElement('span');
     label.style.cssText = 'display:flex;align-items:center;gap:4px;color:#ffb900;';
-    label.innerHTML = `<span>🔖</span><span style="color:inherit;font-variant-numeric:tabular-nums;">${timeStr}${nameStr}</span>`;
+    const icon = document.createElement('span');
+    icon.textContent = '🔖';
+    const labelText = document.createElement('span');
+    labelText.style.cssText = 'color:inherit;font-variant-numeric:tabular-nums;';
+    label.append(icon, labelText);
+    const updateLabel = () => {
+      labelText.textContent = `${timeStr}${bm.name ? ` · ${bm.name}` : ''}`;
+    };
+    updateLabel();
 
     const btnJump = document.createElement('button');
     btnJump.className = 'density-bm-jump-btn';
@@ -124,8 +130,7 @@ export class DensityCanvas {
     const saveName = (ev) => {
       ev.stopPropagation();
       bm.name = nameInput.value.trim();
-      const updatedNameStr = bm.name ? ` · ${bm.name}` : '';
-      label.innerHTML = `<span>🔖</span><span style="color:inherit;font-variant-numeric:tabular-nums;">${timeStr}${updatedNameStr}</span>`;
+      updateLabel();
       editWrap.style.display = 'none';
       if (this.onBookmarkRenamed) this.onBookmarkRenamed(bm);
     };
@@ -133,6 +138,11 @@ export class DensityCanvas {
     btnSave.addEventListener('click', saveName);
     nameInput.addEventListener('keydown', (ev) => {
       if (ev.key === 'Enter') saveName(ev);
+      if (ev.key === 'Escape') {
+        ev.stopPropagation();
+        nameInput.value = bm.name || '';
+        editWrap.style.display = 'none';
+      }
     });
 
     btnName.addEventListener('click', (ev) => {

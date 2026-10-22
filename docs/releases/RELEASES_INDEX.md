@@ -2,7 +2,7 @@
 
 For a source-checked narrative of feature changes, implementation approach, corrections, and known limitations, see [`../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md). For the original baseline only, see [`../BASE_FEATURE_CATALOG-4.8.1.md`](../BASE_FEATURE_CATALOG-4.8.1.md). Audit attribution: initial audit by **Codex 4.6 Medium in Cursor**; secondary audit and fixes by **GPT-6 Luna High using Codex**.
 
-This document provides the ledger of progressive Windows releases, from the original base (`4.8.1`) through the latest patch release (`4.8.11`). Each release is paired with its Windows executable and a dedicated release dossier.
+This document provides the ledger of progressive Windows releases, from the original base (`4.8.1`) through the current patch release. Each release is paired with its Windows executable and a dedicated release dossier when the artifact is available.
 
 ---
 
@@ -22,6 +22,7 @@ This document provides the ledger of progressive Windows releases, from the orig
 | **v4.8.9** | `v4.8.9` local tag (push pending authentication) | [`GazBoard-4.8.9-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/dist/GazBoard-4.8.9-portable.exe) | 107,270,755 B | [`RELEASE-4.8.9.md`](RELEASE-4.8.9.md) | Video-driven Study Tape and answer-cover toggling, hit-testing/bounds/render fixes, and dedicated ribbon/Add-menu tool entries. |
 | **v4.8.10** | Local tag `v4.8.10` | [`GazBoard-4.8.10-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/V-4.8.10/dist/GazBoard-4.8.10-portable.exe) | 107,275,427 B | [`RELEASE-4.8.10.md`](RELEASE-4.8.10.md) | Optional live replay camera follow; fixed recording/whole-board or follow-strokes video framing, including stitched exports. |
 | **v4.8.11** | Local tag `v4.8.11` + replay wiring follow-up | [`GazBoard-4.8.11-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/V-4.8.11/dist/GazBoard-4.8.11-portable.exe) | 107,277,884 B | [`RELEASE-4.8.11.md`](RELEASE-4.8.11.md) | Replay seek-state reliability, visible live highlighter outlines and live Surface-to-ReplayEngine wiring, working recording rename, adaptive recording menu placement, camera center/dead-zone modes, unique video export filenames. |
+| **v4.8.21** | Local tag `v4.8.21` | [`GazBoard-v4.8.21-Portable.exe`](../../dist/GazBoard-v4.8.21-Portable.exe) | 106,252,560 B | [`RELEASE-4.8.21.md`](RELEASE-4.8.21.md) | Electron IPC sender and navigation guards, validated external URLs, safe bookmark labels with Escape-to-cancel, Obsidian YAML block-list metadata, locale completeness. |
 
 ---
 

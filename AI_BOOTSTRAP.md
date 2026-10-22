@@ -7,9 +7,9 @@
 
 ## 1. Quick Repository Facts & Mental Model
 
-* **Project**: **GazBoard Replay** (Windows-first fork of GazBoard v4.8.1); current working release **v4.8.11** (replay seek/outline fixes, live camera framing modes, recording actions, unique export names, and a live Surface-to-ReplayEngine wiring correction, following v4.8.10).
-  * **Current repo snapshot:** branch `feat/m5-hardening-release`, commit `f01e1b30e57a8d28b680b504a44cc651160a6fe4`, local tag `v4.8.11`. Full onboarding, user preferences, verification limits, archive rules, and next-session protocol: [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md).
-  * **Verified archive:** `C:\Users\kazir\Documents\Antigravity\GazBoard\V-4.8.11`. Treat this as an archival release snapshot; work in the OpenCode repository and only synchronize a verified release.
+* **Project**: **GazBoard Replay** (Windows-first fork of GazBoard v4.8.1); current source release **v4.8.21**. It contains v4.8.12–v4.8.20 feature history plus Electron IPC/navigation hardening, safe bookmark labels, Escape-to-cancel bookmark rename, and standard Obsidian YAML block-list metadata parsing.
+  * **Current repo snapshot:** read `package.json`, `git status`, and `git log` for live version/commit state; the previous tagged baseline is v4.8.20. Release details and verification: [`docs/releases/RELEASE-4.8.21.md`](docs/releases/RELEASE-4.8.21.md). Full onboarding, preferences, and next-session protocol: [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md).
+  * **Archive policy:** keep active work in this repository. Copy only a verified durable release to the user's configured archive location; never rely on stale hardcoded archive paths in old release notes.
   * Base-only behavior and source entry points: [`docs/BASE_FEATURE_CATALOG-4.8.1.md`](docs/BASE_FEATURE_CATALOG-4.8.1.md).
   * Custom feature and fix history through v4.8.11: [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) covers v4.8.2–v4.8.8; see the v4.8.9, v4.8.10, and v4.8.11 release dossiers for later patches.
   * Treat plans as proposals/history, not proof of shipped behavior. Verify current behavior against source and focused tests.
@@ -103,7 +103,7 @@ node scripts/i18n-check.js
 npm run dist:win
 ```
 
-Current patch release notes and verification state: [`docs/releases/RELEASE-4.8.11.md`](docs/releases/RELEASE-4.8.11.md).
+Current patch release notes and verification state: [`docs/releases/RELEASE-4.8.21.md`](docs/releases/RELEASE-4.8.21.md).
 
 Current repository status, release snapshot, owner preferences, and verification limitations: [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md).
 

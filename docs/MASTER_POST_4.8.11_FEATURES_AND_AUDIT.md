@@ -4,9 +4,9 @@
 > **Breadcrumb Navigation**: [`docs/INDEX.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/docs/INDEX.md) → [`AI_BOOTSTRAP.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/AI_BOOTSTRAP.md) → **`MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md`**  
 > **Document Authority**: Authoritative Level 2/3 Technical Specification, Subsystem Architecture Map, and External AI Audit Dossier for all releases from `v4.8.11` to `v4.8.20`.  
 > **Target OS**: Windows 10 / 11 (64-bit Electron Portable Binary / NSIS Installer on-demand).  
-> **Active Target Release**: `v4.8.20` (Binary: `GazBoard-v4.8.20-Portable.exe`).  
+> **Feature history scope**: `v4.8.11`–`v4.8.20`; follow-up hardening is documented in [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md).
 > **Fast Test Runner**: `node --test test/custom-features.test.mjs test/markdown.test.mjs test/replay-reading.test.mjs test/video-framing.test.mjs` (Strict execution budget: $< 250\text{ms}$).  
-> **Mandatory Invariant Rule**: NEVER run the legacy 1,240 base smoke tests (`scripts/smoke.js`). Only run the targeted custom test suite.
+> **Verification rule**: Follow the current repository `AGENTS.md`; focused custom checks supplement, and do not replace, the required full smoke and translation checks.
 
 ---
 
@@ -439,8 +439,7 @@ Run the verified custom test runner:
 cd "C:\Users\kazir\Documents\OpenCode\GazBoard"
 node --test test/custom-features.test.mjs test/markdown.test.mjs test/replay-reading.test.mjs test/video-framing.test.mjs
 ```
-*Expected Result*: All 45 tests pass with 0 failures in $< 200\text{ms}$.  
-*Warning*: Never run `node scripts/smoke.js`.
+*Expected Result*: Run the focused checks relevant to the change. Also run the full smoke and translation checks required by the current repository `AGENTS.md`.
 
 ### Step 2: Autonomous Continuous Auditing & Flaw Discovery
 Future AI assistants are strictly mandated to:
@@ -482,5 +481,20 @@ Whenever a release or tag is created:
 3. Commit and tag: `git tag v4.8.x`.
 4. Build portable executable: `npx electron-builder --win portable`.
 5. Verify output: `dist/GazBoard-v4.8.x-Portable.exe` (~96.8 MB).
-6. Copy to `releases/` and mirror to `C:\Users\kazir\Documents\Antigravity\GazBoard\dist\`.
-7. Update `C:\Users\kazir\Documents\Antigravity\TOPIC_CATALOG.md`.
+6. Copy the verified portable binary to the configured durable archive only after checks pass.
+7. Update the repository release dossier, release index, feature record, bug log, bootstrap, handover, and documentation map as applicable.
+
+## 7. v4.8.20 Audit Follow-Up (v4.8.21)
+
+Source review and focused tests through v4.8.20 found these items worth recording:
+
+| Area | Source-checked result | Action in v4.8.21 |
+| :--- | :--- | :--- |
+| Markdown frontmatter | Parser did not support Obsidian's standard indented YAML list form for `tags` and `aliases`; quoted inline values containing commas were split incorrectly. | Added block-list parsing and quote-aware inline list parsing; covered by `test/markdown.test.mjs`. |
+| Bookmark tooltip | Saved bookmark labels were interpolated into `innerHTML`. | Switched untrusted names to `textContent`; added Escape-to-cancel behavior. |
+| Electron IPC | `ipcMain.handle` callbacks accepted any sender frame. | All handlers now use a common check for the primary `app://board` frame. |
+| Electron navigation | The window-open handler sent arbitrary URL schemes to `shell.openExternal`; the releases bridge used a string-prefix check. | Blocked navigation outside the app, allowed only HTTP(S) in the external opener, and parsed the release URL against the configured origin/path. |
+| SVG XHTML | Renderer output already escapes raw Markdown and self-closes generated void elements. The previous regex-only sanitizer proposal was incomplete and was not applied. | No additional sanitizer was added. |
+| v4.8.20 math and pen switching | Currency-delimiter regression tests pass; pen switching retains tool-specific colors in the current toolbar implementation. | No code change needed. |
+
+**Residual security work:** the BrowserWindow sandbox remains disabled because preload depends on Node's `crypto`; migrate that preload before enabling it. The file bridge still accepts paths from the trusted main renderer and should eventually use user-approved file capabilities. IPC frame checks do not prevent an XSS in the trusted top-level document, so continue treating board/import data as untrusted and avoid unsafe HTML sinks.

@@ -1,6 +1,6 @@
 # GazBoard Replay — Developer Handover & Future Agent Guide
 
-> **Current handover snapshot (2026-10-18):** working source is v4.8.11 at tagged commit `f01e1b30e57a8d28b680b504a44cc651160a6fe4`, plus the post-tag live replay wiring correction in the working tree. Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-4.8.11.md`](releases/RELEASE-4.8.11.md) for the root cause, final checks, artifact hashes, and archive copy. This file is the primary human/AI handover; the quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
+> **Current handover snapshot (2026-10-22):** v4.8.21 audit hardening is implemented and the portable build is verified. Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md) for audit findings, fixes, focused checks, and the artifact record. The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
 
 > **Important**: This document is the primary onboarding manual for any future AI assistant, software engineer, or contributor picking up this project in a new session or clean environment. It details the complete architecture, data models, state flows, invariant guardrails, and build instructions.
 
@@ -19,15 +19,14 @@
   6. *Pluggable Inking Pipeline*: Hardware DirectInk low-latency pen trail paired with pure-JS velocity-weighted cubic Bézier curve fitting (`Windows Ink` mode).
   7. *Deterministic Video Exporter*: Multi-session WebM animation pipeline with stitched audio tracks.
 
-## 1.1 Current Worktree and Release State (2026-10-18)
+## 1.1 Current Worktree and Release State (2026-10-22)
 
 - **Working repository:** `C:\Users\kazir\Documents\OpenCode\GazBoard`.
-- **Current source version:** `4.8.11`; `package.json` version is `4.8.11`.
-- **Git state at handover:** branch `feat/m5-hardening-release`, HEAD `f01e1b30e57a8d28b680b504a44cc651160a6fe4`, local tag `v4.8.11`; source and documentation have intentional post-tag working-tree changes. Preserve the user-provided untracked `docs/MASTER_ALL_FEATURES_CATALOG_AND_ARCHITECTURE.md`.
-- **Verified archive:** `C:\Users\kazir\Documents\Antigravity\GazBoard\V-4.8.11`. It is a release archive, not a working tree. The user authorized copying the refreshed relevant source/docs and rebuilt Windows binaries into this snapshot; record the final sync result in the release dossier.
-- **Latest release scope:** delayed-seek authority, visible live replay/highlighter outline, recording rename persistence/undo, adaptive recording action-menu placement, replay camera viewport/center/dead-zone framing, timestamped Windows-safe video export names, and live Surface-to-App replay wiring. The live/export discrepancy and Reading/Writing mode distinction are explained in BUG-023 and the v4.8.11 dossier.
-- **Latest release verification:** full regression passed 1,240/1,240 after the replay code correction; custom-only smoke passed all 45 checks across six groups; locale coverage passed 1,395/1,395 in all seven locales. Windows x64 artifacts were rebuilt to `dist-replay-fix/` because the user's running portable app held the usual output open. Exact hashes and archive synchronization details are in the v4.8.11 dossier.
-- **Important verification limit:** the user confirmed live replay highlight/animation works on their board after the wiring correction. Automated replay/export checks also passed. No real-board export speed/quality/file-size benchmark was completed.
+- **Current source version:** v4.8.21, based on the audited v4.8.12–v4.8.20 feature history.
+- **Git state:** inspect `git status`, `git log`, and local tags at session start. The last verified release tag before this audit is `v4.8.20`.
+- **Latest audited scope:** all v4.8.12–v4.8.20 feature/fix entries are listed in [`MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md`](MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md). The v4.8.21 follow-up addresses untrusted bookmark labels, Electron frame/navigation checks, URL validation, and Obsidian YAML block lists.
+- **Archive policy:** keep active work here. Use the user-configured durable archive only after a release has passed checks; do not copy to historical Antigravity paths from older records.
+- **Verification/build state:** focused audit tests and locale checks pass; see [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md) for the portable artifact hash, remaining npm advisories, and architectural follow-ups.
 - **Audit attribution supplied by the project owner:** initial audit — Codex 4.6 Medium in Cursor; secondary audit/fixes — GPT-6 Luna High using Codex.
 - **Collaboration preferences:** the owner uses dictated English and may need intent rephrased in plain language when a request is ambiguous. When feasible, retain user-selectable alternatives rather than forcing a binary choice (especially for inking engines). The feature request is the product source of truth; propose trade-offs before removing or simplifying requested behavior.
 

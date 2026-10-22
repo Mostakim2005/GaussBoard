@@ -284,3 +284,30 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 * **Verification**: Focused replay/custom checks and the full regression smoke run passed after the fix. The user also confirmed live-board behavior works. See `docs/releases/RELEASE-4.8.11.md` for final build/check details.
 * **Files Touched**: `src/js/app.js` (wiring correction); renderer behavior remains in `src/js/core/surface.js` and `src/js/core/replay.js`.
 
+### BUG-024: Saved Bookmark Names Were Interpreted as Tooltip HTML (v4.8.21)
+* **Symptom**: Bookmark names from board data were interpolated into `innerHTML` in the replay density tooltip.
+* **Cause**: A user-controlled label was mixed with trusted tooltip markup rather than rendered as text.
+* **Fix**: Build the label with DOM nodes and assign the timestamp/name through `textContent`. Escape cancels an edit and restores the persisted value.
+* **Verification**: `test/security-hardening.test.mjs`; manual tooltip interaction should also be checked in the built app.
+* **Files Touched**: `src/js/ui/density-canvas.js`.
+
+### BUG-025: Electron IPC and External Navigation Were Not Restricted to the Main App Frame (v4.8.21)
+* **Symptom**: IPC handlers did not verify their sender frame, `window.open()` passed arbitrary schemes to `shell.openExternal`, and renderer navigation was unrestricted.
+* **Cause**: The main process trusted renderer-originated requests without checking the frame or parsing external URLs.
+* **Fix**: Route every `ipcMain.handle` through a primary-frame `app://board` guard; prevent navigation off the app URL; open only HTTP(S) URLs externally; restrict the explicit releases bridge to the configured GitHub releases path.
+* **Verification**: `test/security-hardening.test.mjs`; full smoke suite and packaged-app launch are recorded in the v4.8.21 release dossier.
+* **Files Touched**: `main.js`, `src/js/platform/security.cjs`.
+
+### BUG-026: Standard Obsidian YAML Block Lists Were Dropped from Board Metadata (v4.8.21)
+* **Symptom**: `tags:` and `aliases:` written as indented `- item` YAML lists were parsed as empty values, so tags were missing from imported Markdown cards.
+* **Cause**: The lightweight parser only recognized inline bracket arrays and one-line scalars.
+* **Fix**: Parse block lists and preserve quoted commas/colons in inline list entries without adding a YAML dependency.
+* **Verification**: `test/markdown.test.mjs`.
+* **Files Touched**: `src/js/core/markdown.js`.
+
+### BUG-027: Locale Dictionaries Had Missing and Obsolete Keys (v4.8.21)
+* **Symptom**: The required locale check failed: several recently added UI strings were untranslated in all seven dictionaries, while renamed strings remained as stale entries.
+* **Fix**: Added translations for the extracted strings, removed obsolete keys, and verified complete parity across the seven locales.
+* **Verification**: `node scripts/i18n-check.js` reports 1,483/1,483 strings and zero extras/problems for every locale.
+* **Files Touched**: `src/locales/ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, `zh-Hant.json`.
+

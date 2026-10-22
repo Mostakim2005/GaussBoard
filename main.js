@@ -9,6 +9,7 @@ const { pathToFileURL } = require('node:url');
 const crypto = require('node:crypto');
 const StorageLocation = require('./storage-location.js');
 const { isPathWithin } = require('./src/js/platform/path-security.cjs');
+const { safeExternalUrl, isReleaseUrl } = require('./src/js/platform/security.cjs');
 
 const SRC = path.join(__dirname, 'src');
 const isDev = process.argv.includes('--dev');
@@ -624,6 +625,7 @@ async function migrateLegacyData() {
  *  Windows
  * ------------------------------------------------------------------ */
 let mainWindow = null;
+const trustedConversionFiles = new WeakMap();
 let pendingOpen = null;
 /*
  * Sticky, unlike pendingOpen, which is cleared the moment the file is handed to
@@ -748,11 +750,56 @@ function createWindow() {
     });
     mainWindow.webContents.once('did-finish-load', async () => {
       try { await require(process.env.GAZBOARD_TEST || './test/smoke.js').run(mainWindow, app); }
-      catch (e) { console.error('SMOKE FAILED:', e); app.exit(1); }
+      catch (e) { console.error('SMOKE FAILED:', e?.stack || e); app.exit(1); }
     });
   }
 
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  mainWindow.webContents.on('will-navigate', (event, target) => {
+    if (isTrustedAppUrl(target)) return;
+    event.preventDefault();
+    const safeUrl = safeExternalUrl(target);
+    if (safeUrl) shell.openExternal(safeUrl).catch(() => {});
+  });
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    const safeUrl = safeExternalUrl(url);
+    if (safeUrl) shell.openExternal(safeUrl).catch(() => {});
+    return { action: 'deny' };
+  });
+}
+
+function isTrustedAppUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'app:' && url.hostname === 'board' && !url.username && !url.password;
+  } catch { return false; }
+}
+
+function isTrustedRenderer(event) {
+  const frame = event?.senderFrame;
+  return !!mainWindow && !mainWindow.isDestroyed()
+    && event.sender === mainWindow.webContents
+    && frame?.parent == null
+    && isTrustedAppUrl(frame.url);
+}
+
+function isTrustedConversionRead(event, channel, args) {
+  if (channel !== 'fs:readFile') return false;
+  const frame = event?.senderFrame;
+  const allowedPath = event?.sender && trustedConversionFiles.get(event.sender);
+  if (!allowedPath || !frame || frame.parent != null || !isTrustedAppUrl(frame.url)) return false;
+  try {
+    const url = new URL(frame.url);
+    return url.pathname === '/convert.html' && typeof args[0] === 'string'
+      && path.resolve(args[0]) === allowedPath;
+  } catch { return false; }
+}
+
+function handleIpc(channel, listener) {
+  ipcMain.handle(channel, (event, ...args) => {
+    if (!isTrustedRenderer(event) && !isTrustedConversionRead(event, channel, args))
+      throw new Error(`Rejected IPC from an untrusted frame: ${channel}`);
+    return listener(event, ...args);
+  });
 }
 
 function send(channel, payload) { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload); }
@@ -929,8 +976,9 @@ function convertWithHiddenWindow(filePath, kind, { finalLook = true } = {}) {
       show: false, width: 1280, height: 900,
       webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false, offscreen: false }
     });
+    trustedConversionFiles.set(win.webContents, path.resolve(filePath));
     let settled = false;
-    const done = (fn, v) => { if (settled) return; settled = true; ipcMain.removeListener('convert:ready', onReady); ipcMain.removeListener('convert:error', onError); try { win.destroy(); } catch {} fn(v); };
+    const done = (fn, v) => { if (settled) return; settled = true; trustedConversionFiles.delete(win.webContents); ipcMain.removeListener('convert:ready', onReady); ipcMain.removeListener('convert:error', onError); try { win.destroy(); } catch {} fn(v); };
     const onReady = async (_e, msg) => {
       if (msg.token !== token) return;
       try {
@@ -1068,7 +1116,7 @@ function sync() {
  *  IPC
  * ------------------------------------------------------------------ */
 function ipc() {
-  ipcMain.handle('app:info', async () => ({
+  handleIpc('app:info', async () => ({
     version: app.getVersion(), platform: process.platform,
     electron: process.versions.electron, chrome: process.versions.chrome, boardsDir: dataDir(),
     storage: await storageInfo(),
@@ -1083,8 +1131,8 @@ function ipc() {
     pendingBoardFile: openedFromFile
   }));
 
-  ipcMain.handle('storage:get', () => storageInfo({ count: true }));
-  ipcMain.handle('storage:choose', async () => {
+  handleIpc('storage:get', () => storageInfo({ count: true }));
+  handleIpc('storage:choose', async () => {
     // open where the boards are now (or were, when that folder has gone missing), as other apps do;
     // the usual place inside the app's own data is no help to anyone, so that one keeps the system's start
     const r = await dialog.showOpenDialog(mainWindow, {
@@ -1094,11 +1142,11 @@ function ipc() {
     if (r.canceled || !r.filePaths[0]) return { canceled: true };
     return checkPickedFolder(r.filePaths[0]);
   });
-  ipcMain.handle('storage:apply', async (_e, opts = {}) =>
+  handleIpc('storage:apply', async (_e, opts = {}) =>
     applyStorageLocation(opts.path, opts.mode));
-  ipcMain.handle('storage:reset', async (_e, opts = {}) =>
+  handleIpc('storage:reset', async (_e, opts = {}) =>
     applyStorageLocation(defaultDataDir(), opts.mode, true));
-  ipcMain.handle('storage:delete-old', async (_e, token) => trashOldStorageCopies(token));
+  handleIpc('storage:delete-old', async (_e, token) => trashOldStorageCopies(token));
   /*
    * The My boards folders, kept beside the boards in a chosen folder so they
    * travel with them (see catalogueOf in src/js/core/folders.js). Only ever
@@ -1106,7 +1154,7 @@ function ipc() {
    * settings exactly as before - and only when it reads as a catalogue.
    */
   const catalogueFile = () => (activeDataDir ? path.join(dataDir(), 'folders.json') : null);
-  ipcMain.handle('storage:catalogue:read', async () => {
+  handleIpc('storage:catalogue:read', async () => {
     const file = catalogueFile();
     if (!file) return null;
     try {
@@ -1114,7 +1162,7 @@ function ipc() {
       return raw && typeof raw === 'object' && !Array.isArray(raw) && Array.isArray(raw.folders) ? raw : null;
     } catch { return null; }
   });
-  ipcMain.handle('storage:catalogue:write', async (_e, json) => {
+  handleIpc('storage:catalogue:write', async (_e, json) => {
     const file = catalogueFile();
     if (!file || typeof json !== 'string' || json.length > 4 * 1024 * 1024) return false;
     try {
@@ -1124,7 +1172,7 @@ function ipc() {
       return true;
     } catch { return false; }
   });
-  ipcMain.handle('storage:flush-ack', (_e, ticket, ok = true) => {
+  handleIpc('storage:flush-ack', (_e, ticket, ok = true) => {
     const finish = storageFlushes.get(ticket);
     if (!finish) return false;
     storageFlushes.delete(ticket);
@@ -1132,24 +1180,24 @@ function ipc() {
     return true;
   });
 
-  ipcMain.handle('fs:readFile', async (_e, p) => { const b = await fsp.readFile(p); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); });
+  handleIpc('fs:readFile', async (_e, p) => { const b = await fsp.readFile(p); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); });
 
-  ipcMain.handle('dialog:open', async (_e, opts) => {
+  handleIpc('dialog:open', async (_e, opts) => {
     const r = await dialog.showOpenDialog(mainWindow, opts || {});
     return r.canceled ? [] : r.filePaths;
   });
 
-  ipcMain.handle('dialog:save', async (_e, opts) => {
+  handleIpc('dialog:save', async (_e, opts) => {
     const r = await dialog.showSaveDialog(mainWindow, opts || {});
     return r.canceled ? null : r.filePath;
   });
 
-  ipcMain.handle('fs:writeFile', async (_e, { filePath, data }) => {
+  handleIpc('fs:writeFile', async (_e, { filePath, data }) => {
     await fsp.writeFile(filePath, Buffer.from(data));
     return true;
   });
 
-  ipcMain.handle('shell:showItem', (_e, p) => { shell.showItemInFolder(p); });
+  handleIpc('shell:showItem', (_e, p) => { shell.showItemInFolder(p); });
 
   /*
    * Open the boards folder itself, with the boards in it.
@@ -1165,7 +1213,7 @@ function ipc() {
    * joins paths - a renderer gluing on '/boards' was near enough on Windows
    * and not something to keep relying on.
    */
-  ipcMain.handle('shell:openBoards', async () => {
+  handleIpc('shell:openBoards', async () => {
     const dir = dataDir();
     try { await fsp.mkdir(dir, { recursive: true }); } catch { /* it is there, or it cannot be */ }
     const err = await shell.openPath(dir);
@@ -1173,9 +1221,9 @@ function ipc() {
     if (err) { shell.showItemInFolder(dir); return false; }
     return true;
   });
-  ipcMain.handle('shell:openExternal', async (_e, url) => {
+  handleIpc('shell:openExternal', async (_e, url) => {
     // only ever our own releases page - never an arbitrary URL from the board
-    if (typeof url !== 'string' || !url.startsWith(RELEASES_URL)) return false;
+    if (!isReleaseUrl(url, RELEASES_URL)) return false;
     await shell.openExternal(url);
     return true;
   });
@@ -1189,7 +1237,7 @@ function ipc() {
    * GitHub sees what any web request shows it. The answer is a version string
    * and a URL; deciding what to do with them belongs to the renderer.
    */
-  ipcMain.handle('updates:check', async () => {
+  handleIpc('updates:check', async () => {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 8000);
     try {
@@ -1221,11 +1269,11 @@ function ipc() {
    * runs unless the person presses the button: download fetches the version
    * the check found, install puts it in place on a restart.
    */
-  ipcMain.handle('updates:mode', async () => {
+  handleIpc('updates:mode', async () => {
     const u = updater();
     return u ? u.mode() : { mode: 'page', reason: 'unavailable' };
   });
-  ipcMain.handle('updates:download', async (e, version) => {
+  handleIpc('updates:download', async (e, version) => {
     const u = updater();
     if (!u) return { ok: false, error: 'The updater is not part of this build' };
     let last = 0;
@@ -1236,17 +1284,17 @@ function ipc() {
       try { e.sender.send('updates:progress', { frac, got, total }); } catch { /* window gone */ }
     });
   });
-  ipcMain.handle('updates:install', async (_e, opts) => {
+  handleIpc('updates:install', async (_e, opts) => {
     const u = updater();
     return u ? u.install({ now: !(opts && opts.now === false) }) : { ok: false, error: 'The updater is not part of this build' };
   });
-  ipcMain.handle('updates:note', async () => {
+  handleIpc('updates:note', async () => {
     const u = updater();
     return u ? u.takeNote() : null;
   });
 
   /* --- board persistence --- */
-  ipcMain.handle('boards:list', async () => {
+  handleIpc('boards:list', async () => {
     await ensureDataDir();
     const files = (await fsp.readdir(dataDir())).filter((f) => f.endsWith('.json'));
     const out = [];
@@ -1270,14 +1318,14 @@ function ipc() {
     }
     return out.sort((a, b) => b.modified - a.modified);
   });
-  ipcMain.handle('boards:load', async (_e, id) => {
+  handleIpc('boards:load', async (_e, id) => {
     await ensureDataDir();
     try {
       const raw = JSON.parse(await fsp.readFile(path.join(dataDir(), id + '.json'), 'utf8'));
       return StorageLocation.isBoardFile(raw) ? raw : null;
     } catch { return null; }
   });
-  ipcMain.handle('boards:save', async (_e, payload) => withStorageWrite(async () => {
+  handleIpc('boards:save', async (_e, payload) => withStorageWrite(async () => {
     await ensureDataDir();
     // The renderer sends { id, json }. An older shape - the board object itself -
     // is still accepted so nothing breaks if the two sides are ever out of step.
@@ -1309,7 +1357,7 @@ function ipc() {
    * null if it cannot - the caller then keeps the picture inline, exactly as
    * before, so a failure here can never lose an image.
    */
-  ipcMain.handle('assets:put', async (_e, dataUrl) => withStorageWrite(async () => {
+  handleIpc('assets:put', async (_e, dataUrl) => withStorageWrite(async () => {
     try {
       const d = decodeDataUrl(dataUrl);
       if (!d || !d.buf.length) return null;
@@ -1325,7 +1373,7 @@ function ipc() {
   }));
 
   /** Read one picture back as a data: URL. Null when it is not there. */
-  ipcMain.handle('assets:get', async (_e, id) => {
+  handleIpc('assets:get', async (_e, id) => {
     if (!ASSET_NAME.test(String(id || ''))) return null;
     try {
       const buf = await fsp.readFile(path.join(assetsDir(), id));
@@ -1335,7 +1383,7 @@ function ipc() {
   });
 
   /** Which of these are already stored. Used to avoid sending bytes needlessly. */
-  ipcMain.handle('assets:have', async (_e, ids) => {
+  handleIpc('assets:have', async (_e, ids) => {
     const out = {};
     for (const id of Array.isArray(ids) ? ids : []) {
       if (!ASSET_NAME.test(String(id || ''))) { out[id] = false; continue; }
@@ -1346,7 +1394,7 @@ function ipc() {
 
   const activeRecordings = new Map();
 
-  ipcMain.handle('recording:start', async (_e, sessionId) => {
+  handleIpc('recording:start', async (_e, sessionId) => {
     const safeId = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
     if (!safeId) return false;
     const tmpFile = path.join(app.getPath('userData'), 'temp', `${safeId}.tmp`);
@@ -1356,7 +1404,7 @@ function ipc() {
     return true;
   });
 
-  ipcMain.handle('recording:appendChunk', async (_e, { sessionId, chunk }) => {
+  handleIpc('recording:appendChunk', async (_e, { sessionId, chunk }) => {
     const safeId = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
     const entry = activeRecordings.get(safeId);
     if (entry && chunk) {
@@ -1365,7 +1413,7 @@ function ipc() {
     return true;
   });
 
-  ipcMain.handle('recording:finish', async (_e, { sessionId, durationMs }) => withStorageWrite(async () => {
+  handleIpc('recording:finish', async (_e, { sessionId, durationMs }) => withStorageWrite(async () => {
     const safeId = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
     const entry = activeRecordings.get(safeId);
     if (!entry) return null;
@@ -1383,7 +1431,7 @@ function ipc() {
     return { assetId: hash, durationMs };
   }));
 
-  ipcMain.handle('assets:putBinaryDirect', async (_e, { assetId, buffer }) => withStorageWrite(async () => {
+  handleIpc('assets:putBinaryDirect', async (_e, { assetId, buffer }) => withStorageWrite(async () => {
     if (!ASSET_NAME.test(String(assetId || ''))) return false;
     const dest = path.join(assetsDir(), assetId);
     await fsp.mkdir(assetsDir(), { recursive: true });
@@ -1392,12 +1440,12 @@ function ipc() {
   }));
 
   /* --- LAN sync. Every one of these is inert until sync:start is called. --- */
-  ipcMain.handle('sync:state', () => (syncService ? syncService.state() : {
+  handleIpc('sync:state', () => (syncService ? syncService.state() : {
     running: false, deviceName: '', deviceId: '', port: 0, unusualPort: false,
     expectedPort: 0, error: null, peers: [], paired: []
   }));
-  ipcMain.handle('sync:start', () => sync().start());
-  ipcMain.handle('sync:stop', async () => {
+  handleIpc('sync:start', () => sync().start());
+  handleIpc('sync:stop', async () => {
     // Switching sharing off with a question still on screen would leave the
     // sender holding a socket open on an answer that can no longer come.
     declineAllPending();
@@ -1410,18 +1458,18 @@ function ipc() {
    * note on `asking`. Returns false when nothing was waiting, which is a
    * normal outcome rather than a fault, so it is reported rather than thrown.
    */
-  ipcMain.handle('sync:answer', (_e, msg) => {
+  handleIpc('sync:answer', (_e, msg) => {
     const { ticket, outcome } = msg || {};
     return settleAsk(ticket, outcome || null);
   });
-  ipcMain.handle('sync:setName', (_e, name) => sync().setDeviceName(name));
-  ipcMain.handle('sync:beginPairing', (_e, opts) => sync().beginPairing(opts || {}));
-  ipcMain.handle('sync:cancelPairing', () => { sync().cancelPairing(); return true; });
-  ipcMain.handle('sync:pairWith', async (_e, { peer, code }) => {
+  handleIpc('sync:setName', (_e, name) => sync().setDeviceName(name));
+  handleIpc('sync:beginPairing', (_e, opts) => sync().beginPairing(opts || {}));
+  handleIpc('sync:cancelPairing', () => { sync().cancelPairing(); return true; });
+  handleIpc('sync:pairWith', async (_e, { peer, code }) => {
     try { return { ok: true, device: await sync().pairWith(peer, code) }; }
     catch (e) { return { ok: false, error: e.message }; }
   });
-  ipcMain.handle('sync:send', async (_e, { peer, board }) => {
+  handleIpc('sync:send', async (_e, { peer, board }) => {
     /*
      * A board of imported pages is tens of megabytes on the wire, and on
      * classroom wifi that is a real wait. Reporting bytes as they go is the
@@ -1440,20 +1488,20 @@ function ipc() {
     try { return { ok: true, result: await sync().send(peer, board, onProgress) }; }
     catch (e) { return { ok: false, error: e.message }; }
   });
-  ipcMain.handle('sync:addByAddress', async (_e, address) => {
+  handleIpc('sync:addByAddress', async (_e, address) => {
     try { return { ok: true, peer: await sync().addByAddress(address) }; }
     catch (e) { return { ok: false, error: e.message }; }
   });
   // Resolves to whether the other machine was actually told. Forgetting here
   // has happened either way by the time this returns.
-  ipcMain.handle('sync:stillPaired', async (_e, peer) => {
+  handleIpc('sync:stillPaired', async (_e, peer) => {
     try { return await sync().stillPaired(peer); } catch { return null; }
   });
-  ipcMain.handle('sync:unpair', async (_e, deviceId) => {
+  handleIpc('sync:unpair', async (_e, deviceId) => {
     try { return { ok: true, told: await sync().unpair(deviceId) }; }
     catch (e) { return { ok: true, told: false, error: e.message }; }
   });
-  ipcMain.handle('sync:endSession', () => sync().endSession());
+  handleIpc('sync:endSession', () => sync().endSession());
 
   /*
    * The firewall. Reading is free and quiet; the other two raise a UAC prompt
@@ -1461,15 +1509,15 @@ function ipc() {
    * demand so a machine that never shares a board never loads it at all.
    */
   const firewall = () => require('./sync/firewall.js');
-  ipcMain.handle('sync:firewall:check', async () => {
+  handleIpc('sync:firewall:check', async () => {
     try { return await firewall().inspect(); }
     catch (e) { return { supported: false, state: 'unknown', detail: e.message }; }
   });
-  ipcMain.handle('sync:firewall:repair', async () => {
+  handleIpc('sync:firewall:repair', async () => {
     try { return await firewall().repair(); }
     catch (e) { return { ok: false, reason: 'failed', detail: e.message }; }
   });
-  ipcMain.handle('sync:firewall:remove', async () => {
+  handleIpc('sync:firewall:remove', async () => {
     try { return await firewall().remove(); }
     catch (e) { return { ok: false, reason: 'failed', detail: e.message }; }
   });
@@ -1480,7 +1528,7 @@ function ipc() {
    * worse than handing them none, so which firewall is running is looked up
    * first rather than assumed.
    */
-  ipcMain.handle('sync:firewall:commands', async () => {
+  handleIpc('sync:firewall:commands', async () => {
     try {
       const fw = firewall();
       if (!fw.supported()) return [];
@@ -1489,17 +1537,17 @@ function ipc() {
     } catch { return []; }
   });
 
-  ipcMain.handle('boards:last', () => getLastBoard());
+  handleIpc('boards:last', () => getLastBoard());
   // idempotent, and safe to call any time: it only ever copies files that are missing
-  ipcMain.handle('boards:migrate', () => migrateLegacyData());
-  ipcMain.handle('boards:setLast', (_e, id) => setLastBoard(id));
+  handleIpc('boards:migrate', () => migrateLegacyData());
+  handleIpc('boards:setLast', (_e, id) => setLastBoard(id));
 
   /**
    * The board to open on launch: the one that was last open, or failing that
    * the most recently touched one. Falling back to a blank canvas while the
    * user's work sits on disk is the one thing this must never do.
    */
-  ipcMain.handle('boards:resume', async () => {
+  handleIpc('boards:resume', async () => {
     await ensureDataDir();
     const read = async (id) => {
       try {
@@ -1532,7 +1580,7 @@ function ipc() {
     }
     return { board: null, reason: 'none' };
   });
-  ipcMain.handle('boards:delete', (_e, id) => withStorageWrite(async () => {
+  handleIpc('boards:delete', (_e, id) => withStorageWrite(async () => {
     let ok = false;
     const file = path.join(dataDir(), String(id) + '.json');
     /*
@@ -1551,7 +1599,7 @@ function ipc() {
   }));
 
   /* --- document import: anything -> PDF bytes --- */
-  ipcMain.handle('export:pdf', async (_e, { html, widthIn, heightIn }) => {
+  handleIpc('export:pdf', async (_e, { html, widthIn, heightIn }) => {
     try {
       const pdf = await printHtmlToPdf(html, { widthIn, heightIn });
       return { ok: true, data: pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) };
@@ -1561,7 +1609,7 @@ function ipc() {
     }
   });
 
-  ipcMain.handle('import:toPdf', async (_e, filePath, opts = {}) => {
+  handleIpc('import:toPdf', async (_e, filePath, opts = {}) => {
     const ext = path.extname(filePath).toLowerCase();
     if (ext === '.pdf') {
       const b = await fsp.readFile(filePath);
