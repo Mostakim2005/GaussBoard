@@ -5,6 +5,7 @@ import { h } from './popover.js';
 import { icon } from './icons.js';
 import { t } from '../i18n.js';
 import { DensityCanvas } from './density-canvas.js';
+import { replayDisplayMode } from '../core/replay-clock.js';
 
 export function formatTime(ms) {
   if (!(ms > 0)) return '00:00';
@@ -80,6 +81,8 @@ export class AudioBar {
     this._interval = null;
     this._lastPlayActive = null;
     this._sessionMenuEl = null;
+    this._sessionMenuDismiss = null;
+    this.replayModeSelect = null;
 
     this.density = new DensityCanvas({
       width: 220,
@@ -245,10 +248,15 @@ export class AudioBar {
   }
 
   closeSessionMenu() {
+    if (this._sessionMenuDismiss && typeof window !== 'undefined') {
+      window.removeEventListener('pointerdown', this._sessionMenuDismiss);
+      this._sessionMenuDismiss = null;
+    }
     if (this._sessionMenuEl) {
       this._sessionMenuEl.remove();
       this._sessionMenuEl = null;
     }
+    this.replayModeSelect = null;
   }
 
   openSkipMenu() {
@@ -466,6 +474,35 @@ export class AudioBar {
     );
     panel.appendChild(syncRow);
 
+    // Keep playback presentation separate from Reading/Writing input mode:
+    // this controls how timestamped ink is displayed, not whether the board edits.
+    const replayModeSelect = h('select', {
+      class: 'ab-replay-display-mode',
+      'aria-label': t('Replay display mode'),
+      title: t('Replay display mode'),
+      style: 'flex:1;min-width:110px;padding:5px 7px;border:1px solid var(--line,rgba(128,128,128,.25));border-radius:8px;background:var(--surface,#fff);color:inherit;font:inherit;font-size:12px;'
+    },
+      h('option', { value: 'reveal' }, t('Live reveal')),
+      h('option', { value: 'spotlight' }, t('Spotlight')),
+      h('option', { value: 'static' }, t('Static'))
+    );
+    replayModeSelect.value = replayDisplayMode(this.app?.settings);
+    replayModeSelect.addEventListener('change', () => {
+      const mode = replayDisplayMode(null, replayModeSelect.value);
+      this.app.settings.replayDisplayMode = mode;
+      this.app.saveSettings();
+      if (this.app.surface) {
+        this.app.surface._ink = null;
+        this.app.surface.invalidate();
+      }
+      this.syncUI();
+    });
+    this.replayModeSelect = replayModeSelect;
+    const replayModeRow = h('div', {
+      style: 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0;'
+    }, h('span', { style: 'font-size:12px;font-weight:600;' }, t('Replay display mode')), replayModeSelect);
+    panel.appendChild(replayModeRow);
+
     // List of recordings
     const listWrap = h('div', {
       style: 'display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;'
@@ -518,7 +555,12 @@ export class AudioBar {
         window.removeEventListener('pointerdown', onDismiss);
       }
     };
-    setTimeout(() => window.addEventListener('pointerdown', onDismiss), 0);
+    this._sessionMenuDismiss = onDismiss;
+    setTimeout(() => {
+      if (this._sessionMenuEl === panel && this._sessionMenuDismiss === onDismiss) {
+        window.addEventListener('pointerdown', onDismiss);
+      }
+    }, 0);
 
     document.body.appendChild(panel);
     const anchor = this.btnSession?.getBoundingClientRect?.() || this.el.getBoundingClientRect();
@@ -803,7 +845,7 @@ export class AudioBar {
     }
 
     if (this.btnSession) {
-      if (tracks.length > 1) {
+      if (tracks.length > 0) {
         this.btnSession.style.display = 'inline-flex';
         const curIdx = tracks.findIndex((t) => t.id === this.track?.id);
         const name = this.track?.name || `Session ${curIdx >= 0 ? curIdx + 1 : 1}`;
@@ -833,6 +875,10 @@ export class AudioBar {
     }
     if (this.cameraMode && this.cameraMode.value !== (this.app?.settings?.replayCameraMode || 'viewport')) {
       this.cameraMode.value = this.app?.settings?.replayCameraMode || 'viewport';
+    }
+    const displayMode = replayDisplayMode(this.app?.settings);
+    if (this.replayModeSelect && this.replayModeSelect.value !== displayMode) {
+      this.replayModeSelect.value = displayMode;
     }
     if (this.outlineEffect && this.outlineEffect.value !== (this.app.settings.replayOutlineEffect || 'neon')) {
       this.outlineEffect.value = this.app.settings.replayOutlineEffect || 'neon';

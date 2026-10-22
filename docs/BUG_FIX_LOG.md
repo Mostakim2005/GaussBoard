@@ -30,6 +30,11 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 | **BUG-020** | Recording Rename Dialog Did Not Work Reliably | Medium | Audio / UI | Resolved in v4.8.11 |
 | **BUG-021** | Recording Action Menu Could Overflow the Viewport | Medium | Audio / UI | Resolved in v4.8.11 |
 | **BUG-022** | Video Export Suggested Names Could Collide or Be Invalid on Windows | Low | Video Export | Resolved in v4.8.11 |
+| **BUG-028** | Center Camera Follow Snapped After Pause or Long Frame | Medium | Replay Camera | Resolved in v5.0.0 |
+| **BUG-029** | Scratch-Out Classification Varied with Pointer Sample Rate | Medium | Gesture Recognition | Resolved in v5.0.0 |
+| **BUG-030** | Replay Rebuilt Track Lookup from the Full Board Every Frame | Medium | Replay Performance | Improved in v5.0.0; overlay paint remains session-sized |
+| **BUG-031** | Window Focus Loss Could Strand a Pointer Gesture | Medium | Interaction Lifecycle | Resolved in v5.0.0 |
+| **BUG-032** | Closed Recording Menu Could Acquire a Delayed Dismiss Listener | Low | AudioBar Lifecycle | Resolved in v5.0.0 |
 
 ---
 
@@ -310,4 +315,39 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 * **Fix**: Added translations for the extracted strings, removed obsolete keys, and verified complete parity across the seven locales.
 * **Verification**: `node scripts/i18n-check.js` reports 1,483/1,483 strings and zero extras/problems for every locale.
 * **Files Touched**: `src/locales/ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, `zh-Hant.json`.
+
+### BUG-028: Center Camera Follow Snapped After Pause or Long Frame (v5.0.0)
+* **Symptom**: Center-follow could translate most of the remaining offset in one step after a pause or a delayed animation frame, making the replay camera jump.
+* **Cause**: Exponential easing used the full elapsed wall-clock interval; a long gap made its blend factor approach 1.
+* **Fix**: Increase the time constant to 360 ms, cap a single easing delta at 50 ms, and reset the smoothing clock whenever playback pauses.
+* **Verification**: `test/replay-reading.test.mjs` covers a delayed frame and pause/resume movement bounds.
+* **Files Touched**: `src/js/core/replay.js`.
+
+### BUG-029: Scratch-Out Classification Varied with Pointer Sample Rate (v5.0.0)
+* **Symptom**: Dense and coarse pointer streams describing the same scratch gesture could produce different density/reversal measurements.
+* **Cause**: Classification consumed device-reported move samples directly, so report rate changed the detector's input geometry.
+* **Fix**: Resample finite coordinates at a fixed 3 px spacing for classification, preserving major x/y/diagonal turns. Keep raw ink points, timestamps and pressure/tilt data untouched.
+* **Verification**: `test/custom-features.test.mjs` compares coarse and high-rate versions of the same gesture and malformed input.
+* **Files Touched**: `src/js/core/scratch.js`.
+
+### BUG-030: Replay Rebuilt Track Lookup from the Full Board Every Frame (v5.0.0)
+* **Symptom**: Replay active-stroke selection and camera-follow target search repeatedly filtered document objects while the animation loop ran.
+* **Cause**: Callers rebuilt a session selection from `doc.order` or `Object.values(doc.objects)` for each frame.
+* **Fix**: Cache a selected track's strokes per Store revision in a WeakMap/LRU map. Rebuild only after Store revision changes; bound each Store's retained track indexes to 16.
+* **Verification**: `test/replay-reading.test.mjs` asserts cache reuse and invalidation; replay/video custom smoke checks pass. Drawing already-visible strokes is still proportional to the selected track's stroke count.
+* **Files Touched**: `src/js/core/replay-clock.js`, `src/js/core/replay.js`, `src/js/core/surface.js`, `src/js/export-video.js`.
+
+### BUG-031: Window Focus Loss Could Strand a Pointer Gesture (v5.0.0)
+* **Symptom**: If the app lost focus before pointer-up, active ink/object interaction state and pointer capture could remain stale until another action or refresh.
+* **Cause**: The Interaction state machine depended on receiving `pointerup`/`pointercancel` from its canvas.
+* **Fix**: On window blur, complete the owning action through the ordinary pointer-up route at its last screen point, release every captured pointer ID and clear remaining pointer state.
+* **Verification**: `test/custom-features.test.mjs` verifies the final event, completion and release of all captures.
+* **Files Touched**: `src/js/core/tools.js`.
+
+### BUG-032: Closed Recording Menu Could Acquire a Delayed Dismiss Listener (v5.0.0)
+* **Symptom**: A queued zero-delay callback could add a global outside-click listener after the recording panel had already closed.
+* **Cause**: Listener attachment was deferred to avoid dismissing the menu on its opening click, but did not re-check menu identity.
+* **Fix**: Remove the listener whenever the menu closes and have delayed attachment confirm the same panel and handler remain active.
+* **Verification**: Covered by code-path review and the audio-bar focused test suite; menu close/dismiss behavior has not been run through a full interactive UI automation scenario.
+* **Files Touched**: `src/js/ui/audio-bar.js`.
 

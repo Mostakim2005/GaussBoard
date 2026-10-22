@@ -1481,5 +1481,9 @@
   "Sticky Note": "Haftnotiz",
   "Strong": "Stark",
   "Subtle": "Dezent",
-  "Expressive": "Ausdrucksstark"
+  "Expressive": "Ausdrucksstark",
+  "Replay display mode": "Wiedergabeanzeige",
+  "Live reveal": "Live einblenden",
+  "Spotlight": "Spotlight",
+  "Static": "Statisch"
 }

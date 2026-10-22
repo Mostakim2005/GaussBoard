@@ -1481,5 +1481,9 @@
   "Sticky Note": "ملاحظة لاصقة",
   "Strong": "قوي",
   "Subtle": "خفيف",
-  "Expressive": "تعبيري"
+  "Expressive": "تعبيري",
+  "Replay display mode": "وضع عرض الإعادة",
+  "Live reveal": "كشف مباشر",
+  "Spotlight": "تسليط الضوء",
+  "Static": "ثابت"
 }

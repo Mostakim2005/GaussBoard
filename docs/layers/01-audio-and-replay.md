@@ -46,6 +46,9 @@ stroke.points = [{ x, y, p, t: 1240 }, ...]; // p: pressure, t: relative timesta
 10. **Seek Authority**: While a media seek is pending, the requested timeline position remains the replay clock source until the media element confirms the seek. `seeked`, `loadedmetadata`, and `canplay` events resolve or retry pending seeks; an old media clock must not overwrite a new scrub position.
 11. **Camera Framing Modes**: With camera follow enabled, `settings.replayCameraMode` chooses `viewport` (legacy fit when the full stroke leaves view), `center` (keep the active point centered), or `dead-zone` (keep the active point inside the central 40% of the viewport and pan only when it exits). These modes preserve the current zoom; the legacy viewport mode retains its previous fit behavior.
 12. **Live Surface App Wiring**: The primary board `Surface` must receive `{ app: this }`. Its draw path uses that reference to reach the app's `ReplayEngine`; omitting it silently disables live replay rendering even though export may work, because export constructs its own Surface with the app reference.
+13. **Replay Presentation**: `settings.replayDisplayMode` is one of `reveal` (fallback/default), `spotlight`, or `static`. This affects ink presentation only and must remain independent from Reading/Writing gesture mode. The live board and video exporter share the same scene-filter and display-mode helpers.
+14. **Session Stroke Index**: `replayStrokesForTrack(store, trackId)` caches the selected session's ordered stroke list by Store revision and retains no more than 16 track indexes per Store. Mutating a document without changing its revision would make the index stale; all writes must continue through Store operations/revision updates.
+15. **Center Follow Smoothing**: Center-follow uses a 360 ms exponential response, caps a frame's elapsed-time contribution at 50 ms, and resets its clock on pause. This prevents a resumed/backgrounded replay from using a stale elapsed interval as a near-immediate pan.
 
 ## 5. Relevant Bug Fixes
 * **BUG-005**: `#btnTopRecord` was disconnected from `audioRecorder` state and persistence $\rightarrow$ fixed in `toolbar.js`.
@@ -54,6 +57,8 @@ stroke.points = [{ x, y, p, t: 1240 }, ...]; // p: pressure, t: relative timesta
 * **v4.8.11 replay regression:** pending seeks could be overwritten by the media element's previous time before seeking completed. The replay clock now holds the requested time through the media seek lifecycle.
 * **v4.8.11 live outline visibility:** highlighter replay outlines inherited multiply blending and could vanish against the board. The feedback pass now draws as a source-over overlay while the original stroke keeps its normal appearance.
 * **v4.8.11 live replay wiring correction:** export worked because its Surface received the app, while the primary board Surface did not. Passing the app into the live Surface restores ReplayEngine access. Reading/Writing mode controls gestures and editing; `settings.audioInkSync` gates replay stroke separation/overlay rendering, and neither replaces the Surface-to-app reference.
+* **v5.0.0 replay presentation:** Live reveal, Spotlight and Static apply to live and exported playback. Static leaves session ink in the base scene; animated modes partition it into the overlay. The existing Ghost/Hidden Preview choice is shared with export. Sync-off remains the master gate.
+* **v5.0.0 repeat/switch lifecycle check:** current generation counters, pending-seek handling and track-load reset are protected by a targeted replay test for end → replay and track switching. Long-session export quality and frame-time still require representative hardware benchmarking.
 
 ## 6. Verification Commands
 ```powershell
@@ -69,6 +74,9 @@ npm run smoke:replay
 # and safe unique video export filenames.
 npm run smoke:video
 # Focused video framing options and active-stroke camera-follow calculations.
+node --test test/replay-reading.test.mjs test/audio-bar.test.mjs test/video-framing.test.mjs
+# v5.0.0 focused suite; for the post-v4.8.1 feature-only smoke scope use:
+npm run smoke:custom
 ```
 
 ## 7. v4.8.8 Additions and Audit Notes

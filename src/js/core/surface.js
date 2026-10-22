@@ -5,7 +5,7 @@ import { drawBackground, drawRuling, drawObject, drawSelection, drawMemberOutlin
 import { worldBounds, boundsOf } from './store.js';
 import { pageRects, pageMarginRects, pageIndexForBox, pageIndexForBoxIn, stripBounds } from './pages.js';
 import { boxesIntersect } from './util.js';
-import { replayInkEnabled } from './replay-clock.js';
+import { replayDisplayMode, replayInkEnabled, replaySceneFilter, replayStrokesForTrack } from './replay-clock.js';
 import { currentLanguage } from '../i18n.js';
 import { route as connectorRoute, midPoint } from './connectors.js';
 
@@ -179,9 +179,10 @@ export class Surface {
   freezeKey() {
     const cam = this.cam;
     const ed = this.editing ? `${this.editing.id}:${this.editing.cell || ''}` : '';
-    const repTrackId = replayInkEnabled(this.app?.settings) && (this.app?.replayEngine?.active || this.app?.audioBar?.visible)
+    const displayMode = replayDisplayMode(this.app?.settings);
+    const repTrackId = displayMode !== 'static' && replayInkEnabled(this.app?.settings) && (this.app?.replayEngine?.active || this.app?.audioBar?.visible)
       ? (this.app?.replayEngine?.track?.id || '') : '';
-    const rep = repTrackId ? `|rep:${repTrackId}:sync` : '|replay-sync-off';
+    const rep = repTrackId ? `|rep:${repTrackId}:sync:${displayMode}` : `|replay-sync-off:${displayMode}`;
     return `${this.store.rev}.${this._liveRev || 0}|${cam.x}|${cam.y}|${cam.z}|${this.width}|${this.height}|${this.dpr}|${ed}${rep}`;
   }
 
@@ -528,8 +529,8 @@ export class Surface {
     // an image that finishes decoding mid-stroke has to invalidate the freeze,
     // or it would not appear until the pen lifted
     const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
-    const activeTrackId = isReplay && replayInkEnabled(this.app?.settings) ? this.app.replayEngine.track?.id : null;
-    const filter = activeTrackId ? (o) => o.audioId !== activeTrackId : null;
+    const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
+    const filter = replaySceneFilter(activeTrackId, this.app?.settings);
     this.drawScene(g, this.width, this.height, () => { this._ink = null; this.invalidate(); }, null, filter);
     return { canvas: c, key };
   }
@@ -652,8 +653,8 @@ export class Surface {
        * board load or a camera move is always the full one.
        */
       const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
-      const activeTrackId = isReplay && replayInkEnabled(this.app?.settings) ? this.app.replayEngine.track?.id : null;
-      const replayFilter = activeTrackId ? (o) => o.audioId !== activeTrackId : null;
+      const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
+      const replayFilter = replaySceneFilter(activeTrackId, this.app?.settings);
       this.drawScene(ctx, w, h, () => this.invalidate(), this._band, replayFilter);
     } else if (this._ink && this._ink.key === this.freezeKey()) {
       /*
@@ -682,8 +683,8 @@ export class Surface {
        * taken before the picture existed, so it would never appear.
        */
       const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
-      const activeTrackId = isReplay && replayInkEnabled(this.app?.settings) ? this.app.replayEngine.track?.id : null;
-      const replayFilter = activeTrackId ? (o) => o.audioId !== activeTrackId : null;
+      const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
+      const replayFilter = replaySceneFilter(activeTrackId, this.app?.settings);
       this.drawScene(ctx, w, h, () => { this._ink = null; this.invalidate(); }, null, replayFilter);
       this._painted = true;
     }
@@ -820,6 +821,10 @@ export class Surface {
 
   drawReplaySession(ctx, replay = this.app?.replayEngine) {
     if (!replay || !replay.track || !replayInkEnabled(this.app?.settings)) return;
+    const displayMode = replayDisplayMode(this.app?.settings, replay?.displayMode);
+    // Static mode keeps this track in the regular frozen-scene pass. Drawing
+    // it again here would double its opacity and needlessly redraw it per frame.
+    if (displayMode === 'static') return;
     const t = replay.currentTimeMs;
     const trackId = replay.track.id;
     const outlineColor = /^#[0-9a-f]{6}$/i.test(this.app?.settings?.replayOutlineColor || '')
@@ -831,7 +836,6 @@ export class Surface {
     ctx.save();
     ctx.setTransform(this.dpr * cam.z, 0, 0, this.dpr * cam.z, this.dpr * cam.x, this.dpr * cam.y);
 
-    const objs = this.store.doc.objects;
     const drawReplayOutline = (object, opacity = 0.7, widthBoost = 5) => {
       // Highlighters normally use multiply blending to stay translucent. That
       // blend makes a neon replay colour disappear against a light board, so
@@ -851,9 +855,9 @@ export class Surface {
       drawObject(ctx, outline, () => this.invalidate(), this.editing);
       ctx.restore();
     };
-    for (const id of this.store.doc.order) {
-      const o = objs[id];
-      if (!o || o.audioId !== trackId) continue;
+    const replayStrokes = replay?.track?.id === trackId && typeof replay.getTrackStrokes === 'function'
+      ? replay.getTrackStrokes() : replayStrokesForTrack(this.store, trackId);
+    for (const o of replayStrokes) {
 
       if (o.t1 != null && o.t1 <= t) {
         if (outlineEffect !== 'none' && t - o.t1 < 450) {
@@ -863,7 +867,7 @@ export class Surface {
         drawObject(ctx, o, () => this.invalidate(), this.editing);
       } else if (o.t0 != null && o.t0 <= t && (o.t1 == null || t < o.t1)) {
         if (Array.isArray(o.points)) {
-          const sliceIndex = o.points.findIndex((p) => p.t != null && p.t > t);
+          const sliceIndex = displayMode === 'spotlight' ? -1 : o.points.findIndex((p) => p.t != null && p.t > t);
           let pts = sliceIndex >= 0 ? o.points.slice(0, sliceIndex) : o.points;
           if (pts.length === 1) {
             // Keep a just-started stroke visible before its second sampled

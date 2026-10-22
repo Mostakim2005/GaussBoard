@@ -16,6 +16,7 @@ Governs high-level user interface containers, the dual-viewport Split Study Work
 * Mounts two side-by-side flexbox viewports. Left pane usually displays textbook or reference PDF; right pane acts as an active scratch note.
 * Each pane possesses its own independent `Store`, `Camera`, and `Surface`.
 * Lifecycle Invariant: DOM element measuring and flex layout MUST occur before constructing secondary camera and hydrating state to avoid unmounted host crashes (`BUG-008`).
+* Each pane's `Interaction` listens for window blur. If the app loses focus mid-gesture, it completes the owning action and releases all captured pointer IDs so a hidden pane cannot keep a drawing or drag action active.
 
 ### Notes Overview & Gallery Smart Reflow (`src/js/ui/note-overview.js`):
 * Direct Double-Click: Double-clicking any board card immediately opens that board.
@@ -42,6 +43,7 @@ Governs high-level user interface containers, the dual-viewport Split Study Work
 * `#ctxbar` features a 350ms grace bridge and `:hover` tracking matching native Windows hover menus (`BUG-012`).
 * When right-clicking an object with quick actions active, the context menu opens adjacent side-by-side (`cr.right + 8` or `cr.left - 8 - menuWidth`) with zero overlap (`BUG-013`).
 * Audio recording action menus use viewport measurements to open above or below the selected recording and constrain their height when neither side has full room. Recording names are edited with the app's modal text dialog and persisted as an undoable document transaction (v4.8.11).
+* The recording-session menu removes its outside-click listener at close; its deferred listener attach checks that the same menu instance remains open (`BUG-032`, v5.0.0).
 
 ## 4. Relevant Bug Fixes
 * **BUG-004**: In-settings search failed to match descriptions $\rightarrow$ multi-word token inverted index added.

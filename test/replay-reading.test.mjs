@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { ReplayEngine } from '../src/js/core/replay.js';
 import { Surface } from '../src/js/core/surface.js';
 import { AudioRecorder } from '../src/js/core/audio-recorder.js';
-import { audioInkClock, replayInkEnabled } from '../src/js/core/replay-clock.js';
+import { audioInkClock, replayDisplayMode, replayGhostMode, replayInkEnabled, replaySceneFilter, replayStrokesForTrack } from '../src/js/core/replay-clock.js';
 
 class FakeAudio {
   constructor() {
@@ -77,6 +77,54 @@ test('replay does not enter active state when the media play request rejects', a
   }
 });
 
+test('replay can restart after ending and switch tracks without carrying the old session state', async () => {
+  const previous = {
+    Audio: globalThis.Audio,
+    requestAnimationFrame: globalThis.requestAnimationFrame,
+    cancelAnimationFrame: globalThis.cancelAnimationFrame
+  };
+  class EventAudio extends FakeAudio {
+    constructor() { super(); this.listeners = new Map(); this.src = ''; }
+    addEventListener(name, fn) {
+      if (!this.listeners.has(name)) this.listeners.set(name, new Set());
+      this.listeners.get(name).add(fn);
+    }
+    removeEventListener(name, fn) { this.listeners.get(name)?.delete(fn); }
+    emit(name) { for (const fn of [...(this.listeners.get(name) || [])]) fn({ type: name }); }
+    load() { this.readyState = 1; this.ended = false; this.emit('loadedmetadata'); }
+    play() { this.paused = false; this.ended = false; return Promise.resolve(); }
+  }
+  globalThis.Audio = EventAudio;
+  globalThis.requestAnimationFrame = () => 1;
+  globalThis.cancelAnimationFrame = () => {};
+  try {
+    const engine = new ReplayEngine({ surface: { invalidate() {}, _ink: null }, settings: {} });
+    engine.loadTrack({ id: 'track-first', assetId: 'asset-first', durationMs: 1000 });
+    assert.equal(await engine.play(), true);
+    engine.audio.currentTime = 1;
+    engine.currentTimeMs = 1000;
+    engine.audio.ended = true;
+    engine.onEnded();
+    assert.equal(engine.active, false);
+    assert.equal(await engine.play(), true);
+    assert.equal(engine.audio.currentTime, 0);
+
+    engine.loadTrack({ id: 'track-second', assetId: 'asset-second', durationMs: 2400 });
+    assert.equal(engine.active, false);
+    assert.equal(engine.audio.paused, true);
+    assert.equal(engine.track.id, 'track-second');
+    assert.equal(engine.audio.src, 'app://board/asset/asset-second');
+    assert.equal(engine.currentTimeMs, 0);
+    assert.equal(await engine.play(), true);
+    assert.equal(engine.active, true);
+    engine.pause();
+  } finally {
+    if (previous.Audio === undefined) delete globalThis.Audio; else globalThis.Audio = previous.Audio;
+    if (previous.requestAnimationFrame === undefined) delete globalThis.requestAnimationFrame; else globalThis.requestAnimationFrame = previous.requestAnimationFrame;
+    if (previous.cancelAnimationFrame === undefined) delete globalThis.cancelAnimationFrame; else globalThis.cancelAnimationFrame = previous.cancelAnimationFrame;
+  }
+});
+
 test('recording chunks are written in order before the asset is finalized', async () => {
   const previous = {
     MediaRecorder: globalThis.MediaRecorder,
@@ -140,6 +188,38 @@ test('sync setting is the single gate for replay ink rendering', () => {
   assert.equal(replayInkEnabled({ audioInkSync: false }), false);
   assert.equal(replayInkEnabled({ audioInkSync: true }), true);
   assert.equal(replayInkEnabled({}), true);
+});
+
+test('replay display modes preserve the live default and keep static strokes in the base scene', () => {
+  assert.equal(replayDisplayMode({}), 'reveal');
+  assert.equal(replayDisplayMode({ replayDisplayMode: 'spotlight' }), 'spotlight');
+  assert.equal(replayDisplayMode({ replayDisplayMode: 'broken' }), 'reveal');
+  const animated = replaySceneFilter('track-mode', { audioInkSync: true, replayDisplayMode: 'spotlight' });
+  assert.equal(animated({ audioId: 'track-mode' }), false);
+  assert.equal(animated({ audioId: 'other-track' }), true);
+  assert.equal(replaySceneFilter('track-mode', { audioInkSync: true, replayDisplayMode: 'static' }), null);
+  assert.equal(replaySceneFilter('track-mode', { audioInkSync: false, replayDisplayMode: 'reveal' }), null);
+  assert.equal(replayGhostMode({}, 'hidden', 'spotlight'), 'hidden');
+  assert.equal(replayGhostMode({}, 'translucent', 'spotlight'), 'translucent');
+  assert.equal(replayGhostMode({}, undefined, 'reveal'), 'translucent');
+  assert.equal(replayGhostMode({}, 'translucent', 'static'), 'hidden');
+});
+
+test('replay indexes only the selected session and invalidates the index on Store revisions', () => {
+  const store = { rev: 4, doc: { order: ['a', 'b', 'c'], objects: {
+    a: { id: 'a', audioId: 'track-index', type: 'stroke', points: [{ x: 0, y: 0 }] },
+    b: { id: 'b', audioId: 'other-track', type: 'stroke', points: [{ x: 1, y: 1 }] },
+    c: { id: 'c', audioId: 'track-index', type: 'stroke', points: [{ x: 2, y: 2 }] }
+  } } };
+  const first = replayStrokesForTrack(store, 'track-index');
+  assert.deepEqual(first.map((stroke) => stroke.id), ['a', 'c']);
+  assert.strictEqual(replayStrokesForTrack(store, 'track-index'), first);
+  store.doc.order.push('d');
+  store.doc.objects.d = { id: 'd', audioId: 'track-index', type: 'stroke', points: [{ x: 3, y: 3 }] };
+  store.rev++;
+  const refreshed = replayStrokesForTrack(store, 'track-index');
+  assert.deepEqual(refreshed.map((stroke) => stroke.id), ['a', 'c', 'd']);
+  assert.notStrictEqual(refreshed, first);
 });
 
 test('live replay camera-follow can be toggled without changing replay state', () => {
@@ -206,6 +286,33 @@ test('dead-zone camera stays still inside its frame and pans only at an edge', (
     engine.currentTimeMs = 700;
     engine.followActiveStroke();
     assert.deepEqual({ x: cam.x, y: cam.y }, { x: -50, y: 0 });
+  } finally {
+    if (previous === undefined) delete globalThis.Audio; else globalThis.Audio = previous;
+  }
+});
+
+test('center camera follow eases more slowly and resets its clock across pauses', () => {
+  const previous = globalThis.Audio;
+  globalThis.Audio = FakeAudio;
+  try {
+    const stroke = { id: 'center-stroke', audioId: 'track-center', type: 'stroke', t0: 0, t1: 1000,
+      points: [{ x: 400, y: 250, t: 0 }, { x: 410, y: 250, t: 1000 }] };
+    const cam = { x: 0, y: 0, z: 1, toScreen(x, y) { return { x: x + this.x, y: y + this.y }; },
+      panBy(dx, dy) { this.x += dx; this.y += dy; }, cancelGlide() {} };
+    const engine = new ReplayEngine({ settings: { replayCameraFollow: true, replayCameraMode: 'center' },
+      store: { doc: { order: ['center-stroke'], objects: { 'center-stroke': stroke } } },
+      surface: { cam, width: 500, height: 500, invalidate() {} } });
+    engine.track = { id: 'track-center' };
+    engine.currentTimeMs = 100;
+    engine._centerFollowAt = performance.now() - 10000;
+    engine.followActiveStroke();
+    assert.ok(cam.x < 0 && cam.x > -30, 'a delayed frame must be capped instead of snapping to center');
+
+    const beforeResume = cam.x;
+    engine.pause();
+    assert.equal(engine._centerFollowAt, null);
+    engine.followActiveStroke();
+    assert.ok(Math.abs(cam.x - beforeResume) < 15, 'resume begins with a short easing step');
   } finally {
     if (previous === undefined) delete globalThis.Audio; else globalThis.Audio = previous;
   }

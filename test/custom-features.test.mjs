@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { isScratchGesture } from '../src/js/core/scratch.js';
+import { isScratchGesture, resampleScratchPoints } from '../src/js/core/scratch.js';
 import {
   INK_ENGINES, getInkEngine, hasPressureVariation, preparePoints,
   setInkEngine, strokeWeight, inkPath,
   calligraphyEnvelope, calligraphySvgPath, brushRuns, fountainRuns
 } from '../src/js/core/ink.js';
-import { INK_TOOLS, isInkTool } from '../src/js/core/tools.js';
+import { INK_TOOLS, Interaction, isInkTool } from '../src/js/core/tools.js';
 import { HEAD_STYLES, ROUTES, connectorSvg, drawConnector, route, useConnectorStore } from '../src/js/core/connectors.js';
 import { clampImageCrop } from '../src/js/core/render.js';
 import { Camera } from '../src/js/core/camera.js';
@@ -27,6 +27,28 @@ test('slow dense scratch-out is accepted and ordinary writing is rejected', () =
   const writing = Array.from({ length: 24 }, (_, i) => ({ x: i * 5, y: Math.sin(i / 3) * 3, t: i * 80 }));
   assert.equal(isScratchGesture(scratch), true);
   assert.equal(isScratchGesture(writing), false);
+});
+
+test('scratch-out classification is stable across pointer sample rates and skips malformed samples', () => {
+  const path = Array.from({ length: 21 }, (_, i) => ({ x: i % 2 ? 50 : 0, y: i * 8 }));
+  const sampledAt = (stepsPerSegment) => {
+    const result = [];
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1], b = path[i];
+      for (let j = i === 1 ? 0 : 1; j <= stepsPerSegment; j++) {
+        const f = j / stepsPerSegment;
+        result.push({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f });
+      }
+    }
+    return result;
+  };
+  const coarse = sampledAt(1);
+  const dense = sampledAt(32);
+  dense.splice(80, 0, null, { x: NaN, y: 0 });
+  assert.equal(isScratchGesture(coarse), true);
+  assert.equal(isScratchGesture(dense), true);
+  assert.ok(resampleScratchPoints(dense).length < dense.length);
+  assert.equal(isScratchGesture([null, { x: Infinity, y: 4 }]), false);
 });
 
 test('inking engines can be selected and smoothed samples retain time and metadata', () => {
@@ -355,6 +377,40 @@ test('split-workspace board autocomplete filtering and new board template genera
   const parsed = JSON.parse(res.saveCall.json);
   assert.equal(parsed.title, 'Quantum Mechanics');
   assert.equal(parsed.v, 2);
+});
+
+test('window blur closes an active pointer gesture and releases all captured pointers', () => {
+  const interaction = Object.create(Interaction.prototype);
+  const upEvents = [];
+  const released = [];
+  interaction.action = { type: 'draw' };
+  interaction.actionId = 7;
+  interaction.pointers = new Map([
+    [7, { type: 'pen', sp: { x: 45, y: 60 } }],
+    [8, { type: 'touch', sp: { x: 70, y: 75 } }]
+  ]);
+  interaction.lastMotion = { sp: { x: 52, y: 63 }, mods: { shift: true, alt: false } };
+  interaction.cancelHold = () => {};
+  interaction.stopEdgePan = () => {};
+  interaction.hideInkPointer = () => {};
+  interaction.canvas = { releasePointerCapture: (id) => released.push(id) };
+  interaction.surface = { invalidate() {} };
+  interaction.onUp = (event) => {
+    upEvents.push(event);
+    interaction.action = null;
+    interaction.actionId = null;
+    interaction.pointers.delete(event.pointerId);
+  };
+
+  interaction.finishOnWindowBlur();
+
+  assert.equal(upEvents.length, 1);
+  assert.deepEqual({ id: upEvents[0].pointerId, type: upEvents[0].pointerType, x: upEvents[0].clientX, y: upEvents[0].clientY, shift: upEvents[0].shiftKey },
+    { id: 7, type: 'pen', x: 52, y: 63, shift: true });
+  assert.deepEqual(released.sort(), [7, 8]);
+  assert.equal(interaction.action, null);
+  assert.equal(interaction.actionId, null);
+  assert.equal(interaction.pointers.size, 0);
 });
 
 test('dual-viewport interaction isolation and store independence', () => {

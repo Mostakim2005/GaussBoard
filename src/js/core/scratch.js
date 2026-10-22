@@ -3,9 +3,39 @@ import { dist, bboxOfPoints } from './util.js';
 export const SCRATCH_MIN_REVERSALS = 5;       // Digits '2', '3' and letters 'w', 'm' have <= 3 reversals
 export const SCRATCH_MIN_DENSITY = 3.5;         // Scribbles retrace densely over same space (L / diagonal >= 3.5)
 export const SCRATCH_MAX_NET_PROGRESS = 0.35;   // Writing translates forward; scribbles stay in place
+export const SCRATCH_SAMPLE_SPACING = 3;
+
+/** Reduce redundant high-PPS pointer samples for classification only. */
+export function resampleScratchPoints(points, spacing = SCRATCH_SAMPLE_SPACING) {
+  if (!Array.isArray(points)) return [];
+  const valid = points.filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y));
+  if (valid.length < 2 || !(spacing > 0)) return valid;
+  const axes = [
+    (point) => point.x,
+    (point) => point.y,
+    (point) => (point.x + point.y) * 0.7071,
+    (point) => (point.x - point.y) * 0.7071
+  ];
+  const isTurn = (before, point, after) => axes.some((axis) => {
+    const incoming = axis(point) - axis(before);
+    const outgoing = axis(after) - axis(point);
+    return incoming * outgoing < 0 && Math.abs(incoming) + Math.abs(outgoing) >= spacing * 0.5;
+  });
+  const sampled = [valid[0]];
+  let anchor = valid[0];
+  for (let i = 1; i < valid.length - 1; i++) {
+    if (dist(anchor, valid[i]) >= spacing || isTurn(valid[i - 1], valid[i], valid[i + 1])) {
+      sampled.push(valid[i]);
+      anchor = valid[i];
+    }
+  }
+  const end = valid[valid.length - 1];
+  if (sampled[sampled.length - 1] !== end) sampled.push(end);
+  return sampled;
+}
 
 export function isScratchGesture(points, sensitivity = 'medium') {
-  if (!points) return false;
+  if (!Array.isArray(points)) return false;
 
   let minReversals = SCRATCH_MIN_REVERSALS; // 5
   let minDensity = SCRATCH_MIN_DENSITY;     // 3.5
@@ -21,6 +51,7 @@ export function isScratchGesture(points, sensitivity = 'medium') {
     minPoints = 10;
   }
 
+  points = resampleScratchPoints(points);
   if (points.length < minPoints) return false;
   const first = points[0];
   const last = points[points.length - 1];
@@ -74,7 +105,7 @@ export function isScratchGesture(points, sensitivity = 'medium') {
   }
   const bbox = bboxOfPoints(points);
   const diagonal = Math.hypot(bbox.w, bbox.h);
-  if (diagonal < 14) return false;
+  if (diagonal < 14 || totalPathLength <= 0) return false;
 
   const density = totalPathLength / Math.max(1, diagonal);
   if (density < minDensity) return false;

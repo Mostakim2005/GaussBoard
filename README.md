@@ -106,11 +106,13 @@ while the app release label and Windows artifacts use the requested `4.8.4.1` na
 [`docs/releases/RELEASE-4.8.4.1.md`](docs/releases/RELEASE-4.8.4.1.md) for the audit record,
 fixes, attribution and comparison with v4.8.5–v4.8.7.
 
-The current audited source and Windows release is **v4.8.11**, following the v4.8.8 consolidation
-and v4.8.9–v4.8.10 replay/study updates. A post-tag correction wires the live board Surface to
-ReplayEngine, restoring progressive replay highlights on the board; the export path already had
-that connection. See [`docs/releases/RELEASE-4.8.11.md`](docs/releases/RELEASE-4.8.11.md)
-for the root cause, changes, verification results, artifact hashes, and limitations. The release ledger is
+The current audited source and Windows release is **v5.0.0**. It adds selectable Live reveal,
+Spotlight and Static audio replay modes shared by live playback and video export, steadier center
+camera follow, cached per-track replay lookup, sample-rate-stable scratch-out classification, and
+pointer cleanup on window focus loss. See [`docs/releases/RELEASE-5.0.0.md`](docs/releases/RELEASE-5.0.0.md)
+for implementation, test results, artifact hashes and limits, and
+[`docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md)
+for the feature ranking and deeper cross-feature/security review. The release ledger is
 [`docs/releases/RELEASES_INDEX.md`](docs/releases/RELEASES_INDEX.md); fresh contributors and AI sessions
 should start with [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md).
 

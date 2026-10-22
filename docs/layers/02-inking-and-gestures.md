@@ -6,6 +6,7 @@ Governs pen stroke generation, pressure smoothing, pluggable inking engines (Gaz
 ## 2. Primary Source Files (Touch ONLY These)
 * **Gesture Eraser**: `src/js/core/scratch.js` (`isScratchOut()` algorithm, dominant reversal axis spatial overlap guard).
 * **Pointer Event Dispatcher**: `src/js/core/tools.js` (`startStroke()`, `addStrokePoint()`, `finishStroke()`, `onPointerUp`).
+* **Window Focus Recovery**: `src/js/core/tools.js` (`Interaction.finishOnWindowBlur()` finalizes an active action and releases pointer capture).
 * **Pluggable Inking Pipeline**: `src/js/core/ink.js` (`InkEngine` interface, `WindowsInkEngine` cubic Bézier velocity interpolator).
 * **Canvas Stroke Rendering**: `src/js/core/render.js` (`drawStroke()`, `highlighterOpacity`, `globalCompositeOperation = 'multiply'` for color popping).
 * **Settings & Menus**:
@@ -14,6 +15,8 @@ Governs pen stroke generation, pressure smoothing, pluggable inking engines (Gaz
 
 ## 3. Algorithmic Invariants & Math Parameters
 ### Scratch-Out Gesture Eraser (`src/js/core/scratch.js`):
+A 3 px spacing sampler normalizes classifier input across digitizers with different pointer report rates. It rejects non-finite coordinates and keeps significant x/y/diagonal turns; it never replaces or mutates the raw samples stored on the stroke.
+
 A stroke qualifies as an intentional scratch-out gesture **only** if all 4 conditions are met:
 1. Sharp direction reversals $\ge 5$ across normalized angles.
 2. Stroke density $\ge 3.5$ (total arc length divided by bounding box diagonal).
@@ -37,6 +40,8 @@ A stroke qualifies as an intentional scratch-out gesture **only** if all 4 condi
 * **BUG-002**: Scratch-out false positives on numbers and handwriting solved via spatial overlap guard.
 * **BUG-009**: Settings pills lacked visual `.primary` class switching on click $\rightarrow$ fixed in `panels.js`.
 
+The v5.0.0 focus-loss handler sends the owning interaction through its normal finish path and releases all captured pointer IDs; the check covers both active ink and stale pointer cleanup.
+
 ## 5. Verification Commands
 ```powershell
 node scripts/smoke.js
@@ -45,6 +50,8 @@ node scripts/smoke.js
 # - on a dark board a shape drawn in default colour is light
 # - laser duration switches immediately
 ```
+
+For the v5.0.0 feature-only verification scope, run `npm run smoke:custom`; the full audit and deferred issues are in [`../releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](../releases/AUDIT-POST-4.8.1-TO-5.0.0.md).
 
 ## 6. v4.8.8 Engine Choice and Compatibility
 

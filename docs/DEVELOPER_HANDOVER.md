@@ -1,6 +1,6 @@
 # GazBoard Replay — Developer Handover & Future Agent Guide
 
-> **Current handover snapshot (2026-10-22):** v4.8.21 audit hardening is implemented and the portable build is verified. Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md) for audit findings, fixes, focused checks, and the artifact record. The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
+> **Current handover snapshot (2026-10-22):** v5.0.0 audits and improves the local cumulative feature line through v4.8.21. Read [`INDEX.md`](INDEX.md) for routing, [`releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](releases/AUDIT-POST-4.8.1-TO-5.0.0.md) for the priority/security review, and [`releases/RELEASE-5.0.0.md`](releases/RELEASE-5.0.0.md) for implementation, verification and artifact state. The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
 
 > **Important**: This document is the primary onboarding manual for any future AI assistant, software engineer, or contributor picking up this project in a new session or clean environment. It details the complete architecture, data models, state flows, invariant guardrails, and build instructions.
 
@@ -22,9 +22,10 @@
 ## 1.1 Current Worktree and Release State (2026-10-22)
 
 - **Working repository:** `C:\Users\kazir\Documents\OpenCode\GazBoard`.
-- **Current source version:** v4.8.21, based on the audited v4.8.12–v4.8.20 feature history.
-- **Git state:** inspect `git status`, `git log`, and local tags at session start. The last verified release tag before this audit is `v4.8.20`.
-- **Latest audited scope:** all v4.8.12–v4.8.20 feature/fix entries are listed in [`MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md`](MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md). The v4.8.21 follow-up addresses untrusted bookmark labels, Electron frame/navigation checks, URL validation, and Obsidian YAML block lists.
+- **Current source version:** v5.0.0, based on the local cumulative project feature line through v4.8.21.
+- **Git state:** inspect `git status`, `git log`, and local tags at session start. The v5.0.0 tag is local; do not assume it has been pushed.
+- **Lineage:** local v4.8.2–v4.8.21 tags and upstream v4.9.0–v4.9.4 tags are on diverged histories. v5.0.0 includes the former line only; it is not a merge of upstream 4.9.x.
+- **Latest audited scope:** [`releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](releases/AUDIT-POST-4.8.1-TO-5.0.0.md) ranks the major post-v4.8.1 features and records cross-feature, security and performance findings. The v5.0.0 dossier lists implemented changes, test totals and the portable artifact.
 - **Archive policy:** keep active work here. Use the user-configured durable archive only after a release has passed checks; do not copy to historical Antigravity paths from older records.
 - **Verification/build state:** focused audit tests and locale checks pass; see [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md) for the portable artifact hash, remaining npm advisories, and architectural follow-ups.
 - **Audit attribution supplied by the project owner:** initial audit — Codex 4.6 Medium in Cursor; secondary audit/fixes — GPT-6 Luna High using Codex.
@@ -35,7 +36,7 @@
 1. Read `AGENTS.md`, then `AI_BOOTSTRAP.md` and `docs/INDEX.md` to choose one layer dossier. Consult [`AI_DOCS_MAP.md`](AI_DOCS_MAP.md) only if document scope or authority is unclear. Read this handover only for current state, owner preferences, archive policy, or verification limits.
 2. Ask what the user wants to tackle next if the prompt does not specify a concrete next change. Do not infer a release, tag, EXE build, or archive update from a documentation/audit request.
 3. For a reported replay defect, start with `docs/layers/01-audio-and-replay.md`; for video-export behavior/performance, start with `docs/layers/07-video-export.md`. Confirm whether the issue is reproducible with provided/test data before changing behavior.
-4. Keep mandatory regression, custom-feature, replay, and video suites distinct. The current repository `AGENTS.md` explicitly requires `node scripts/smoke.js` and `node scripts/i18n-check.js`; run both before reporting completion. The earlier translation deferral predates the current explicit repository instruction.
+4. Keep base regression and custom-feature suites distinct. For v5.0.0, the owner explicitly restricted smoke verification to features added after v4.8.1; see the release dossier for the exact result. For future tasks, follow the current repository verification instructions unless the user narrows the scope. Check i18n parity when UI strings change.
 5. Update the release dossier, release ledger, feature record, bug log, and both documentation trees only when their content is affected. Archive only a completed and verified release snapshot.
 
 ---

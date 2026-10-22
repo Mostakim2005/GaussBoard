@@ -1481,5 +1481,9 @@
   "Sticky Note": "便利貼",
   "Strong": "強",
   "Subtle": "柔和",
-  "Expressive": "表現力"
+  "Expressive": "表現力",
+  "Replay display mode": "重播顯示模式",
+  "Live reveal": "即時顯示",
+  "Spotlight": "聚焦",
+  "Static": "靜態"
 }

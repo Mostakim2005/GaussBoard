@@ -1,5 +1,9 @@
 import { boxesIntersect } from './util.js';
 import { boundsOf } from './store.js';
+import { replayStrokesForTrack } from './replay-clock.js';
+
+export const REPLAY_CENTER_FOLLOW_TAU_MS = 360;
+export const REPLAY_CENTER_FOLLOW_MAX_DELTA_MS = 50;
 
 export class ReplayEngine {
   constructor(app = null) {
@@ -160,6 +164,9 @@ export class ReplayEngine {
 
   pause() {
     this.playGeneration++;
+    // Do not let time spent paused/backgrounded turn the next center-follow
+    // frame into a near-instant camera snap.
+    this._centerFollowAt = null;
     if (this.audio) {
       try { this.audio.pause(); } catch {}
     }
@@ -300,13 +307,15 @@ export class ReplayEngine {
   }
 
   getActiveStroke() {
-    const doc = this.app?.store?.doc;
-    if (!this.track?.id || !doc?.order) return null;
-    for (const id of doc.order) {
-      const o = doc.objects[id];
-      if (o && o.audioId === this.track.id && o.t0 <= this.currentTimeMs && this.currentTimeMs < o.t1) return o;
+    if (!this.track?.id) return null;
+    for (const stroke of this.getTrackStrokes()) {
+      if (stroke.t0 <= this.currentTimeMs && this.currentTimeMs < stroke.t1) return stroke;
     }
     return null;
+  }
+
+  getTrackStrokes() {
+    return replayStrokesForTrack(this.app?.store, this.track?.id);
   }
 
   getActivePoint(stroke = this.getActiveStroke()) {
@@ -344,7 +353,9 @@ export class ReplayEngine {
     const screen = cam.toScreen(point.x, point.y);
     const width = this.surface.width, height = this.surface.height;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const elapsed = this._centerFollowAt == null ? 16 : Math.max(1, now - this._centerFollowAt);
+    const elapsed = this._centerFollowAt == null
+      ? 16
+      : Math.min(REPLAY_CENTER_FOLLOW_MAX_DELTA_MS, Math.max(1, now - this._centerFollowAt));
     this._centerFollowAt = now;
     let dx = 0, dy = 0;
     if (this.followMode === 'center') {
@@ -364,7 +375,7 @@ export class ReplayEngine {
       if (this.followMode === 'center') {
         // Smooth center-follow across playback frames so sampled point jitter
         // does not translate directly into a shaky camera.
-        const blend = 1 - Math.exp(-elapsed / 180);
+        const blend = 1 - Math.exp(-elapsed / REPLAY_CENTER_FOLLOW_TAU_MS);
         const moveX = Math.abs(dx) < 0.75 ? 0 : dx * blend;
         const moveY = Math.abs(dy) < 0.75 ? 0 : dy * blend;
         if (moveX || moveY) cam.panBy(moveX, moveY);

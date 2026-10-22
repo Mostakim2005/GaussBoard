@@ -6,6 +6,7 @@ import { t } from './i18n.js';
 import { isDarkBoard } from './core/render.js';
 import { boundsOf } from './core/store.js';
 import { stripBounds } from './core/pages.js';
+import { replayDisplayMode, replayGhostMode, replaySceneFilter, replayStrokesForTrack } from './core/replay-clock.js';
 import { h } from './ui/popover.js';
 
 export const VIDEO_EXPORT_PRESETS = Object.freeze({
@@ -77,8 +78,12 @@ function frameCamera(surface, box, width, height, padding = 96) {
 
 export function strokeAtOrAfter(objects, trackId, timeMs) {
   const ordered = Object.values(objects || {}).filter((o) => o?.audioId === trackId && Number.isFinite(o.t0));
-  return ordered.find((o) => Number.isFinite(o.t1) && o.t0 <= timeMs && timeMs < o.t1)
-    || ordered.find((o) => o.t0 >= timeMs)
+  return strokeAtOrAfterInList(ordered, timeMs);
+}
+
+export function strokeAtOrAfterInList(ordered, timeMs) {
+  return (ordered || []).find((o) => Number.isFinite(o.t0) && Number.isFinite(o.t1) && o.t0 <= timeMs && timeMs < o.t1)
+    || (ordered || []).find((o) => Number.isFinite(o.t0) && o.t0 >= timeMs)
     || null;
 }
 
@@ -174,7 +179,13 @@ export class VideoExporter {
     // Dedicated offscreen surface instance
     const sf = new Surface(canvas, this.app.store, { app: this.app, ephemeral: true });
     sf.resize(width, height);
-    const replayClock = { track, currentTimeMs: 0, ghostMode: 'none' };
+    const displayMode = replayDisplayMode(this.app?.settings);
+    const replayClock = {
+      track, currentTimeMs: 0,
+      ghostMode: replayGhostMode(this.app?.settings, this.app?.replayEngine?.ghostMode, displayMode),
+      displayMode
+    };
+    const trackStrokes = replayStrokesForTrack(this.app?.store, track.id);
 
     initializeExportCamera(sf, this.app, track, width, height, cameraMode, fixedFrame);
 
@@ -265,14 +276,15 @@ export class VideoExporter {
       const curMs = audio.currentTime * 1000;
       replayClock.currentTimeMs = curMs;
       if (cameraMode === VIDEO_CAMERA_MODES.FOLLOW) {
-        followExportCamera(sf, strokeAtOrAfter(this.app?.store?.doc?.objects, track.id, curMs), width, height, frameInterval);
+        followExportCamera(sf, strokeAtOrAfterInList(trackStrokes, curMs), width, height, frameInterval);
       }
 
       // Deterministically render solid background, base scene, and synchronized replay session
       ctx.save();
       ctx.fillStyle = isDarkBoard() ? '#1f1e1d' : '#f5f4f2';
       ctx.fillRect(0, 0, width, height);
-      sf.drawScene(ctx, width, height, () => {}, null, (o) => o.audioId !== track.id);
+      sf.drawScene(ctx, width, height, () => {}, null,
+        replaySceneFilter(track.id, this.app?.settings, replayClock.displayMode));
       sf.drawReplaySession(ctx, replayClock);
       ctx.restore();
 
@@ -322,7 +334,12 @@ export class VideoExporter {
     let rec = null;
     let activeAudio = null;
     let activeSource = null;
-    const replayClock = { track: null, currentTimeMs: 0, ghostMode: 'none' };
+    const displayMode = replayDisplayMode(this.app?.settings);
+    const replayClock = {
+      track: null, currentTimeMs: 0,
+      ghostMode: replayGhostMode(this.app?.settings, this.app?.replayEngine?.ghostMode, displayMode),
+      displayMode
+    };
     try {
     videoStream = canvas.captureStream ? canvas.captureStream(fps) : null;
     if (!videoStream) throw new Error('Canvas captureStream not supported in this environment');
@@ -374,6 +391,7 @@ export class VideoExporter {
     for (let i = 0; i < tracks.length; i++) {
       if (this.cancelled) break;
       const track = tracks[i];
+      const trackStrokes = replayStrokesForTrack(this.app?.store, track.id);
       replayClock.track = track;
       replayClock.currentTimeMs = 0;
       initializeExportCamera(sf, this.app, track, width, height, cameraMode, fixedFrame);
@@ -410,13 +428,14 @@ export class VideoExporter {
           const curMs = audio.currentTime * 1000;
           replayClock.currentTimeMs = curMs;
           if (cameraMode === VIDEO_CAMERA_MODES.FOLLOW) {
-            followExportCamera(sf, strokeAtOrAfter(this.app?.store?.doc?.objects, track.id, curMs), width, height, frameInterval);
+            followExportCamera(sf, strokeAtOrAfterInList(trackStrokes, curMs), width, height, frameInterval);
           }
 
           ctx.save();
           ctx.fillStyle = isDarkBoard() ? '#1f1e1d' : '#f5f4f2';
           ctx.fillRect(0, 0, width, height);
-          sf.drawScene(ctx, width, height, () => {}, null, (o) => o.audioId !== track.id);
+          sf.drawScene(ctx, width, height, () => {}, null,
+            replaySceneFilter(track.id, this.app?.settings, replayClock.displayMode));
           sf.drawReplaySession(ctx, replayClock);
           ctx.restore();
 

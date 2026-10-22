@@ -2,7 +2,7 @@
 
 For a source-checked narrative of feature changes, implementation approach, corrections, and known limitations, see [`../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](../FEATURE_EVOLUTION-4.8.1-to-4.8.8.md). For the original baseline only, see [`../BASE_FEATURE_CATALOG-4.8.1.md`](../BASE_FEATURE_CATALOG-4.8.1.md). Audit attribution: initial audit by **Codex 4.6 Medium in Cursor**; secondary audit and fixes by **GPT-6 Luna High using Codex**.
 
-This document provides the ledger of progressive Windows releases, from the original base (`4.8.1`) through the current patch release. Each release is paired with its Windows executable and a dedicated release dossier when the artifact is available.
+This document provides the ledger of progressive Windows releases, from the original base (`4.8.1`) through the current major release. Each release is paired with its Windows executable and a dedicated release dossier when the artifact is available.
 
 ---
 
@@ -23,6 +23,7 @@ This document provides the ledger of progressive Windows releases, from the orig
 | **v4.8.10** | Local tag `v4.8.10` | [`GazBoard-4.8.10-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/V-4.8.10/dist/GazBoard-4.8.10-portable.exe) | 107,275,427 B | [`RELEASE-4.8.10.md`](RELEASE-4.8.10.md) | Optional live replay camera follow; fixed recording/whole-board or follow-strokes video framing, including stitched exports. |
 | **v4.8.11** | Local tag `v4.8.11` + replay wiring follow-up | [`GazBoard-4.8.11-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/V-4.8.11/dist/GazBoard-4.8.11-portable.exe) | 107,277,884 B | [`RELEASE-4.8.11.md`](RELEASE-4.8.11.md) | Replay seek-state reliability, visible live highlighter outlines and live Surface-to-ReplayEngine wiring, working recording rename, adaptive recording menu placement, camera center/dead-zone modes, unique video export filenames. |
 | **v4.8.21** | Local tag `v4.8.21` | [`GazBoard-v4.8.21-Portable.exe`](../../dist/GazBoard-v4.8.21-Portable.exe) | 106,252,560 B | [`RELEASE-4.8.21.md`](RELEASE-4.8.21.md) | Electron IPC sender and navigation guards, validated external URLs, safe bookmark labels with Escape-to-cancel, Obsidian YAML block-list metadata, locale completeness. |
+| **v5.0.0** | Local tag `v5.0.0` | [`GazBoard-v5.0.0-Portable.exe`](../../dist-v5.0.0/GazBoard-v5.0.0-Portable.exe) | 106,255,198 B | [`RELEASE-5.0.0.md`](RELEASE-5.0.0.md) | Feature audit; replay display modes across live/export; track-index caching; calmer center camera; sample-rate-stable scratch classification; pointer focus cleanup. |
 
 ---
 
@@ -46,10 +47,8 @@ If an issue is observed during testing, follow this progressive bisect checklist
 ---
 
 ## 3. Storage Locations
-- **Permanent Archive Executables**: `C:\Users\kazir\Documents\Antigravity\GazBoard\dist\`
-- **Permanent Archive Documentation**: `C:\Users\kazir\Documents\Antigravity\GazBoard\docs\releases\`
+- **Durable release archive**: `C:\Users\kazir\Documents\Codex\GazBoard\`
+- **Current v5.0.0 archive snapshot**: `C:\Users\kazir\Documents\Codex\GazBoard\v5.0.0\`
 - **Working Repository Source**: `C:\Users\kazir\Documents\OpenCode\GazBoard\`
-- **V 4.8.4.1 isolated archive**: `C:\Users\kazir\Documents\Antigravity\GazBoard\V-4.8.4.1\`
-- **Latest verified archive snapshot (v4.8.11)**: `C:\Users\kazir\Documents\Antigravity\GazBoard\V-4.8.11\` (archive only; do not develop in place).
-- **Older snapshots**: v4.8.8 and v4.8.10 remain in their versioned archive directories; do not replace them when archiving later releases.
+- Older Antigravity locations referenced in historical release rows record where prior artifacts were stored; they are not destinations for new releases.
 - **Archive rule**: copy source/docs/build artifacts only after the working release passes its required verification. For documentation-only handover updates, copy the updated documentation paths into the current archive without replacing its binaries.

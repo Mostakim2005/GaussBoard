@@ -71,7 +71,7 @@ export const DEFAULT_SETTINGS = {
   // rememberPen() creates the map on first use; leaving it out is also what
   // makes Reset to defaults put every pen back to the colour it shipped with.
   highlighterColor: '#fff100', highlighterWidth: 20, highlighterOpacity: 0.5, highlighterColorPop: true,
-  audioInkSync: true, replayOutlineColor: '#00e5ff', replayOutlineEffect: 'neon', replayCameraFollow: true, replayCameraMode: 'viewport',
+  audioInkSync: true, replayDisplayMode: 'reveal', replayOutlineColor: '#00e5ff', replayOutlineEffect: 'neon', replayCameraFollow: true, replayCameraMode: 'viewport',
   eraserSize: 30, eraserMode: 'partial',
   pdfPaper: 'a4', pdfOrientation: '', pdfMargin: 'narrow', pdfMode: 'fit', pdfQuality: 2,
   noteColor: '#ffd94a', noteSize: 200, noteFont: 'hand',
@@ -316,6 +316,7 @@ class App {
     try {
       const raw = localStorage.getItem('gazboard.settings') || localStorage.getItem('openboard.settings') || '{}';
       const s = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+      if (!['reveal', 'spotlight', 'static'].includes(s.replayDisplayMode)) s.replayDisplayMode = 'reveal';
       if (s.eraserMode === 'stroke') s.eraserMode = 'object';   // pre-1.1 name
       // Text and notes were set in the sans face up to 1.13. Handwriting is the
       // default now; carry anyone who never touched the picker across to it, and

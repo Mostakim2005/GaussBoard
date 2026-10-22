@@ -7,7 +7,7 @@
 > **Performance Philosophy:** Fluid 120 FPS responsiveness and rock-solid feature reliability take precedence over memory frugality. High RAM allocation and bundling native runtimes (C# .NET 8, PDFium, FFmpeg/MediaFoundation) are explicitly approved.  
 > **Multi-Layer System Status:** Strictly **ON HOLD** (fully specified in Section 6 for future resumption).
 
-> **Current release and handover:** the source is v4.8.11 plus a post-tag live replay surface-wiring correction. This catalog's detailed evolution inventory below stops at v4.8.8; consult `docs/releases/RELEASE-4.8.9.md` through `RELEASE-4.8.11.md` for later implemented scope and verification. For actual repository state, owner preferences, verified checks, and limitations, start with `docs/DEVELOPER_HANDOVER.md`. The future-facing sections in this file are proposals and must not be presented as shipped features without source and test evidence.
+> **Current release and handover:** current source is v5.0.0. This catalog's shipped evolution inventory stops at v4.8.11, while later history is in `docs/MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md` and release dossiers. Use [`docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](releases/AUDIT-POST-4.8.1-TO-5.0.0.md) for the current ranked feature audit and [`docs/DEVELOPER_HANDOVER.md`](DEVELOPER_HANDOVER.md) for current repository state. Future-facing sections here are proposals and must not be presented as shipped features without source and test evidence.
 
 ---
 

@@ -11,16 +11,17 @@
 | Start a fresh AI/contributor session | [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md), then this index; open [`DEVELOPER_HANDOVER.md`](DEVELOPER_HANDOVER.md) when current state/preferences are needed | Project mental model, task routing, current branch/release, owner preferences, verified state, and known limitations. |
 | Understand only the original baseline | [`BASE_FEATURE_CATALOG-4.8.1.md`](BASE_FEATURE_CATALOG-4.8.1.md) | Base features, source locations, and improvement checkpoints, excluding later custom additions. |
 | Trace custom release history | [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md) | Select one release dossier; the evolution file is historical and covers v4.8.2–v4.8.8. |
+| Review priority features added after v4.8.1 | [`releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](releases/AUDIT-POST-4.8.1-TO-5.0.0.md) | Ranked complexity/importance, cross-feature checks, security findings, completed improvements, and deferred performance work. |
 | Inspect feature history and audit from v4.8.11 to v4.8.20 | [`MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md`](MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md) | Feature history, subsystem maps, invariant ledger, and source-checked audit follow-up. See [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md) for implemented hardening. |
 | Find an implementation area | Layer dossiers below | Current architecture and source entry points; read only the relevant dossier for code work. |
-| See release claims and package registry | [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md) | Release ledger and binary/archive references. Current patch dossier: [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md). |
+| See release claims and package registry | [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md) | Release ledger and binary/archive references. Current release dossier: [`releases/RELEASE-5.0.0.md`](releases/RELEASE-5.0.0.md). |
 | See individual change records | [`FEATURE_RECORD.md`](FEATURE_RECORD.md), [`BUG_FIX_LOG.md`](BUG_FIX_LOG.md), `releases/RELEASE-*.md` | Feature IDs, bug resolutions, and per-release notes. |
 | See original requirements and design proposals | [`plan/`](plan/) | Historical analysis/specifications; proposals must be checked against current source before being described as shipped. |
 | See audit methodology and findings | [`releases/AUDIT-CUSTOM-FEATURES-4.8.1-to-4.8.7.md`](releases/AUDIT-CUSTOM-FEATURES-4.8.1-to-4.8.7.md), [`releases/AUDIT-4.8.4-FINDINGS.md`](releases/AUDIT-4.8.4-FINDINGS.md) | Audit records; consult the evolution record for later implementation/status. |
 
 The initial audit was performed with **Codex 4.6 Medium in Cursor**. The secondary audit and fixes were applied with **GPT-6 Luna High using Codex**. Release dossiers and plans can include historical or proposed claims; verify shipped behavior in current source and feature-focused tests.
 
-**Current snapshot:** v4.8.21, local release tag pending verification. Adds Electron sender/navigation hardening, safe bookmark label rendering, Escape-to-cancel bookmark renaming, and standard Obsidian YAML block-list metadata support. See [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md) for audit rationale, checks, and portable artifact details. The complete v4.8.12–v4.8.20 feature inventory remains in the master audit dossier above.
+**Current snapshot:** v5.0.0 on the local cumulative feature line through v4.8.21. The user-scoped audit and cross-feature improvements are in [`releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](releases/AUDIT-POST-4.8.1-TO-5.0.0.md); release verification and portable artifact details are in [`releases/RELEASE-5.0.0.md`](releases/RELEASE-5.0.0.md). Upstream tags v4.9.0–v4.9.4 belong to a diverged history and are not included. The release ledger remains local; no remote push was made.
 
 ---
 
@@ -28,7 +29,7 @@ The initial audit was performed with **Codex 4.6 Medium in Cursor**. The seconda
 
 | Feature / Task Domain | Brief Description | Layer Dossier | Primary Source Files |
 | :--- | :--- | :--- | :--- |
-| **Audio-Ink Sync & Replay** | Audio recording with millisecond-timestamped strokes (`p.t`), live animated replay overlay, robust seeking, and optional viewport/center/dead-zone camera follow | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/app.js`<br>`src/js/core/audio-recorder.js`<br>`src/js/core/replay.js`<br>`src/js/core/surface.js` |
+| **Audio-Ink Sync & Replay** | Audio recording with millisecond-timestamped strokes (`p.t`), live reveal/spotlight/static presentation, robust seeking, and optional viewport/center/dead-zone camera follow | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/app.js`<br>`src/js/core/audio-recorder.js`<br>`src/js/core/replay.js`<br>`src/js/core/surface.js` |
 | **Reading/Writing Playback Modes** | Playback defaults to read-only pan/navigation; Writing mode allows new replay-timestamped ink. Sync, camera follow, and replay outline appearance can be changed from AudioBar. | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/app.js`<br>`src/js/core/tools.js`<br>`src/js/core/surface.js`<br>`src/js/ui/replay-bar.js`<br>`src/js/ui/audio-bar.js` |
 | **AudioBar, Scrubber & Bookmarks** | Waveform density scrubber, skip intervals (5s, 10s, 15s, 30s), named bookmark editor, recording rename and adaptive action menu | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/ui/audio-bar.js`<br>`src/js/ui/density-canvas.js` |
 | **Canvas Audio Player Cards** | Interactive `type: 'audio'` cards placed on canvas with direct tap-to-play | [`layers/01-audio-and-replay.md`](layers/01-audio-and-replay.md) | `src/js/core/render.js`<br>`src/js/core/tools.js` |

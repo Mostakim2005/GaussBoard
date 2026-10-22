@@ -32,7 +32,8 @@ if (!env.GAZBOARD_USER_DATA) {
 if (argv.includes('--builtin')) env.GAZBOARD_DISABLE_LIBREOFFICE = '1';
 if (argv.includes('--features-4.8.4.1')) env.GAZBOARD_TEST = './test/smoke-features-4.8.4.1.js';
 if (argv.includes('--features-4.8.8')) env.GAZBOARD_TEST = './test/smoke-features-4.8.8.js';
-const extra = argv.filter((a) => !['--builtin', '--features-4.8.4.1', '--features-4.8.8'].includes(a));
+if (argv.includes('--features-5.0.0')) env.GAZBOARD_TEST = './test/smoke-features-5.0.0.js';
+const extra = argv.filter((a) => !['--builtin', '--features-4.8.4.1', '--features-4.8.8', '--features-5.0.0'].includes(a));
 
 const onLinux = process.platform === 'linux';
 const headless = onLinux && !process.env.DISPLAY;   // a build machine, or a bare shell

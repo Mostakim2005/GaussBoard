@@ -1481,5 +1481,9 @@
   "Sticky Note": "便笺",
   "Strong": "强",
   "Subtle": "柔和",
-  "Expressive": "表现力"
+  "Expressive": "表现力",
+  "Replay display mode": "回放显示模式",
+  "Live reveal": "实时显现",
+  "Spotlight": "聚焦",
+  "Static": "静态"
 }

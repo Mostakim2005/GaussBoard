@@ -92,6 +92,9 @@ export class Interaction {
     c.addEventListener('pointermove', (e) => this.onMove(e), { signal });
     c.addEventListener('pointerup', (e) => this.onUp(e), { signal });
     c.addEventListener('pointercancel', (e) => this.onUp(e), { signal });
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('blur', () => this.finishOnWindowBlur(), { signal });
+    }
     c.addEventListener('pointerleave', () => {
       if (this.action) return;
       this.surface.hoverId = null;
@@ -158,6 +161,41 @@ export class Interaction {
     this.cancelNibHide();
     this.stopEdgePan();
     this.hideInkPointer();
+  }
+
+  /** Finish the current gesture when the OS takes focus before pointerup. */
+  finishOnWindowBlur() {
+    this.cancelHold();
+    this.stopEdgePan();
+    const pointerId = this.actionId;
+    const capturedIds = [...this.pointers.keys()];
+    const pointer = pointerId == null ? null : this.pointers.get(pointerId);
+    const sp = this.lastMotion?.sp || pointer?.sp || { x: 0, y: 0 };
+    if (this.action && pointerId != null) {
+      const event = {
+        pointerId,
+        pointerType: pointer?.type || this._lastDownType || 'mouse',
+        clientX: sp.x,
+        clientY: sp.y,
+        shiftKey: !!this.lastMotion?.mods?.shift,
+        altKey: !!this.lastMotion?.mods?.alt,
+        preventDefault() {}
+      };
+      // onUp commits the last stroke/object state and runs normal save hooks.
+      this.onUp(event);
+    }
+    for (const id of capturedIds) {
+      try { this.canvas.releasePointerCapture?.(id); } catch { /* pointer may already be gone */ }
+    }
+    this.pointers.clear();
+    this.action = null;
+    this.actionId = null;
+    this.rightPan = null;
+    this.secondaryPan = null;
+    this.pinch = null;
+    this.lastMotion = null;
+    this.hideInkPointer();
+    this.surface?.invalidate?.();
   }
 
   get tool() { return this.app.tool; }

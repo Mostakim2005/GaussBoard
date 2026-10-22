@@ -31,6 +31,10 @@ This document serves as the master registry of all features, enhancements, bug f
 | **F-119** | Turnout Page Margin Adjustment Dialog | `src/js/ui/pagemargin-dialog.js`<br>`src/js/ui/panels.js`<br>`src/js/app.js` | Verified | Turnout-inspired modal with 8 draggable blue control handles, presets (Cornell wide left, wide right, top header, 2-col), background colors, and scope toggle (`Apply to entire note` vs `Apply to current page`). |
 | **F-120** | Live Board Replay Surface Wiring | `src/js/app.js`<br>`src/js/core/surface.js`<br>`src/js/core/replay.js` | Verified | Connects the primary board Surface to its owning App so live drawing can access ReplayEngine and render progressively reanimated/highlighted session strokes. Reading/Writing mode remains a gesture/editing policy; sync and replay state govern the overlay. See BUG-023 and the v4.8.11 release dossier. |
 | **F-121** | Obsidian YAML Block-List Metadata | `src/js/core/markdown.js`<br>`test/markdown.test.mjs` | Verified | Extracts tags and aliases from standard YAML block lists and parses quoted inline list entries with commas or colons without splitting their values. |
+| **F-122** | Replay Display Modes Across Live and Export | `src/js/core/replay-clock.js`<br>`src/js/core/surface.js`<br>`src/js/export-video.js`<br>`src/js/ui/audio-bar.js` | Verified in v5.0.0 | Live reveal, Spotlight and Static are separate from Reading/Writing input mode; mode/filter and Ghost/Hidden Preview choices govern live board and single/stitched export. Live reveal remains the fallback. |
+| **F-123** | Revision-Keyed Replay Session Index | `src/js/core/replay-clock.js`<br>`src/js/core/replay.js`<br>`src/js/export-video.js` | Verified in v5.0.0 | Reuses selected-session strokes by Store revision and track; at most 16 track indexes are kept per Store. Revision changes rebuild the index. Rendering visible strokes still scales with session size. |
+| **F-124** | Sample-Rate-Stable Scratch Classifier | `src/js/core/scratch.js`<br>`test/custom-features.test.mjs` | Verified in v5.0.0 | Resamples valid points at 3 px spacing for classification only, preserves major axis/diagonal turns, rejects malformed coordinates and leaves actual ink samples unchanged. |
+| **F-125** | Replay Camera and Pointer Focus Resilience | `src/js/core/replay.js`<br>`src/js/core/tools.js`<br>`test/replay-reading.test.mjs`<br>`test/custom-features.test.mjs` | Verified in v5.0.0 | Center follow uses a slower 360 ms response, caps a delayed frame at 50 ms and resets on pause. Window blur finalizes the active gesture and releases captured pointers. |
 
 ---
 
@@ -197,6 +201,14 @@ This document serves as the master registry of all features, enhancements, bug f
 - **v4.8.10:** optional live replay camera follow and stationary/follow-strokes export framing; see `docs/releases/RELEASE-4.8.10.md`.
 - **v4.8.11:** reliable pending seek state, visible live replay outline, application-native undoable recording rename, adaptive recording menu placement, camera viewport/center/dead-zone modes, unique safe export names, and a follow-up correction wiring the primary live Surface to the App/ReplayEngine; see `docs/releases/RELEASE-4.8.11.md`.
 - **Current source:** v4.8.11 (`f01e1b3`, local tag `v4.8.11`) plus the documented post-tag live-surface wiring correction. The user confirmed the live replay highlight/animation works on the board; automated checks and build details are in the release dossier.
+
+### V 5.0.0 Feature Audit and Improvements
+
+- The ranked review of all project additions after v4.8.1 is in [`docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](releases/AUDIT-POST-4.8.1-TO-5.0.0.md). Highest complexity areas: audio-synchronized replay/video, isolated split workspace, advanced inking, and the Markdown/wikilink rendering pipeline.
+- Adds selectable Live reveal, Spotlight and Static replay presentation across live board and video exports; these do not replace Reading/Writing input modes.
+- Reuses revision-keyed per-track replay stroke indexes, steadies center camera easing across pauses/delayed frames, normalizes scratch gesture classifier spacing, and releases pointer captures after app focus loss.
+- `npm run smoke:custom` is the release smoke scope for user-added features; v5.0.0 did not run the base-only full smoke suite per the user's explicit scope.
+- See [`docs/releases/RELEASE-5.0.0.md`](releases/RELEASE-5.0.0.md) for test totals, artifact and local tag record.
 
 ### V 4.8.4.1 — Audit Follow-up
 

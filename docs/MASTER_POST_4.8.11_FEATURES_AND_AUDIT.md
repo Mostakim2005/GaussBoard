@@ -1,4 +1,5 @@
 # GazBoard Replay — Master Feature Specification & Technical Audit (v4.8.11 to v4.8.20)
+> **History boundary:** this document is the source-checked historical record through v4.8.20 and the v4.8.21 hardening follow-up. The current release is v5.0.0; its cross-version feature ranking and follow-up audit are in [`releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](releases/AUDIT-POST-4.8.1-TO-5.0.0.md).
 ## Comprehensive Evolutionary Inventory, Subsystem Architecture Deep Dives, 6 Golden Invariants Ledger, and Actionable AI Hardening Runbook
 
 > **Breadcrumb Navigation**: [`docs/INDEX.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/docs/INDEX.md) → [`AI_BOOTSTRAP.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/AI_BOOTSTRAP.md) → **`MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md`**  

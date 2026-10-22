@@ -21,6 +21,8 @@ Orchestrates offscreen canvas frame rendering and Web Audio multi-track multiple
 * **Fixed view:** `Fixed view area` fits either the selected recording's ink bounds or the combined bounds of all board objects and page extents. The export frame stays stationary.
 * **Follow strokes:** the camera eases toward the active or next timestamped stroke as it is reanimated. If a recording has no associated strokes, the exporter falls back to the current board view.
 * Both framing choices apply to single-track and stitched exports; stitched exports initialize the camera at each recording boundary.
+* **Replay presentation:** Live reveal, Spotlight and Static share `replayDisplayMode()` and `replaySceneFilter()` with the live board. Static draws session ink only in the normal scene pass. Spotlight draws the current stroke in full and can show future strokes as a faint preview when Ghost Preview is enabled; Live reveal progressively draws the current stroke. Export also reuses the live engine's Ghost/Hidden Preview choice.
+* **Lookup cost:** the exporter builds one selected-track stroke list keyed by Store revision, then reuses it for camera target selection. Scene rendering still paints visible strokes from the selected track every frame; no large-board encoder benchmark is implied by unit tests.
 
 ### Audio Multiplexing & Chunk Flushing:
 * Streams binary audio chunks via Web Audio `AudioContext.createMediaStreamDestination()`.
@@ -48,5 +50,7 @@ node scripts/smoke.js
 - `test/audio-bar.test.mjs` covers Windows-safe unique names. `npm run smoke:video` remains focused on framing/configuration; it does not measure full encode time or output size.
 
 Focused tests validate preset configuration and the dialog's returned selection. Media encoding and long-duration memory behavior should still be manually verified on target Windows hardware before making stronger performance claims.
+
+For the post-v4.8.1 feature audit, replay modes and cross-feature behavior, see [`../releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](../releases/AUDIT-POST-4.8.1-TO-5.0.0.md). The v5.0.0 portable release and feature-only test totals are recorded in [`../releases/RELEASE-5.0.0.md`](../releases/RELEASE-5.0.0.md).
 
 Run `npm run smoke:video` for focused frame-bounds and camera-follow checks. `npm run smoke:features:4.8.8` exercises the export-dialog choices.
