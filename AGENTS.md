@@ -22,7 +22,7 @@
      * Canvas, Study Tape, Image Annotation $\rightarrow$ [`docs/layers/03-canvas-and-study-tape.md`](docs/layers/03-canvas-and-study-tape.md)
      * Arrowheads, Lines, Custom Templates $\rightarrow$ [`docs/layers/04-geometry-and-templates.md`](docs/layers/04-geometry-and-templates.md)
      * PDF Background Mode, Page Margins $\rightarrow$ [`docs/layers/05-pdf-and-pagemargins.md`](docs/layers/05-pdf-and-pagemargins.md)
-     * Split Workspace, OmniSearch, UI $\rightarrow$ [`docs/layers/06-workspace-and-ui.md`](docs/layers/06-workspace-and-ui.md)
+     * Split Workspace, Markdown, board links, excerpts, OmniSearch, UI $\rightarrow$ [`docs/layers/06-workspace-and-ui.md`](docs/layers/06-workspace-and-ui.md)
      * Video Export & Audio Stitching $\rightarrow$ [`docs/layers/07-video-export.md`](docs/layers/07-video-export.md)
      * Multi-Layer System (On Standby) $\rightarrow$ [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md) (§6)
 5. **Fourth Step — Edit ONLY the Specified Files**:
@@ -32,7 +32,7 @@
 
 ## 1A. Current Documentation Map
 
-The current release and source snapshot are recorded in `package.json`, `docs/INDEX.md`, and `docs/DEVELOPER_HANDOVER.md`; verify them at the start of each task. `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md` is historical, and `docs/BASE_FEATURE_CATALOG-4.8.1.md` describes baseline-only behavior. Historical plans document intent, not current implementation. Preserve user choices as additive selectable options where practical, and record effects on other subsystems.
+The current release and source snapshot are recorded in `package.json`, `docs/INDEX.md`, and `docs/DEVELOPER_HANDOVER.md`; verify them at the start of each task. Current split-workspace, Markdown, board-link and excerpt behavior is routed through `docs/layers/06-workspace-and-ui.md`; v5.1.0 implementation and checks are recorded in `docs/releases/RELEASE-5.1.0.md`. `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md` is historical, and `docs/BASE_FEATURE_CATALOG-4.8.1.md` describes baseline-only behavior. Historical plans document intent, not current implementation. Preserve user choices as additive selectable options where practical, and record effects on other subsystems.
 
 ---
 

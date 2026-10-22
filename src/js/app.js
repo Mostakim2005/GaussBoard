@@ -15,6 +15,7 @@ import { InkTrail } from './core/inktrail.js';
 import { setInkEngine } from './core/ink.js';
 import { pick, ghost } from './core/hit.js';
 import { uid, debounce, clamp, unionBox } from './core/util.js';
+import { EXCERPT_MIME, excerptImageObject, validateExcerptPayload } from './core/excerpts.js';
 import { pageRects, stripBounds, pageIndexForBox, nearestPageIndex, offsetIntoRect, PAGE_GAP, todayStamp } from './core/pages.js';
 import { isNewer } from './core/version.js';
 import { emojiAspect, forgetEmojiMetrics, setDarkBoard } from './core/render.js';
@@ -1750,7 +1751,8 @@ class App {
     if (!target) { this.toast(t('“{name}” is not on this computer', { name: ref.name || '?' })); return false; }
     if (target.id === this.store.doc.id) {
       if (ref.page > 0 && this.pageCount) this.goToPage(ref.page - 1);
-      if (ref.box && this.surface?.cam) {
+      if (ref.heading) this.focusMarkdownHeading(ref.heading);
+      else if (ref.box && this.surface?.cam) {
         this.surface.cam.glideTo(ref.box, this.surface.width, this.surface.height, { duration: 400 });
       }
       return true;
@@ -1767,12 +1769,40 @@ class App {
     await this.loadBoard(data, { claimed: true });
     requestAnimationFrame(() => {
       if (ref.page > 0 && this.pageCount) this.goToPage(ref.page - 1);
-      if (ref.box && this.surface?.cam) {
+      if (ref.heading) this.focusMarkdownHeading(ref.heading);
+      else if (ref.box && this.surface?.cam) {
         this.surface.cam.glideTo(ref.box, this.surface.width, this.surface.height, { duration: 400 });
       }
     });
     this.syncBackPill();
     return true;
+  }
+
+  /** Focus a Markdown heading or Obsidian block id after following a wikilink. */
+  focusMarkdownHeading(anchor) {
+    const wanted = String(anchor || '').trim();
+    if (!wanted || !this.surface?.cam) return false;
+    const slug = (value) => String(value || '').toLowerCase().replace(/^#+\s*/, '')
+      .replace(/<[^>]*>/g, '').replace(/[^\p{L}\p{N}\s-]/gu, '').trim().replace(/[\s-]+/g, '-');
+    const wantedSlug = slug(wanted);
+    for (const obj of this.store.objects) {
+      if (!obj || typeof obj.text !== 'string') continue;
+      const lines = obj.text.split(/\r?\n/);
+      const index = lines.findIndex((line) => {
+        if (wanted.startsWith('^')) return line.includes(wanted);
+        const heading = line.match(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
+        return heading && slug(heading[1]) === wantedSlug;
+      });
+      if (index < 0) continue;
+      const b = boundsOf(obj);
+      const lineH = b.h / Math.max(1, lines.length);
+      const y = b.y + Math.min(b.h - 1, (index + 0.5) * lineH);
+      this.surface.cam.glideTo({ x: b.x, y: y - Math.max(40, lineH * 2), w: b.w, h: Math.max(80, lineH * 4) },
+        this.surface.width, this.surface.height, { duration: 400 });
+      this.surface.invalidate();
+      return true;
+    }
+    return false;
   }
 
   openBoard(id) {
@@ -2801,6 +2831,89 @@ class App {
     return ok;
   }
 
+  /** Build a portable, bounded screenshot payload from the active pane selection. */
+  buildExcerptPayload(surface = this.surface, store = this.store) {
+    if (!surface?.selection?.size || !store?.doc || typeof surface.renderTo !== 'function') return null;
+    const selected = surface.selectionBounds?.();
+    if (!selected || ![selected.x, selected.y, selected.w, selected.h].every(Number.isFinite)
+        || selected.w <= 0 || selected.h <= 0) return null;
+    const sourceBounds = { ...selected };
+    const padding = Math.min(24, Math.max(4, Math.min(selected.w, selected.h) * 0.04));
+    const box = {
+      x: selected.x - padding, y: selected.y - padding,
+      w: selected.w + padding * 2, h: selected.h + padding * 2
+    };
+    // Bound memory and drag payload size while retaining enough resolution for
+    // ordinary study excerpts. The screenshot is never allowed to allocate an
+    // unbounded canvas for a huge multi-selection.
+    const maxSide = Math.max(box.w, box.h);
+    const areaScale = Math.sqrt(12_000_000 / Math.max(1, box.w * box.h));
+    const scale = Math.min(2, 4096 / maxSide, areaScale);
+    if (!Number.isFinite(scale) || scale <= 0) return null;
+    let dataUrl;
+    try { dataUrl = surface.renderTo(box, scale, true, false)?.toDataURL('image/png'); } catch { return null; }
+    if (typeof dataUrl !== 'string') return null;
+    const factor = Math.min(1, 640 / Math.max(box.w, box.h));
+    const doc = store.doc;
+    const isLeftPane = this.splitWorkspace?.leftStore === store;
+    const page = !isLeftPane && this.pageCount ? this.currentPageIndex() + 1 : 0;
+    const payload = {
+      version: 1,
+      dataUrl,
+      width: box.w * factor,
+      height: box.h * factor,
+      source: {
+        boardId: String(doc.id || ''),
+        boardName: String(doc.name || doc.title || t('Untitled board')).slice(0, 200),
+        page,
+        bounds: sourceBounds
+      }
+    };
+    return validateExcerptPayload(payload) ? payload : null;
+  }
+
+  /** Copy the selected area as an in-app linked screenshot for another board. */
+  async copyAsExcerpt() {
+    const payload = this.buildExcerptPayload();
+    if (!payload) { this.toast(t('Select something to make an excerpt')); return false; }
+    const center = {
+      x: payload.source.bounds.x + payload.source.bounds.w / 2,
+      y: payload.source.bounds.y + payload.source.bounds.h / 2
+    };
+    const image = excerptImageObject(payload, center);
+    if (!image) return false;
+    this.clipboard = [image];
+    try { await window.board?.clipboardWrite?.({ image: payload.dataUrl }); } catch { /* in-app clipboard remains available */ }
+    this.clipStamp = this.clipboardStamp();
+    this.toast(t('Excerpt copied — paste it into another board'));
+    return true;
+  }
+
+  /** Place an excerpt delivered by a drag operation into a chosen board store. */
+  insertExcerptPayload(payload, at, { store = this.store, surface = this.surface, onChange = null } = {}) {
+    if (!validateExcerptPayload(payload) || !store?.add || !surface) return false;
+    const obj = excerptImageObject(payload, at);
+    if (!obj) return false;
+    store.add(obj, 'add linked excerpt');
+    surface.selection?.clear?.();
+    surface.selection?.add?.(obj.id);
+    surface.invalidate?.();
+    if (typeof onChange === 'function') onChange();
+    else if (store === this.store) this.syncUI();
+    return obj;
+  }
+
+  openExcerptSource(obj) {
+    const source = obj?.excerptSource;
+    if (!source?.boardId) return false;
+    return this.openBoardRef({
+      id: source.boardId,
+      name: source.boardName,
+      page: source.page || 0,
+      box: source.bounds
+    });
+  }
+
   /** The words on the selected objects, in reading order, for Copy text. */
   selectedWords() {
     const objs = this.selected.filter((o) => ['text', 'note', 'shape', 'table'].includes(o.type) && !o.hidden);
@@ -2941,6 +3054,8 @@ class App {
 
   async pasteAt(wp) {
     if (this.readingMode) return;
+    if (this.splitWorkspace?.active && this.splitWorkspace.isPointerOverLeft
+        && this.splitWorkspace.pasteClipboardToLeft?.()) return;
     if (!wp) wp = this.pastePoint();
     const held = this.clipboard.length;
     const now = await this.clipboardNow();
@@ -4518,6 +4633,13 @@ class App {
     stage.addEventListener('drop', (e) => {
       e.preventDefault();
       if (this.readingMode) return;
+      const excerpt = e.dataTransfer?.getData(EXCERPT_MIME);
+      if (excerpt) {
+        try {
+          this.insertExcerptPayload(JSON.parse(excerpt), this.surface.toWorld(e));
+        } catch { this.toast(t('This excerpt could not be added')); }
+        return;
+      }
       this.dropFiles([...(e.dataTransfer?.files || [])], this.surface.toWorld(e));
     });
 

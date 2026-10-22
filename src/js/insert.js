@@ -446,29 +446,6 @@ export async function pickAndInsertImage(app) {
 export function isImagePath(p) { return IMAGE_EXT.includes(p.split('.').pop().toLowerCase()); }
 export function isDocPath(p) { return DOC_EXT.includes(p.split('.').pop().toLowerCase()); }
 
-export function createExcerptCard(app, { boardId, page = 1, box = null, imageAssetId = null, title = '' } = {}) {
-  const at = dropOrigin(app, 320, 200);
-  const card = {
-    id: uid(),
-    type: 'boardlink',
-    x: at.x,
-    y: at.y,
-    w: 320,
-    h: 200,
-    rotation: 0,
-    ref: {
-      id: boardId || app.store.doc.id,
-      name: title || app.store.doc.name || 'Study Excerpt',
-      page: page || 1,
-      box: box ? { x: Math.round(box.x), y: Math.round(box.y), w: Math.round(box.w), h: Math.round(box.h) } : undefined
-    },
-    assetId: imageAssetId || undefined
-  };
-  app.store.add(card, 'create study excerpt card');
-  app.surface?.invalidate();
-  return card;
-}
-
 export async function insertAudioFromPath(app, p) {
   const ext = (p.split('.').pop() || '').toLowerCase();
   const name = p.split(/[\\/]/).pop() || 'Audio Track';

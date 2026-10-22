@@ -5,6 +5,8 @@ Governs high-level user interface containers, the dual-viewport Split Study Work
 
 ## 2. Primary Source Files (Touch ONLY These)
 * **Split Workspace**: `src/js/ui/split-workspace.js` (`SplitWorkspace` class, dual viewport layout, independent Store and Camera synchronization).
+* **Excerpt & selection actions**: `src/js/app.js`, `src/js/core/excerpts.js`, `src/js/core/render.js`, `src/js/ui/contextmenu.js` (bounded screenshot payload, source backlink, validation and hit-testing).
+* **Markdown/board references**: `src/js/core/markdown.js`, `src/js/core/boardrefs.js`, `src/js/core/render.js` (Markdown parsing/rendering, anchor serialization and link geometry).
 * **Notes Overview**: `src/js/ui/note-overview.js` (Gallery cards, double-click to open, smart reflow actions `[ | ] Split`, `# Tag`, `🏷️ Alias`).
 * **OmniSearch & Filtering**: `src/js/ui/search-dialog.js` (Ctrl+F multi-word token fuzzy matcher across titles, descriptions, and tags).
 * **Properties Dialog**: `src/js/ui/properties-dialog.js` (Obsidian tags `#tag/subtag` and aliases with workspace-wide autocomplete).
@@ -17,6 +19,13 @@ Governs high-level user interface containers, the dual-viewport Split Study Work
 * Each pane possesses its own independent `Store`, `Camera`, and `Surface`.
 * Lifecycle Invariant: DOM element measuring and flex layout MUST occur before constructing secondary camera and hydrating state to avoid unmounted host crashes (`BUG-008`).
 * Each pane's `Interaction` listens for window blur. If the app loses focus mid-gesture, it completes the owning action and releases all captured pointer IDs so a hidden pane cannot keep a drawing or drag action active.
+* The shared in-app clipboard can paste into the left pane when the pointer is over it. Excerpt payload drops are accepted by either pane; inserted images keep their originating board/page/bounds so Ctrl-click or the excerpt action can return to the source.
+* Excerpts are bounded transparent PNG snapshots of a selection, capped at 4096 px per dimension and approximately 12 megapixels. Payload validation rejects unsupported versions, malformed image data, invalid bounds and oversized input before insertion. Board-bundle ID remapping updates excerpt backlinks.
+
+### Markdown and board-link navigation
+* Markdown text retains editable source and adds Obsidian-style highlights, subscript/superscript, footnotes, hidden comments, tilde code fences and hidden-but-addressable block IDs. Existing frontmatter, aliases/tags, tables, tasks, callouts, math and wikilinks remain supported.
+* Wikilinks can target headings with `[[Board#Heading|Alias]]`, local headings with `[[#Heading]]`, and Obsidian block IDs with `[[#^block-id]]`. Numeric anchors continue to mean pad pages. Markdown links and native references preserve their heading anchor through serialization.
+* Raw HTML remains escaped/unsupported; comments are omitted only in rendered Markdown and remain in the editable source. Footnote definitions are removed from the rendered body and displayed as a numbered list.
 
 ### Notes Overview & Gallery Smart Reflow (`src/js/ui/note-overview.js`):
 * Direct Double-Click: Double-clicking any board card immediately opens that board.

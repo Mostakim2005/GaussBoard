@@ -29,7 +29,9 @@
 | `docs/layers/` | Seven current subsystem dossiers; each describes invariants, source files, and focused checks | You are changing or debugging a subsystem. Choose exactly one dossier from the index. |
 | `docs/releases/RELEASES_INDEX.md` | Compact release ledger and artifact registry | You need to identify a release or artifact. |
 | `docs/releases/RELEASE-x.y.z.md` | Scope, implementation, causes/fixes, verification, and limitations for one release | You need details for that specific version. Open only the selected dossier. |
+| `docs/releases/RELEASE-5.1.0.md` | Split workspace transfer, Markdown improvements, board/heading links and visual excerpts | You need the current 5.1.0 behavior, verification or release record. |
 | `docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md` | Ranked source-checked review of custom additions, cross-feature behavior, security/performance findings and follow-up work | You need the v5.0.0 feature-audit decision record. |
+| `docs/releases/RELEASE-5.1.0.md` | v5.1.0 split-pane, Markdown/link, excerpt implementation and verification | You need current release specifics. |
 | `docs/FEATURE_RECORD.md` | Stable feature IDs and concise feature descriptions | You need the feature registry or to add a feature record. |
 | `docs/BUG_FIX_LOG.md` | Bug IDs, symptoms, causes, fixes, and verification | You need a prior incident or are recording a fix. Search by ID/term first. |
 | `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md` | Historical custom-feature changes through v4.8.8 | You need history for those versions. It is not current implementation authority. |

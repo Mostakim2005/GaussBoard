@@ -35,6 +35,8 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 | **BUG-030** | Replay Rebuilt Track Lookup from the Full Board Every Frame | Medium | Replay Performance | Improved in v5.0.0; overlay paint remains session-sized |
 | **BUG-031** | Window Focus Loss Could Strand a Pointer Gesture | Medium | Interaction Lifecycle | Resolved in v5.0.0 |
 | **BUG-032** | Closed Recording Menu Could Acquire a Delayed Dismiss Listener | Low | AudioBar Lifecycle | Resolved in v5.0.0 |
+| **BUG-033** | Markdown Heading Anchors Were Not Distinguished from Pad Pages | Medium | Board Links / Markdown | Resolved in v5.1.0 |
+| **BUG-034** | Split Workspace Could Not Receive In-App Excerpt Clipboard or Drop | Medium | Split Workspace / Clipboard | Resolved in v5.1.0 |
 
 ---
 
@@ -115,6 +117,20 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
   1. Replaced the raw `<select>` element with a custom floating glassmorphic popover menu (`ab-session-dropdown`).
   2. Preserved the popover across clock ticks, closing it only on explicit selection or click-outside dismiss.
 * **Files Touched**: `src/js/ui/audio-bar.js`.
+
+### BUG-033: Markdown Heading Anchors Were Not Distinguished from Pad Pages (v5.1.0)
+* **Symptom**: Textual board references could target a board or numeric page, but heading and local block targets were not represented consistently across Markdown conversion, canvas hit-testing and navigation.
+* **Cause**: The native reference format treated its fragment as a page number and Markdown conversion did not preserve a separate heading target.
+* **Fix**: Encode heading anchors with an `h:` marker, preserve them through native-reference/wikilink conversion and board-ID remapping, and navigate to matching Markdown headings or block IDs. Numeric fragments continue to select pad pages.
+* **Verification**: Board-reference round-trip tests cover heading/local targets; focused Markdown and v5.1.0 smoke checks pass.
+* **Files Touched**: `src/js/core/boardrefs.js`, `src/js/core/markdown.js`, `src/js/core/render.js`, `src/js/app.js`.
+
+### BUG-034: Split Workspace Could Not Receive In-App Excerpt Clipboard or Drop (v5.1.0)
+* **Symptom**: An excerpt copied from a selection could be inserted into the active board, but the left reference pane did not receive it through the shared clipboard or drag/drop workflow.
+* **Cause**: The secondary canvas owns a separate Store and was outside the active board's paste/drop routing.
+* **Fix**: Route in-app clipboard paste to the hovered left pane and support a validated custom excerpt payload in either split-pane drop target. Store data remains independent and the source backlink travels with the image.
+* **Verification**: Electron feature smoke confirms left-pane paste and drag/drop both create a linked image.
+* **Files Touched**: `src/js/ui/split-workspace.js`, `src/js/app.js`, `src/js/core/excerpts.js`.
 
 ---
 

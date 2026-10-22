@@ -4,10 +4,10 @@
  * Canvas2D caching and interactive Live Preview DOM overlays.
  */
 
-export const EMBED_WIKILINK_RE = /!\[\[([^\]|#\n]+)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
-export const WIKILINK_RE = /(?<!!)\[\[([^\]|#\n]+)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
-export const EMBED_BOARDREF_RE = /@!\[([^\]\n]+)\]\(b:([a-zA-Z0-9_-]+)(?:#(\d{1,4}))?\)/g;
-export const BOARDREF_RE = /@\[([^\]\n]+)\]\(b:([a-zA-Z0-9_-]+)(?:#(\d{1,4}))?\)/g;
+export const EMBED_WIKILINK_RE = /!\[\[([^\]|#\n]*)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
+export const WIKILINK_RE = /(?<!!)\[\[([^\]|#\n]*)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
+export const EMBED_BOARDREF_RE = /@!\[([^\]\n]+)\]\(b:([a-zA-Z0-9_-]+)(?:#([^\)\n]{1,200}))?\)/g;
+export const BOARDREF_RE = /@\[([^\]\n]+)\]\(b:([a-zA-Z0-9_-]+)(?:#([^\)\n]{1,200}))?\)/g;
 export const CALLOUT_HEADER_RE = /^\[!([A-Za-z]+)\]([+-])?\s*(.*)$/;
 export const TASK_LINE_RE = /^([ \t]*)[-*+]\s+\[([ xX])\]\s+(.*)$/;
 export const DISPLAY_MATH_RE = /\$\$([\s\S]+?)\$\$/g;
@@ -35,7 +35,78 @@ const CALLOUT_ICONS = {
   todo: '☑️'
 };
 
-const MD_HEURISTIC_RE = /(?:^|\n)\s*(?:#{1,6}\s+|>\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+\.\s+|\|.+\|)|^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)|(?:\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~]+~~|`[^`\n]+`|<u>[\s\S]+?<\/u>|\$\$[\s\S]+?\$\$|(?<=[^\$\\\w])\$[^\s\$\n](?:[^\$\n]*?[^\s\$\n])?\$|!?\[\[[^\]]+\]\]|@!?\[[^\]]+\]\(b:|(?:^|[\s(\[{"'])#[a-zA-Z][a-zA-Z0-9_\-/]*)/;
+const MD_HEURISTIC_RE = /(?:^|\n)\s*(?:#{1,6}\s+|>{1}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+\.\s+|\|.+\||`{3,}|~{3,})|^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)|(?:\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~]+~~|(?<!~)~(?!~)[^~\n]+(?<!~)~(?!~)|\^[^^\n]+\^|==[^=\n]+==|`[^`\n]+`|<u>[\s\S]+?<\/u>|\$\$[\s\S]+?\$\$|(?<=[^\$\\\w])\$[^\s\$\n](?:[^\$\n]*?[^\s\$\n])?\$|!?\[\[[^\]]+\]\]|\[\^[^\]]+\]|%%[\s\S]*?%%|@!?\[[^\]]+\]\(b:|(?:^|[\s(\[{"'])#[a-zA-Z][a-zA-Z0-9_\-/]*)/;
+
+/** Remove Obsidian comments while preserving line numbers and fenced code. */
+export function stripObsidianComments(markdownText) {
+  const lines = String(markdownText ?? '').replace(/\r\n?/g, '\n').split('\n');
+  let fence = null, inComment = false;
+  return lines.map((line) => {
+    const fenceLine = line.match(/^\s*(`{3,}|~{3,})/);
+    if (!inComment && fenceLine) {
+      const mark = fenceLine[1];
+      if (!fence) fence = { char: mark[0], length: mark.length };
+      else if (mark[0] === fence.char && mark.length >= fence.length) fence = null;
+      return line;
+    }
+    if (fence) return line;
+    let out = '';
+    let inlineTicks = 0;
+    for (let i = 0; i < line.length; i++) {
+      if (!inComment && line[i] === '`') {
+        let end = i + 1;
+        while (line[end] === '`') end++;
+        const count = end - i;
+        inlineTicks = inlineTicks === count ? 0 : (inlineTicks ? inlineTicks : count);
+        out += line.slice(i, end); i = end - 1; continue;
+      }
+      if (!inlineTicks && line.slice(i, i + 2) === '%%') {
+        inComment = !inComment; i++; continue;
+      }
+      out += inComment ? ' ' : line[i];
+    }
+    return out;
+  }).join('\n');
+}
+
+function extractFootnotes(markdownText) {
+  const lines = String(markdownText ?? '').split('\n');
+  const definitions = new Map();
+  let fence = null;
+  for (let i = 0; i < lines.length; i++) {
+    const fenceLine = lines[i].match(/^\s*(`{3,}|~{3,})/);
+    if (fenceLine) {
+      const mark = fenceLine[1];
+      if (!fence) fence = { char: mark[0], length: mark.length };
+      else if (mark[0] === fence.char && mark.length >= fence.length) fence = null;
+      continue;
+    }
+    if (fence) continue;
+    const def = lines[i].match(/^\[\^([^\]\s]+)\]:\s*(.*)$/);
+    if (!def) continue;
+    const content = [def[2]];
+    lines[i] = '';
+    let j = i + 1;
+    while (j < lines.length && (/^(?: {2,}|\t)\S/.test(lines[j]) || /^\s*$/.test(lines[j]))) {
+      if (lines[j].trim()) content.push(lines[j].trim());
+      lines[j] = '';
+      j++;
+    }
+    definitions.set(def[1], content.join('\n').trim());
+    i = j - 1;
+  }
+  const body = lines.join('\n');
+  const scan = body.replace(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, ' ').replace(/`[^`\n]*`/g, ' ');
+  const numbers = new Map();
+  const re = /\[\^([^\]\s]+)\]/g;
+  let match;
+  while ((match = re.exec(scan))) if (definitions.has(match[1]) && !numbers.has(match[1])) numbers.set(match[1], numbers.size + 1);
+  return { body, definitions, numbers };
+}
+
+function footnoteId(id) {
+  return String(id).toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'note';
+}
 
 function parseFrontmatterScalar(raw) {
   const value = String(raw || '').trim();
@@ -201,14 +272,15 @@ export function renderMathToXhtml(tex, displayMode = false) {
 /**
  * Renders an embedded board transclusion block (`![[Board#Page|Alias]]` or `@![Label](b:id#page)`).
  */
-function renderEmbedCardXhtml({ boardId = '', target = '', page = '', label = '' }) {
-  const displayLabel = label || (page ? `${target} › Page ${page}` : target);
-  const pageBadge = page ? `<span class="gb-embed-page">P${escapeXhtml(page)}</span>` : '';
+function renderEmbedCardXhtml({ boardId = '', target = '', page = '', heading = '', label = '' }) {
+  const displayLabel = label || (page ? `${target} › Page ${page}` : heading ? `${target} › ${heading}` : target);
+  const pageBadge = page ? `<span class="gb-embed-page">P${escapeXhtml(page)}</span>` : heading ? `<span class="gb-embed-page">§ ${escapeXhtml(heading)}</span>` : '';
   const dataId = boardId ? ` data-board-id="${escapeXhtml(boardId)}"` : '';
   const dataPage = page ? ` data-page="${escapeXhtml(page)}"` : '';
+  const dataHeading = heading ? ` data-anchor="${escapeXhtml(heading)}"` : '';
   const dataTarget = target ? ` data-wikilink="${escapeXhtml(target)}"` : '';
   return (
-    `<span class="gb-embed-card" data-embed="true"${dataId}${dataPage}${dataTarget}>` +
+    `<span class="gb-embed-card" data-embed="true"${dataId}${dataPage}${dataHeading}${dataTarget}>` +
       `<span class="gb-embed-icon">⊞</span>` +
       `<span class="gb-embed-title">${escapeXhtml(displayLabel)}</span>` +
       pageBadge +
@@ -240,6 +312,21 @@ export function renderInlineMarkdown(text, options = {}) {
   src = src.replace(/`([^`\n]+)`/g, (_, code) =>
     stash(`<code class="gb-inline-code">${escapeXhtml(code)}</code>`)
   );
+  src = src.replace(/(^|\s)\^([A-Za-z0-9-]{2,})\s*$/g, (_, prefix, id) =>
+    stash(`${escapeXhtml(prefix)}<span class="gb-md-block-id" data-block-id="${escapeXhtml(id)}"></span>`)
+  );
+
+  // Obsidian footnotes and comments/formatting extensions. Code has already
+  // been stashed so marker-looking text inside it remains literal.
+  src = src.replace(/\[\^([^\]\s]+)\]/g, (whole, id) => {
+    const number = options.footnoteNumbers?.get(id);
+    return number
+      ? stash(`<sup class="gb-md-footnote-ref"><a href="#gb-footnote-${footnoteId(id)}">${number}</a></sup>`)
+      : whole;
+  });
+  src = src.replace(/==([^=\n]+)==/g, (_, value) => stash(`<mark class="gb-md-highlight">${renderInlineMarkdown(value, options)}</mark>`));
+  src = src.replace(/(?<!~)~(?!~)([^~\n]+)(?<!~)~(?!~)/g, (_, value) => stash(`<sub>${renderInlineMarkdown(value, options)}</sub>`));
+  src = src.replace(/(?<!\^)\^([^\^\n]+)\^(?!\^)/g, (_, value) => stash(`<sup>${renderInlineMarkdown(value, options)}</sup>`));
 
   // 2. Display math appearing inline & Inline math: $$...$$ and $...$
   src = src.replace(DISPLAY_MATH_RE, (_, tex) =>
@@ -250,9 +337,11 @@ export function renderInlineMarkdown(text, options = {}) {
   );
 
   // 3a. Native GazBoard Embed tokens: @![Label](b:boardId#page)
-  src = src.replace(EMBED_BOARDREF_RE, (_, label, boardId, page) =>
-    stash(renderEmbedCardXhtml({ boardId, target: label, page: page || '', label }))
-  );
+  src = src.replace(EMBED_BOARDREF_RE, (_, label, boardId, rawAnchor) => {
+    const page = rawAnchor && /^\d+$/.test(rawAnchor) ? rawAnchor : '';
+    const heading = rawAnchor && !page ? rawAnchor.replace(/^h:/, '') : '';
+    return stash(renderEmbedCardXhtml({ boardId, target: label, page, heading, label }));
+  });
 
   // 3b. Obsidian Embed Wikilinks: ![[Board Name#Page|Alias]]
   src = src.replace(EMBED_WIKILINK_RE, (_, rawTarget, rawAnchor, rawAlias) => {
@@ -267,7 +356,8 @@ export function renderInlineMarkdown(text, options = {}) {
           renderEmbedCardXhtml({
             boardId: resolved.id || '',
             target,
-            page: anchor,
+            page: /^\d+$/.test(anchor) ? anchor : '',
+            heading: anchor && !/^\d+$/.test(anchor) ? anchor.replace(/^h:/, '') : '',
             label: alias || resolved.label || target
           })
         );
@@ -279,10 +369,12 @@ export function renderInlineMarkdown(text, options = {}) {
 
   // 3c. Native GazBoard link tokens: @[Label](b:boardId#page)
   src = src.replace(BOARDREF_RE, (_, label, boardId, page) => {
+    const isPage = page && /^\d+$/.test(page);
     const pageSuffix = page ? `#${escapeXhtml(page)}` : '';
-    const dataPage = page ? ` data-page="${escapeXhtml(page)}"` : '';
+    const dataPage = isPage ? ` data-page="${escapeXhtml(page)}"` : '';
+    const dataAnchor = page && !isPage ? ` data-anchor="${escapeXhtml(page.replace(/^h:/, ''))}"` : '';
     return stash(
-      `<a class="gb-wikilink" href="b:${escapeXhtml(boardId)}${pageSuffix}" data-board-id="${escapeXhtml(boardId)}"${dataPage}>${escapeXhtml(label)}</a>`
+      `<a class="gb-wikilink" href="b:${escapeXhtml(boardId)}${pageSuffix}" data-board-id="${escapeXhtml(boardId)}"${dataPage}${dataAnchor}>${escapeXhtml(label)}</a>`
     );
   });
 
@@ -409,13 +501,15 @@ export function parseMarkdownAST(markdownText) {
     }
 
     // 2. Fenced Code Block (```lang ... ```)
-    const fenceMatch = line.match(/^\s*```([a-zA-Z0-9_-]*)\s*$/);
+    const fenceMatch = line.match(/^\s*(`{3,}|~{3,})([a-zA-Z0-9_-]*)\s*$/);
     if (fenceMatch) {
-      const lang = fenceMatch[1] || '';
+      const fence = fenceMatch[1];
+      const lang = fenceMatch[2] || '';
       const startLine = i;
       i++;
       const codeLines = [];
-      while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) {
+      const closeRe = new RegExp(`^\\s*${fence[0]}{${fence.length},}\\s*$`);
+      while (i < lines.length && !closeRe.test(lines[i])) {
         codeLines.push(lines[i]);
         i++;
       }
@@ -612,7 +706,7 @@ export function parseMarkdownAST(markdownText) {
     while (
       i < lines.length &&
       !/^\s*$/.test(lines[i]) &&
-      !/^\s*(?:#{1,6}\s+|```|>\s?|[-*+]\s+|\d+\.\s+|\$\$)/.test(lines[i]) &&
+      !/^\s*(?:#{1,6}\s+|`{3,}|~{3,}|>\s?|[-*+]\s+|\d+\.\s+|\$\$)/.test(lines[i]) &&
       !(lines[i].includes('|') && i + 1 < lines.length && parseTableDelimiter(lines[i + 1]))
     ) {
       paraLines.push(lines[i]);
@@ -633,8 +727,13 @@ export function parseMarkdownAST(markdownText) {
  * Renders parsed Markdown AST into strict XHTML.
  */
 export function renderMarkdownToHtml(markdownText, options = {}) {
-  const { attributes, body } = parseFrontmatter(markdownText);
-  const ast = parseMarkdownAST(body);
+  const { attributes, body: cleanBody } = parseFrontmatter(stripObsidianComments(markdownText));
+  const footnoteData = extractFootnotes(cleanBody);
+  const renderOptions = {
+    ...options,
+    footnoteNumbers: footnoteData.numbers.size ? footnoteData.numbers : (options.footnoteNumbers || new Map())
+  };
+  const ast = parseMarkdownAST(footnoteData.body);
   const blocks = [];
 
   for (const node of ast) {
@@ -642,7 +741,7 @@ export function renderMarkdownToHtml(markdownText, options = {}) {
       case 'heading': {
         const tag = `h${node.level}`;
         blocks.push(
-          `<${tag} class="gb-md-h gb-md-h${node.level}" data-line="${node.line}">${renderInlineMarkdown(node.text, options)}</${tag}>`
+          `<${tag} class="gb-md-h gb-md-h${node.level}" data-line="${node.line}">${renderInlineMarkdown(node.text, renderOptions)}</${tag}>`
         );
         break;
       }
@@ -673,13 +772,13 @@ export function renderMarkdownToHtml(markdownText, options = {}) {
       case 'callout': {
         const icon = CALLOUT_ICONS[node.calloutType] || CALLOUT_ICONS.note;
         const bodyHtml = node.body
-          ? `<div class="callout-content">${renderMarkdownToHtml(node.body, options)}</div>`
+          ? `<div class="callout-content">${renderMarkdownToHtml(node.body, { ...renderOptions, includeFootnotes: false })}</div>`
           : '';
         blocks.push(
           `<div class="callout callout-${escapeXhtml(node.calloutType)}" data-callout="${escapeXhtml(node.calloutType)}" data-line="${node.lineStart}">` +
             `<div class="callout-title">` +
               `<span class="callout-icon">${icon}</span>` +
-              `<span class="callout-title-inner">${renderInlineMarkdown(node.title, options)}</span>` +
+              `<span class="callout-title-inner">${renderInlineMarkdown(node.title, renderOptions)}</span>` +
             `</div>` +
             bodyHtml +
           `</div>`
@@ -689,7 +788,7 @@ export function renderMarkdownToHtml(markdownText, options = {}) {
 
       case 'blockquote': {
         blocks.push(
-          `<blockquote class="gb-blockquote" data-line="${node.lineStart}">${renderMarkdownToHtml(node.body, options)}</blockquote>`
+          `<blockquote class="gb-blockquote" data-line="${node.lineStart}">${renderMarkdownToHtml(node.body, { ...renderOptions, includeFootnotes: false })}</blockquote>`
         );
         break;
       }
@@ -699,7 +798,7 @@ export function renderMarkdownToHtml(markdownText, options = {}) {
           .map((h, colIdx) => {
             const align = node.aligns[colIdx];
             const style = align ? ` style="text-align:${align}"` : '';
-            return `<th${style}>${renderInlineMarkdown(h, options)}</th>`;
+            return `<th${style}>${renderInlineMarkdown(h, renderOptions)}</th>`;
           })
           .join('');
 
@@ -710,7 +809,7 @@ export function renderMarkdownToHtml(markdownText, options = {}) {
                 const align = node.aligns[colIdx];
                 const style = align ? ` style="text-align:${align}"` : '';
                 const cellText = row[colIdx] ?? '';
-                return `<td${style}>${renderInlineMarkdown(cellText, options)}</td>`;
+                return `<td${style}>${renderInlineMarkdown(cellText, renderOptions)}</td>`;
               })
               .join('');
             return `<tr>${tds}</tr>`;
@@ -735,11 +834,11 @@ export function renderMarkdownToHtml(markdownText, options = {}) {
               return (
                 `<li class="${itemCls}" data-line="${item.line}">` +
                   `<input type="checkbox" class="gb-task-checkbox" data-line="${item.line}"${checkedAttr} />` +
-                  `<span class="gb-task-label">${renderInlineMarkdown(item.text, options)}</span>` +
+                  `<span class="gb-task-label">${renderInlineMarkdown(item.text, renderOptions)}</span>` +
                 `</li>`
               );
             }
-            return `<li data-line="${item.line}">${renderInlineMarkdown(item.text, options)}</li>`;
+            return `<li data-line="${item.line}">${renderInlineMarkdown(item.text, renderOptions)}</li>`;
           })
           .join('');
         blocks.push(`<${tag} class="${listCls}" data-line="${node.lineStart}">${lis}</${tag}>`);
@@ -749,7 +848,7 @@ export function renderMarkdownToHtml(markdownText, options = {}) {
       case 'paragraph': {
         const lineHtml = node.text
           .split('\n')
-          .map((l) => renderInlineMarkdown(l, options))
+          .map((l) => renderInlineMarkdown(l, renderOptions))
           .join('<br />');
         blocks.push(`<p class="gb-md-p" data-line="${node.lineStart}">${lineHtml}</p>`);
         break;
@@ -757,6 +856,14 @@ export function renderMarkdownToHtml(markdownText, options = {}) {
     }
   }
 
+  if (options.includeFootnotes !== false && footnoteData.numbers.size) {
+    const entries = [...footnoteData.numbers.entries()].sort((a, b) => a[1] - b[1]);
+    const items = entries.map(([id, number]) => {
+      const body = footnoteData.definitions.get(id) || '';
+      return `<li id="gb-footnote-${footnoteId(id)}" value="${number}">${renderInlineMarkdown(body, renderOptions)}</li>`;
+    }).join('');
+    blocks.push(`<section class="gb-md-footnotes"><ol>${items}</ol></section>`);
+  }
   return blocks.join('\n');
 }
 
@@ -844,6 +951,11 @@ export function getMarkdownInlineCss({
       padding: 0.12em 0.35em;
       border-radius: 4px;
     }
+    .gb-md-highlight { background: rgba(255, 225, 82, 0.62); color: inherit; padding: 0 0.12em; border-radius: 2px; }
+    .gb-md-footnotes { border-top: 1px solid rgba(128,128,128,0.28); margin-top: 0.65em; padding-top: 0.25em; font-size: 0.82em; }
+    .gb-md-footnote-ref { font-size: 0.75em; vertical-align: super; }
+    .gb-md-footnotes ol { margin: 0.2em 0; padding-left: 1.6em; }
+    .gb-md-block-id { display: none; }
     .gb-codeblock-wrap {
       position: relative;
       margin: 0.45em 0;

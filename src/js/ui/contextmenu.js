@@ -6,6 +6,7 @@ import { t } from '../i18n.js';
 import { PEN_COLORS, NOTE_COLORS, TEXT_COLORS, SHAPE_STROKES, SHAPE_FILLS } from './palettes.js';
 import { inkPaint } from '../core/render.js';
 import { boundsOf } from '../core/store.js';
+import { EXCERPT_MIME } from '../core/excerpts.js';
 
 // kinds whose default ink the board draws light on a dark theme (notes and tables keep their own dark ink)
 const FOLLOWS_BOARD = new Set(['stroke', 'shape', 'text', 'math', 'connector']);
@@ -75,6 +76,7 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(h('div', { class: 'menu-sep' }));
     menu.appendChild(item(t('Copy'), 'copy', () => app.command('edit.copy'), { key: 'Ctrl+C' }));
     menu.appendChild(item(t('Copy as picture'), 'image', () => app.command('edit.copyPicture')));
+    appendExcerptItem(menu, app);
     menu.appendChild(item(t('Export selection as PNG…'), 'image', () => app.command('export.pngSelection')));
     openPopover({ x: posX, y: posY }, menu, popOpts);
     return;
@@ -85,6 +87,7 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(item(t('Cut'), 'copy', () => app.command('edit.cut'), { key: 'Ctrl+X' }));
     menu.appendChild(item(t('Copy'), 'copy', () => app.command('edit.copy'), { key: 'Ctrl+C' }));
     menu.appendChild(item(t('Copy as picture'), 'image', () => app.command('edit.copyPicture')));
+    appendExcerptItem(menu, app);
     if (app.selected.some((o) => ['text', 'note', 'shape', 'table'].includes(o.type) && (o.text || (o.cells && Object.keys(o.cells).length))))
       menu.appendChild(item(t('Copy text'), 'text', () => app.command('edit.copyText')));
     menu.appendChild(item(t('Duplicate'), 'duplicate', () => app.command('edit.duplicate'), { key: 'Ctrl+D' }));
@@ -129,7 +132,25 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(item(t('Page margins…'), 'palette', () => app.openPageMarginDialog?.()));
     menu.appendChild(item(t('Clear canvas'), 'trash', () => app.command('edit.clear'), { danger: true }));
   }
+
+  if (one?.type === 'image' && one.excerptSource?.boardId) {
+    menu.appendChild(item(t('Open source excerpt'), 'link', () => app.openExcerptSource(one)));
+  }
   openPopover({ x: posX, y: posY }, menu, popOpts);
+}
+
+function appendExcerptItem(menu, app) {
+  const button = item(t('Copy excerpt'), 'image', () => app.copyAsExcerpt());
+  button.draggable = true;
+  button.title = t('Copy this screenshot, or drag it onto another board');
+  button.addEventListener('dragstart', (event) => {
+    const payload = app.buildExcerptPayload?.();
+    if (!payload || !event.dataTransfer) { event.preventDefault(); return; }
+    event.dataTransfer.effectAllowed = 'copy';
+    try { event.dataTransfer.setData(EXCERPT_MIME, JSON.stringify(payload)); }
+    catch { event.preventDefault(); }
+  });
+  menu.appendChild(button);
 }
 
 /* ------------------------------------------------------------------ *
@@ -331,6 +352,9 @@ export function updateSelectionBar(app, targetObj = null) {
 
   if (sel.length === 1 && sel[0].type === 'image') {
     const imgObj = sel[0];
+    if (imgObj.excerptSource?.boardId) {
+      bar.appendChild(mk(t('Open source excerpt'), 'link', () => app.openExcerptSource(imgObj)));
+    }
     bar.appendChild(mk(t('Crop image'), 'crop', () => startImageCrop(app, imgObj)));
     bar.appendChild(mk(t('Annotate image'), 'pen', () => startImageAnnotate(app, imgObj)));
   }

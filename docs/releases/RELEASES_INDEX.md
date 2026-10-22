@@ -24,6 +24,7 @@ This document provides the ledger of progressive Windows releases, from the orig
 | **v4.8.11** | Local tag `v4.8.11` + replay wiring follow-up | [`GazBoard-4.8.11-portable.exe`](file:///C:/Users/kazir/Documents/Antigravity/GazBoard/V-4.8.11/dist/GazBoard-4.8.11-portable.exe) | 107,277,884 B | [`RELEASE-4.8.11.md`](RELEASE-4.8.11.md) | Replay seek-state reliability, visible live highlighter outlines and live Surface-to-ReplayEngine wiring, working recording rename, adaptive recording menu placement, camera center/dead-zone modes, unique video export filenames. |
 | **v4.8.21** | Local tag `v4.8.21` | [`GazBoard-v4.8.21-Portable.exe`](../../dist/GazBoard-v4.8.21-Portable.exe) | 106,252,560 B | [`RELEASE-4.8.21.md`](RELEASE-4.8.21.md) | Electron IPC sender and navigation guards, validated external URLs, safe bookmark labels with Escape-to-cancel, Obsidian YAML block-list metadata, locale completeness. |
 | **v5.0.0** | Local tag `v5.0.0` | [`GazBoard-v5.0.0-Portable.exe`](../../dist-v5.0.0/GazBoard-v5.0.0-Portable.exe) | 106,255,198 B | [`RELEASE-5.0.0.md`](RELEASE-5.0.0.md) | Feature audit; replay display modes across live/export; track-index caching; calmer center camera; sample-rate-stable scratch classification; pointer focus cleanup. |
+| **v5.1.0** | Local tag `v5.1.0` | [`GazBoard-v5.1.0-Portable.exe`](../../dist-v5.1.0/GazBoard-v5.1.0-Portable.exe) | 106,259,823 B | [`RELEASE-5.1.0.md`](RELEASE-5.1.0.md) | Linked screenshot excerpts; split-pane paste/drop; board heading and block links; additional Obsidian Markdown conveniences. |
 
 ---
 
@@ -48,7 +49,7 @@ If an issue is observed during testing, follow this progressive bisect checklist
 
 ## 3. Storage Locations
 - **Durable release archive**: `C:\Users\kazir\Documents\Codex\GazBoard\`
-- **Current v5.0.0 archive snapshot**: `C:\Users\kazir\Documents\Codex\GazBoard\v5.0.0\`
+- **Current v5.1.0 archive snapshot**: `C:\Users\kazir\Documents\Codex\GazBoard\v5.1.0\`
 - **Working Repository Source**: `C:\Users\kazir\Documents\OpenCode\GazBoard\`
 - Older Antigravity locations referenced in historical release rows record where prior artifacts were stored; they are not destinations for new releases.
 - **Archive rule**: copy source/docs/build artifacts only after the working release passes its required verification. For documentation-only handover updates, copy the updated documentation paths into the current archive without replacing its binaries.

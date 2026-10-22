@@ -3,7 +3,8 @@
 
 import { h } from './popover.js';
 import { Surface } from '../core/surface.js';
-import { Store } from '../core/store.js';
+import { Store, boundsOf } from '../core/store.js';
+import { EXCERPT_MIME } from '../core/excerpts.js';
 import { Interaction } from '../core/tools.js';
 import { PropertiesDialog } from './properties-dialog.js';
 import { icon } from './icons.js';
@@ -197,6 +198,27 @@ export class SplitWorkspace {
     this.isPointerOverLeft = false;
     this.leftPane.addEventListener('pointerenter', () => { this.isPointerOverLeft = true; });
     this.leftPane.addEventListener('pointerleave', () => { this.isPointerOverLeft = false; });
+    this.leftPane.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer?.types?.includes(EXCERPT_MIME)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+    this.leftPane.addEventListener('drop', (e) => {
+      const raw = e.dataTransfer?.getData(EXCERPT_MIME);
+      if (!raw) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (this.app?.readingMode || !this.leftStore || !this.leftSurface) return;
+      try {
+        const payload = JSON.parse(raw);
+        this.app.insertExcerptPayload(payload, this.leftSurface.toWorld(e), {
+          store: this.leftStore,
+          surface: this.leftSurface,
+          onChange: () => this.saveLeftBoardDebounced()
+        });
+      } catch { this.app?.toast?.(t('This excerpt could not be added')); }
+    });
 
     // Divider
     this.divider = h('div', {
@@ -373,6 +395,41 @@ export class SplitWorkspace {
     }
     if (this.leftSurface) this.leftSurface.resize();
     if (this.app?.surface) this.app.surface.resize();
+  }
+
+  /** Paste the shared in-app clipboard into the left pane when it owns focus. */
+  pasteClipboardToLeft() {
+    const clipboard = this.app?.clipboard;
+    if (!this.enabled || !this.leftStore || !this.leftSurface || !clipboard?.length) return false;
+    const box = clipboard.reduce((all, obj) => {
+      const next = boundsOf(obj);
+      if (!next) return all;
+      if (!all) return next;
+      const x = Math.min(all.x, next.x), y = Math.min(all.y, next.y);
+      const right = Math.max(all.x + all.w, next.x + next.w);
+      const bottom = Math.max(all.y + all.h, next.y + next.h);
+      return { x, y, w: right - x, h: bottom - y };
+    }, null);
+    if (!box) return false;
+    const view = this.leftSurface.cam.viewport(this.leftSurface.width, this.leftSurface.height);
+    const center = { x: view.x + view.w / 2, y: view.y + view.h / 2 };
+    const copies = this.app.cloneBatch(clipboard, center.x - (box.x + box.w / 2), center.y - (box.y + box.h / 2));
+    this.leftStore.addMany(copies, 'paste');
+    this.leftSurface.selection.clear();
+    for (const copy of copies) this.leftSurface.selection.add(copy.id);
+    this.leftSurface.invalidate();
+    this.saveLeftBoardDebounced();
+    return true;
+  }
+
+  /** Public helper used by paste and automation tests to place a payload in the reference pane. */
+  dropExcerptPayload(payload, event) {
+    if (!this.enabled || !this.leftStore || !this.leftSurface || !event) return false;
+    return this.app?.insertExcerptPayload?.(payload, this.leftSurface.toWorld(event), {
+      store: this.leftStore,
+      surface: this.leftSurface,
+      onChange: () => this.saveLeftBoardDebounced()
+    }) || false;
   }
 
   wireDivider(divider) {

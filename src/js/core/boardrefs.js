@@ -3,12 +3,26 @@
 
 import { t } from '../i18n.js';
 
-export const EMBED_REF_RE = /@!\[([^\]\n]{1,200})\]\(b:([A-Za-z0-9_-]{1,128})(?:#(\d{1,4}))?\)/g;
-export const REF_RE = /@\[([^\]\n]{1,200})\]\(b:([A-Za-z0-9_-]{1,128})(?:#(\d{1,4}))?\)/g;
-export const EMBED_WIKILINK_RE = /!\[\[([^\]|#\n]+)(?:#(\d{1,4}))?(?:\|([^\]\n]+))?\]\]/g;
-export const WIKILINK_RE = /(?<!!)\[\[([^\]|#\n]+)(?:#(\d{1,4}))?(?:\|([^\]\n]+))?\]\]/g;
+export const EMBED_REF_RE = /@!\[([^\]\n]{1,200})\]\(b:([A-Za-z0-9_-]{1,128})(?:#([^\)\n]{1,200}))?\)/g;
+export const REF_RE = /@\[([^\]\n]{1,200})\]\(b:([A-Za-z0-9_-]{1,128})(?:#([^\)\n]{1,200}))?\)/g;
+export const EMBED_WIKILINK_RE = /!\[\[([^\]|#\n]*)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
+export const WIKILINK_RE = /(?<!!)\[\[([^\]|#\n]*)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
 
 const clean = (s) => String(s ?? '').replace(/[\]\n\r]/g, ' ').trim().slice(0, 200) || '?';
+
+function nativeAnchor(ref) {
+  if (Number.isInteger(ref?.page) && ref.page > 0) return String(Math.floor(ref.page));
+  if (ref?.heading) return `h:${encodeURIComponent(String(ref.heading).slice(0, 160))}`;
+  return '';
+}
+
+function parseNativeAnchor(raw) {
+  if (!raw) return { page: 0, heading: '' };
+  if (/^\d{1,4}$/.test(raw)) return { page: Number(raw), heading: '' };
+  const encoded = raw.startsWith('h:') ? raw.slice(2) : raw;
+  try { return { page: 0, heading: decodeURIComponent(encoded).slice(0, 160) }; }
+  catch { return { page: 0, heading: encoded.slice(0, 160) }; }
+}
 
 function fallbackIdFromTitle(title) {
   const slug = String(title ?? '')
@@ -22,7 +36,8 @@ function fallbackIdFromTitle(title) {
 
 /** The text form of a link, for putting into words. Supports `ref.embed` (`@![...](b:...)`). */
 export function refToken(ref) {
-  const page = ref.page > 0 ? '#' + Math.floor(ref.page) : '';
+  const anchor = nativeAnchor(ref);
+  const page = anchor ? '#' + anchor : '';
   const prefix = ref.embed ? '@![' : '@[';
   const label = ref.alias || ref.name;
   return `${prefix}${clean(label)}](b:${ref.id}${page})`;
@@ -31,8 +46,8 @@ export function refToken(ref) {
 /** Format an Obsidian wikilink or embed (`[[Board#Page|Alias]]` or `![[Board#Page|Alias]]`). */
 export function wikilinkToken(ref) {
   const b = lookupBoard(ref);
-  const boardName = clean(ref.boardName || (b && b.name) || ref.name || '?');
-  const pagePart = ref.page > 0 ? `#${Math.floor(ref.page)}` : '';
+  const boardName = clean(ref.boardName || (b && b.name) || ref.name || (ref.id === current.id ? current.name : '') || '?');
+  const pagePart = ref.page > 0 ? `#${Math.floor(ref.page)}` : ref.heading ? `#${String(ref.heading).slice(0, 160)}` : '';
   const alias = ref.alias ? clean(ref.alias) : (ref.name && ref.name !== boardName ? clean(ref.name) : '');
   const aliasPart = alias && alias !== boardName ? `|${alias}` : '';
   return `${ref.embed ? '!' : ''}[[${boardName}${pagePart}${aliasPart}]]`;
@@ -48,13 +63,15 @@ export function wikilinksToRefs(text) {
 
   const replaceFn = (isEmbed) => (whole, rawTitle, rawPage, rawAlias) => {
     const title = String(rawTitle || '').trim();
-    if (!title) return whole;
-    const page = rawPage ? Number(rawPage) : 0;
+    const anchor = String(rawPage || '').trim();
+    const { page, heading } = /^\d{1,4}$/.test(anchor) ? { page: Number(anchor), heading: '' } : { page: 0, heading: anchor };
+    if (!title && !current.id) return whole;
     const alias = rawAlias ? String(rawAlias).trim() : '';
-    const match = lookupBoard({ name: title });
+    const match = title ? lookupBoard({ name: title }) : lookupBoard({ id: current.id });
+    const boardName = (match && match.name) || title || current.name;
     const id = match ? match.id : fallbackIdFromTitle(title);
-    const displayName = alias || (match && match.name) || title;
-    return refToken({ id, name: displayName, page, embed: isEmbed });
+    const displayName = alias || boardName;
+    return refToken({ id, name: displayName, boardName, page, heading, embed: isEmbed });
   };
 
   s = s.replace(EMBED_WIKILINK_RE, replaceFn(true));
@@ -70,10 +87,11 @@ export function refsToWikilinks(text) {
   let s = String(text ?? '');
   if (!s.includes('](b:')) return s;
 
-  const toWl = (isEmbed) => (_, label, id, page) => {
+  const toWl = (isEmbed) => (_, label, id, rawAnchor) => {
     const b = lookupBoard({ id, name: label });
     const boardName = (b && b.name) || label;
-    const pagePart = page ? `#${page}` : '';
+    const { page, heading } = parseNativeAnchor(rawAnchor);
+    const pagePart = page ? `#${page}` : heading ? `#${heading}` : '';
     const aliasPart = label && label !== boardName ? `|${label}` : '';
     return `${isEmbed ? '!' : ''}[[${boardName}${pagePart}${aliasPart}]]`;
   };
@@ -92,11 +110,13 @@ export function refSpans(text) {
     EMBED_REF_RE.lastIndex = 0;
     let m;
     while ((m = EMBED_REF_RE.exec(s))) {
-      out.push({ start: m.index, end: m.index + m[0].length, name: m[1], id: m[2], page: m[3] ? Number(m[3]) : 0, embed: true });
+      const anchor = parseNativeAnchor(m[3]);
+      out.push({ start: m.index, end: m.index + m[0].length, name: m[1], id: m[2], ...anchor, embed: true });
     }
     REF_RE.lastIndex = 0;
     while ((m = REF_RE.exec(s))) {
-      out.push({ start: m.index, end: m.index + m[0].length, name: m[1], id: m[2], page: m[3] ? Number(m[3]) : 0, embed: false });
+      const anchor = parseNativeAnchor(m[3]);
+      out.push({ start: m.index, end: m.index + m[0].length, name: m[1], id: m[2], ...anchor, embed: false });
     }
   }
 
@@ -106,9 +126,10 @@ export function refSpans(text) {
       let m;
       while ((m = re.exec(s))) {
         const title = String(m[1] || '').trim();
-        const page = m[2] ? Number(m[2]) : 0;
+        const rawAnchor = String(m[2] || '').trim();
+        const { page, heading } = /^\d{1,4}$/.test(rawAnchor) ? { page: Number(rawAnchor), heading: '' } : { page: 0, heading: rawAnchor };
         const alias = m[3] ? String(m[3]).trim() : '';
-        const found = lookupBoard({ name: title });
+        const found = title ? lookupBoard({ name: title }) : lookupBoard({ id: current.id });
         out.push({
           start: m.index,
           end: m.index + m[0].length,
@@ -117,6 +138,7 @@ export function refSpans(text) {
           alias,
           id: found ? found.id : fallbackIdFromTitle(title),
           page,
+          heading,
           embed: isEmbed,
           wikilink: true
         });
@@ -137,9 +159,13 @@ export const hasRefs = (text) =>
 export function refsAsWords(text) {
   if (!hasRefs(text)) return String(text ?? '');
   const withRefs = wikilinksToRefs(text);
+  const anchorWords = (raw) => {
+    const anchor = parseNativeAnchor(raw);
+    return anchor.page ? ' › ' + anchor.page : anchor.heading ? ' › ' + anchor.heading : '';
+  };
   return String(withRefs)
-    .replace(EMBED_REF_RE, (_, name, id, page) => '@!' + (directoryName(id) || name) + (page ? ' › ' + page : ''))
-    .replace(REF_RE, (_, name, id, page) => '@' + (directoryName(id) || name) + (page ? ' › ' + page : ''));
+    .replace(EMBED_REF_RE, (_, name, id, anchor) => '@!' + (directoryName(id) || name) + anchorWords(anchor))
+    .replace(REF_RE, (_, name, id, anchor) => '@' + (directoryName(id) || name) + anchorWords(anchor));
 }
 
 /* ------------------------------------------------------------------ *
@@ -163,6 +189,7 @@ export function setCurrentBoard(id, name) {
 }
 
 export const currentBoardId = () => current.id;
+export const currentBoardName = () => current.name;
 export const directoryKnown = () => known;
 export function onDirectoryChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 
@@ -199,7 +226,7 @@ export function refLabel(ref) {
   if (ref?.alias) return ref.page > 0 ? `${ref.alias} › ${ref.page}` : ref.alias;
   const b = lookupBoard(ref);
   const name = (b && b.name) || ref?.name || '?';
-  return ref?.page > 0 ? `${name} › ${ref.page}` : name;
+  return ref?.page > 0 ? `${name} › ${ref.page}` : ref?.heading ? `${name} › ${ref.heading}` : name;
 }
 
 export function linkedRefs(objects) {
@@ -210,6 +237,7 @@ export function linkedRefs(objects) {
   for (const o of list) {
     if (!o) continue;
     if (o.type === 'boardlink') add(o.board);
+    if (o.excerptSource?.boardId) add({ id: o.excerptSource.boardId, name: o.excerptSource.boardName || '' });
     if (typeof o.text === 'string') words(o.text);
     if (o.cells) for (const v of Object.values(o.cells)) words(v);
   }
@@ -221,8 +249,8 @@ export function remapBoardIds(objects, map) {
   const swap = (s) => {
     if (typeof s !== 'string' || !s.includes('](b:')) return s;
     return s
-      .replace(EMBED_REF_RE, (whole, name, id, page) => (map.has(id) ? `@![${name}](b:${map.get(id)}${page ? '#' + page : ''})` : whole))
-      .replace(REF_RE, (whole, name, id, page) => (map.has(id) ? `@[${name}](b:${map.get(id)}${page ? '#' + page : ''})` : whole));
+      .replace(EMBED_REF_RE, (whole, name, id, anchor) => (map.has(id) ? `@![${name}](b:${map.get(id)}${anchor ? '#' + anchor : ''})` : whole))
+      .replace(REF_RE, (whole, name, id, anchor) => (map.has(id) ? `@[${name}](b:${map.get(id)}${anchor ? '#' + anchor : ''})` : whole));
   };
   const runsFor = (runs, text) => {
     if (!Array.isArray(runs)) return runs;
@@ -233,6 +261,9 @@ export function remapBoardIds(objects, map) {
     if (!o || typeof o !== 'object') return o;
     const n = { ...o };
     if (n.type === 'boardlink' && n.board && map.has(n.board.id)) n.board = { ...n.board, id: map.get(n.board.id) };
+    if (n.excerptSource?.boardId && map.has(n.excerptSource.boardId)) {
+      n.excerptSource = { ...n.excerptSource, boardId: map.get(n.excerptSource.boardId) };
+    }
     if (typeof n.text === 'string') {
       n.text = swap(n.text);
       if (n.runs) { const r = runsFor(n.runs, n.text); if (r) n.runs = r; else delete n.runs; }

@@ -7,7 +7,7 @@ import { inkPath, inkRuns, strokeWeight, hasPressureVariation, calligraphyPath }
 import { objectRuns, layoutRich, fitRichSize, drawRichLines, needsRich, watchChips } from './richtext.js';
 import { mathEntry, hasMaths } from './maths.js';
 import { drawArrowhead, drawConnector } from './connectors.js';
-import { lookupBoard, refLabel, refMissing } from './boardrefs.js';
+import { lookupBoard, refLabel, refMissing, currentBoardId, currentBoardName } from './boardrefs.js';
 import { isMarkdown, buildMarkdownSvgDataUri } from './markdown.js';
 
 import { fontStack } from '../ui/palettes.js';
@@ -41,11 +41,13 @@ const MAX_MD_CACHE = 250;
 
 function resolveWikilinkForRender(target, anchor, alias) {
   const page = anchor && /^\d+$/.test(anchor) ? Number(anchor) : 0;
-  const b = lookupBoard({ name: target });
-  const label = alias || refLabel({ id: b?.id, name: target, page });
+  const title = String(target || '').trim();
+  const b = lookupBoard(title ? { name: title } : { id: currentBoardId() });
+  const heading = anchor && !page ? anchor : '';
+  const label = alias || refLabel({ id: b?.id, name: title || currentBoardName(), page, heading });
   return {
     id: b?.id || '',
-    href: `b:${b?.id || target}${anchor ? '#' + anchor : ''}`,
+    href: `b:${b?.id || title}${anchor ? '#' + (page ? anchor : `h:${encodeURIComponent(anchor)}`) : ''}`,
     label
   };
 }
@@ -960,6 +962,29 @@ export function drawImage(ctx, o, onload) {
       ctx.fillText(o.label, o.x, o.y - 8);
     }
   }
+  if (o.excerptSource?.boardId) {
+    const size = Math.max(14, Math.min(22, Math.min(o.w, o.h) * 0.16));
+    const bx = o.x + o.w - size - 5, by = o.y + 5;
+    ctx.save();
+    ctx.globalAlpha = 0.94;
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#0f6cbd';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, size, size, size * 0.28); else ctx.rect(bx, by, size, size);
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#0f6cbd';
+    ctx.lineWidth = Math.max(1.2, size / 10);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bx + size * 0.32, by + size * 0.68);
+    ctx.lineTo(bx + size * 0.68, by + size * 0.32);
+    ctx.moveTo(bx + size * 0.43, by + size * 0.32);
+    ctx.lineTo(bx + size * 0.68, by + size * 0.32);
+    ctx.lineTo(bx + size * 0.68, by + size * 0.57);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.restore();
 }
 
@@ -1300,6 +1325,13 @@ export function drawAudioCard(ctx, o) {
 let probe = null;
 export function linkRectsOf(o) {
   if (!o || o.hidden) return [];
+  if (o.type === 'image' && o.excerptSource?.boardId) {
+    const b = boundsOf(o);
+    const c = { x: b.x + b.w / 2, y: b.y + b.h / 2 }, a = o.rotation || 0;
+    const turn = (px, py) => (a ? { x: c.x + (px - c.x) * Math.cos(a) - (py - c.y) * Math.sin(a), y: c.y + (px - c.x) * Math.sin(a) + (py - c.y) * Math.cos(a) } : { x: px, y: py });
+    const s = o.excerptSource;
+    return [{ ref: { id: s.boardId, name: s.boardName, page: s.page || 0, box: s.bounds }, quad: [turn(b.x, b.y), turn(b.x + b.w, b.y), turn(b.x + b.w, b.y + b.h), turn(b.x, b.y + b.h)] }];
+  }
   if (o.type === 'boardlink') {
     const b = boundsOf(o);
     const c = { x: b.x + b.w / 2, y: b.y + b.h / 2 }, a = o.rotation || 0;

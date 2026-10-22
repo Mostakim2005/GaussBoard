@@ -7,11 +7,11 @@
 
 ## 1. Quick Repository Facts & Mental Model
 
-* **Project**: **GazBoard Replay** (Windows-first fork of GazBoard v4.8.1); current source release **v5.0.0**. It includes the local cumulative feature line through v4.8.21 plus replay-mode, camera-easing, session-index, scratch-classifier and pointer-focus improvements.
-  * **Current repo snapshot:** read `package.json`, `git status`, `git log` and local tags for live version/commit state. Release details and verification: [`docs/releases/RELEASE-5.0.0.md`](docs/releases/RELEASE-5.0.0.md); ranked audit and deferred findings: [`docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md). Full onboarding, preferences, and next-session protocol: [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md).
+* **Project**: **GazBoard Replay** (Windows-first fork of GazBoard v4.8.1); current source release **v5.1.0**. It adds linked excerpts, heading/block links and Obsidian Markdown conveniences alongside the cumulative local feature line.
+  * **Current repo snapshot:** read `package.json`, `git status`, `git log` and local tags for live version/commit state. Release details and verification: [`docs/releases/RELEASE-5.1.0.md`](docs/releases/RELEASE-5.1.0.md); prior audit and deferred findings: [`docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md). Full onboarding, preferences, and next-session protocol: [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md).
   * **Archive policy:** keep active work in this repository. Copy only a verified durable release to the user's configured archive location; never rely on stale hardcoded archive paths in old release notes.
   * Base-only behavior and source entry points: [`docs/BASE_FEATURE_CATALOG-4.8.1.md`](docs/BASE_FEATURE_CATALOG-4.8.1.md).
-  * Upstream tags v4.9.0–v4.9.4 are on a separate diverged history; v5.0.0 does not claim to include them.
+  * Upstream tags v4.9.0–v4.9.4 are on a separate diverged history; v5.1.0 does not claim to include them.
   * Custom feature and fix history through v4.8.11: [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) covers v4.8.2–v4.8.8; see the v4.8.9, v4.8.10, and v4.8.11 release dossiers for later patches.
   * Treat plans as proposals/history, not proof of shipped behavior. Verify current behavior against source and focused tests.
 * **Base Architecture**: Pure Vanilla JavaScript (ES6 Modules), HTML5 Canvas 2D, Electron 43.

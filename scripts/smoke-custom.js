@@ -7,12 +7,15 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const runs = [
   ['Node custom-feature checks', ['--test', 'test/custom-features.test.mjs']],
+  ['Node Markdown extension checks', ['--test', 'test/markdown.test.mjs']],
+  ['Node excerpt/link checks', ['--test', 'test/excerpt.test.mjs']],
   ['Node replay-camera checks', ['--test', 'test/replay-reading.test.mjs']],
   ['Node video-framing checks', ['--test', 'test/video-framing.test.mjs']],
   ['Node protocol path security checks', ['--test', 'test/path-security.test.cjs']],
   ['Electron 4.8.4.1 audit checks', ['scripts/smoke.js', '--features-4.8.4.1']],
   ['Electron 4.8.8 custom-feature checks', ['scripts/smoke.js', '--features-4.8.8']],
-  ['Electron 5.0.0 replay-mode checks', ['scripts/smoke.js', '--features-5.0.0']]
+  ['Electron 5.0.0 replay-mode checks', ['scripts/smoke.js', '--features-5.0.0']],
+  ['Electron 5.1.0 split/excerpt checks', ['scripts/smoke.js', '--features-5.1.0']]
 ];
 
 for (const [label, args] of runs) {

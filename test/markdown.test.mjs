@@ -8,7 +8,9 @@ import {
   buildMarkdownSvgDataUri,
   parseFrontmatter,
   countTags,
-  INLINE_MATH_RE
+  INLINE_MATH_RE,
+  stripObsidianComments,
+  parseMarkdownAST
 } from '../src/js/core/markdown.js';
 
 test('isMarkdown accurately detects GFM and Obsidian syntax', () => {
@@ -17,6 +19,7 @@ test('isMarkdown accurately detects GFM and Obsidian syntax', () => {
   assert.equal(isMarkdown('> [!NOTE] Newtons Second Law'), true);
   assert.equal(isMarkdown('- [ ] Solve problem set 4'), true);
   assert.equal(isMarkdown('Reference: [[Classical Mechanics#2]]'), true);
+  assert.equal(isMarkdown('Water is H~2~O and x^2^'), true);
   assert.equal(isMarkdown('Inline formula $E = mc^2$ here'), true);
 });
 
@@ -86,6 +89,19 @@ test('Renders Obsidian wikilinks, piped aliases, and obsidian:// URIs', () => {
   assert.match(html, /class="gb-obsidian-uri" href="obsidian:\/\/open\?vault=Notes">Vault<\/a>/);
 });
 
+test('renders heading wikilinks with a distinct anchor instead of a pad-page number', () => {
+  const html = renderMarkdownToHtml('[[Target Board#Important Section|Open section]]', {
+    resolveWikilink: (target, anchor, alias) => ({
+      id: target === 'Target Board' ? 'board-1' : '',
+      href: `b:board-1#h:${encodeURIComponent(anchor)}`,
+      label: alias
+    })
+  });
+  assert.match(html, /href="b:board-1#h:Important%20Section"/);
+  assert.match(html, /data-anchor="Important Section"/);
+  assert.match(html, />Open section<\/a>/);
+});
+
 test('Produces valid XHTML inside SVG <foreignObject> data URI', () => {
   const md = '# Heading\n- [ ] Task 1\n---\nLine 1\nLine 2';
   const uri = buildMarkdownSvgDataUri(md, { width: 400, height: 300 });
@@ -145,4 +161,36 @@ Body`;
   assert.deepEqual(attributes.aliases, ['Quantum, level 2', 'QM: advanced']);
   assert.deepEqual(countTags(md), { lecture: 1, 'math, physics': 1 });
   assert.equal(body, 'Body');
+});
+
+test('renders Obsidian highlight, subscript, superscript and footnotes safely', () => {
+  const html = renderMarkdownToHtml('Water is H~2~O and x^2^; ==review this==[^source].\n\n[^source]: See **the source**.');
+  assert.match(html, /<sub>2<\/sub>/);
+  assert.match(html, /<sup>2<\/sup>/);
+  assert.match(html, /<mark class="gb-md-highlight">review this<\/mark>/);
+  assert.match(html, /class="gb-md-footnote-ref"><a href="#gb-footnote-source">1<\/a>/);
+  assert.match(html, /<li id="gb-footnote-source" value="1">See <strong>the source<\/strong>\.<\/li>/);
+});
+
+test('Obsidian comments are omitted from rendered Markdown but kept in fenced code', () => {
+  const source = 'Visible %%secret%% text.\n\n```txt\n%%literal code%%\n```';
+  const html = renderMarkdownToHtml(source);
+  assert.match(html, /Visible\s+\s+text\./);
+  assert.doesNotMatch(html, /secret/);
+  assert.match(html, /%%literal code%%/);
+  assert.match(stripObsidianComments(source), /```txt\n%%literal code%%\n```/);
+});
+
+test('Obsidian block ids stay addressable in source without showing in the rendered note', () => {
+  const html = renderMarkdownToHtml('A reusable definition. ^definition-1');
+  assert.match(html, /class="gb-md-block-id" data-block-id="definition-1"/);
+  assert.doesNotMatch(html, />\^definition-1</);
+});
+
+test('supports tilde fenced code blocks and keeps their contents out of Markdown parsing', () => {
+  const ast = parseMarkdownAST('Text before the code.\n\n~~~js\nconst x = ==literal==;\n~~~\n\nAfter the code.');
+  assert.equal(ast.length, 3);
+  assert.equal(ast[1].type, 'codeblock');
+  assert.equal(ast[1].lang, 'js');
+  assert.equal(ast[1].code, 'const x = ==literal==;');
 });
