@@ -15,6 +15,7 @@ import { mathEntry, mathPng, hasMaths, inlineFit } from './core/maths.js';
 import { connectorSvg } from './core/connectors.js';
 import { loadZip } from './board-export.js';
 import { calligraphySvgPath } from './core/ink.js';
+import { isMarkdown, renderMarkdownToHtml } from './core/markdown.js';
 
 /**
  * What a bitmap or vector export covers.
@@ -253,7 +254,22 @@ function svgObjects(objects, meas) {
       parts.push(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="4" fill="${o.color}"${rot}/>`);
       if (o.text) parts.push(textSvg(meas, o.text, o.x + 14, o.y + 14, o.w - 28, o.h - 28, { align: o.align || 'center', valign: 'middle', color: o.textColor || '#201f1e', size: o.fontSize || 22, runs: objectRuns(o), bold: o.bold, italic: o.italic, underline: o.underline, font: o.font }, rot));
     } else if (o.type === 'text') {
-      parts.push(textSvg(meas, o.text, o.x, o.y, o.w, o.h, { align: o.align || 'left', valign: 'top', color: o.color, size: o.fontSize || 24, font: o.font, runs: objectRuns(o), bold: o.bold, italic: o.italic, underline: o.underline }, rot));
+      if (o.markdown !== false && isMarkdown(o.text)) {
+        const pad = 12;
+        const x = o.x - pad, y = o.y - pad, w = o.w + pad * 2, h = o.h + pad * 2;
+        const bg = o.background && o.background !== 'none' ? o.background : '#ffffff';
+        const html = renderMarkdownToHtml(o.text, { fontSize: o.fontSize || 16, color: o.color || '#201f1e' });
+        parts.push(`<g${rot}>
+          <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${bg}" stroke="rgba(0,0,0,0.12)" stroke-width="1.5" />
+          <foreignObject x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Segoe UI,sans-serif;font-size:${o.fontSize || 16}px;color:${o.color || '#201f1e'};word-break:break-word;overflow:hidden;">
+              ${html}
+            </div>
+          </foreignObject>
+        </g>`);
+      } else {
+        parts.push(textSvg(meas, o.text, o.x, o.y, o.w, o.h, { align: o.align || 'left', valign: 'top', color: o.color, size: o.fontSize || 24, font: o.font, runs: objectRuns(o), bold: o.bold, italic: o.italic, underline: o.underline }, rot));
+      }
     } else if (o.type === 'emoji') {
       /*
        * An emoji goes out as the character itself, not as a picture of it.

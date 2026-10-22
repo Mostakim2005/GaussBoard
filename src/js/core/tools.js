@@ -765,9 +765,13 @@ export class Interaction {
           for (const ce of evs) {
             const csp = this.surface.screenPoint(ce);
             const cwp = this.surface.cam.toWorld(csp.x, csp.y);
-            offer({ ...cwp, p: this.pressure(ce), ...(curT != null ? { t: curT } : {}) });
+            const tilt = (ce && typeof ce.tiltX === 'number' && (ce.tiltX !== 0 || ce.tiltY !== 0)) ? { tiltX: ce.tiltX, tiltY: ce.tiltY } : {};
+            offer({ ...cwp, p: this.pressure(ce), ...(curT != null ? { t: curT } : {}), ...tilt });
           }
-        } else offer({ ...wp, p: pressure, ...(curT != null ? { t: curT } : {}) });
+        } else {
+          const tilt = (e && typeof e.tiltX === 'number' && (e.tiltX !== 0 || e.tiltY !== 0)) ? { tiltX: e.tiltX, tiltY: e.tiltY } : {};
+          offer({ ...wp, p: pressure, ...(curT != null ? { t: curT } : {}), ...tilt });
+        }
 
         if (added) a.obj.bbox = bboxOfPoints(a.obj.points);
         this.sendInkTrail(e, a, wp, pressure);
@@ -1673,7 +1677,8 @@ export class Interaction {
       obj.audioId = clock.trackId;
       obj.t0 = clock.timeMs;
     }
-    const pt0 = this.snapToRuler({ ...wp, p: this.pressure(e), ...(t0 != null ? { t: t0 } : {}) }, act);
+    const tilt = (e && typeof e.tiltX === 'number' && (e.tiltX !== 0 || e.tiltY !== 0)) ? { tiltX: e.tiltX, tiltY: e.tiltY } : {};
+    const pt0 = this.snapToRuler({ ...wp, p: this.pressure(e), ...(t0 != null ? { t: t0 } : {}), ...tilt }, act);
     obj.points.push(pt0);
     this.surface.wet = obj;
     this.action = act;

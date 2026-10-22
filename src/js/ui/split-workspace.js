@@ -193,6 +193,11 @@ export class SplitWorkspace {
     this.leftPane.appendChild(leftHeader);
     this.leftPane.appendChild(canvasWrap);
 
+    // Track active pointer position over left split pane for smart undo/redo routing
+    this.isPointerOverLeft = false;
+    this.leftPane.addEventListener('pointerenter', () => { this.isPointerOverLeft = true; });
+    this.leftPane.addEventListener('pointerleave', () => { this.isPointerOverLeft = false; });
+
     // Divider
     this.divider = h('div', {
       class: 'split-divider',
@@ -308,6 +313,7 @@ export class SplitWorkspace {
     this.leftStore = null;
     this.leftNib = null;
     this.leftBoardId = null;
+    this.isPointerOverLeft = false;
 
     if (this.leftPropertiesDialog) {
       this.leftPropertiesDialog.close();

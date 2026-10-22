@@ -5,7 +5,10 @@ import {
   renderMarkdownToHtml,
   toggleTaskAtLine,
   extractTaskItems,
-  buildMarkdownSvgDataUri
+  buildMarkdownSvgDataUri,
+  parseFrontmatter,
+  countTags,
+  INLINE_MATH_RE
 } from '../src/js/core/markdown.js';
 
 test('isMarkdown accurately detects GFM and Obsidian syntax', () => {
@@ -92,4 +95,39 @@ test('Produces valid XHTML inside SVG <foreignObject> data URI', () => {
   assert.match(decoded, /<foreignObject width="100%" height="100%">/);
   assert.match(decoded, /<hr class="gb-md-hr" data-line="2" \/>/);
   assert.match(decoded, /<br \/>/);
+});
+
+test('Inline math discriminates genuine formulas from currency prices', () => {
+  const currencyText = 'This laptop costs $500 and that monitor is $250.';
+  const mathMatches = currencyText.match(INLINE_MATH_RE);
+  assert.equal(mathMatches, null, 'Currency prices must not be parsed as LaTeX math');
+
+  const formulaText = 'Einstein derived $E = mc^2$ and momentum $p = mv$.';
+  const formulaMatches = formulaText.match(INLINE_MATH_RE);
+  assert.deepEqual(formulaMatches, ['$E = mc^2$', '$p = mv$']);
+});
+
+test('YAML frontmatter metadata is extracted cleanly without polluting card body', () => {
+  const md = `---
+title: Quantum Mechanics
+tags: [physics, modern-physics, lecture-3]
+aliases: [QM L3]
+---
+# Lecture 3
+Wave functions and probability density.`;
+
+  const { attributes, body } = parseFrontmatter(md);
+  assert.equal(attributes.title, 'Quantum Mechanics');
+  assert.deepEqual(attributes.tags, ['physics', 'modern-physics', 'lecture-3']);
+  assert.deepEqual(attributes.aliases, ['QM L3']);
+  assert.ok(body.startsWith('# Lecture 3'));
+
+  const tags = countTags(md);
+  assert.equal(tags['physics'], 1);
+  assert.equal(tags['modern-physics'], 1);
+  assert.equal(tags['lecture-3'], 1);
+
+  const html = renderMarkdownToHtml(md);
+  assert.match(html, /<h1 class="gb-md-h gb-md-h1" data-line="0">Lecture 3<\/h1>/);
+  assert.ok(!html.includes('title: Quantum Mechanics'));
 });

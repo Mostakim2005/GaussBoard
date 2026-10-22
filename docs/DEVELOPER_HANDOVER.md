@@ -192,3 +192,39 @@ npm run dist:win
 - For current implementation entry points and test commands, use `docs/INDEX.md` and the single relevant `docs/layers/*.md` dossier. Plans are historical proposals, not proof that a feature shipped.
 - For final package identities, checksums, and archive path, use [`releases/RELEASE-4.8.11.md`](releases/RELEASE-4.8.11.md). The portable and installer artifacts are under `dist/` in the working tree and the verified snapshot under the archive path above.
 - Current exporter remains Chromium `canvas.captureStream()` + `MediaRecorder` (VP9/Opus with WebM fallback). WebCodecs and native FFmpeg were assessed but not integrated; a performance claim requires representative real-board benchmarks.
+
+---
+
+## 8. Handover Protocol for AI Models: Autonomous Auditing, Hardening & Lateral Feature Cross-Pollination
+
+This section establishes mandatory operating directives for any AI assistant continuing engineering on GazBoard:
+
+### 8.1. Autonomous Auditing & Vulnerability Discovery
+1. **Never Assume Code is Defect-Free**: Continuously audit recent releases (v4.8.12 through v4.8.20) for subtle regressions:
+   - State isolation leaks between split viewports ([`src/js/ui/split-workspace.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/split-workspace.js)).
+   - Coordinate space drift or precision loss during deep zooming or pan bounds ([`src/js/core/camera.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/camera.js), [`src/js/ui/pagemargin-dialog.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/pagemargin-dialog.js)).
+   - WeakMap and geometry cache invalidation gaps ([`src/js/core/ink.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/ink.js), [`src/js/core/render.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/render.js)).
+   - SVG `<foreignObject>` namespace compliance and unescaped HTML characters ([`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js)).
+2. **Defensive Hardening**: When a potential flaw, vulnerability, or poor architectural decision is identified:
+   - Do not wait for user complaints; proactively propose and implement the hardening fix.
+   - Always accompany code changes with targeted unit tests in `test/custom-features.test.mjs` or `test/markdown.test.mjs`.
+
+### 8.2. Lateral Feature Cross-Pollination & App Inspiration
+When designing or refining features, actively examine and draw inspiration from premier study and note-taking apps:
+* **Obsidian & Logseq**:
+  - Frontmatter metadata extraction (`--- yaml ---`) auto-populating board properties and `#tags`.
+  - Magnetic edge connection ports on card bounding boxes for visual flowcharting.
+  - Collapsible block callouts and embedded board cards (`![[Board#Section]]`).
+* **Flexcil & LiquidText**:
+  - Split-view bidirectional excerpt jump links with visual accent glow pulses (`#00e5ff`).
+  - Margin grid snapping for study notes and Cornell layout workflows.
+* **StarNote, GoodNotes 6 & Apple Notes**:
+  - Scribble-to-erase kinematics and lasso circle-to-select gestures.
+  - Straighten-and-hold tactile stroke snapping for lines, circles, and polygons.
+* **Concepts & Procreate**:
+  - Real-time digitizer stylus barrel tilt modulation (`tiltX`, `tiltY`) for chisel calligraphy and fountain flex.
+  - Realistic wet ink bleed and paper grain procedural shaders.
+
+### 8.3. Execution & Fast Testing Directives
+* **Strict Fast Test Budget**: ONLY run `node --test test/custom-features.test.mjs test/markdown.test.mjs test/replay-reading.test.mjs test/video-framing.test.mjs` ($< 250\text{ms}$). NEVER run the 1,240 base smoke tests.
+* **Portable Packaging by Default**: Standard feature builds must produce `GazBoard-v<Version>-Portable.exe` in `releases/` and mirror to `C:\Users\kazir\Documents\Antigravity\GazBoard\dist\`.

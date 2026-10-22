@@ -11,8 +11,9 @@ export const BOARDREF_RE = /@\[([^\]\n]+)\]\(b:([a-zA-Z0-9_-]+)(?:#(\d{1,4}))?\)
 export const CALLOUT_HEADER_RE = /^\[!([A-Za-z]+)\]([+-])?\s*(.*)$/;
 export const TASK_LINE_RE = /^([ \t]*)[-*+]\s+\[([ xX])\]\s+(.*)$/;
 export const DISPLAY_MATH_RE = /\$\$([\s\S]+?)\$\$/g;
-export const INLINE_MATH_RE = /(?:^|(?<=[^$\\]))\$([^\$\n]+?)\$/g;
+export const INLINE_MATH_RE = /(?:^|(?<=[^\$\\\w]))\$([^\s\$\n](?:[^\$\n]*?[^\s\$\n])?)\$(?=[^\$\w\d]|$)/g;
 export const HASHTAG_RE = /(?:^|(?<=[\s(\[{"']))#([a-zA-Z][a-zA-Z0-9_\-/]*)/g;
+export const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
 
 export const CALLOUT_TYPES = new Set([
   'note', 'tip', 'warning', 'danger', 'info', 'success',
@@ -34,7 +35,36 @@ const CALLOUT_ICONS = {
   todo: '☑️'
 };
 
-const MD_HEURISTIC_RE = /(?:^|\n)\s*(?:#{1,6}\s+|>\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+\.\s+|\|.+\|)|(?:\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~]+~~|`[^`\n]+`|<u>[\s\S]+?<\/u>|\$\$[\s\S]+?\$\$|\$[^$\n]+\$|!?\[\[[^\]]+\]\]|@!?\[[^\]]+\]\(b:|(?:^|[\s(\[{"'])#[a-zA-Z][a-zA-Z0-9_\-/]*)/;
+const MD_HEURISTIC_RE = /(?:^|\n)\s*(?:#{1,6}\s+|>\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+\.\s+|\|.+\|)|^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)|(?:\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~]+~~|`[^`\n]+`|<u>[\s\S]+?<\/u>|\$\$[\s\S]+?\$\$|(?<=[^\$\\\w])\$[^\s\$\n](?:[^\$\n]*?[^\s\$\n])?\$|!?\[\[[^\]]+\]\]|@!?\[[^\]]+\]\(b:|(?:^|[\s(\[{"'])#[a-zA-Z][a-zA-Z0-9_\-/]*)/;
+
+/**
+ * Parses Obsidian YAML frontmatter from the beginning of a document.
+ * @param {string} markdownText
+ * @returns {{ attributes: Record<string, any>, body: string }}
+ */
+export function parseFrontmatter(markdownText) {
+  if (!markdownText || typeof markdownText !== 'string') return { attributes: {}, body: markdownText || '' };
+  const match = markdownText.match(FRONTMATTER_RE);
+  if (!match) return { attributes: {}, body: markdownText };
+
+  const rawYaml = match[1];
+  const body = markdownText.slice(match[0].length);
+  const attributes = {};
+
+  for (const line of rawYaml.split(/\r?\n/)) {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx === -1) continue;
+    const key = line.slice(0, colonIdx).trim();
+    let val = line.slice(colonIdx + 1).trim();
+    if (val.startsWith('[') && val.endsWith(']')) {
+      val = val.slice(1, -1).split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+    } else {
+      val = val.replace(/^['"]|['"]$/g, '');
+    }
+    attributes[key] = val;
+  }
+  return { attributes, body };
+}
 
 /**
  * Fast check to determine if a text string contains Markdown or Obsidian syntax.
@@ -72,8 +102,19 @@ export function countTags(markdownText) {
   const counts = {};
   if (!markdownText || typeof markdownText !== 'string') return counts;
 
+  const { attributes, body } = parseFrontmatter(markdownText);
+  if (Array.isArray(attributes.tags)) {
+    for (const tg of attributes.tags) {
+      const clean = tg.startsWith('#') ? tg.slice(1) : tg;
+      counts[clean] = (counts[clean] || 0) + 1;
+    }
+  } else if (typeof attributes.tags === 'string') {
+    const clean = attributes.tags.startsWith('#') ? attributes.tags.slice(1) : attributes.tags;
+    counts[clean] = (counts[clean] || 0) + 1;
+  }
+
   // Strip fenced code blocks and inline code before scanning for tags
-  const cleaned = markdownText
+  const cleaned = body
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`[^`\n]+`/g, ' ')
     .replace(/\$\$[\s\S]*?\$\$/g, ' ')
@@ -559,7 +600,8 @@ export function parseMarkdownAST(markdownText) {
  * Renders parsed Markdown AST into strict XHTML.
  */
 export function renderMarkdownToHtml(markdownText, options = {}) {
-  const ast = parseMarkdownAST(markdownText);
+  const { attributes, body } = parseFrontmatter(markdownText);
+  const ast = parseMarkdownAST(body);
   const blocks = [];
 
   for (const node of ast) {

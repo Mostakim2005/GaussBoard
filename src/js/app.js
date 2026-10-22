@@ -2313,8 +2313,22 @@ class App {
     ].includes(id)) return;
     const s = this.store, sf = this.surface;
     switch (id) {
-      case 'undo': case 'edit.undo': this.textEditor.commit(); s.undo(); this.pruneSelection(); break;
-      case 'redo': case 'edit.redo': this.textEditor.commit(); s.redo(); this.pruneSelection(); break;
+      case 'undo': case 'edit.undo':
+        if (this.splitWorkspace?.isOpen && this.splitWorkspace?.isPointerOverLeft) {
+          this.splitWorkspace.leftStore?.undo();
+          this.splitWorkspace.leftSurface?.repaintAll();
+          this.splitWorkspace.saveLeftBoardDebounced();
+          break;
+        }
+        this.textEditor.commit(); s.undo(); this.pruneSelection(); break;
+      case 'redo': case 'edit.redo':
+        if (this.splitWorkspace?.isOpen && this.splitWorkspace?.isPointerOverLeft) {
+          this.splitWorkspace.leftStore?.redo();
+          this.splitWorkspace.leftSurface?.repaintAll();
+          this.splitWorkspace.saveLeftBoardDebounced();
+          break;
+        }
+        this.textEditor.commit(); s.redo(); this.pruneSelection(); break;
 
       case 'edit.delete': {
         const free = withAttached(s, this.selected.filter((o) => !o.locked).map((o) => o.id))

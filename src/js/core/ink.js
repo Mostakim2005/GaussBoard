@@ -286,6 +286,13 @@ export function calligraphyEnvelope(points, size = 12, angleDeg = 35, flatness =
   const path = new Path2D();
   if (!points || !points.length) return path;
 
+  // Support hardware digitizer stylus barrel tilt modulation when available
+  const p0 = points[0];
+  if (p0 && typeof p0.tiltX === 'number' && (p0.tiltX !== 0 || p0.tiltY !== 0)) {
+    const tiltAngle = (Math.atan2(p0.tiltY, p0.tiltX) * 180) / Math.PI;
+    if (Number.isFinite(tiltAngle)) angleDeg = Math.round(((tiltAngle % 180) + 180) % 180);
+  }
+
   const rad = (angleDeg * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
@@ -567,7 +574,7 @@ export function inkRuns(stroke, scale = 1) {
   const size = stroke.width || (tool === 'brush' ? 8 : tool === 'calligraphy' ? 12 : 4);
   const band = Math.round(Math.log2(Math.max(0.05, scale)) * 2);
   const engine = activeInkEngine;
-  const key = `${size}_${tool}_${stroke.softness || ''}_${stroke.slant || ''}_${stroke.flex || ''}_${band}_${engine}`;
+  const key = `${size}_${tool}_${stroke.softness || ''}_${stroke.slant || ''}_${stroke.flex || ''}_${stroke.velocityThinning ?? ''}_${band}_${engine}`;
   const hit = runCache.get(pts);
   if (hit && hit.len === pts.length && hit.key === key) return hit.runs;
   let runs;

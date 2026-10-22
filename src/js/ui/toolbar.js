@@ -958,6 +958,15 @@ export function openToolPopover(app, anchor, tool) {
           style: `flex:1;padding:5px 6px;font-size:11.5px;display:flex;align-items:center;justify-content:center;gap:4px;border:none;border-radius:6px;${active ? 'font-weight:600;' : 'background:none;'}`
         }, h('span', { html: icon(pt.icon, 13) }), pt.label);
         b.addEventListener('click', () => {
+          // Preserve current active ink color when switching pen types
+          const curColor = cur === 'brush' ? s.brushColor : cur === 'fountain' ? s.fountainColor : cur === 'calligraphy' ? s.calligraphyColor : s.penColor;
+          if (curColor) {
+            if (pt.id === 'brush') s.brushColor = curColor;
+            else if (pt.id === 'fountain') s.fountainColor = curColor;
+            else if (pt.id === 'calligraphy') s.calligraphyColor = curColor;
+            else if (pt.id === 'pen') s.penColor = curColor;
+            app.saveSettings();
+          }
           app.setTool(pt.id);
           app.syncUI();
           openToolPopover(app, anchor, pt.id);

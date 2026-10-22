@@ -20,7 +20,7 @@
 
 The initial audit was performed with **Codex 4.6 Medium in Cursor**. The secondary audit and fixes were applied with **GPT-6 Luna High using Codex**. Release dossiers and plans can include historical or proposed claims; verify shipped behavior in current source and feature-focused tests.
 
-**Current snapshot:** v4.8.19, commit `75caf1b`, local tag `v4.8.19`. Features include Obsidian Markdown Cards, 1:1 Page Margin Kinematics, Scribble Eraser Target Guarding, Note Overview Previews, Split Study Workspace Dual-Store Isolation, and Advanced Pen Suite (Brush, Fountain, Calligraphy). Standalone portable executable: `releases/GazBoard-v4.8.19-Portable.exe` mirrored to `C:\Users\kazir\Documents\Antigravity\GazBoard\dist\GazBoard-v4.8.19-Portable.exe`.
+**Current snapshot:** v4.8.20, local tag `v4.8.20`. Features include Split Study Workspace `Ctrl+Z` smart routing, Brush velocity thinning cache key, SVG markdown `<foreignObject>` vector export, KaTeX currency non-collision, YAML frontmatter extraction, digitizer hardware stylus tilt capture, pen color preservation, Obsidian Markdown Cards, 1:1 Page Margin Kinematics, Scribble Eraser Target Guarding, and Advanced Pen Suite (Brush, Fountain, Calligraphy). Standalone portable executable: `releases/GazBoard-v4.8.20-Portable.exe` mirrored to `C:\Users\kazir\Documents\Antigravity\GazBoard\dist\GazBoard-v4.8.20-Portable.exe`.
 
 ---
 

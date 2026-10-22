@@ -1,18 +1,18 @@
-# GazBoard Replay — Master Feature Specification & Technical Audit (v4.8.11 to v4.8.19)
+# GazBoard Replay — Master Feature Specification & Technical Audit (v4.8.11 to v4.8.20)
 ## Comprehensive Evolutionary Inventory, Subsystem Architecture Deep Dives, 6 Golden Invariants Ledger, and Actionable AI Hardening Runbook
 
 > **Breadcrumb Navigation**: [`docs/INDEX.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/docs/INDEX.md) → [`AI_BOOTSTRAP.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/AI_BOOTSTRAP.md) → **`MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md`**  
-> **Document Authority**: Authoritative Level 2/3 Technical Specification, Subsystem Architecture Map, and External AI Audit Dossier for all releases from `v4.8.11` to `v4.8.19`.  
+> **Document Authority**: Authoritative Level 2/3 Technical Specification, Subsystem Architecture Map, and External AI Audit Dossier for all releases from `v4.8.11` to `v4.8.20`.  
 > **Target OS**: Windows 10 / 11 (64-bit Electron Portable Binary / NSIS Installer on-demand).  
-> **Active Target Release**: `v4.8.19` (Commit `75caf1b`, Binary: `GazBoard-v4.8.19-Portable.exe`).  
+> **Active Target Release**: `v4.8.20` (Binary: `GazBoard-v4.8.20-Portable.exe`).  
 > **Fast Test Runner**: `node --test test/custom-features.test.mjs test/markdown.test.mjs test/replay-reading.test.mjs test/video-framing.test.mjs` (Strict execution budget: $< 250\text{ms}$).  
 > **Mandatory Invariant Rule**: NEVER run the legacy 1,240 base smoke tests (`scripts/smoke.js`). Only run the targeted custom test suite.
 
 ---
 
-## 1. Executive Progression Matrix (v4.8.11 to v4.8.19)
+## 1. Executive Progression Matrix (v4.8.11 to v4.8.20)
 
-The following ledger establishes the complete historical and technical lineage of all modifications, features, and hardening patches integrated between `v4.8.11` and `v4.8.19`:
+The following ledger establishes the complete historical and technical lineage of all modifications, features, and hardening patches integrated between `v4.8.11` and `v4.8.20`:
 
 | Version | Git Tag | Commit | Release Date | Core Theme & Technical Scope | Key Source Modules Touched | Test Footprint |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -25,6 +25,7 @@ The following ledger establishes the complete historical and technical lineage o
 | **v4.8.17** | `v4.8.17` | `05bc7e8` | Oct 2026 | Note Overview real thumbnail previews; inline modal `# Tag` & `Alias` prompt shortcuts; 3D glassmorphic Replay Bar HUD styling. | [`src/js/ui/note-overview.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/note-overview.js)<br>[`src/js/ui/replay-bar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/replay-bar.js) | 41 tests |
 | **v4.8.18** | `v4.8.18` | `cd61bba` | Oct 2026 | Split Study Workspace overhaul: true dual-interactive drawing with isolated stores, surfaces, ink nibs & undo stacks; autocomplete combobox (`setLast: false`). | [`src/js/ui/split-workspace.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/split-workspace.js)<br>[`src/js/core/tools.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/tools.js)<br>[`src/js/ui/properties-dialog.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/properties-dialog.js) | 41 tests |
 | **v4.8.19** | `v4.8.19` | `75caf1b` | Oct 2026 | Advanced Pen Suite: Brush (`brush`), Fountain (`fountain`), Calligraphy (`calligraphy`); closed polygon ribbon math; directional tine dilation; 1-click pen switcher. | [`src/js/core/ink.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/ink.js)<br>[`src/js/core/render.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/render.js)<br>[`src/js/core/tools.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/tools.js)<br>[`src/js/ui/toolbar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/toolbar.js)<br>[`src/js/export.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/export.js) | 42 tests |
+| **v4.8.20** | `v4.8.20` | `HEAD` | Oct 2026 | Hardening & Lateral Integrations: Split workspace `Ctrl+Z` smart routing; brush cache key fix; SVG markdown `<foreignObject>` export; KaTeX currency non-collision; YAML frontmatter metadata extraction; hardware stylus tilt modulation; pen color preservation. | [`src/js/app.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/app.js)<br>[`src/js/core/ink.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/ink.js)<br>[`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js)<br>[`src/js/core/tools.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/tools.js)<br>[`src/js/export.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/export.js)<br>[`src/js/ui/split-workspace.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/split-workspace.js)<br>[`src/js/ui/toolbar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/toolbar.js) | 45 tests |
 
 ---
 
@@ -186,6 +187,30 @@ The following ledger establishes the complete historical and technical lineage o
   - GazBoard provided only standard round ballpoint pen and flat translucent highlighter. Study and sketch workflows required expressive inking: split-nib fountain flex handwriting, Chinese/Japanese calligraphy chisel ribbons, and sable hair artist brushes with velocity thinning.
 * **Subsystem Architecture ([`src/js/core/ink.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/ink.js))**:
   - Detailed in [Section 3.2](#32-advanced-pen-vector-geometry--rendering-pipeline) below.
+
+---
+
+### 2.9. Version v4.8.20 — Hardening, Bug Fixes & Lateral Integrations
+* **Commit**: `HEAD` (v4.8.20)
+* **Problem Statement & Audit Resolutions**:
+  1. **Split Workspace Undo/Redo Smart Routing**:
+     - *Issue*: `Ctrl+Z` / `Ctrl+Y` on physical keyboard previously routed strictly to the primary right board even when drawing in the left study board.
+     - *Solution*: `splitWorkspace.leftPane` pointer tracking (`isPointerOverLeft`) routes keyboard undo/redo commands to `leftStore.undo()` / `redo()` with instant canvas invalidation when hovering over the left workspace.
+  2. **Brush Velocity Thinning Geometry Cache Key**:
+     - *Issue*: Toggling velocity thinning on/off for brush pens did not recompute stroke geometry because `stroke.velocityThinning` was omitted from the `runCache` key.
+     - *Solution*: Added `${stroke.velocityThinning ?? ''}` to the cache key in `inkRuns()`.
+  3. **SVG Vector Export for Markdown Cards**:
+     - *Issue*: Vector SVG export rendered markdown cards as raw plain text source lines.
+     - *Solution*: `exportSvg` now generates SVG `<foreignObject>` containers embedding the fully compiled XHTML markup, matching canvas and raster PNG exports with rich typography, tables, and KaTeX math.
+  4. **KaTeX Inline Math Currency Sign Discrimination**:
+     - *Issue*: Text containing ordinary currency prices (e.g. `Costs $10 and $20`) turned intervening text into LaTeX math equations.
+     - *Solution*: Tightened `INLINE_MATH_RE` to require non-whitespace boundaries matching CommonMark math specifications, preventing false positives on currency numbers.
+  5. **YAML Frontmatter Extraction (Obsidian-inspired)**:
+     - *Enhancement*: Added `parseFrontmatter(markdownText)` in `src/js/core/markdown.js`. Frontmatter blocks (`--- \n tags: [...] \n ---`) are parsed into board tags and aliases while cleanly stripping raw YAML from the card body.
+  6. **Hardware Stylus Barrel Tilt Capture**:
+     - *Enhancement*: Captured `e.tiltX` and `e.tiltY` from digitizer pointer events in `tools.js`, dynamically modulating calligraphy chisel angle in `calligraphyEnvelope()` when physical stylus tilt is detected.
+  7. **Pen Type Switcher Color Preservation**:
+     - *Enhancement*: Switching between Ballpoint, Brush, Fountain, and Calligraphy tabs preserves the currently selected ink color across all pen tools.
 
 ---
 
@@ -414,19 +439,46 @@ Run the verified custom test runner:
 cd "C:\Users\kazir\Documents\OpenCode\GazBoard"
 node --test test/custom-features.test.mjs test/markdown.test.mjs test/replay-reading.test.mjs test/video-framing.test.mjs
 ```
-*Expected Result*: All 42 tests pass with 0 failures in $< 200\text{ms}$.  
+*Expected Result*: All 45 tests pass with 0 failures in $< 200\text{ms}$.  
 *Warning*: Never run `node scripts/smoke.js`.
 
-### Step 2: Validate the 6 Golden Invariants
+### Step 2: Autonomous Continuous Auditing & Flaw Discovery
+Future AI assistants are strictly mandated to:
+1. **Actively Audit Code for Architectural Flaws & Vulnerabilities**:
+   - Inspect dual-viewport event and state isolation in `split-workspace.js`.
+   - Verify that all stroke and geometry caches in `ink.js` include all relevant parameters (size, tool, slant, flex, softness, velocityThinning, scale band, engine) in their cache keys.
+   - Guard against XML parsing exceptions in SVG `<foreignObject>` data URIs by verifying strict XHTML self-closing compliance in `markdown.js`.
+   - Guard against pointer capture leaks during OS window blur, Alt+Tab, or notifications in `pagemargin-dialog.js` and `split-workspace.js`.
+2. **Defensive Auto-Hardening**:
+   - When identifying suboptimal planning or potential bugs, do not merely document them; implement clean, minimal, non-breaking hardening patches.
+   - Always verify that the 6 Golden Invariants remain unbroken.
+
+### Step 3: Lateral Feature Cross-Pollination from Premier Apps
+When users request enhancements or when seeking natural extensions for whiteboard/study workflows, take inspiration from these leading applications:
+* **Obsidian & Logseq**:
+  - Frontmatter metadata extraction (`--- yaml ---`) auto-populating board properties and `#tags`.
+  - Magnetic edge connection ports on card bounding boxes for visual flowcharting.
+  - Collapsible block callouts and embedded board cards (`![[Board#Section]]`).
+* **Flexcil & LiquidText**:
+  - Split-view bidirectional excerpt jump links with visual accent glow pulses (`#00e5ff`).
+  - Margin grid snapping for study notes and Cornell layout workflows.
+* **StarNote, GoodNotes 6 & Apple Notes**:
+  - Scribble-to-erase kinematics and lasso circle-to-select gestures.
+  - Straighten-and-hold tactile stroke snapping for lines, circles, and polygons.
+* **Concepts & Procreate**:
+  - Real-time digitizer stylus barrel tilt modulation (`tiltX`, `tiltY`) for chisel calligraphy and fountain flex.
+  - Realistic wet ink bleed and paper grain procedural shaders.
+
+### Step 4: Validate the 6 Golden Invariants
 Before editing code, verify:
 1. Does your change alter screen-to-world coordinate transforms? If yes, check against `INV-1`.
 2. Does your change touch undo/redo or document state? Check against `INV-2`.
 3. Does your change touch stroke geometry or rendering? Check against `INV-3` and `INV-6`.
 
-### Step 3: Package Portable Binary Protocol
+### Step 5: Package Portable Binary Protocol
 Whenever a release or tag is created:
 1. Bump `"version"` in `package.json`.
-2. Run fast test suite.
+2. Run fast test suite: all 45 tests must pass.
 3. Commit and tag: `git tag v4.8.x`.
 4. Build portable executable: `npx electron-builder --win portable`.
 5. Verify output: `dist/GazBoard-v4.8.x-Portable.exe` (~96.8 MB).

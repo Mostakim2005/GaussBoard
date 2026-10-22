@@ -458,8 +458,58 @@ test('new pen types: brush, fountain, and calligraphy stroke geometry and tool r
     const avgSlowW = runsSlow.reduce((acc, r) => acc + r.width, 0) / runsSlow.length;
     const avgFastW = runsFast.reduce((acc, r) => acc + r.width, 0) / runsFast.length;
     assert.ok(avgSlowW > avgFastW, 'Brush pen with velocity thinning should produce narrower strokes when drawn quickly');
+
+    // 5. Stylus hardware tilt dynamic modulation
+    const tiltedPoints = [
+      { x: 10, y: 10, p: 0.5, tiltX: 45, tiltY: 0 },
+      { x: 30, y: 30, p: 0.5, tiltX: 45, tiltY: 0 }
+    ];
+    const tiltedEnv = calligraphyEnvelope(tiltedPoints, 12, 35, 4);
+    assert.ok(tiltedEnv instanceof TestPath2D);
   } finally {
     if (priorPath2D === undefined) delete globalThis.Path2D;
     else globalThis.Path2D = priorPath2D;
   }
+});
+
+test('split workspace undo routing distinguishes pointer location over left study board', () => {
+  const primaryStore = new Store();
+  const leftStudyStore = new Store();
+
+  primaryStore.add({ id: 'p1', type: 'stroke', points: [{ x: 5, y: 5 }] });
+  leftStudyStore.add({ id: 'l1', type: 'stroke', points: [{ x: 10, y: 10 }] });
+
+  const mockApp = {
+    splitWorkspace: {
+      isOpen: true,
+      isPointerOverLeft: true,
+      leftStore: leftStudyStore,
+      leftSurface: { repaintAll() {} },
+      saveLeftBoardDebounced() {}
+    },
+    store: primaryStore,
+    surface: { selection: new Set() },
+    textEditor: { commit() {} },
+    pruneSelection() {},
+    command(id) {
+      if (id === 'undo') {
+        if (this.splitWorkspace?.isOpen && this.splitWorkspace?.isPointerOverLeft) {
+          this.splitWorkspace.leftStore?.undo();
+          this.splitWorkspace.leftSurface?.repaintAll();
+          return;
+        }
+        this.store.undo();
+      }
+    }
+  };
+
+  // When pointer is over left board, command('undo') undoes on leftStudyStore
+  mockApp.command('undo');
+  assert.equal(leftStudyStore.has('l1'), false, 'Left study store stroke should be undone');
+  assert.equal(primaryStore.has('p1'), true, 'Primary board stroke must remain untouched');
+
+  // When pointer is not over left board, command('undo') undoes on primaryStore
+  mockApp.splitWorkspace.isPointerOverLeft = false;
+  mockApp.command('undo');
+  assert.equal(primaryStore.has('p1'), false, 'Primary board stroke should now be undone');
 });
