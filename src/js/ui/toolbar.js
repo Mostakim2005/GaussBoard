@@ -1381,7 +1381,7 @@ export function openToolPopover(app, anchor, tool) {
 function menuItem(label, iconName, onClick, opts = {}) {
   const actionBtn = h('button', {
     type: 'button',
-    class: 'menu-action-zone' + (opts.pinKey ? '' : ' standalone') + (opts.danger ? ' danger' : ''),
+    class: 'menu-item menu-action-zone' + (opts.pinKey ? '' : ' standalone') + (opts.danger ? ' danger' : ''),
     title: label
   },
     h('span', { html: icon(iconName, 17), style: 'display:flex;align-items:center;' }),
@@ -1397,6 +1397,9 @@ function menuItem(label, iconName, onClick, opts = {}) {
 
   if (!opts.pinKey) {
     const card = h('div', { class: 'menu-card-row' }, actionBtn);
+    card.addEventListener('click', (e) => {
+      if (e.target !== actionBtn && !actionBtn.contains(e.target)) actionBtn.click();
+    });
     return card;
   }
 
@@ -1417,6 +1420,10 @@ function menuItem(label, iconName, onClick, opts = {}) {
     h('div', { class: 'menu-card-sep' }),
     pinBtn
   );
+  card.addEventListener('click', (e) => {
+    if (e.target === pinBtn || pinBtn.contains(e.target)) return;
+    if (e.target !== actionBtn && !actionBtn.contains(e.target)) actionBtn.click();
+  });
   return card;
 }
 

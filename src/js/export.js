@@ -254,7 +254,7 @@ function svgObjects(objects, meas) {
       parts.push(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="4" fill="${o.color}"${rot}/>`);
       if (o.text) parts.push(textSvg(meas, o.text, o.x + 14, o.y + 14, o.w - 28, o.h - 28, { align: o.align || 'center', valign: 'middle', color: o.textColor || '#201f1e', size: o.fontSize || 22, runs: objectRuns(o), bold: o.bold, italic: o.italic, underline: o.underline, font: o.font }, rot));
     } else if (o.type === 'text') {
-      if (o.markdown !== false && isMarkdown(o.text)) {
+      if ((o.markdown === true || o.cardStyle) && isMarkdown(o.text)) {
         const pad = 12;
         const x = o.x - pad, y = o.y - pad, w = o.w + pad * 2, h = o.h + pad * 2;
         const bg = o.background && o.background !== 'none' ? o.background : '#ffffff';

@@ -57,7 +57,7 @@ function resolveWikilinkForRender(target, anchor, alias) {
  * Supports 4 models: 'canvas' | 'window' | 'minimal' | 'transparent'.
  */
 export function drawMarkdownCardContainer(ctx, o, isDark = darkBoard) {
-  const style = o.cardStyle || (o.background && o.background !== 'none' ? 'canvas' : 'canvas');
+  const style = o.cardStyle || (o.background && o.background !== 'none' ? 'canvas' : (o.markdown === true ? 'canvas' : 'transparent'));
   if (style === 'transparent') {
     if (o.background && o.background !== 'none') {
       ctx.save();

@@ -3,7 +3,7 @@ dist/
 dist-v*/
 dist-web/
 dist-replay-fix/
-releases/
+/releases/
 test/out/
 sync-inbox/
 dist-sync/

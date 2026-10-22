@@ -25,6 +25,7 @@ This document provides the ledger of progressive Windows releases, from the orig
 | **v4.8.21** | Local tag `v4.8.21` | [`GazBoard-v4.8.21-Portable.exe`](../../dist/GazBoard-v4.8.21-Portable.exe) | 106,252,560 B | [`RELEASE-4.8.21.md`](RELEASE-4.8.21.md) | Electron IPC sender and navigation guards, validated external URLs, safe bookmark labels with Escape-to-cancel, Obsidian YAML block-list metadata, locale completeness. |
 | **v5.0.0** | Local tag `v5.0.0` | [`GazBoard-v5.0.0-Portable.exe`](../../dist-v5.0.0/GazBoard-v5.0.0-Portable.exe) | 106,255,198 B | [`RELEASE-5.0.0.md`](RELEASE-5.0.0.md) | Feature audit; replay display modes across live/export; track-index caching; calmer center camera; sample-rate-stable scratch classification; pointer focus cleanup. |
 | **v5.1.0** | Local tag `v5.1.0` | [`GazBoard-v5.1.0-Portable.exe`](../../dist-v5.1.0/GazBoard-v5.1.0-Portable.exe) | 106,259,823 B | [`RELEASE-5.1.0.md`](RELEASE-5.1.0.md) | Linked screenshot excerpts; split-pane paste/drop; board heading and block links; additional Obsidian Markdown conveniences. |
+| **v5.2.0** | Local tag `v5.2.0` | [`GazBoard-v5.2.0-Portable.exe`](../../dist-v5.2.0/GazBoard-v5.2.0-Portable.exe) | 106,265,899 B | [`RELEASE-5.2.0.md`](RELEASE-5.2.0.md) | Full audit verification; toolbar `.menu-item` compatibility & card click delegation; plain text vs Markdown card disambiguation; PWA precache sync. |
 
 ---
 

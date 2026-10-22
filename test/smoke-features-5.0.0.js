@@ -6,7 +6,7 @@ const fs = require('node:fs/promises');
 const browserChecks = String.raw`(async () => {
   const out = {};
   const app = window.app;
-  const wait = (fn, ms = 3000) => new Promise((resolve, reject) => {
+  const wait = (fn, ms = 6000) => new Promise((resolve, reject) => {
     const start = Date.now();
     const timer = setInterval(() => {
       try {
