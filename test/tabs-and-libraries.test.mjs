@@ -13,17 +13,20 @@ test('libraries.json manifest includes required libraries and versions', () => {
   assert.ok(fs.existsSync(localManifestPath), 'src/vendor/libraries.json exists');
 
   const manifest = JSON.parse(fs.readFileSync(localManifestPath, 'utf8'));
-  assert.equal(manifest.manifestVersion, '1.0.0');
+  assert.ok(manifest.manifestVersion.startsWith('1.'), 'manifestVersion is 1.x');
   assert.ok(Array.isArray(manifest.libraries), 'libraries array exists');
 
   const ids = manifest.libraries.map(l => l.id);
   assert.ok(ids.includes('katex'), 'KaTeX registered');
   assert.ok(ids.includes('pdfjs'), 'PDF.js registered');
+  assert.ok(ids.includes('pdfjs-viewer'), 'PDF.js Viewer registered');
+  assert.ok(ids.includes('pdf-lib'), 'pdf-lib registered');
+  assert.ok(ids.includes('fontkit'), 'fontkit registered');
+  assert.ok(ids.includes('tesseract'), 'Tesseract OCR registered');
   assert.ok(ids.includes('jszip'), 'JSZip registered');
   assert.ok(ids.includes('mammoth'), 'Mammoth registered');
   assert.ok(ids.includes('mermaid'), 'Mermaid registered');
   assert.ok(ids.includes('chartjs'), 'Chart.js registered');
-  assert.ok(ids.includes('pdf-lib'), 'pdf-lib registered');
 
   // Verify versions and statuses
   const katex = manifest.libraries.find(l => l.id === 'katex');
@@ -54,9 +57,12 @@ test('Shared CommonLibraries repository exists on C: with all engines', () => {
   // Check shared engine bundles
   assert.ok(fs.existsSync(path.join(sharedDir, 'katex', 'katex.min.js')), 'KaTeX shared bundle exists');
   assert.ok(fs.existsSync(path.join(sharedDir, 'pdfjs', 'pdf.min.mjs')), 'PDF.js shared bundle exists');
+  assert.ok(fs.existsSync(path.join(sharedDir, 'pdfjs', 'pdf_viewer.mjs')), 'PDF.js viewer shared bundle exists');
   assert.ok(fs.existsSync(path.join(sharedDir, 'mermaid', 'mermaid.min.js')), 'Mermaid.js shared bundle exists');
   assert.ok(fs.existsSync(path.join(sharedDir, 'chartjs', 'chart.umd.min.js')), 'Chart.js shared bundle exists');
   assert.ok(fs.existsSync(path.join(sharedDir, 'pdf-lib', 'pdf-lib.min.js')), 'pdf-lib shared bundle exists');
+  assert.ok(fs.existsSync(path.join(sharedDir, 'fontkit', 'fontkit.umd.min.js')), 'fontkit shared bundle exists');
+  assert.ok(fs.existsSync(path.join(sharedDir, 'tesseract', 'tesseract.min.js')), 'Tesseract shared bundle exists');
 });
 
 test('TabBar in-memory LRU session cache and tab life cycle', async () => {

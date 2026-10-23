@@ -47,3 +47,10 @@ node scripts/smoke.js
 Margin fields remain per-page data. `src/js/core/pages.js` computes guide rectangles and `src/js/core/surface.js` draws them on the interactive canvas. The guide overlay is not rendered into PNG, PDF or video output, and it does not clip user content or reserve a printable area. This is a known partial implementation; the release dossier and feature history must use this exact boundary.
 
 The focused unit checks verify margin calculation, scope, persistence and undo operations. They do not verify margin enforcement in an exported document because no such export consumer exists yet.
+
+---
+
+## 6. Advanced PDF Annotation & Book Reader Blueprint (v5.6.0+)
+
+For the comprehensive engineering specification for interactive text markup (highlights, underline, squiggly), LiquidText-style pin-and-tear excerpts, book margin expansion via `pdf-lib`, scanned book offline OCR via `Tesseract.js` WASM, and Table of Contents navigation, see:  
+[`docs/plan/08-pdf-annotation-and-book-reader-architecture.md`](../plan/08-pdf-annotation-and-book-reader-architecture.md).

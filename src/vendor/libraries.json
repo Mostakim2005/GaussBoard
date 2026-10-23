@@ -1,7 +1,7 @@
 {
-  "manifestVersion": "1.0.0",
+  "manifestVersion": "1.1.0",
   "rootPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries",
-  "updatedAt": "2026-10-23T17:52:00.000Z",
+  "updatedAt": "2026-10-23T18:25:00.000Z",
   "description": "Central shared offline runtime libraries repository for GazBoard and Antigravity applications",
   "libraries": [
     {
@@ -19,7 +19,7 @@
     },
     {
       "id": "pdfjs",
-      "name": "PDF.js",
+      "name": "PDF.js Core",
       "version": "4.10.38",
       "category": "PDF Engine",
       "description": "Mozilla PDF document parser, text layer extractor, and page rendering engine.",
@@ -28,6 +28,58 @@
       "bundledInApp": true,
       "bundledPath": "src/vendor/pdf.min.mjs",
       "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdfjs\\pdf.min.mjs",
+      "status": "ready"
+    },
+    {
+      "id": "pdfjs-viewer",
+      "name": "PDF.js Viewer & Annotation Layer",
+      "version": "4.10.38",
+      "category": "PDF Annotation & Viewer UI",
+      "description": "Mozilla PDF.js viewer components, TextLayerBuilder, AnnotationEditorLayer (native highlights, freetext, ink), and PDFFindController.",
+      "license": "Apache-2.0",
+      "homepage": "https://mozilla.github.io/pdf.js/",
+      "bundledInApp": false,
+      "bundledPath": null,
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdfjs\\pdf_viewer.mjs",
+      "status": "ready"
+    },
+    {
+      "id": "pdf-lib",
+      "name": "pdf-lib",
+      "version": "1.17.1",
+      "category": "PDF Metadata & Vector Annotations",
+      "description": "Pure JavaScript library to modify existing PDFs, expand page margins, edit metadata, and embed native annotations.",
+      "license": "MIT",
+      "homepage": "https://pdf-lib.js.org/",
+      "bundledInApp": false,
+      "bundledPath": null,
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdf-lib\\pdf-lib.min.js",
+      "status": "ready"
+    },
+    {
+      "id": "fontkit",
+      "name": "fontkit (@pdf-lib/fontkit)",
+      "version": "1.1.1",
+      "category": "Font Embedding & Typography",
+      "description": "Advanced font engine for pdf-lib allowing custom TTF/OTF/WOFF font embedding for non-Latin and equation annotations in PDFs.",
+      "license": "Apache-2.0",
+      "homepage": "https://github.com/Hopding/fontkit",
+      "bundledInApp": false,
+      "bundledPath": null,
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\fontkit\\fontkit.umd.min.js",
+      "status": "ready"
+    },
+    {
+      "id": "tesseract",
+      "name": "Tesseract.js (Offline OCR)",
+      "version": "5.1.1",
+      "category": "Scanned PDF OCR",
+      "description": "Pure WebAssembly offline OCR engine with English trained language data for recognizing text in scanned books and image excerpts.",
+      "license": "Apache-2.0",
+      "homepage": "https://tesseract.projectnaptha.com/",
+      "bundledInApp": false,
+      "bundledPath": null,
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\tesseract\\tesseract.min.js",
       "status": "ready"
     },
     {
@@ -80,19 +132,6 @@
       "bundledInApp": false,
       "bundledPath": null,
       "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\chartjs\\chart.umd.min.js",
-      "status": "ready"
-    },
-    {
-      "id": "pdf-lib",
-      "name": "pdf-lib",
-      "version": "1.17.1",
-      "category": "PDF Metadata & Vector Annotations",
-      "description": "Pure JavaScript library to create and modify PDF documents, edit metadata, and embed native PDF annotations.",
-      "license": "MIT",
-      "homepage": "https://pdf-lib.js.org/",
-      "bundledInApp": false,
-      "bundledPath": null,
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdf-lib\\pdf-lib.min.js",
       "status": "ready"
     }
   ]
