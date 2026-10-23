@@ -1784,5 +1784,9 @@
   "Document Navigator & TOC…": "文档导航与目录…",
   "Obsidian Canvas (.canvas)…": "Obsidian Canvas (.canvas)…",
   "Export Obsidian Canvas (.canvas)…": "导出为 Obsidian Canvas (.canvas)…",
-  "Export Markdown note (.md)…": "导出为 Markdown 笔记 (.md)…"
+  "Export Markdown note (.md)…": "导出为 Markdown 笔记 (.md)…",
+  "Multi-window editing badge": "多窗口编辑徽标",
+  "Show active editor or read-only indicator badge in the corner when multiple windows are open.": "当打开多个窗口时，在角落显示活动编辑器或只读指示器徽标。",
+  "Default diagram card style": "默认图表卡片样式",
+  "Default background style for newly created diagrams and charts.": "新创建的图表和图形的默认背景样式。"
 }

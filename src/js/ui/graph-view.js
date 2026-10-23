@@ -251,13 +251,12 @@ export class GraphViewModal {
     // Setup Listeners
     this.setupInteractions();
 
-    const onKey = (e) => {
+    this._onKeyDown = (e) => {
       if (e.key === 'Escape') {
         this.close();
-        window.removeEventListener('keydown', onKey);
       }
     };
-    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', this._onKeyDown);
   }
 
   setupInteractions() {
@@ -297,7 +296,7 @@ export class GraphViewModal {
       this.lastMouse = { x: e.clientX, y: e.clientY };
     });
 
-    window.addEventListener('mousemove', (e) => {
+    this._onMouseMove = (e) => {
       if (!this.el) return;
       const w = toWorld(e.clientX, e.clientY);
 
@@ -315,12 +314,14 @@ export class GraphViewModal {
         this.hoveredNode = findNodeAt(w.x, w.y);
         this.canvas.style.cursor = this.hoveredNode ? 'pointer' : 'grab';
       }
-    });
+    };
+    window.addEventListener('mousemove', this._onMouseMove);
 
-    window.addEventListener('mouseup', () => {
+    this._onMouseUp = () => {
       this.draggedNode = null;
       this.isDragging = false;
-    });
+    };
+    window.addEventListener('mouseup', this._onMouseUp);
 
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -477,6 +478,18 @@ export class GraphViewModal {
   close() {
     if (this.animId) cancelAnimationFrame(this.animId);
     this.animId = null;
+    if (this._onKeyDown) {
+      window.removeEventListener('keydown', this._onKeyDown);
+      this._onKeyDown = null;
+    }
+    if (this._onMouseMove) {
+      window.removeEventListener('mousemove', this._onMouseMove);
+      this._onMouseMove = null;
+    }
+    if (this._onMouseUp) {
+      window.removeEventListener('mouseup', this._onMouseUp);
+      this._onMouseUp = null;
+    }
     if (this.el) {
       this.el.remove();
       this.el = null;

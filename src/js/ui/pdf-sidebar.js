@@ -30,6 +30,10 @@ export class PdfSidebarDrawer {
 
   close() {
     this.isOpen = false;
+    if (this._onKeyDown) {
+      window.removeEventListener('keydown', this._onKeyDown);
+      this._onKeyDown = null;
+    }
     if (this.el) {
       this.el.remove();
       this.el = null;
@@ -38,6 +42,10 @@ export class PdfSidebarDrawer {
 
   render() {
     if (this.el) this.el.remove();
+    if (this._onKeyDown) {
+      window.removeEventListener('keydown', this._onKeyDown);
+      this._onKeyDown = null;
+    }
 
     const titleEl = h('div', { style: 'font-weight:700;font-size:14px;color:var(--text, #fff);display:flex;align-items:center;gap:8px;' },
       h('span', { style: 'color:#00e5ff;' }, '📖'),
@@ -97,6 +105,11 @@ export class PdfSidebarDrawer {
     }, header, tabNav, body);
 
     document.body.appendChild(this.el);
+
+    this._onKeyDown = (e) => {
+      if (e.key === 'Escape') this.close();
+    };
+    window.addEventListener('keydown', this._onKeyDown);
   }
 
   renderToc(container) {

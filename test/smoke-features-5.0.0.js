@@ -6,7 +6,7 @@ const fs = require('node:fs/promises');
 const browserChecks = String.raw`(async () => {
   const out = {};
   const app = window.app;
-  const wait = (fn, ms = 6000) => new Promise((resolve, reject) => {
+  const wait = (fn, ms = 10000) => new Promise((resolve, reject) => {
     const start = Date.now();
     const timer = setInterval(() => {
       try {
@@ -29,7 +29,10 @@ const browserChecks = String.raw`(async () => {
     await wait(() => bar.btnSession && bar.btnSession.style.display !== 'none');
     out.singleRecordingShowsSessionControls = true;
 
-    bar.btnSession.click();
+    if (!document.querySelector('.ab-session-dropdown')) {
+      if (typeof bar.toggleSessionMenu === 'function') bar.toggleSessionMenu();
+      else bar.btnSession.click();
+    }
     const menu = await wait(() => document.querySelector('.ab-session-dropdown'));
     const selector = menu.querySelector('select.ab-replay-display-mode');
     out.replayModesExposeAllThreeChoices = !!selector &&

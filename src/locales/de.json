@@ -1784,5 +1784,9 @@
   "Document Navigator & TOC…": "Dokument-Navigator & Inhaltsverzeichnis…",
   "Obsidian Canvas (.canvas)…": "Obsidian Canvas (.canvas)…",
   "Export Obsidian Canvas (.canvas)…": "Obsidian Canvas (.canvas) exportieren…",
-  "Export Markdown note (.md)…": "Markdown-Notiz (.md) exportieren…"
+  "Export Markdown note (.md)…": "Markdown-Notiz (.md) exportieren…",
+  "Multi-window editing badge": "Bearbeitungs-Badge für mehrere Fenster",
+  "Show active editor or read-only indicator badge in the corner when multiple windows are open.": "Badge für aktiven Editor oder Schreibschutz-Anzeige in der Ecke anzeigen, wenn mehrere Fenster geöffnet sind.",
+  "Default diagram card style": "Standard-Diagrammkartenstil",
+  "Default background style for newly created diagrams and charts.": "Standard-Hintergrundstil für neu erstellte Diagramme und Charts."
 }

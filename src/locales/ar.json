@@ -1784,5 +1784,9 @@
   "Document Navigator & TOC…": "مستعرض المستند وجدول المحتويات…",
   "Obsidian Canvas (.canvas)…": "لوحة Obsidian (.canvas)…",
   "Export Obsidian Canvas (.canvas)…": "تصدير لوحة Obsidian (.canvas)…",
-  "Export Markdown note (.md)…": "تصدير ملاحظة Markdown (.md)…"
+  "Export Markdown note (.md)…": "تصدير ملاحظة Markdown (.md)…",
+  "Multi-window editing badge": "شارة تحرير النوافذ المتعددة",
+  "Show active editor or read-only indicator badge in the corner when multiple windows are open.": "إظهار شارة المحرر النشط أو مؤشر القراءة فقط في الزاوية عند فتح نوافذ متعددة.",
+  "Default diagram card style": "نمط بطاقة المخطط الافتراضي",
+  "Default background style for newly created diagrams and charts.": "نمط الخلفية الافتراضي للمخططات والرسوم البيانية المنشأة حديثًا."
 }

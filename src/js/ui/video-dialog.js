@@ -343,6 +343,20 @@ export class VideoPlayerDialog {
       window.removeEventListener('keydown', this._onKeyDown);
       this._onKeyDown = null;
     }
+    if (this.videoEl) {
+      try {
+        this.videoEl.pause();
+        this.videoEl.src = '';
+        this.videoEl.load();
+      } catch (_) {}
+      this.videoEl = null;
+    }
+    if (this.iframe) {
+      try {
+        this.iframe.src = 'about:blank';
+      } catch (_) {}
+      this.iframe = null;
+    }
     if (this.el) {
       this.el.remove();
       this.el = null;

@@ -304,9 +304,13 @@ export function evalMathExpression(tex) {
   s = s.replace(/\\left\[/g, '(').replace(/\\right\]/g, ')');
   s = s.replace(/\\,/g, '');
 
+  // Guard against excessive string length or exponential calculation loops
+  if (s.length > 256 || /\*{2,}.*\*{2,}.*\*{2,}/.test(s)) {
+    return { ok: false };
+  }
+
   // Only permit safe arithmetic characters: digits, Math.*, + - * / ** ( ) . ,
   // Reject any variables, brackets, or code injection
-  const safeRegex = /^[0-9+\-*/().,\s]|Math\.(PI|sqrt|pow|sin|cos|tan|asin|acos|atan|exp|log|log10|log2|abs)/;
   const stripped = s.replace(/Math\.(PI|sqrt|pow|sin|cos|tan|asin|acos|atan|exp|log|log10|log2|abs)/g, '');
   if (!/^[0-9+\-*/().,\s*]*$/.test(stripped)) {
     return { ok: false };

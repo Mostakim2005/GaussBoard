@@ -2803,6 +2803,10 @@ class App {
   }
 
   updateWindowModeBadge(mode) {
+    if (this.settings?.showWindowModeBadge === false) {
+      if (this.windowModeBadgeEl) this.windowModeBadgeEl.style.display = 'none';
+      return;
+    }
     if (!this.windowModeBadgeEl) this.ensureWindowModeBadge();
     const badge = this.windowModeBadgeEl;
     if (!badge) return;

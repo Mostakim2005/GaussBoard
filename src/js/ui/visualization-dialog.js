@@ -167,7 +167,7 @@ export class VisualizationDialog {
     this.activeTab = 'builder'; // 'builder' | 'code'
     this.builderKind = 'flowchart'; // 'flowchart' | 'mindmap' | 'radar'
     this.engine = 'mermaid'; // 'mermaid' | 'chartjs'
-    this.cardStyle = 'white'; // 'white' | 'transparent'
+    this.cardStyle = app?.settings?.diagramCardStyle || 'white'; // 'white' | 'transparent'
     this.code = DIAGRAM_TEMPLATES.flowchart_basic.code;
     this.title = '';
     this.renderedDataUrl = '';
@@ -240,7 +240,7 @@ export class VisualizationDialog {
       this.activeTab = 'builder';
       this.builderKind = 'flowchart';
       this.engine = 'mermaid';
-      this.cardStyle = 'white';
+      this.cardStyle = this.app?.settings?.diagramCardStyle || 'white';
       this.title = '';
       this.synthesizeFromBuilder();
     }
@@ -252,6 +252,10 @@ export class VisualizationDialog {
 
   close() {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (this._onKeyDown) {
+      window.removeEventListener('keydown', this._onKeyDown);
+      this._onKeyDown = null;
+    }
     if (this.overlay) {
       this.overlay.remove();
       this.overlay = null;
@@ -278,12 +282,13 @@ export class VisualizationDialog {
       if (e.target === overlay) this.close();
     });
 
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.active) {
+    this._onKeyDown = (e) => {
+      if (e.key === 'Escape') {
         e.preventDefault();
         this.close();
       }
-    }, { once: true });
+    };
+    window.addEventListener('keydown', this._onKeyDown);
 
     this.overlay = overlay;
     this.dialog = dialog;

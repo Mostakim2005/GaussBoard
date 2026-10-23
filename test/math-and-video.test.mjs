@@ -50,6 +50,8 @@ test('scientific math studio: safe offline quick math evaluator', () => {
   assert.deepEqual(evalMathExpression('2^8'), { ok: true, result: '256', numeric: 256 });
   assert.deepEqual(evalMathExpression('\\sin(\\pi / 2)'), { ok: true, result: '1', numeric: 1 });
   assert.equal(evalMathExpression('badVariable + 1').ok, false, 'Rejects unknown variables');
+  assert.equal(evalMathExpression('2**2**2**2').ok, false, 'Rejects dangerous chained power computations');
+  assert.equal(evalMathExpression('1 + '.repeat(100) + '1').ok, false, 'Rejects expressions exceeding 256 characters');
 });
 
 test('video suite: URL parsing, time formatting, and seek parsers', () => {

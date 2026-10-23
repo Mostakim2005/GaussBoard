@@ -1784,5 +1784,9 @@
   "Document Navigator & TOC…": "ডকুমেন্ট নেভিগেটর ও সূচিপত্র…",
   "Obsidian Canvas (.canvas)…": "Obsidian Canvas (.canvas)…",
   "Export Obsidian Canvas (.canvas)…": "Obsidian Canvas (.canvas) রপ্তানি করুন…",
-  "Export Markdown note (.md)…": "Markdown নোট (.md) রপ্তানি করুন…"
+  "Export Markdown note (.md)…": "Markdown নোট (.md) রপ্তানি করুন…",
+  "Multi-window editing badge": "মাল্টি-উইন্ডো সম্পাদনা ব্যাজ",
+  "Show active editor or read-only indicator badge in the corner when multiple windows are open.": "একাধিক উইন্ডো খোলা থাকলে কোণে সক্রিয় সম্পাদক বা কেবল-পঠন নির্দেশক ব্যাজ দেখান।",
+  "Default diagram card style": "ডিফল্ট ডায়াগ্রাম কার্ড শৈলী",
+  "Default background style for newly created diagrams and charts.": "নতুন তৈরি ডায়াগ্রাম এবং চার্টের জন্য ডিফল্ট পটভূমি শৈলী।"
 }

@@ -1639,6 +1639,19 @@ export function createPanels(app) {
             t('Simulate force-directed node movement in the Knowledge Graph View modal.')),
           row(t('Auto-export Markdown sidecar on save'), mkToggle(() => !!s.autoExportMarkdownSidecar, (v) => { s.autoExportMarkdownSidecar = v; app.saveSettings(); }),
             t('Automatically writes a companion .md note with YAML frontmatter whenever a board is saved.')),
+          row(t('Multi-window editing badge'), mkToggle(() => s.showWindowModeBadge !== false, (v) => {
+            s.showWindowModeBadge = v;
+            app.saveSettings();
+            if (!v && app.windowModeBadgeEl) app.windowModeBadgeEl.style.display = 'none';
+            else if (v && app.windowCount > 1) app.updateWindowModeBadge?.(app.isWindowLeaseEditor ? 'editor' : 'readonly');
+          }), t('Show active editor or read-only indicator badge in the corner when multiple windows are open.')),
+          row(t('Default diagram card style'), mkChoice([
+            ['white', t('White Card')],
+            ['transparent', t('Transparent')]
+          ], () => s.diagramCardStyle || 'white', (v) => {
+            s.diagramCardStyle = v;
+            app.saveSettings();
+          }), t('Default background style for newly created diagrams and charts.')),
           row(t('Skip dead air (silence)'), mkToggle(() => !!s.replaySkipSilence, (v) => (s.replaySkipSilence = v)),
             t('During audio replay, automatically fast-forwards across silent gaps longer than 2 seconds where no strokes or bookmarks occur.')),
           row(t('Tap stroke to seek audio'), mkToggle(() => s.tapStrokeToSeek !== false, (v) => (s.tapStrokeToSeek = v)),
