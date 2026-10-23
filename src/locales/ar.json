@@ -1585,5 +1585,12 @@
   "Open board tabs": "علامات تبويب اللوحات المفتوحة",
   "New tab (Ctrl+T)": "علامة تبويب جديدة (Ctrl+T)",
   "Could not load board": "تعذر تحميل اللوحة",
-  "Close tab (Ctrl+W)": "إغلاق علامة التبويب (Ctrl+W)"
+  "Close tab (Ctrl+W)": "إغلاق علامة التبويب (Ctrl+W)",
+  "Open in new window": "فتح في نافذة جديدة",
+  "Read-only reference": "مرجع للقراءة فقط",
+  "Active editor": "المحرر النشط",
+  "Take over editing": "تولي التحرير",
+  "Close other tabs": "إغلاق علامات التبويب الأخرى",
+  "Duplicate tab": "تكرار علامة التبويب",
+  "Click to claim editing in this window": "انقر للمطالبة بالتحرير في هذه النافذة"
 }

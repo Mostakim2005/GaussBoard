@@ -1585,5 +1585,12 @@
   "Open board tabs": "Offene Whiteboard-Tabs",
   "New tab (Ctrl+T)": "Neuer Tab (Strg+T)",
   "Could not load board": "Whiteboard konnte nicht geladen werden",
-  "Close tab (Ctrl+W)": "Tab schließen (Strg+W)"
+  "Close tab (Ctrl+W)": "Tab schließen (Strg+W)",
+  "Open in new window": "In neuem Fenster öffnen",
+  "Read-only reference": "Schreibgeschützte Referenz",
+  "Active editor": "Aktiver Editor",
+  "Take over editing": "Bearbeitung übernehmen",
+  "Close other tabs": "Andere Tabs schließen",
+  "Duplicate tab": "Tab duplizieren",
+  "Click to claim editing in this window": "Klicken, um die Bearbeitung in diesem Fenster zu übernehmen"
 }

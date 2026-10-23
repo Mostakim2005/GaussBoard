@@ -2147,3 +2147,115 @@ body.presenting .gb-tab-bar { display: none !important; }
   min-width: 80px;
   justify-content: center;
 }
+
+/* =================================================================== *
+ *  Multi-Window Lease Indicator & Tab Context Menu (v5.6.0)
+ * =================================================================== */
+.window-mode-badge {
+  position: fixed;
+  top: 48px;
+  right: 18px;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  transition: opacity 0.3s ease, transform 0.2s ease;
+  user-select: none;
+}
+.window-mode-badge.dimmed {
+  opacity: 0.25;
+}
+.window-mode-badge.dimmed:hover {
+  opacity: 0.95;
+}
+.window-mode-badge.active-editor {
+  background: rgba(30, 142, 62, 0.18);
+  border: 1px solid rgba(30, 142, 62, 0.4);
+  color: #137333;
+}
+body.dark .window-mode-badge.active-editor {
+  background: rgba(129, 201, 149, 0.2);
+  border: 1px solid rgba(129, 201, 149, 0.4);
+  color: #81c995;
+}
+.window-mode-badge.read-only {
+  background: rgba(234, 134, 0, 0.18);
+  border: 1px solid rgba(234, 134, 0, 0.45);
+  color: #b06000;
+}
+body.dark .window-mode-badge.read-only {
+  background: rgba(253, 214, 99, 0.18);
+  border: 1px solid rgba(253, 214, 99, 0.45);
+  color: #fdd663;
+}
+.window-mode-badge .badge-takeover-btn {
+  background: #1a73e8;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 4px;
+}
+.window-mode-badge .badge-takeover-btn:hover {
+  background: #1557b0;
+}
+
+.gb-tab-context-menu {
+  position: fixed;
+  z-index: 10000;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 4px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  min-width: 210px;
+  font-family: inherit;
+  font-size: 12.5px;
+}
+body.dark .gb-tab-context-menu {
+  background: #252423;
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color: #f3f2f1;
+}
+.gb-tab-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.gb-tab-menu-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+body.dark .gb-tab-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.gb-tab-menu-item .shortcut {
+  margin-left: auto;
+  color: #706d6b;
+  font-size: 11px;
+}
+.gb-tab-menu-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 4px 0;
+}
+body.dark .gb-tab-menu-divider {
+  background: rgba(255, 255, 255, 0.1);
+}

@@ -1,6 +1,6 @@
 # GazBoard Replay — Developer Handover & Future Agent Guide
 
-> **Current handover snapshot (2026-10-23):** v5.5.0 completes Phase 2 Step 1 of the architectural roadmap: Chrome-style Multi-Tab Bar (`TabBar`) with sub-5ms LRU session cache, centralized `C:\Users\kazir\Documents\Antigravity\CommonLibraries\` runtime library repository, and the in-app Library Inspector modal displaying active engines (KaTeX, PDF.js, JSZip, Mammoth, Mermaid, Chart.js, pdf-lib), version stamps, and disk paths with 100% i18n parity and zero regression failures (1,240/1,240 smoke checks passed). Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-5.5.0.md`](releases/RELEASE-5.5.0.md) for implementation, verification and artifact state. The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
+> **Current handover snapshot (2026-10-23):** v5.6.0 completes Phase 2 Step 2 of the architectural roadmap: Multi-Window Browsing with focus-driven lease locking (Active Editor vs Read-Only Reference Mode), real-time cross-window board synchronization, TabBar right-click context menu (Open in new window, Close other tabs, Duplicate tab), and <kbd>Ctrl+Shift+N</kbd> hotkey, building on the Phase 2 Step 1 Multi-Tab Bar (`TabBar`) and centralized `C:\Users\kazir\Documents\Antigravity\CommonLibraries\` runtime library repository with 100% i18n parity and zero regression failures (1,240/1,240 smoke checks passed). Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-5.6.0.md`](releases/RELEASE-5.6.0.md) for implementation, verification and artifact state. The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
 
 > **Important**: This document is the primary onboarding manual for any future AI assistant, software engineer, or contributor picking up this project in a new session or clean environment. It details the complete architecture, data models, state flows, invariant guardrails, and build instructions.
 
@@ -22,10 +22,10 @@
 ## 1.1 Current Worktree and Release State (2026-10-23)
 
 - **Working repository:** `C:\Users\kazir\Documents\OpenCode\GazBoard`.
-- **Current source version:** v5.5.0, based on the local cumulative project feature line.
+- **Current source version:** v5.6.0, based on the local cumulative project feature line.
 - **Git state:** branch `feat/cumulative-fixes`.
-- **Lineage:** delivers Phase 2 Step 1 Multi-Tab Bar & CommonLibraries Shared Repository on top of Phase 1 upstream sync v5.4.0.
-- **Latest release scope:** [`releases/RELEASE-5.5.0.md`](releases/RELEASE-5.5.0.md) records the Multi-Tab Bar (`TabBar`) with sub-5ms LRU session cache, centralized `C:\Users\kazir\Documents\Antigravity\CommonLibraries\` runtime library repository, and the in-app Library Inspector modal with 100% i18n parity and 1,240/1,240 passed smoke checks. Releases ledger is at [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md).
+- **Lineage:** delivers Phase 2 Step 2 Multi-Window Browsing & Lease Locking on top of Phase 2 Step 1 Multi-Tab Bar v5.5.0.
+- **Latest release scope:** [`releases/RELEASE-5.6.0.md`](releases/RELEASE-5.6.0.md) records Multi-Window Browsing, focus-driven lease locking, real-time cross-window sync, TabBar context menu, and <kbd>Ctrl+Shift+N</kbd> with 100% i18n parity and 1,240/1,240 passed smoke checks. Releases ledger is at [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md).
 - **Archive policy:** keep active work here. Use the user-configured durable archive only after a release has passed checks; do not copy to historical Antigravity paths from older records.
 - **Verification/build state:** focused audit tests and locale checks pass; see [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md) for the portable artifact hash, remaining npm advisories, and architectural follow-ups.
 - **Audit attribution supplied by the project owner:** initial audit — Codex 4.6 Medium in Cursor; secondary audit/fixes — GPT-6 Luna High using Codex.

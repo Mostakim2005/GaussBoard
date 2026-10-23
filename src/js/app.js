@@ -294,6 +294,7 @@ class App {
     this.replayBar = new ReplayBar(this);
     this.tabBar = new TabBar(this);
     if (typeof document !== 'undefined') this.tabBar.init();
+    this.initMultiWindowLease();
     this.wireGlobalEvents();
     this.initDismissal();
     this.wireStore();
@@ -2674,6 +2675,141 @@ class App {
     this.noteOverview.toggle();
   }
 
+  /* ---------------- multi-window & lease locking ---------------- */
+
+  initMultiWindowLease() {
+    this.isWindowLeaseEditor = true;
+    this.windowCount = 1;
+    this._forcedLeaseReadOnly = false;
+    this.windowModeBadgeEl = null;
+
+    if (typeof window === 'undefined') return;
+
+    window.addEventListener('focus', () => {
+      if (this.windowCount > 1 && !this.isWindowLeaseEditor) {
+        window.board?.claimLease?.();
+      }
+    });
+
+    window.board?.onLeaseChanged?.((state) => {
+      this.handleLeaseStateChange(state);
+    });
+
+    window.board?.onBoardExternalUpdate?.(async (info) => {
+      if (info?.id && this.store?.doc?.id === info.id && !this.isWindowLeaseEditor) {
+        try {
+          const data = await window.board?.boards?.load?.(info.id);
+          if (data) {
+            const cam = this.surface?.cam ? { x: this.surface.cam.x, y: this.surface.cam.y, z: this.surface.cam.z } : null;
+            await this.loadBoard(data, { silent: true, claimed: true });
+            if (cam && this.surface?.cam) {
+              this.surface.cam.x = cam.x;
+              this.surface.cam.y = cam.y;
+              this.surface.cam.z = cam.z;
+            }
+            this.surface?.damageAll();
+          }
+        } catch (e) {
+          console.warn('[multi-window] live external board sync failed:', e);
+        }
+      }
+    });
+
+    window.board?.onOpenBoardById?.(async (boardId) => {
+      if (boardId) {
+        try {
+          const data = await window.board?.boards?.load?.(boardId);
+          if (data) {
+            await this.loadBoard(data, { silent: true, claimed: true });
+            this.tabBar?.onBoardLoaded?.(boardId, this.store.doc.name);
+          }
+        } catch (e) {
+          console.warn('[multi-window] open board by id failed:', e);
+        }
+      }
+    });
+  }
+
+  handleLeaseStateChange(state) {
+    if (!state) return;
+    this.windowCount = state.windowCount || 1;
+    const isEditor = !!state.isEditor;
+    this.isWindowLeaseEditor = isEditor;
+
+    this.ensureWindowModeBadge();
+
+    if (this.windowCount <= 1) {
+      if (this._forcedLeaseReadOnly) {
+        this._forcedLeaseReadOnly = false;
+        this.setReadingMode(false, { silent: true });
+      }
+      if (this.windowModeBadgeEl) {
+        this.windowModeBadgeEl.style.display = 'none';
+      }
+      return;
+    }
+
+    if (isEditor) {
+      if (this._forcedLeaseReadOnly) {
+        this._forcedLeaseReadOnly = false;
+        this.setReadingMode(false, { silent: true });
+      }
+      this.updateWindowModeBadge('editor');
+    } else {
+      this._forcedLeaseReadOnly = true;
+      this.setReadingMode(true, { silent: true });
+      this.updateWindowModeBadge('readonly');
+    }
+  }
+
+  ensureWindowModeBadge() {
+    if (this.windowModeBadgeEl || typeof document === 'undefined') return;
+    const el = document.createElement('div');
+    el.id = 'windowModeBadge';
+    el.className = 'window-mode-badge';
+    el.style.display = 'none';
+    el.setAttribute('title', t('Click to claim editing in this window'));
+    document.getElementById('app')?.appendChild(el);
+    this.windowModeBadgeEl = el;
+
+    el.addEventListener('click', async (e) => {
+      if (!this.isWindowLeaseEditor) {
+        e.stopPropagation();
+        await window.board?.claimLease?.();
+      }
+    });
+  }
+
+  updateWindowModeBadge(mode) {
+    if (!this.windowModeBadgeEl) this.ensureWindowModeBadge();
+    const badge = this.windowModeBadgeEl;
+    if (!badge) return;
+    badge.style.display = 'flex';
+    if (this._badgeFadeTimeout) {
+      clearTimeout(this._badgeFadeTimeout);
+      this._badgeFadeTimeout = null;
+    }
+
+    if (mode === 'editor') {
+      badge.className = 'window-mode-badge active-editor';
+      badge.innerHTML = `
+        <span class="badge-icon">✍️</span>
+        <span class="badge-label">${t('Active editor')}</span>
+      `;
+      this._badgeFadeTimeout = setTimeout(() => {
+        badge.classList.add('dimmed');
+      }, 2500);
+    } else {
+      badge.className = 'window-mode-badge read-only';
+      badge.classList.remove('dimmed');
+      badge.innerHTML = `
+        <span class="badge-icon">🔒</span>
+        <span class="badge-label">${t('Read-only reference')}</span>
+        <button class="badge-takeover-btn" type="button">${t('Take over editing')}</button>
+      `;
+    }
+  }
+
   /* ---------------- clipboard ---------------- */
 
   /**
@@ -4985,7 +5121,15 @@ class App {
       if (k === 'g') { e.preventDefault(); this.command(e.shiftKey ? 'edit.ungroup' : 'edit.group'); return; }
       if (k === 's') { e.preventDefault(); this.command('board.save'); return; }
       if (k === 'o') { e.preventDefault(); this.command('board.open'); return; }
-      if (k === 'n') { e.preventDefault(); this.command('board.new'); return; }
+      if (k === 'n') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          window.board?.newWindow?.({ boardId: this.store?.doc?.id });
+        } else {
+          this.command('board.new');
+        }
+        return;
+      }
       if (k === 't') { e.preventDefault(); this.tabBar?.newTab(); return; }
       if (k === 'w') { e.preventDefault(); this.tabBar?.closeActiveTab(); return; }
       if (e.key === 'Tab') {

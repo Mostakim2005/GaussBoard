@@ -186,6 +186,12 @@ contextBridge.exposeInMainWorld('board', {
   openBoardsFolder: () => ipcRenderer.invoke('shell:openBoards'),
   openLibrariesFolder: () => ipcRenderer.invoke('shell:openCommonLibraries'),
   loadLibrariesManifest: () => ipcRenderer.invoke('libraries:manifest'),
+  newWindow: (opts) => ipcRenderer.invoke('window:new', opts || {}),
+  claimLease: () => ipcRenderer.invoke('window:claimLease'),
+  getLeaseState: () => ipcRenderer.invoke('window:getLeaseState'),
+  onLeaseChanged: (cb) => ipcRenderer.on('lease:state', (_e, state) => cb(state)),
+  onBoardExternalUpdate: (cb) => ipcRenderer.on('board:externalUpdate', (_e, info) => cb(info)),
+  onOpenBoardById: (cb) => ipcRenderer.on('board:openById', (_e, id) => cb(id)),
   storage: {
     get: () => ipcRenderer.invoke('storage:get'),
     choose: () => ipcRenderer.invoke('storage:choose'),

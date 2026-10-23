@@ -1585,5 +1585,12 @@
   "Open board tabs": "Abas de quadros abertos",
   "New tab (Ctrl+T)": "Nova aba (Ctrl+T)",
   "Could not load board": "Não foi possível carregar o quadro",
-  "Close tab (Ctrl+W)": "Fechar aba (Ctrl+W)"
+  "Close tab (Ctrl+W)": "Fechar aba (Ctrl+W)",
+  "Open in new window": "Abrir em nova janela",
+  "Read-only reference": "Referência somente leitura",
+  "Active editor": "Editor ativo",
+  "Take over editing": "Assumir edição",
+  "Close other tabs": "Fechar outras abas",
+  "Duplicate tab": "Duplicar aba",
+  "Click to claim editing in this window": "Clique para assumir a edição nesta janela"
 }

@@ -1585,5 +1585,12 @@
   "Open board tabs": "খোলা বোর্ড ট্যাবসমূহ",
   "New tab (Ctrl+T)": "নতুন ট্যাব (Ctrl+T)",
   "Could not load board": "বোর্ড লোড করা যায়নি",
-  "Close tab (Ctrl+W)": "ট্যাব বন্ধ করুন (Ctrl+W)"
+  "Close tab (Ctrl+W)": "ট্যাব বন্ধ করুন (Ctrl+W)",
+  "Open in new window": "নতুন উইন্ডোতে খুলুন",
+  "Read-only reference": "শুধুমাত্র পাঠযোগ্য রেফারেন্স",
+  "Active editor": "সক্রিয় সম্পাদক",
+  "Take over editing": "সম্পাদনার দায়িত্ব নিন",
+  "Close other tabs": "অন্যান্য ট্যাব বন্ধ করুন",
+  "Duplicate tab": "ট্যাব ডুপ্লিকেট করুন",
+  "Click to claim editing in this window": "এই উইন্ডোতে সম্পাদনা সক্ষম করতে ক্লিক করুন"
 }

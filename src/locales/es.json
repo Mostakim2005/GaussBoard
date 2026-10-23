@@ -1585,5 +1585,12 @@
   "Open board tabs": "Pestañas de pizarras abiertas",
   "New tab (Ctrl+T)": "Nueva pestaña (Ctrl+T)",
   "Could not load board": "No se pudo cargar la pizarra",
-  "Close tab (Ctrl+W)": "Cerrar pestaña (Ctrl+W)"
+  "Close tab (Ctrl+W)": "Cerrar pestaña (Ctrl+W)",
+  "Open in new window": "Abrir en una ventana nueva",
+  "Read-only reference": "Referencia de solo lectura",
+  "Active editor": "Editor activo",
+  "Take over editing": "Tomar el control de la edición",
+  "Close other tabs": "Cerrar las demás pestañas",
+  "Duplicate tab": "Duplicar pestaña",
+  "Click to claim editing in this window": "Haga clic para asumir la edición en esta ventana"
 }

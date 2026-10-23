@@ -687,7 +687,41 @@ async function migrateLegacyData() {
  *  Windows
  * ------------------------------------------------------------------ */
 let mainWindow = null;
+const whiteboardWindows = new Set();
+let activeEditorWin = null;
 let revealMainWindow = null;      // shows the main window and closes the starting-up one (createWindow sets it)
+
+function broadcast(channel, payload) {
+  for (const win of whiteboardWindows) {
+    if (!win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
+      win.webContents.send(channel, payload);
+    }
+  }
+}
+
+function broadcastLeaseState() {
+  const windowCount = whiteboardWindows.size;
+  if (windowCount <= 1) {
+    for (const win of whiteboardWindows) {
+      if (!win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
+        win.webContents.send('lease:state', { isEditor: true, windowCount: 1 });
+      }
+    }
+    return;
+  }
+  for (const win of whiteboardWindows) {
+    if (!win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
+      const isEditor = (win === activeEditorWin);
+      win.webContents.send('lease:state', { isEditor, windowCount });
+    }
+  }
+}
+
+function setEditorLease(targetWin) {
+  if (!targetWin || targetWin.isDestroyed()) return;
+  activeEditorWin = targetWin;
+  broadcastLeaseState();
+}
 const trustedConversionFiles = new WeakMap();
 let pendingOpen = null;
 /*
@@ -823,8 +857,19 @@ function createWindow() {
     mainWindow.on(ev, () => send('window:resized'));
   screen.on('display-metrics-changed', () => send('window:resized'));
 
+  whiteboardWindows.add(mainWindow);
+  activeEditorWin = mainWindow;
+
+  mainWindow.on('focus', () => setEditorLease(mainWindow));
   mainWindow.on('close', saveWindowState);
-  mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.on('closed', () => {
+    whiteboardWindows.delete(mainWindow);
+    if (activeEditorWin === mainWindow) {
+      activeEditorWin = whiteboardWindows.values().next().value || null;
+      broadcastLeaseState();
+    }
+    mainWindow = whiteboardWindows.values().next().value || null;
+  });
 
   if (process.argv.includes('--smoke')) {
     mainWindow.webContents.on('console-message', (_e, level, message, line, src) => {
@@ -850,6 +895,83 @@ function createWindow() {
   });
 }
 
+function createWhiteboardWindow(opts = {}) {
+  const win = new BrowserWindow({
+    width: opts.width ?? 1280,
+    height: opts.height ?? 800,
+    x: opts.x,
+    y: opts.y,
+    minWidth: 460, minHeight: 480,
+    backgroundColor: '#f3f2f1',
+    title: 'GazBoard',
+    show: false,
+    autoHideMenuBar: true,
+    icon: path.join(SRC, 'assets', 'icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      spellcheck: true,
+      additionalArguments: process.argv.includes('--smoke') ? ['--smoke'] : [],
+      backgroundThrottling: false
+    }
+  });
+
+  whiteboardWindows.add(win);
+  activeEditorWin = win;
+
+  win.loadURL('app://board/index.html');
+
+  win.once('ready-to-show', () => {
+    win.show();
+    broadcastLeaseState();
+  });
+
+  win.webContents.once('did-finish-load', () => {
+    if (opts.boardId) {
+      win.webContents.send('board:openById', opts.boardId);
+    }
+    broadcastLeaseState();
+  });
+
+  win.on('focus', () => {
+    setEditorLease(win);
+  });
+
+  for (const ev of ['resize', 'maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen', 'move']) {
+    win.on(ev, () => {
+      if (!win.isDestroyed()) win.webContents.send('window:resized');
+    });
+  }
+
+  win.on('closed', () => {
+    whiteboardWindows.delete(win);
+    if (activeEditorWin === win) {
+      activeEditorWin = whiteboardWindows.values().next().value || null;
+      broadcastLeaseState();
+    }
+    if (mainWindow === win) {
+      mainWindow = whiteboardWindows.values().next().value || null;
+    }
+  });
+
+  win.webContents.on('will-navigate', (event, target) => {
+    if (isTrustedAppUrl(target)) return;
+    event.preventDefault();
+    const safeUrl = safeExternalUrl(target);
+    if (safeUrl) shell.openExternal(safeUrl).catch(() => {});
+  });
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    const safeUrl = safeExternalUrl(url);
+    if (safeUrl) shell.openExternal(safeUrl).catch(() => {});
+    return { action: 'deny' };
+  });
+
+  return win;
+}
+
 function isTrustedAppUrl(value) {
   try {
     const url = new URL(value);
@@ -859,8 +981,16 @@ function isTrustedAppUrl(value) {
 
 function isTrustedRenderer(event) {
   const frame = event?.senderFrame;
-  return !!mainWindow && !mainWindow.isDestroyed()
-    && event.sender === mainWindow.webContents
+  let isWhiteboard = (!!mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents);
+  if (!isWhiteboard) {
+    for (const win of whiteboardWindows) {
+      if (!win.isDestroyed() && event.sender === win.webContents) {
+        isWhiteboard = true;
+        break;
+      }
+    }
+  }
+  return isWhiteboard
     && frame?.parent == null
     && isTrustedAppUrl(frame.url);
 }
@@ -1343,6 +1473,32 @@ function ipc() {
     }
     return manifest;
   });
+  handleIpc('window:new', async (event, opts = {}) => {
+    const senderWin = BrowserWindow.fromWebContents(event.sender);
+    const bounds = senderWin ? senderWin.getBounds() : { x: 100, y: 100, width: 1280, height: 800 };
+    const newWin = createWhiteboardWindow({
+      x: (bounds.x || 100) + 40,
+      y: (bounds.y || 100) + 40,
+      width: bounds.width || 1280,
+      height: bounds.height || 800,
+      boardId: opts.boardId || null
+    });
+    return { ok: true, windowId: newWin.id };
+  });
+  handleIpc('window:claimLease', (event) => {
+    const senderWin = BrowserWindow.fromWebContents(event.sender);
+    if (senderWin && !senderWin.isDestroyed()) {
+      setEditorLease(senderWin);
+      return { ok: true, isEditor: true };
+    }
+    return { ok: false };
+  });
+  handleIpc('window:getLeaseState', (event) => {
+    const senderWin = BrowserWindow.fromWebContents(event.sender);
+    const windowCount = whiteboardWindows.size;
+    const isEditor = (windowCount <= 1) || (activeEditorWin === senderWin);
+    return { isEditor, windowCount, windowId: senderWin ? senderWin.id : null };
+  });
   handleIpc('shell:openExternal', async (_e, url) => {
     // only ever our own releases page - never an arbitrary URL from the board
     if (!isReleaseUrl(url, RELEASES_URL)) return false;
@@ -1464,7 +1620,7 @@ function ipc() {
       return StorageLocation.isBoardFile(raw) ? raw : null;
     } catch { return null; }
   });
-  handleIpc('boards:save', async (_e, payload) => withStorageWrite(async () => {
+  handleIpc('boards:save', async (event, payload) => withStorageWrite(async () => {
     await ensureDataDir();
     // The renderer sends { id, json }. An older shape - the board object itself -
     // is still accepted so nothing breaks if the two sides are ever out of step.
@@ -1479,6 +1635,11 @@ function ipc() {
       writeAtomic(path.join(dir, board.id + '.json'), board.json),
       moveLast ? setLastBoard(board.id, dir) : Promise.resolve()
     ]);
+    for (const w of whiteboardWindows) {
+      if (!w.isDestroyed() && w.webContents && w.webContents !== event.sender) {
+        w.webContents.send('board:externalUpdate', { id: board.id });
+      }
+    }
     return true;
   }));
   /**

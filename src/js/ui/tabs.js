@@ -323,10 +323,128 @@ export class TabBar {
         }
       });
 
+      item.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.showTabContextMenu(tab.id, e.clientX, e.clientY);
+      });
+
       const closeBtn = item.querySelector('.gb-tab-close');
       closeBtn.addEventListener('click', (e) => this.closeTab(tab.id, e));
 
       this.tabsListEl.appendChild(item);
+    }
+  }
+
+  showTabContextMenu(tabId, x, y) {
+    if (typeof document === 'undefined') return;
+    document.querySelector('.gb-tab-context-menu')?.remove();
+
+    const menu = document.createElement('div');
+    menu.className = 'gb-tab-context-menu';
+    const menuWidth = 220;
+    const menuHeight = 135;
+    const posX = typeof window !== 'undefined' ? Math.min(x, window.innerWidth - menuWidth - 10) : x;
+    const posY = typeof window !== 'undefined' ? Math.min(y, window.innerHeight - menuHeight - 10) : y;
+    menu.style.left = `${posX}px`;
+    menu.style.top = `${posY}px`;
+
+    menu.innerHTML = `
+      <button class="gb-tab-menu-item" data-action="new-window">
+        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+          <rect x="2" y="3" width="14" height="14" rx="2"></rect>
+          <path d="M8 21h12a2 2 0 0 0 2-2V9"></path>
+        </svg>
+        <span>${t('Open in new window')}</span>
+        <span class="shortcut">Ctrl+Shift+N</span>
+      </button>
+      <button class="gb-tab-menu-item" data-action="duplicate">
+        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <span>${t('Duplicate tab')}</span>
+      </button>
+      <div class="gb-tab-menu-divider"></div>
+      <button class="gb-tab-menu-item" data-action="close-others">
+        <span>${t('Close other tabs')}</span>
+      </button>
+      <button class="gb-tab-menu-item" data-action="close">
+        <span>${t('Close tab')}</span>
+        <span class="shortcut">Ctrl+W</span>
+      </button>
+    `;
+
+    document.body.appendChild(menu);
+
+    const cleanup = () => {
+      menu.remove();
+      document.removeEventListener('pointerdown', onDocPointer);
+    };
+    const onDocPointer = (evt) => {
+      if (!menu.contains(evt.target)) cleanup();
+    };
+    setTimeout(() => document.addEventListener('pointerdown', onDocPointer), 10);
+
+    menu.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.gb-tab-menu-item');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      cleanup();
+      if (action === 'new-window') {
+        window.board?.newWindow?.({ boardId: tabId });
+      } else if (action === 'duplicate') {
+        await this.duplicateTab(tabId);
+      } else if (action === 'close-others') {
+        await this.closeOtherTabs(tabId);
+      } else if (action === 'close') {
+        await this.closeTab(tabId);
+      }
+    });
+  }
+
+  async duplicateTab(targetId) {
+    const tab = this.tabs.find(t => t.id === targetId);
+    if (!tab) return;
+    try {
+      if (targetId === this.activeId) {
+        this.cacheCurrentSession();
+      }
+      const cached = this.cache.get(targetId);
+      let docToCopy = null;
+      if (cached?.docSnapshot) {
+        docToCopy = JSON.parse(JSON.stringify(cached.docSnapshot));
+      } else {
+        const loaded = await window.board?.boards?.load?.(targetId);
+        if (loaded) docToCopy = loaded;
+      }
+      if (docToCopy) {
+        this.app.newBoard(true);
+        this.app.store.doc.objects = JSON.parse(JSON.stringify(docToCopy.objects || {}));
+        this.app.store.doc.name = (docToCopy.name || t('Untitled board')) + ' (Copy)';
+        this.app.surface?.damageAll();
+        this.app.syncUI();
+        const newId = this.app.store.doc.id;
+        const newName = this.app.store.doc.name;
+        this.tabs.push({ id: newId, title: newName });
+        this.activeId = newId;
+        this.render();
+      }
+    } catch (e) {
+      console.warn('[tabs] duplicate tab failed:', e);
+    }
+  }
+
+  async closeOtherTabs(keepId) {
+    const toClose = this.tabs.filter(t => t.id !== keepId).map(t => t.id);
+    for (const id of toClose) {
+      this.cache.delete(id);
+    }
+    this.tabs = this.tabs.filter(t => t.id === keepId);
+    if (this.activeId !== keepId) {
+      await this.switchTab(keepId);
+    } else {
+      this.render();
     }
   }
 

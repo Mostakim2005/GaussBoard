@@ -1585,5 +1585,12 @@
   "Open board tabs": "打开的白板标签页",
   "New tab (Ctrl+T)": "新建标签页 (Ctrl+T)",
   "Could not load board": "无法加载白板",
-  "Close tab (Ctrl+W)": "关闭标签页 (Ctrl+W)"
+  "Close tab (Ctrl+W)": "关闭标签页 (Ctrl+W)",
+  "Open in new window": "在新窗口中打开",
+  "Read-only reference": "只读参考",
+  "Active editor": "活动编辑器",
+  "Take over editing": "接管编辑",
+  "Close other tabs": "关闭其他标签页",
+  "Duplicate tab": "复制标签页",
+  "Click to claim editing in this window": "点击接管此窗口的编辑权"
 }

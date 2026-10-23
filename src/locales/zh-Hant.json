@@ -1585,5 +1585,12 @@
   "Open board tabs": "開啟的白板分頁",
   "New tab (Ctrl+T)": "新增分頁 (Ctrl+T)",
   "Could not load board": "無法載入白板",
-  "Close tab (Ctrl+W)": "關閉分頁 (Ctrl+W)"
+  "Close tab (Ctrl+W)": "關閉分頁 (Ctrl+W)",
+  "Open in new window": "在新視窗中開啟",
+  "Read-only reference": "唯讀參考",
+  "Active editor": "使用中編輯器",
+  "Take over editing": "接管編輯",
+  "Close other tabs": "關閉其他分頁",
+  "Duplicate tab": "複製分頁",
+  "Click to claim editing in this window": "點擊接管此視窗的編輯權"
 }
