@@ -19,6 +19,8 @@ const P = {
   shapes: 'M4 13h7v7H4zM15.5 4l5 8h-10z',
   insert: 'M12 5v14M5 12h14',
   image: 'M4 5h16v14H4zM4 15l4.5-4.5 3.5 3.5 3-3L20 16M9 9.2a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 0 1 2.4 0z',
+  video: 'M4 6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2l4-2.5v9L16 12v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6zm6 2v4l3.5-2L10 8z',
+  compress: 'M4 14h6v6M10 14L3 21M20 10h-6V4M14 10l7-7',
   doc: 'M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 15.5h6M9 9h3',
   template: 'M4 5h16v5H4zM4 12h7v7H4zM13 12h7v7h-7z',
   ruler: 'M3.5 14.5l11-11 6 6-11 11zM7 11l1.8 1.8M9.8 8.2l1.8 1.8M12.6 5.4l1.8 1.8',

@@ -2580,6 +2580,7 @@ class App {
       case 'insert.boardlink': this.pickBoardLink(); break;
       case 'insert.markdown': this.insertMarkdownCard(); break;
       case 'insert.diagram': this.openVisualizationStudio(); break;
+      case 'insert.video': this.openVideoInsertDialog(); break;
       case 'page.margin': this.openPageMarginDialog(); break;
       case 'board.back': this.goBack(); break;
       case 'curtain.reveal': this.revealSelectedCurtains(); break;
@@ -3016,6 +3017,26 @@ class App {
   openPageMarginDialog() {
     import('./ui/pagemargin-dialog.js').then((m) => {
       new m.PageMarginDialog(this).open();
+    });
+  }
+
+  openVideoInsertDialog() {
+    import('./ui/video-dialog.js').then((m) => {
+      m.openVideoInsertDialog(this);
+    });
+  }
+
+  openVideoPlayer(videoObj) {
+    if (!videoObj) return;
+    import('./ui/video-dialog.js').then((m) => {
+      new m.VideoPlayerDialog(this, videoObj).open();
+    });
+  }
+
+  openImageCompressDialog(imgObj) {
+    if (!imgObj) return;
+    import('./ui/compression-dialog.js').then((m) => {
+      m.openImageCompressDialog(this, imgObj);
     });
   }
 

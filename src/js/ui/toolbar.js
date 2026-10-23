@@ -237,6 +237,7 @@ export function getPinMetadata(app) {
   return {
     'insert.markdown': { icon: 'text', title: t('Insert Markdown note'), onClick: () => app.insertMarkdownCard?.() },
     'insert.diagram': { icon: 'shapes', title: t('Diagram & Chart Studio'), onClick: () => app.openVisualizationStudio?.() },
+    'insert.video': { icon: 'video', title: t('Video / YouTube'), onClick: () => app.openVideoInsertDialog?.() },
     'page.margin': { icon: 'palette', title: t('Page margins'), onClick: () => app.openPageMarginDialog?.() },
     'insert.image': { icon: 'image', title: t('Insert image'), onClick: () => app.command('insert.image') },
     'insert.audio': { icon: 'audio', title: t('Insert audio or recording'), onClick: () => app.command('insert.audio') },
@@ -451,6 +452,7 @@ function initPhoneToolbar(app, bar) {
       h('div', { class: 'menu-sep' }),
       menuItem(t('Markdown note…'), 'text', () => app.insertMarkdownCard?.()),
       menuItem(t('Picture…'), 'image', () => app.command('insert.image')),
+      menuItem(t('Video / YouTube…'), 'video', () => app.openVideoInsertDialog?.()),
       menuItem(t('Document (Word, PowerPoint, PDF)…'), 'doc', () => app.command('insert.document')),
       menuItem(t('Table'), 'table', () => app.command('insert.table')),
       menuItem(t('Answer cover'), 'curtain', () => app.command('insert.curtain')),
@@ -1572,6 +1574,7 @@ export function openInsertPopover(app, anchor) {
     h('div', { class: 'menu-title', style: 'padding:4px 8px;font-size:11px;font-weight:700;color:var(--text-3,rgba(128,128,128,0.7));text-transform:uppercase;letter-spacing:0.5px;' }, t('Insert objects')),
     insertItem(t('Markdown note…'), 'text', () => app.insertMarkdownCard?.(), 'insert.markdown'),
     insertItem(t('Diagram & Chart Studio…'), 'shapes', () => app.openVisualizationStudio?.(), 'insert.diagram'),
+    insertItem(t('Video / YouTube…'), 'video', () => app.openVideoInsertDialog?.(), 'insert.video'),
     insertItem(t('Page margins…'), 'palette', () => app.openPageMarginDialog?.(), 'page.margin'),
     insertItem(t('Image…'), 'image', () => app.command('insert.image'), 'insert.image'),
     insertItem(t('Audio / Recording…'), 'audio', () => app.command('insert.audio'), 'insert.audio'),

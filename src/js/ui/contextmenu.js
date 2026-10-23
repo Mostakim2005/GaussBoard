@@ -127,6 +127,7 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(item(t('Insert maths'), 'maths', () => app.command('insert.math')));
     menu.appendChild(item(t('Insert document…'), 'doc', () => app.command('insert.document')));
     menu.appendChild(item(t('Insert diagram…'), 'shapes', () => app.openVisualizationStudio?.()));
+    menu.appendChild(item(t('Insert video / YouTube…'), 'video', () => app.openVideoInsertDialog?.()));
     menu.appendChild(h('div', { class: 'menu-sep' }));
     menu.appendChild(item(t('Templates…'), 'template', () => app.panels.templates()));
     menu.appendChild(item(t('Canvas…'), 'palette', () => app.panels.background()));
@@ -362,6 +363,12 @@ export function updateSelectionBar(app, targetObj = null) {
     }));
   }
 
+  if (sel.length === 1 && sel[0].type === 'video') {
+    const vid = sel[0];
+    bar.appendChild(mk(t('Play video'), 'video', () => app.openVideoPlayer?.(vid)));
+    bar.appendChild(mk(t('Bookmark timestamp…'), 'audio', () => app.openVideoPlayer?.(vid)));
+  }
+
   if (sel.length === 1 && sel[0].type === 'image') {
     const imgObj = sel[0];
     if (imgObj.excerptSource?.boardId) {
@@ -369,6 +376,7 @@ export function updateSelectionBar(app, targetObj = null) {
     }
     bar.appendChild(mk(t('Crop image'), 'crop', () => startImageCrop(app, imgObj)));
     bar.appendChild(mk(t('Annotate image'), 'pen', () => startImageAnnotate(app, imgObj)));
+    bar.appendChild(mk(t('Compress image…'), 'compress', () => app.openImageCompressDialog?.(imgObj)));
   }
 
   // a table gets its own row and column controls

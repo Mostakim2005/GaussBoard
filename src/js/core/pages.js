@@ -13,12 +13,31 @@
 export const PAGE_GAP = 56;        // world units of desk between sheets
 
 /**
- * World rectangles for every sheet, top to bottom.
+ * World rectangles for every sheet, top to bottom (or 2-page spread).
  * @param {Array<{w:number,h:number}>} pages
+ * @param {string} [layout]
  * @returns {Array<{x:number,y:number,w:number,h:number}>}
  */
-export function pageRects(pages) {
+export function pageRects(pages, layout = 'vertical') {
   if (!pages || !pages.length) return [];
+  const effectiveLayout = layout === 'spread' || pages?._layout === 'spread' ? 'spread' : 'vertical';
+  if (effectiveLayout === 'spread') {
+    const out = [];
+    let top = -pages[0].h / 2;
+    for (let i = 0; i < pages.length; i += 2) {
+      const p1 = pages[i];
+      const p2 = pages[i + 1];
+      const maxH = p2 ? Math.max(p1.h, p2.h) : p1.h;
+      if (!p2) {
+        out.push({ x: -p1.w / 2, y: top, w: p1.w, h: p1.h });
+      } else {
+        out.push({ x: -p1.w - PAGE_GAP / 2, y: top, w: p1.w, h: p1.h });
+        out.push({ x: PAGE_GAP / 2, y: top, w: p2.w, h: p2.h });
+      }
+      top += maxH + PAGE_GAP;
+    }
+    return out;
+  }
   const out = [];
   let top = -pages[0].h / 2;
   for (const p of pages) {

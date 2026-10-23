@@ -1348,6 +1348,7 @@ export function drawObject(ctx, o, onload, editing = null) {
     case 'boardlink': drawBoardLink(ctx, o, onload); break;
     case 'audio': drawAudioCard(ctx, o); break;
     case 'diagram': drawDiagram(ctx, o, onload); break;
+    case 'video': drawVideoCard(ctx, o, onload); break;
   }
   ctx.restore();
 }
@@ -1473,6 +1474,73 @@ export function drawAudioCard(ctx, o) {
   const m = Math.floor(totalSec / 60), s = totalSec % 60;
   const timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   ctx.fillText(`🎙️ ${timeStr}`, x + 56, y + h / 2 + 10);
+
+  ctx.restore();
+}
+
+export function drawVideoCard(ctx, o, onload) {
+  const { x, y, w, h } = o;
+  if (w <= 0 || h <= 0) return;
+  const dark = darkBoard;
+  const r = Math.min(14, Math.min(w, h) * 0.05);
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.18)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = dark ? '#1b1f24' : '#ffffff';
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = dark ? '#30363d' : '#d0d7de';
+  ctx.stroke();
+
+  const thumbH = Math.max(30, h - 56);
+  if (o.thumb) {
+    const img = image(o.thumb, onload);
+    if (img && img.naturalWidth) {
+      ctx.save();
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x + 6, y + 6, w - 12, thumbH, Math.max(4, r - 4));
+      else ctx.rect(x + 6, y + 6, w - 12, thumbH);
+      ctx.clip();
+      ctx.drawImage(img, x + 6, y + 6, w - 12, thumbH);
+      ctx.restore();
+    }
+  }
+
+  const cx = x + w / 2, cy = y + 6 + thumbH / 2, pr = Math.min(24, thumbH * 0.25);
+  ctx.fillStyle = o.videoType === 'youtube' ? 'rgba(255, 0, 0, 0.88)' : 'rgba(0, 120, 212, 0.88)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, pr, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(cx - pr * 0.35, cy - pr * 0.5);
+  ctx.lineTo(cx + pr * 0.55, cy);
+  ctx.lineTo(cx - pr * 0.35, cy + pr * 0.5);
+  ctx.closePath();
+  ctx.fill();
+
+  const badgeText = o.videoType === 'youtube' ? 'YouTube' : 'Video';
+  ctx.fillStyle = o.videoType === 'youtube' ? '#ff0000' : (dark ? '#00e5ff' : '#0078d4');
+  ctx.font = '700 11px ' + FONT;
+  ctx.fillText(badgeText, x + 12, y + 22);
+
+  ctx.fillStyle = dark ? '#f0f6fc' : '#1f2328';
+  ctx.font = '600 13px ' + FONT;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const title = o.title || (o.videoType === 'youtube' ? 'YouTube Video' : 'Video');
+  ctx.fillText(title, x + 12, y + h - 34, Math.max(40, w - 24));
+
+  const bms = Array.isArray(o.bookmarks) ? o.bookmarks : [];
+  ctx.fillStyle = dark ? '#8b949e' : '#656d76';
+  ctx.font = '500 11px ' + FONT;
+  const bmText = bms.length ? ('🔖 ' + bms.length + (bms.length > 1 ? ' bookmarks' : ' bookmark')) : '▶ Click to play';
+  ctx.fillText(bmText, x + 12, y + h - 16);
 
   ctx.restore();
 }

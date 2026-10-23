@@ -34,7 +34,7 @@ export async function showLibraryInspector(app) {
     { id: 'mammoth', name: 'Mammoth', version: '1.8.0', category: 'Document Conversion', status: 'ready', bundledInApp: true, bundledPath: 'src/vendor/mammoth.browser.min.js' },
     { id: 'mermaid', name: 'Mermaid.js', version: '10.9.1', category: 'Diagrams & Mind Maps', status: 'ready', bundledInApp: false, sharedPath: 'C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\mermaid\\mermaid.min.js' },
     { id: 'chartjs', name: 'Chart.js', version: '4.4.7', category: 'Charts & Visualizations', status: 'ready', bundledInApp: false, sharedPath: 'C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\chartjs\\chart.umd.min.js' },
-    { id: 'pdf-lib', name: 'pdf-lib', version: '1.17.1', category: 'PDF Metadata & Vector Annotations', status: 'ready', bundledInApp: false, sharedPath: 'C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdf-lib\\pdf-lib.min.js' }
+    { id: 'pdf-lib', name: 'pdf-lib', version: '1.17.1', category: 'PDF Metadata & Vector Annotations', status: 'ready', bundledInApp: true, bundledPath: 'src/vendor/pdf-lib.min.js' }
   ];
 
   const rootPath = manifest?.rootPath || 'C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries';

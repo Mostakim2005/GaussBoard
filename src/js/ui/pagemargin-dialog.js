@@ -101,6 +101,7 @@ export class PageMarginDialog {
     });
 
     if (this.app.store) {
+      pages._layout = this.spreadToggle?.checked ? 'spread' : 'vertical';
       const ops = [this.app.store.pagesOp(pages)];
       if (this.color && this.app.store.doc.background) {
         const before = { ...this.app.store.doc.background };
@@ -191,6 +192,7 @@ export class PageMarginDialog {
     const templates = [
       { id: 'standard', title: t('Standard (Equal)'), m: { left: 40, right: 40, top: 40, bottom: 40 }, icon: '◻' },
       { id: 'cornell', title: t('Cornell (Wide Left)'), m: { left: 130, right: 30, top: 40, bottom: 40 }, icon: '▍◻' },
+      { id: 'turnout', title: t('Turnout Gutter (+160px)'), m: { left: 160, right: 40, top: 40, bottom: 40 }, icon: '◨' },
       { id: 'rightMargin', title: t('Wide Right'), m: { left: 30, right: 130, top: 40, bottom: 40 }, icon: '◻▍' },
       { id: 'topHeader', title: t('Top Header'), m: { left: 40, right: 40, top: 100, bottom: 40 }, icon: '▀◻' },
       { id: 'twoCol', title: t('Two Columns'), m: { left: 30, right: 30, top: 40, bottom: 40 }, icon: '▥' }
@@ -215,6 +217,17 @@ export class PageMarginDialog {
       )
     );
     card.appendChild(tplRow);
+
+    const spreadToggle = h('input', {
+      type: 'checkbox',
+      checked: this.app?.store?.doc?.pages?._layout === 'spread',
+      style: 'cursor:pointer;'
+    });
+    this.spreadToggle = spreadToggle;
+    const spreadRow = h('label', {
+      style: 'display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:13px;font-weight:600;'
+    }, h('span', {}, t('2-Page Book Spread (Reading View)')), spreadToggle);
+    card.appendChild(spreadRow);
 
     // 5. Interactive Visual Preview with 8 Draggable Blue Control Handles
     const previewContainer = h('div', {

@@ -38,8 +38,8 @@
       "description": "Mozilla PDF.js viewer components, TextLayerBuilder, AnnotationEditorLayer (native highlights, freetext, ink), and PDFFindController.",
       "license": "Apache-2.0",
       "homepage": "https://mozilla.github.io/pdf.js/",
-      "bundledInApp": false,
-      "bundledPath": null,
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/pdf_viewer.mjs",
       "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdfjs\\pdf_viewer.mjs",
       "status": "ready"
     },
@@ -51,8 +51,8 @@
       "description": "Pure JavaScript library to modify existing PDFs, expand page margins, edit metadata, and embed native annotations.",
       "license": "MIT",
       "homepage": "https://pdf-lib.js.org/",
-      "bundledInApp": false,
-      "bundledPath": null,
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/pdf-lib.min.js",
       "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdf-lib\\pdf-lib.min.js",
       "status": "ready"
     },
@@ -64,8 +64,8 @@
       "description": "Advanced font engine for pdf-lib allowing custom TTF/OTF/WOFF font embedding for non-Latin and equation annotations in PDFs.",
       "license": "Apache-2.0",
       "homepage": "https://github.com/Hopding/fontkit",
-      "bundledInApp": false,
-      "bundledPath": null,
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/fontkit.umd.min.js",
       "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\fontkit\\fontkit.umd.min.js",
       "status": "ready"
     },

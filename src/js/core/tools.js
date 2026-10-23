@@ -1945,6 +1945,12 @@ export class Interaction {
         return true;
       }
     }
+    const hitVideo = pick(this.store, p0, 8 / z);
+    if (hitVideo && hitVideo.type === 'video') {
+      this.discardTapMark();
+      this.app.openVideoPlayer?.(hitVideo);
+      return true;
+    }
     const hitAudio = pick(this.store, p0, 8 / z);
     if (hitAudio && hitAudio.type === 'audio') {
       this.discardTapMark();
@@ -2012,6 +2018,10 @@ export class Interaction {
     if (hit.type === 'audio') {
       const track = ((this.store || this.app.store)?.doc?.audioTracks || []).find((item) => item.id === hit.trackId);
       if (track) { this.app.audioBar?.open(track); this.app.audioBar?.togglePlay(); }
+      return;
+    }
+    if (hit.type === 'video') {
+      this.app.openVideoPlayer?.(hit);
       return;
     }
     const replay = this.app.replayEngine;
@@ -3102,6 +3112,10 @@ export class Interaction {
         this.app.audioBar?.open(tr);
         this.app.audioBar?.togglePlay();
       }
+      return;
+    }
+    if (hit.type === 'video') {
+      this.app.openVideoPlayer?.(hit);
       return;
     }
     // only the picking tools own selection chrome

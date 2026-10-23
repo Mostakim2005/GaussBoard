@@ -10,9 +10,17 @@
 import { h } from './popover.js';
 import { t } from '../i18n.js';
 import { toHtml, loadKatex } from '../core/maths.js';
+import {
+  latexToSymPy,
+  latexToMatlab,
+  latexToWolfram,
+  evalMathExpression,
+  generateMatrixTex,
+  generateCasesTex
+} from '../core/scientific-math.js';
 
 /*
- * The palette. Each entry is [what the button shows, the LaTeX it puts in].
+ * The palette. Each entry is [what the button shows, the LaTeX it puts in, optional shownTex].
  * In the LaTeX, @ is where the cursor lands afterwards - inside the first
  * empty box - and if some text was selected, that text goes there instead,
  * so selecting "x+1" and pressing the root button gives \sqrt{x+1}.
@@ -21,9 +29,23 @@ export const MATH_PALETTE = [
   { name: 'Structures', items: [
     ['a⁄b', '\\frac{@}{}'], ['√', '\\sqrt{@}'], ['ⁿ√', '\\sqrt[n]{@}'], ['x²', '^{@}', 'x^{2}'], ['xᵢ', '_{@}', 'x_{i}'],
     ['∑', '\\sum_{i=1}^{n} @', '\\sum'], ['∏', '\\prod_{i=1}^{n} @', '\\prod'], ['∫', '\\int_{a}^{b} @\\,dx', '\\int'], ['lim', '\\lim_{x \\to \\infty} @', '\\lim'],
-    ['log', '\\log_{2} @', '\\log_2'], ['( )', '\\left( @ \\right)'], ['⌊ ⌋', '\\lfloor @ \\rfloor'], ['⌈ ⌉', '\\lceil @ \\rceil'],
+    ['log', '\\log_{2} @', '\\log_2'], ['ln', '\\ln @', '\\ln'], ['( )', '\\left( @ \\right)'], ['⌊ ⌋', '\\lfloor @ \\rfloor'], ['⌈ ⌉', '\\lceil @ \\rceil'],
     ['[ ]', '\\begin{bmatrix} @ & \\\\ & \\end{bmatrix}', ''], ['{ cases', 'f(x) = \\begin{cases} @ & \\text{if } \\\\ & \\text{otherwise} \\end{cases}', ''],
     ['x̄', '\\bar{@}'], ['x⃗', '\\vec{@}'], ['abc', '\\text{@}']
+  ] },
+  { name: 'Calculus', items: [
+    ['∫ dx', '\\int @\\,dx', '\\int'], ['∫ₐᵇ', '\\int_{a}^{b} @\\,dx', '\\int'], ['∬', '\\iint @\\,dx\\,dy', '\\iint'], ['∮', '\\oint @\\,ds', '\\oint'],
+    ['d/dx', '\\frac{d}{dx}\\left( @ \\right)'], ['∂/∂x', '\\frac{\\partial}{\\partial x}\\left( @ \\right)'], ['d²/dx²', '\\frac{d^2}{dx^2}\\left( @ \\right)'],
+    ['∇', '\\nabla @'], ['∇²', '\\nabla^2 @'], ['lim₀', '\\lim_{x \\to 0} @'], ['lim_∞', '\\lim_{x \\to \\infty} @'],
+    ['∑₀^∞', '\\sum_{n=0}^{\\infty} @'], ['∏₁^∞', '\\prod_{n=1}^{\\infty} @'], ['dy/dx', '\\frac{dy}{dx}']
+  ] },
+  { name: 'LinearAlgebra', items: [
+    ['[2×2]', '\\begin{bmatrix} @ & \\\\ & \\end{bmatrix}', ''],
+    ['[3×3]', '\\begin{bmatrix} @ & & \\\\ & & \\\\ & & \\end{bmatrix}', ''],
+    ['det', '\\det\\left( @ \\right)'], ['|A|', '\\begin{vmatrix} @ & \\\\ & \\end{vmatrix}', ''],
+    ['A⁻¹', '@^{-1}'], ['Aᵀ', '@^{T}'], ['||v||', '\\| @ \\|'],
+    ['u·v', '\\vec{u} \\cdot \\vec{v}'], ['u×v', '\\vec{u} \\times \\vec{v}'],
+    ['col', '\\begin{bmatrix} @ \\\\  \\end{bmatrix}', ''], ['Iₙ', '\\mathbf{I}_{n}'], ['λ', '\\lambda']
   ] },
   { name: 'Greek', items: [
     ['α', '\\alpha'], ['β', '\\beta'], ['γ', '\\gamma'], ['δ', '\\delta'], ['ε', '\\epsilon'], ['θ', '\\theta'], ['λ', '\\lambda'],
@@ -35,11 +57,23 @@ export const MATH_PALETTE = [
     ['≡', '\\equiv'], ['∞', '\\infty'], ['→', '\\to'], ['⇒', '\\Rightarrow'], ['⇔', '\\Leftrightarrow'], ['∈', '\\in'], ['∉', '\\notin'],
     ['⊂', '\\subset'], ['⊆', '\\subseteq'], ['∪', '\\cup'], ['∩', '\\cap'], ['∅', '\\emptyset'], ['∀', '\\forall'], ['∃', '\\exists'],
     ['¬', '\\neg'], ['∧', '\\land'], ['∨', '\\lor'], ['∂', '\\partial'], ['∇', '\\nabla'], ['°', '^{\\circ}'], ['…', '\\ldots'],
-    ['O(n)', 'O(@)'], ['Θ(n)', '\\Theta(@)'], ['ℝ', '\\mathbb{R}'], ['ℕ', '\\mathbb{N}'], ['ℤ', '\\mathbb{Z}']
+    ['O(n)', 'O(@)'], ['Θ(n)', '\\Theta(@)'], ['ℝ', '\\mathbb{R}'], ['ℕ', '\\mathbb{N}'], ['ℤ', '\\mathbb{Z}'], ['ℂ', '\\mathbb{C}']
+  ] },
+  { name: 'PhysicsStats', items: [
+    ['ħ', '\\hbar'], ['c', 'c'], ['G', 'G'], ['k_B', 'k_B'], ['μ', '\\mu'], ['σ', '\\sigma'], ['σ²', '\\sigma^2'],
+    ['x̄', '\\bar{x}'], ['P(A)', 'P(@)'], ['P(A|B)', 'P(@ \\mid B)'], ['N(μ,σ²)', '\\mathcal{N}(\\mu, \\sigma^2)'],
+    ['Δt', '\\Delta t'], ['Δx', '\\Delta x']
   ] }
 ];
 
-const GROUP_LABEL = { Structures: () => t('Structures'), Greek: () => t('Greek'), Symbols: () => t('Symbols') };
+const GROUP_LABEL = {
+  Structures: () => t('Structures'),
+  Calculus: () => t('Calculus'),
+  LinearAlgebra: () => t('Linear Algebra'),
+  Greek: () => t('Greek'),
+  Symbols: () => t('Symbols'),
+  PhysicsStats: () => t('Physics & Stats')
+};
 
 /** Put `tex` into a textarea at its selection, the way a palette button does. */
 export function insertTemplate(area, tex) {
@@ -86,23 +120,116 @@ export class MathEditor {
     area.value = this.original;
     const preview = h('div', { class: 'mx-preview', dir: 'ltr', 'aria-live': 'polite' });
     const error = h('div', { class: 'mx-error' });
+
+    // Scientific Studio Export & Evaluator Row
+    const studioRow = h('div', {
+      class: 'mx-studio-row',
+      style: 'display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin:4px 0;'
+    });
+
+    const btnMatrix = h('button', {
+      type: 'button',
+      class: 'btn',
+      style: 'font-size:11px;padding:3px 8px;',
+      title: t('Insert custom matrix (e.g. 2x2, 3x3)')
+    }, '⊞ ' + t('Matrix…'));
+    btnMatrix.addEventListener('click', () => {
+      const ask = prompt(t('Matrix dimensions (Rows x Columns), e.g. 2x2 or 3x3:'), '2x2');
+      if (!ask) return;
+      const parts = ask.toLowerCase().split('x').map((n) => parseInt(n.trim(), 10));
+      const r = parts[0] || 2, c = parts[1] || r;
+      const tex = generateMatrixTex(r, c);
+      area.focus();
+      insertTemplate(area, tex);
+    });
+
+    const btnSympy = h('button', {
+      type: 'button',
+      class: 'btn',
+      style: 'font-size:11px;padding:3px 8px;',
+      title: t('Copy Python / SymPy equivalent syntax')
+    }, '🐍 ' + t('SymPy'));
+    btnSympy.addEventListener('click', () => {
+      const sympy = latexToSymPy(area.value);
+      navigator.clipboard?.writeText?.(sympy);
+      app.toast(t('SymPy copied: {code}', { code: sympy }));
+    });
+
+    const btnMatlab = h('button', {
+      type: 'button',
+      class: 'btn',
+      style: 'font-size:11px;padding:3px 8px;',
+      title: t('Copy MATLAB / Octave equivalent syntax')
+    }, '📐 ' + t('MATLAB'));
+    btnMatlab.addEventListener('click', () => {
+      const matlab = latexToMatlab(area.value);
+      navigator.clipboard?.writeText?.(matlab);
+      app.toast(t('MATLAB copied: {code}', { code: matlab }));
+    });
+
+    const btnWolfram = h('button', {
+      type: 'button',
+      class: 'btn',
+      style: 'font-size:11px;padding:3px 8px;',
+      title: t('Copy Wolfram Alpha natural query')
+    }, '🐺 ' + t('Wolfram'));
+    btnWolfram.addEventListener('click', () => {
+      const wolfram = latexToWolfram(area.value);
+      navigator.clipboard?.writeText?.(wolfram);
+      app.toast(t('Wolfram query copied: {code}', { code: wolfram }));
+    });
+
+    const evalBadge = h('button', {
+      type: 'button',
+      class: 'btn',
+      style: 'font-size:11px;padding:3px 8px;display:none;background:var(--accent-subtle,rgba(0,120,212,0.12));color:var(--accent,#0078d4);font-weight:700;border:none;cursor:pointer;',
+      title: t('Click to append evaluated result')
+    });
+    evalBadge.addEventListener('click', () => {
+      if (evalBadge.dataset.val) {
+        area.focus();
+        insertTemplate(area, ' = ' + evalBadge.dataset.val);
+      }
+    });
+
+    studioRow.appendChild(h('div', { style: 'display:flex;gap:4px;align-items:center;flex-wrap:wrap;' }, btnMatrix, btnSympy, btnMatlab, btnWolfram));
+    studioRow.appendChild(evalBadge);
+
     let seq = 0;
     const show = async () => {
       const mine = ++seq;
       const tex = area.value;
-      if (!tex.trim()) { preview.innerHTML = ''; preview.appendChild(h('span', { class: 'mx-empty' }, t('The preview appears here'))); error.textContent = ''; return; }
+      if (!tex.trim()) {
+        preview.innerHTML = '';
+        preview.appendChild(h('span', { class: 'mx-empty' }, t('The preview appears here')));
+        error.textContent = '';
+        evalBadge.style.display = 'none';
+        return;
+      }
       try {
         const r = await toHtml(tex);
         if (mine !== seq) return;
         preview.innerHTML = r.html;
         error.textContent = r.error ? t('Not quite LaTeX yet: {why}', { why: r.error.replace(/^(ParseError:\s*)?KaTeX parse error:\s*/, '') }) : '';
+
+        // Safe quick arithmetic & elementary math evaluator
+        const evalRes = evalMathExpression(tex);
+        if (evalRes.ok) {
+          evalBadge.textContent = `= ${evalRes.result}`;
+          evalBadge.dataset.val = evalRes.result;
+          evalBadge.style.display = 'inline-block';
+        } else {
+          evalBadge.style.display = 'none';
+        }
       } catch {
-        if (mine === seq) error.textContent = t('Maths could not be loaded');
+        if (mine === seq) {
+          error.textContent = t('Maths could not be loaded');
+          evalBadge.style.display = 'none';
+        }
       }
     };
     let timer = null;
     // At most every 90ms while typing, so a fast typist still sees the preview keep up
-    // (waiting for a pause meant it stayed blank until they stopped).
     area.addEventListener('input', () => { if (!timer) timer = setTimeout(() => { timer = null; show(); }, 90); });
     area.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.cancel(); return; }
@@ -117,7 +244,7 @@ export class MathEditor {
       for (const [label, tex, shownTex] of g.items) {
         const b = h('button', { type: 'button', class: 'mx-key', title: tex.replace('@', '…'), 'data-tex': tex }, label);
         // The button shows the real thing, typeset, once KaTeX is here; the plain label stands in until then.
-        if (window.katex && g.name === 'Structures' && shownTex !== '') {
+        if (window.katex && (g.name === 'Structures' || g.name === 'Calculus' || g.name === 'LinearAlgebra') && shownTex !== '') {
           try {
             const shown = shownTex ?? tex.replace('@', 'x').replace(/\{\}/g, '{y}').replace('\\text{x}', '\\text{abc}');
             b.innerHTML = window.katex.renderToString(shown, { throwOnError: true, displayMode: false });
@@ -131,7 +258,8 @@ export class MathEditor {
       }
     };
     for (const g of MATH_PALETTE) {
-      const b = h('button', { type: 'button', class: 'mx-tab', role: 'tab', 'data-group': g.name }, GROUP_LABEL[g.name]());
+      const getLabel = GROUP_LABEL[g.name] || (() => g.name);
+      const b = h('button', { type: 'button', class: 'mx-tab', role: 'tab', 'data-group': g.name }, getLabel());
       b.addEventListener('pointerdown', (e) => e.preventDefault());
       b.addEventListener('click', () => showGroup(g));
       tabs.appendChild(b);
@@ -144,7 +272,7 @@ export class MathEditor {
 
     this.el = h('div', { class: 'math-editor', id: 'mathEditor', role: 'dialog', 'aria-label': t('Maths') },
       h('div', { class: 'mx-head' }, h('b', {}, t('Maths')), h('small', {}, t('Enter to finish · Shift+Enter for a new line · Esc to cancel'))),
-      area, preview, error, tabs, grid,
+      area, preview, error, studioRow, tabs, grid,
       h('div', { class: 'mx-actions' }, h('small', { class: 'mx-tip' }, t('Tip: in any text, $x^2$ puts maths in a sentence.')), cancel, done));
     this.area = area;
     document.getElementById('stage').appendChild(this.el);
