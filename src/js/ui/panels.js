@@ -1457,6 +1457,13 @@ export function createPanels(app) {
               () => s.theme || 'system',
               (v) => { s.theme = v; app.saveSettings(); rerender(); }),
             t('System follows whatever your computer or phone is set to, and changes with it. Light and Dark override that. Exports and printing are always on white paper, whichever you pick, so a board you share looks the same to everyone.')),
+          row(t('Show tab bar'),
+            mkToggle(() => s.showTabBar !== false, (v) => {
+              s.showTabBar = v;
+              app.tabBar?.toggleVisibility(v);
+              app.saveSettings();
+            }),
+            t('Show a Chrome-style tab bar at the top of the window for quick switching between multiple boards.')),
         ),
         h('div', { class: 'section' },
           h('h5', {}, t('Inking')),
@@ -1821,6 +1828,18 @@ export function createPanels(app) {
           h('button', { class: 'btn', style: 'width:100%;margin-bottom:8px', onclick: () => { app.command('board.open'); close(); } }, t('Open a board file…')),
           h('button', { class: 'btn', style: 'width:100%;margin-bottom:8px', onclick: () => { app.command('board.save'); close(); } }, t('Save a copy…')),
           h('button', { class: 'btn danger', style: 'width:100%', onclick: () => app.command('edit.clear') }, t('Clear this canvas'))
+        ),
+        h('div', { class: 'section' },
+          h('h5', {}, t('External Libraries & Engines')),
+          h('div', { style: 'font-size:12px;color:var(--text-2);line-height:1.6;margin-bottom:10px' },
+            t('Inspect loaded math, PDF, and diagram engines, version stamps, and shared C: repository paths.')),
+          h('button', {
+            class: 'btn',
+            style: 'width:100%;display:flex;align-items:center;justify-content:center;gap:6px;',
+            onclick: () => {
+              import('./library-inspector.js').then(m => m.showLibraryInspector(app));
+            }
+          }, h('span', {}, '📚'), h('span', {}, t('Inspect Runtime Libraries…')))
         ),
         h('div', { class: 'section' }, h('h5', {}, t('About')), info,
           h('p', { style: 'font-size:12px;color:var(--text-2);margin-top:10px;line-height:1.6' },

@@ -184,6 +184,8 @@ contextBridge.exposeInMainWorld('board', {
   saveDialog: (opts) => ipcRenderer.invoke('dialog:save', opts),
   showItem: (p) => ipcRenderer.invoke('shell:showItem', p),
   openBoardsFolder: () => ipcRenderer.invoke('shell:openBoards'),
+  openLibrariesFolder: () => ipcRenderer.invoke('shell:openCommonLibraries'),
+  loadLibrariesManifest: () => ipcRenderer.invoke('libraries:manifest'),
   storage: {
     get: () => ipcRenderer.invoke('storage:get'),
     choose: () => ipcRenderer.invoke('storage:choose'),

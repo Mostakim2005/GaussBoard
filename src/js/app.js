@@ -47,6 +47,7 @@ import { ReplayBar } from './ui/replay-bar.js';
 import { exportVideoFile } from './export-video.js';
 import { SearchDialog } from './ui/search-dialog.js';
 import { NoteOverviewDrawer } from './ui/note-overview.js';
+import { TabBar } from './ui/tabs.js';
 
 /** An id GazBoard itself would make: safe as a file name on every system, the phone included. */
 const plainBoardId = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id);
@@ -87,7 +88,7 @@ export const DEFAULT_SETTINGS = {
   inkToShape: false, holdToShape: true, pressure: true, wheelZoom: false, mouseWheelMode: 'zoom', enableHoverToolbar: true, hiddenRibbonTools: [], returnToSelect: true, autosave: true,
   scratchOut: true, scratchSensitivity: 'medium', inkEngine: 'default', smoothCamera: true, autoDimBarsWhileInking: true,
   replaySkipSilence: false, tapStrokeToSeek: true, splitSyncScroll: false,
-  showGroupOutlines: true,
+  showGroupOutlines: true, showTabBar: true,
   edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, laserColor: '#ff2d2d',
   penOpacityEnabled: false, penOpacity: 1, laserTrailDuration: 520, boardLinkThumb: true,
   brushColor: '#201f1e', brushWidth: 8, brushOpacity: 0.9, brushSoftness: 'medium', brushVelocityThinning: true,
@@ -291,6 +292,8 @@ class App {
     this.searchDialog = new SearchDialog(this);
     this.noteOverview = new NoteOverviewDrawer(this);
     this.replayBar = new ReplayBar(this);
+    this.tabBar = new TabBar(this);
+    if (typeof document !== 'undefined') this.tabBar.init();
     this.wireGlobalEvents();
     this.initDismissal();
     this.wireStore();
@@ -908,6 +911,7 @@ class App {
     this.syncBackPill();
     this.syncLinkedFrom();
     this.refreshBoardDirectory();
+    this.tabBar?.onBoardLoaded(this.store.doc.id, this.store.doc.name);
     // kept so callers (and the suite) can wait for the board to be on disk
     this.pendingWrite = silent ? Promise.resolve() : this.persist({ force: true });
   }
@@ -970,6 +974,7 @@ class App {
       this.newBoard(true, { folder: wasIn });          // silent: nobody asked for this board
       this.toast(t('Board deleted'));
     }
+    this.tabBar?.onBoardDeleted(id);
     return wasOpen;
   }
 
@@ -1104,6 +1109,7 @@ class App {
     if (!opts.silent) this.toast(t('Opened {name}', { name: this.store.doc.name }));
     if (!opts.noMigrationPrompt) this.checkStrayContent(data);
     this.refreshBoardDirectory();
+    this.tabBar?.onBoardLoaded(this.store.doc.id, this.store.doc.name);
     this.syncBackPill();
     // which boards link here: every other board is looked inside, so not while the app is still starting
     clearTimeout(this._linkedTimer);
@@ -2606,7 +2612,12 @@ class App {
           });
       case 'help.shortcuts': this.showShortcuts(); break;
       case 'help.about': this.showAbout(); break;
+      case 'help.libraries': import('./ui/library-inspector.js').then(m => m.showLibraryInspector(this)); break;
       case 'help.checkUpdates': this.checkForUpdates({ force: true, silent: false }); break;
+      case 'tab.new': this.tabBar?.newTab(); break;
+      case 'tab.close': this.tabBar?.closeActiveTab(); break;
+      case 'tab.next': this.tabBar?.nextTab(); break;
+      case 'tab.prev': this.tabBar?.prevTab(); break;
       default: break;
     }
     this.syncUI();
@@ -4445,7 +4456,10 @@ class App {
       [t('Lift an answer cover'), t('Tap it with the pen, a finger or the laser')],
       ['h', t('Files')],
       [t('New board'), 'Ctrl+N'], [t('Open board'), 'Ctrl+O'], [t('Save a copy'), 'Ctrl+S'],
-      [t('Insert image or document'), t('Drag a file onto the canvas')]
+      [t('Insert image or document'), t('Drag a file onto the canvas')],
+      ['h', t('Tabs & Boards')],
+      [t('New tab'), 'Ctrl+T'], [t('Close tab'), 'Ctrl+W'], [t('Next / previous tab'), 'Ctrl+Tab / Ctrl+Shift+Tab'],
+      [t('Jump to tab 1–9'), 'Ctrl+1–9']
     ];
     const grid = h('div', { class: 'sc-grid' });
     for (const [a, b] of rows) {
@@ -4547,8 +4561,15 @@ class App {
       card.appendChild(where);
     }
 
+    const inspectLibs = h('button', { class: 'btn' }, t('Runtime Libraries…'));
+    inspectLibs.addEventListener('click', () => {
+      this.dismissOverlay();
+      import('./ui/library-inspector.js').then(m => m.showLibraryInspector(this));
+    });
+
     card.appendChild(h('div', { class: 'actions' },
       check,
+      inspectLibs,
       h('button', { class: 'btn primary', onclick: () => this.dismissOverlay() }, t('Close'))));
     this.showOverlay();
   }
@@ -4965,6 +4986,22 @@ class App {
       if (k === 's') { e.preventDefault(); this.command('board.save'); return; }
       if (k === 'o') { e.preventDefault(); this.command('board.open'); return; }
       if (k === 'n') { e.preventDefault(); this.command('board.new'); return; }
+      if (k === 't') { e.preventDefault(); this.tabBar?.newTab(); return; }
+      if (k === 'w') { e.preventDefault(); this.tabBar?.closeActiveTab(); return; }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (e.shiftKey) this.tabBar?.prevTab();
+        else this.tabBar?.nextTab();
+        return;
+      }
+      if (k >= '1' && k <= '9') {
+        const idx = parseInt(k, 10) - 1;
+        if (this.tabBar?.tabs && this.tabBar.tabs[idx]) {
+          e.preventDefault();
+          this.tabBar.switchTab(this.tabBar.tabs[idx].id);
+          return;
+        }
+      }
       if (k === 'r') { e.preventDefault(); this.command('ruler'); return; }
       if (k === '0') { e.preventDefault(); this.command('zoomReset'); return; }
       if (k === '=' || k === '+') { e.preventDefault(); this.command('zoomIn'); return; }

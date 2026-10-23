@@ -170,6 +170,9 @@ function registerProtocol() {
     if (rel === '/' || rel === '') rel = '/index.html';
     const target = path.resolve(SRC, `.${rel}`);
     if (!isPathWithin(SRC, target)) return new Response('Forbidden', { status: 403 });
+    if (!fs.existsSync(target)) {
+      return new Response('Not Found', { status: 404 });
+    }
     return net.fetch(pathToFileURL(target).toString());
   });
 }
@@ -1309,6 +1312,36 @@ function ipc() {
     // openPath answers with an empty string on success and a reason on failure.
     if (err) { shell.showItemInFolder(dir); return false; }
     return true;
+  });
+  handleIpc('shell:openCommonLibraries', async () => {
+    const dir = path.join(os.homedir(), 'Documents', 'Antigravity', 'CommonLibraries');
+    try { await fsp.mkdir(dir, { recursive: true }); } catch { /* it is there, or it cannot be */ }
+    const err = await shell.openPath(dir);
+    if (err) { shell.showItemInFolder(dir); return false; }
+    return true;
+  });
+  handleIpc('libraries:manifest', async () => {
+    const commonPath = path.join(os.homedir(), 'Documents', 'Antigravity', 'CommonLibraries', 'libraries.json');
+    const localPath = path.join(SRC, 'vendor', 'libraries.json');
+    let manifest = null;
+    try {
+      if (fs.existsSync(commonPath)) {
+        manifest = JSON.parse(await fsp.readFile(commonPath, 'utf8'));
+      } else if (fs.existsSync(localPath)) {
+        manifest = JSON.parse(await fsp.readFile(localPath, 'utf8'));
+      }
+    } catch (e) {
+      console.warn('Failed reading libraries.json:', e);
+    }
+    if (!manifest) return null;
+    for (const lib of manifest.libraries || []) {
+      const sharedExists = lib.sharedPath && fs.existsSync(lib.sharedPath);
+      const bundledExists = lib.bundledPath && fs.existsSync(path.join(__dirname, lib.bundledPath));
+      lib.sharedExists = !!sharedExists;
+      lib.bundledExists = !!bundledExists;
+      lib.status = (bundledExists || sharedExists) ? 'ready' : 'available';
+    }
+    return manifest;
   });
   handleIpc('shell:openExternal', async (_e, url) => {
     // only ever our own releases page - never an arbitrary URL from the board

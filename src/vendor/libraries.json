@@ -1,0 +1,99 @@
+{
+  "manifestVersion": "1.0.0",
+  "rootPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries",
+  "updatedAt": "2026-10-23T17:52:00.000Z",
+  "description": "Central shared offline runtime libraries repository for GazBoard and Antigravity applications",
+  "libraries": [
+    {
+      "id": "katex",
+      "name": "KaTeX",
+      "version": "0.16.21",
+      "category": "Math & Formulas",
+      "description": "Fast math typesetting engine for TeX / LaTeX mathematical notations, equations, and structures.",
+      "license": "MIT",
+      "homepage": "https://katex.org/",
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/katex/katex.min.js",
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\katex\\katex.min.js",
+      "status": "ready"
+    },
+    {
+      "id": "pdfjs",
+      "name": "PDF.js",
+      "version": "4.10.38",
+      "category": "PDF Engine",
+      "description": "Mozilla PDF document parser, text layer extractor, and page rendering engine.",
+      "license": "Apache-2.0",
+      "homepage": "https://mozilla.github.io/pdf.js/",
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/pdf.min.mjs",
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdfjs\\pdf.min.mjs",
+      "status": "ready"
+    },
+    {
+      "id": "jszip",
+      "name": "JSZip",
+      "version": "3.10.1",
+      "category": "Packaging & Compression",
+      "description": "ZIP container creation, compression, and extraction for .gazboard single-file bundle packages.",
+      "license": "MIT / GPLv3",
+      "homepage": "https://stuk.github.io/jszip/",
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/jszip.min.js",
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\jszip\\jszip.min.js",
+      "status": "ready"
+    },
+    {
+      "id": "mammoth",
+      "name": "Mammoth .docx Converter",
+      "version": "1.8.0",
+      "category": "Document Conversion",
+      "description": "Converts Microsoft Word (.docx) documents into clean HTML and formatted cards.",
+      "license": "BSD-2-Clause",
+      "homepage": "https://github.com/mwilliamson/mammoth.js",
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/mammoth.browser.min.js",
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\mammoth\\mammoth.browser.min.js",
+      "status": "ready"
+    },
+    {
+      "id": "mermaid",
+      "name": "Mermaid.js",
+      "version": "10.9.1",
+      "category": "Diagrams & Mind Maps",
+      "description": "Flowcharts, sequence diagrams, state diagrams, mind maps, and decision trees.",
+      "license": "MIT",
+      "homepage": "https://mermaid.js.org/",
+      "bundledInApp": false,
+      "bundledPath": null,
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\mermaid\\mermaid.min.js",
+      "status": "ready"
+    },
+    {
+      "id": "chartjs",
+      "name": "Chart.js",
+      "version": "4.4.7",
+      "category": "Charts & Visualizations",
+      "description": "HTML5 Canvas charting engine for Radar/Spider, Bar, Line, Doughnut, and Scatter charts.",
+      "license": "MIT",
+      "homepage": "https://www.chartjs.org/",
+      "bundledInApp": false,
+      "bundledPath": null,
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\chartjs\\chart.umd.min.js",
+      "status": "ready"
+    },
+    {
+      "id": "pdf-lib",
+      "name": "pdf-lib",
+      "version": "1.17.1",
+      "category": "PDF Metadata & Vector Annotations",
+      "description": "Pure JavaScript library to create and modify PDF documents, edit metadata, and embed native PDF annotations.",
+      "license": "MIT",
+      "homepage": "https://pdf-lib.js.org/",
+      "bundledInApp": false,
+      "bundledPath": null,
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdf-lib\\pdf-lib.min.js",
+      "status": "ready"
+    }
+  ]
+}
