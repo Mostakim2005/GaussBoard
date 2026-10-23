@@ -126,6 +126,7 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(item(t('Insert image…'), 'image', () => app.command('insert.image')));
     menu.appendChild(item(t('Insert maths'), 'maths', () => app.command('insert.math')));
     menu.appendChild(item(t('Insert document…'), 'doc', () => app.command('insert.document')));
+    menu.appendChild(item(t('Insert diagram…'), 'shapes', () => app.openVisualizationStudio?.()));
     menu.appendChild(h('div', { class: 'menu-sep' }));
     menu.appendChild(item(t('Templates…'), 'template', () => app.panels.templates()));
     menu.appendChild(item(t('Canvas…'), 'palette', () => app.panels.background()));
@@ -135,6 +136,9 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
 
   if (one?.type === 'image' && one.excerptSource?.boardId) {
     menu.appendChild(item(t('Open source excerpt'), 'link', () => app.openExcerptSource(one)));
+  }
+  if (one?.type === 'diagram') {
+    menu.appendChild(item(t('Edit diagram…'), 'shapes', () => app.openVisualizationStudio?.(one)));
   }
   openPopover({ x: posX, y: posY }, menu, popOpts);
 }
@@ -339,6 +343,15 @@ export function updateSelectionBar(app, targetObj = null) {
   }
   if (sel.length === 1 && sel[0].type === 'math')
     bar.appendChild(mk(t('Edit maths (F2)'), 'maths', () => app.beginMathEdit(sel[0])));
+  if (sel.length === 1 && sel[0].type === 'diagram') {
+    const diag = sel[0];
+    bar.appendChild(mk(t('Edit diagram…'), 'shapes', () => app.openVisualizationStudio?.(diag)));
+    bar.appendChild(mk(diag.cardStyle === 'transparent' ? t('Card background') : t('Transparent background'), 'palette', () => {
+      const next = diag.cardStyle === 'transparent' ? 'white' : 'transparent';
+      app.store.update(diag.id, { cardStyle: next }, 'toggle diagram background');
+      app.surface.invalidate();
+    }));
+  }
   if (sel.length === 1 && sel[0].type === 'boardlink') {
     const card = sel[0];
     bar.appendChild(mk(t('Open the board'), 'board', () => app.openBoardRef(card.board)));

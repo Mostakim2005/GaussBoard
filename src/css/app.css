@@ -2259,3 +2259,811 @@ body.dark .gb-tab-menu-item:hover {
 body.dark .gb-tab-menu-divider {
   background: rgba(255, 255, 255, 0.1);
 }
+
+/* =================================================================== *
+ *  Diagram & Visualization Studio (Phase 3 v5.7.0)                   *
+ * =================================================================== */
+.viz-studio-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.viz-studio-dialog {
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  box-shadow: var(--shadow-3);
+  width: 100%;
+  max-width: 1220px;
+  height: 90vh;
+  max-height: 860px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--text);
+  font-family: inherit;
+  animation: vizZoomIn 0.16s ease-out;
+}
+
+@keyframes vizZoomIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.viz-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--stroke);
+  background: var(--surface-2);
+}
+
+.viz-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.viz-icon-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viz-title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.viz-subtitle {
+  font-size: 11.5px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
+.viz-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.viz-lib-tag {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--stroke);
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.viz-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.viz-close-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text);
+}
+
+.viz-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.viz-left-col {
+  width: 50%;
+  min-width: 440px;
+  border-right: 1px solid var(--stroke);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+}
+
+.viz-mode-tabs {
+  display: flex;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--stroke);
+  gap: 8px;
+}
+
+.viz-mode-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.viz-mode-btn:hover {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.viz-mode-btn.active {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--stroke);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.viz-tab-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.viz-builder-types {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--stroke);
+  padding-bottom: 10px;
+}
+
+.viz-btype-btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+
+.viz-btype-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.viz-orient-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.viz-pill-group {
+  display: inline-flex;
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.viz-pill-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.viz-pill-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.viz-steps-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.viz-step-card {
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  transition: border-color 0.15s;
+}
+
+.viz-step-card.step-valid {
+  border-left: 4px solid #10b981;
+}
+
+.viz-step-card.step-invalid {
+  border-left: 4px solid #ef4444;
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.viz-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.viz-step-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.badge-ok {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+}
+
+.badge-err {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+.viz-kind-select {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.viz-step-actions {
+  margin-left: auto;
+}
+
+.viz-del-step-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.viz-del-step-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.viz-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.viz-field-group label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.viz-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: all 0.15s;
+}
+
+.viz-input.input-valid {
+  border-color: #10b981;
+}
+
+.viz-input.input-invalid {
+  border-color: #ef4444;
+}
+
+.viz-input-err-msg {
+  font-size: 10.5px;
+  color: #dc2626;
+  margin-top: 2px;
+}
+
+.viz-decision-routes,
+.viz-route-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.route-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  min-width: 52px;
+  text-align: center;
+}
+
+.tag-yes { background: rgba(16, 185, 129, 0.15); color: #059669; }
+.tag-no { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+.tag-next { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
+
+.viz-route-select {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 11.5px;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.viz-add-step-btn {
+  width: 100%;
+  padding: 8px;
+  border: 1px dashed var(--stroke);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+
+.viz-add-step-btn:hover {
+  background: var(--surface-2);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.viz-validation-bar {
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--stroke);
+}
+
+.viz-val-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.viz-val-pill.val-ok {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.viz-val-pill.val-err {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.val-icon {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.val-line {
+  margin-left: auto;
+  font-family: monospace;
+  font-size: 10.5px;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* Code Panel */
+.viz-code-toolbar {
+  display: flex;
+  flex-direction: column;
+}
+
+.viz-textarea-wrap {
+  flex: 1;
+  min-height: 220px;
+  display: flex;
+}
+
+.viz-code-textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+  background: var(--surface);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.viz-ai-card {
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  margin-top: 10px;
+}
+
+.viz-ai-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.viz-ai-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.viz-ai-hint {
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.viz-ai-row {
+  display: flex;
+  gap: 8px;
+}
+
+.viz-ai-topic {
+  flex: 1;
+}
+
+.viz-ai-copy-btn {
+  white-space: nowrap;
+  font-size: 11.5px;
+  padding: 6px 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Right Column: Preview */
+.viz-right-col {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2);
+}
+
+.viz-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--stroke);
+  background: var(--surface);
+}
+
+.viz-preview-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.viz-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.viz-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.viz-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.viz-zoom-btn {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  padding: 2px 7px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.viz-zoom-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.viz-zoom-label {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 38px;
+  text-align: center;
+}
+
+.viz-preview-stage {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viz-preview-viewport {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.viz-preview-viewport.bg-card {
+  background: #ffffff;
+  color: #1f2328;
+  border: 1px solid #e1e4e8;
+}
+
+.viz-preview-viewport.bg-transparent {
+  background: repeating-conic-gradient(#e5e7eb 0% 25%, #ffffff 0% 50%) 50% / 16px 16px;
+  border: 1px dashed var(--stroke);
+}
+
+.viz-canvas-host {
+  transform-origin: center center;
+  transition: transform 0.15s ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+}
+
+.viz-canvas-host svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.viz-preview-err {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px;
+  gap: 8px;
+  max-width: 380px;
+}
+
+.viz-err-icon {
+  font-size: 28px;
+}
+
+.viz-err-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.viz-err-detail {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.viz-err-hint {
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: 4px;
+}
+
+/* Footer */
+.viz-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  border-top: 1px solid var(--stroke);
+  background: var(--surface-2);
+}
+
+.viz-footer-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.viz-title-input {
+  max-width: 320px;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--stroke);
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+
+.viz-dim-readout {
+  font-size: 11px;
+  color: var(--text-2);
+  font-family: monospace;
+}
+
+.viz-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.viz-btn {
+  padding: 7px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.viz-btn-secondary {
+  background: transparent;
+  border: 1px solid var(--stroke);
+  color: var(--text);
+}
+
+.viz-btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.viz-btn-primary {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+}
+
+.viz-btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Mindmap & Radar custom rows */
+.viz-mm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.viz-mm-indent-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.viz-mm-level-btn {
+  border: 1px solid var(--stroke);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.viz-mm-level-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 18px;
+  text-align: center;
+}
+
+.viz-dataset-card {
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  margin-bottom: 8px;
+}
+
+.viz-ds-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.viz-color-picker {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.viz-ds-name-input {
+  flex: 1;
+}
+
+.viz-cat-count-badge {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  margin-top: 3px;
+}

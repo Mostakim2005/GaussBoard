@@ -116,8 +116,8 @@
       "description": "Flowcharts, sequence diagrams, state diagrams, mind maps, and decision trees.",
       "license": "MIT",
       "homepage": "https://mermaid.js.org/",
-      "bundledInApp": false,
-      "bundledPath": null,
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/mermaid.min.js",
       "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\mermaid\\mermaid.min.js",
       "status": "ready"
     },
@@ -129,8 +129,8 @@
       "description": "HTML5 Canvas charting engine for Radar/Spider, Bar, Line, Doughnut, and Scatter charts.",
       "license": "MIT",
       "homepage": "https://www.chartjs.org/",
-      "bundledInApp": false,
-      "bundledPath": null,
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/chart.umd.min.js",
       "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\chartjs\\chart.umd.min.js",
       "status": "ready"
     }

@@ -1347,6 +1347,7 @@ export function drawObject(ctx, o, onload, editing = null) {
     case 'connector': drawConnector(ctx, o, (c) => inkPaint(c)); break;
     case 'boardlink': drawBoardLink(ctx, o, onload); break;
     case 'audio': drawAudioCard(ctx, o); break;
+    case 'diagram': drawDiagram(ctx, o, onload); break;
   }
   ctx.restore();
 }
@@ -1472,6 +1473,71 @@ export function drawAudioCard(ctx, o) {
   const m = Math.floor(totalSec / 60), s = totalSec % 60;
   const timeStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   ctx.fillText(`🎙️ ${timeStr}`, x + 56, y + h / 2 + 10);
+
+  ctx.restore();
+}
+
+export function drawDiagram(ctx, o, onload) {
+  const { x, y, w, h } = o;
+  if (w <= 0 || h <= 0) return;
+  const dark = darkBoard;
+  const isTransparent = o.cardStyle === 'transparent';
+
+  ctx.save();
+  if (!isTransparent) {
+    const r = Math.min(12, Math.min(w, h) * 0.04);
+    ctx.shadowColor = 'rgba(0,0,0,0.12)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 3;
+    ctx.fillStyle = dark ? '#22272e' : '#ffffff';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = dark ? '#444c56' : '#d0d7de';
+    ctx.stroke();
+  }
+
+  let titleH = 0;
+  if (o.title && !isTransparent) {
+    titleH = Math.min(26, h * 0.14);
+    ctx.fillStyle = dark ? '#adbac7' : '#57606a';
+    ctx.font = `600 ${Math.max(10, titleH * 0.55)}px ${FONT}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(o.title, x + 14, y + titleH / 2 + 4, Math.max(10, w - 28));
+
+    ctx.strokeStyle = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y + titleH + 4);
+    ctx.lineTo(x + w - 10, y + titleH + 4);
+    ctx.stroke();
+  }
+
+  if (o.dataUrl) {
+    const img = getImage(o.dataUrl, onload);
+    if (img) {
+      const pad = isTransparent ? 0 : 10;
+      const topOffset = titleH > 0 ? titleH + 8 : pad;
+      const targetW = Math.max(10, w - pad * 2);
+      const targetH = Math.max(10, h - topOffset - pad);
+      const iw = img.naturalWidth || img.width || targetW;
+      const ih = img.naturalHeight || img.height || targetH;
+      const scale = Math.min(targetW / iw, targetH / ih);
+      const dw = iw * scale, dh = ih * scale;
+      const dx = x + pad + (targetW - dw) / 2;
+      const dy = y + topOffset + (targetH - dh) / 2;
+      ctx.drawImage(img, dx, dy, dw, dh);
+    }
+  } else {
+    ctx.fillStyle = dark ? '#768390' : '#8c959f';
+    ctx.font = `500 13px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Diagram / Chart', x + w / 2, y + h / 2);
+  }
 
   ctx.restore();
 }

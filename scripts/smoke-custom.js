@@ -14,6 +14,7 @@ const runs = [
   ['Node protocol path security checks', ['--test', 'test/path-security.test.cjs']],
   ['Node multi-tab & common library checks', ['--test', 'test/tabs-and-libraries.test.mjs']],
   ['Node multi-window & lease checks', ['--test', 'test/multi-window.test.mjs']],
+  ['Node diagram & visualization checks', ['--test', 'test/diagrams.test.mjs']],
   ['Electron 4.8.4.1 audit checks', ['scripts/smoke.js', '--features-4.8.4.1']],
   ['Electron 4.8.8 custom-feature checks', ['scripts/smoke.js', '--features-4.8.8']],
   ['Electron 5.0.0 replay-mode checks', ['scripts/smoke.js', '--features-5.0.0']],

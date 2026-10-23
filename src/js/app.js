@@ -48,6 +48,7 @@ import { exportVideoFile } from './export-video.js';
 import { SearchDialog } from './ui/search-dialog.js';
 import { NoteOverviewDrawer } from './ui/note-overview.js';
 import { TabBar } from './ui/tabs.js';
+import { VisualizationDialog } from './ui/visualization-dialog.js';
 
 /** An id GazBoard itself would make: safe as a file name on every system, the phone included. */
 const plainBoardId = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id);
@@ -294,6 +295,7 @@ class App {
     this.replayBar = new ReplayBar(this);
     this.tabBar = new TabBar(this);
     if (typeof document !== 'undefined') this.tabBar.init();
+    this.visualizationStudio = new VisualizationDialog(this);
     this.initMultiWindowLease();
     this.wireGlobalEvents();
     this.initDismissal();
@@ -2469,7 +2471,7 @@ class App {
       'table.addRow', 'table.removeRow', 'table.addCol', 'table.removeCol',
       'order.front', 'order.back', 'order.forward', 'order.backward',
       'view.background', 'insert.image', 'insert.audio', 'insert.math', 'insert.document',
-      'insert.table', 'insert.curtain', 'insert.tape', 'insert.boardlink',
+      'insert.table', 'insert.curtain', 'insert.tape', 'insert.boardlink', 'insert.diagram',
       'curtain.reveal', 'curtain.coverAll', 'page.add', 'page.duplicate', 'page.delete', 'page.fitContent'
     ].includes(id)) return;
     const s = this.store, sf = this.surface;
@@ -2577,6 +2579,7 @@ class App {
       case 'insert.tape': this.addTape(); break;
       case 'insert.boardlink': this.pickBoardLink(); break;
       case 'insert.markdown': this.insertMarkdownCard(); break;
+      case 'insert.diagram': this.openVisualizationStudio(); break;
       case 'page.margin': this.openPageMarginDialog(); break;
       case 'board.back': this.goBack(); break;
       case 'curtain.reveal': this.revealSelectedCurtains(); break;
@@ -3003,6 +3006,11 @@ class App {
       return { arrowScale: next };
     }, 'arrow scale');
     this.surface.invalidate();
+  }
+
+  openVisualizationStudio(targetObj = null) {
+    if (!this.visualizationStudio) this.visualizationStudio = new VisualizationDialog(this);
+    this.visualizationStudio.open(targetObj);
   }
 
   openPageMarginDialog() {
