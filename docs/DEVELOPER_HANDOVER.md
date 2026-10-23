@@ -1,6 +1,6 @@
 # GazBoard Replay — Developer Handover & Future Agent Guide
 
-> **Current handover snapshot (2026-10-23):** v5.3.0 delivers a comprehensive post-4.8.1 codebase audit, fixes 12 root-cause bugs and memory leaks, optimizes live replay stroke path caching by 6.4x, and adds 5 toggleable lateral features (`holdToShape`, `replaySkipSilence`, `tapStrokeToSeek`, `splitSyncScroll`, `autoDimBarsWhileInking`). Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-5.3.0.md`](releases/RELEASE-5.3.0.md) for implementation, verification and artifact state. The v5.0.0 ranked audit is retained at [`releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](releases/AUDIT-POST-4.8.1-TO-5.0.0.md). The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
+> **Current handover snapshot (2026-10-23):** v5.4.0 completes Phase 1 of the architectural roadmap: cleanly merging safe upstream v4.8.2..v4.9.4 features and fixes (graphite pencil with audio-safe acoustic engine, pane-isolated mouse wheel page scrolling, _slideFrozen dynamic canvas blitting, board directory sync) while defending all 19 custom features and 6 Golden Invariants with 100% i18n parity and zero regression failures (1,240/1,240 smoke checks passed). Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-5.4.0.md`](releases/RELEASE-5.4.0.md) for implementation, verification and artifact state. The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
 
 > **Important**: This document is the primary onboarding manual for any future AI assistant, software engineer, or contributor picking up this project in a new session or clean environment. It details the complete architecture, data models, state flows, invariant guardrails, and build instructions.
 
@@ -22,10 +22,10 @@
 ## 1.1 Current Worktree and Release State (2026-10-23)
 
 - **Working repository:** `C:\Users\kazir\Documents\OpenCode\GazBoard`.
-- **Current source version:** v5.3.0, based on the local cumulative project feature line.
-- **Git state:** inspect `git status`, `git log`, and local tags at session start. The v5.3.0 tag is local; do not assume it has been pushed.
-- **Lineage:** local cumulative tags and upstream v4.9.0–v4.9.4 tags are on diverged histories. v5.3.0 continues the local line and is not a merge of upstream 4.9.x.
-- **Latest release scope:** [`releases/RELEASE-5.3.0.md`](releases/RELEASE-5.3.0.md) records the 12 root-cause bug fixes, 6.4x replay path cache optimization, 5 toggleable lateral features, verification counts and the portable artifact. The v5.0.0 dossier retains the previous feature audit.
+- **Current source version:** v5.4.0, based on the local cumulative project feature line.
+- **Git state:** branch `feat/cumulative-fixes`. Local release binary is `releases/GazBoard-v5.4.0-Portable.exe`.
+- **Lineage:** merges upstream v4.8.2..v4.9.4 features cleanly on top of the cumulative v5.3.0 feature line (with conscious exclusion of `Shift straight line` to protect Golden Invariant #2).
+- **Latest release scope:** [`releases/RELEASE-5.4.0.md`](releases/RELEASE-5.4.0.md) records the Phase 1 upstream sync, guarded pencil tool & acoustic engine, pane-isolated mouse wheel page scrolling, 100% i18n parity, and 1,240/1,240 passed smoke checks. Releases ledger is at [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md).
 - **Archive policy:** keep active work here. Use the user-configured durable archive only after a release has passed checks; do not copy to historical Antigravity paths from older records.
 - **Verification/build state:** focused audit tests and locale checks pass; see [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md) for the portable artifact hash, remaining npm advisories, and architectural follow-ups.
 - **Audit attribution supplied by the project owner:** initial audit — Codex 4.6 Medium in Cursor; secondary audit/fixes — GPT-6 Luna High using Codex.
