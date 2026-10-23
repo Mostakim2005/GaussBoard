@@ -14,6 +14,7 @@ import { Surface } from './surface.js';
 import { t, currentLanguage } from '../i18n.js';
 import { SHAPE_LABELS } from '../ui/palettes.js';
 import { route as connectorRoute, midPoint, bendThrough, targetAt, sameTarget, dotsFor, drawConnector, endBox } from './connectors.js';
+import * as PencilSound from './pencilsound.js';
 import { audioInkClock } from './replay-clock.js';
 import { handleWikilinkDoubleClick } from './boardrefs.js';
 
@@ -161,6 +162,7 @@ export class Interaction {
     this.cancelNibHide();
     this.cancelShapeHold();
     this.stopEdgePan();
+    PencilSound.stop();
     this.hideInkPointer();
     if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
   }
@@ -170,6 +172,7 @@ export class Interaction {
     this.cancelHold();
     this.cancelShapeHold();
     this.stopEdgePan();
+    PencilSound.stop();
     if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
     const pointerId = this.actionId;
     const capturedIds = [...this.pointers.keys()];
@@ -257,6 +260,29 @@ export class Interaction {
     return 0.5;
   }
 
+  /**
+   * How far over a stylus is lying, 0 (held upright, or not a stylus) to 1
+   * (flat on its side). Writing is usually done some way over already, so only
+   * a pencil tipped further than that counts: that is shading.
+   */
+  tilt(e) {
+    if (!e || e.pointerType !== 'pen') return 0;
+    let lying = 0;
+    if (typeof e.altitudeAngle === 'number' && e.altitudeAngle > 0 && e.altitudeAngle < Math.PI / 2 - 0.01) lying = 1 - e.altitudeAngle / (Math.PI / 2);
+    else if (e.tiltX || e.tiltY) lying = Math.min(1, Math.hypot(e.tiltX || 0, e.tiltY || 0) / 90);
+    return clamp((lying - 0.45) / 0.4, 0, 1);
+  }
+
+  /**
+   * Is audio being captured or played right now? The pencil's synthesized
+   * scratch must stay silent then: through a microphone it would be recorded
+   * into the lesson, and over a replay it would talk across the recording.
+   */
+  audioBusy() {
+    const rec = this.app.audioRecorder;
+    return !!((rec && (rec.isRecording || rec.state === 'recording')) || this.app.replayEngine?.active);
+  }
+
   /* ------------------------------------------------------------ */
   onDown(e) {
     if (e.button === 2) {
@@ -313,6 +339,7 @@ export class Interaction {
      * it once its owner is gone, so it is safe to let go of here.
      */
     if (this.action && this.actionId != null && !this.pointers.has(this.actionId)) {
+      PencilSound.stop();
       this.surface.wet = null;
       this.surface.wetPieces = null;
       this.action = null;
@@ -815,12 +842,21 @@ export class Interaction {
           offer({ ...wp, p: pressure, ...(curT != null ? { t: curT } : {}), ...tilt });
         }
 
+        if (a.obj.effect === 'pencil' && e) {
+          a.tiltSum = (a.tiltSum || 0) + this.tilt(e); a.tiltN = (a.tiltN || 0) + 1;
+          // never while audio is being recorded or replayed: see audioBusy()
+          if (this.audioBusy()) PencilSound.stop();
+          else PencilSound.move(e.clientX || 0, e.clientY || 0, undefined, this.pressure(e), this.tilt(e));
+          // the line widens as it is drawn, not only when the pencil lifts
+          const lying = a.tiltSum / a.tiltN;
+          if (lying > 0.05) a.obj.tilt = +lying.toFixed(2); else delete a.obj.tilt;
+        }
         if (added) {
           a.obj.bbox = bboxOfPoints(a.obj.points);
           if (a.heldShape && a.heldAt && dist(a.heldAt, wp) * this.surface.cam.z > 14) {
             a.heldShape = null;
           }
-          if (this.app?.settings?.holdToShape !== false && a.obj.tool === 'pen' && !a.ruled) {
+          if (this.app?.settings?.holdToShape !== false && a.obj.tool === 'pen' && a.obj.effect !== 'pencil' && !a.ruled) {
             this.armShapeHold(a, wp);
           }
         }
@@ -1817,6 +1853,13 @@ export class Interaction {
     const tilt = (e && typeof e.tiltX === 'number' && (e.tiltX !== 0 || e.tiltY !== 0)) ? { tiltX: e.tiltX, tiltY: e.tiltY } : {};
     const pt0 = this.snapToRuler({ ...wp, p: this.pressure(e), ...(t0 != null ? { t: t0 } : {}), ...tilt }, act);
     obj.points.push(pt0);
+    if (obj.effect === 'pencil' && e) {
+      act.tiltSum = this.tilt(e); act.tiltN = 1;
+      // the pencil's scratch never plays over a recording or a replay: see audioBusy()
+      if (s.pencilSound !== false && !this.audioBusy() && PencilSound.start(this.pressure(e))) {
+        PencilSound.move(e.clientX || 0, e.clientY || 0);
+      }
+    }
     this.surface.wet = obj;
     this.action = act;
     if (this.app?.settings?.autoDimBarsWhileInking !== false && typeof document !== 'undefined') {
@@ -1985,6 +2028,7 @@ export class Interaction {
    */
   discardTapMark() {
     this.cancelShapeHold();
+    PencilSound.stop();
     if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
     this.surface.wet = null;
     this.surface.wetPieces = null;
@@ -2043,8 +2087,14 @@ export class Interaction {
 
   finishStroke(a) {
     this.cancelShapeHold();
+    PencilSound.stop();
     if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
     const obj = a.obj;
+    // a pencil held on its side all the way through shades: kept on the stroke, so it draws that way everywhere
+    if (obj.effect === 'pencil' && a.tiltN) {
+      const tilt = +(a.tiltSum / a.tiltN).toFixed(2);
+      if (tilt > 0.05) obj.tilt = tilt;
+    }
     this.surface.wet = null;
     this.surface.wetPieces = null;
     if (obj.audioId) {
@@ -2073,6 +2123,7 @@ export class Interaction {
           o.attachedTo = this.lockedHostFor(o) || undefined;
         }
         if (obj.audioId) { o.audioId = obj.audioId; o.t0 = obj.t0; o.t1 = obj.t1; }
+        if (obj.tilt) o.tilt = obj.tilt;
         return o;
       };
       const all = a.pieces.map(tidy);
@@ -2134,7 +2185,7 @@ export class Interaction {
      */
     this.surface.extendFreeze?.(obj);
 
-    if ((this.app.settings.inkToShape || a.heldShape) && obj.tool === 'pen') {
+    if ((this.app.settings.inkToShape || a.heldShape) && obj.tool === 'pen' && obj.effect !== 'pencil') {
       const r = a.heldShape || recognize(obj.points);
       // classified AND actually shaped like the thing it was classified as
       const fit = r ? fitError(obj.points, r.kind, r) : 1;
@@ -2688,6 +2739,11 @@ export class Interaction {
     if (el.hidden) el.hidden = false;
   }
 
+  /** 'pencil' when the active pen is the pencil slot, 'pen' for the three pens. */
+  penKind() {
+    return this.app.settings.penEffect === 'pencil' ? 'pencil' : 'pen';
+  }
+
   /**
    * Put the nib layer under a screen point, tinted for the tool.
    *
@@ -2699,13 +2755,14 @@ export class Interaction {
   placeNib(el, sp, t) {
     const s = this.app.settings;
     const hl = t === 'highlighter';
+    const kind = hl ? 'highlighter' : (t === 'pen' ? this.penKind() : 'pen');
     const color = hl ? s.highlighterColor :
                   t === 'brush' ? (s.brushColor || s.penColor) :
                   t === 'fountain' ? (s.fountainColor || s.penColor) :
-                  t === 'calligraphy' ? (s.calligraphyColor || s.penColor) : s.penColor;
-    const url = inkGlyphUrl(hl ? 'highlighter' : 'pen', color);
+                  t === 'calligraphy' ? (s.calligraphyColor || s.penColor) : inkPaint(s.penColor);
+    const url = inkGlyphUrl(kind, color);
     if (this._nibUrl !== url) { this._nibUrl = url; el.style.backgroundImage = url; }
-    const hot = inkGlyphHotspot(hl ? 'highlighter' : 'pen');
+    const hot = inkGlyphHotspot(kind);
     el.style.transform = 'translate3d(' + Math.round(sp.x - hot.x) + 'px,'
       + Math.round(sp.y - hot.y) + 'px,0)';
   }
@@ -2713,11 +2770,13 @@ export class Interaction {
   /** The pen/highlighter cursor, tinted with the colour the tool is loaded with. */
   inkCursor(tool) {
     const s = this.app.settings;
-    const color = tool === 'highlighter' ? s.highlighterColor :
+    const hl = tool === 'highlighter';
+    const kind = hl ? 'highlighter' : (tool === 'pen' ? this.penKind() : 'pen');
+    const color = hl ? s.highlighterColor :
                   tool === 'brush' ? (s.brushColor || s.penColor) :
                   tool === 'fountain' ? (s.fountainColor || s.penColor) :
                   tool === 'calligraphy' ? (s.calligraphyColor || s.penColor) : inkPaint(s.penColor);
-    return inkCursor(tool === 'highlighter' ? 'highlighter' : 'pen', color);
+    return inkCursor(kind, color);
   }
 
   updateHover(sp, wp, deviceType = 'mouse') {
@@ -2866,22 +2925,33 @@ export class Interaction {
       return;
     }
     const dev = this.wheelDevice(e);
+    const store = this.store || this.app.store;
+    // On a pad of pages, turning a mouse wheel scrolls down the pad - which is
+    // what a wheel does on a page in every other app - and Ctrl+wheel zooms,
+    // strictly inside the window or split pane under the cursor.
+    const paged = (store?.pageCount || 0) > 0 && !this.app.settings.wheelZoom;
     const mode = this.app.settings.mouseWheelMode || (this.app.settings.wheelZoom ? 'zoom' : (dev === 'trackpad' ? 'scroll' : 'zoom'));
     let isZoom;
-    if (dev === 'trackpad') {
+    if (dev === 'trackpad' || paged) {
       isZoom = (e.ctrlKey || e.metaKey) || (this.app.settings.wheelZoom && !e.ctrlKey && !e.metaKey);
     } else {
       isZoom = (mode === 'zoom' && !e.ctrlKey && !e.metaKey) || (mode === 'scroll' && (e.ctrlKey || e.metaKey));
     }
     if (isZoom) {
       this.surface.cam.zoomAt(sp.x, sp.y, Math.exp(-e.deltaY * 0.002));
-    } else if (e.shiftKey) {
-      this.surface.cam.panBy(-e.deltaY, 0);
+      this.surface.clampCamera();
+      this.app.syncZoom();
     } else {
-      this.surface.cam.panBy(-e.deltaX, -e.deltaY);
+      // lines and pages (some mice, some systems) become pixels, about as far as a notch scrolls elsewhere
+      const unit = paged ? (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? this.surface.height * 0.9 : 1) : 1;
+      if (e.shiftKey) {
+        this.surface.cam.panBy(-e.deltaY * unit, 0);
+      } else {
+        this.surface.cam.panBy(-(e.deltaX || 0) * unit, -(e.deltaY || 0) * unit);
+      }
+      this.surface.clampCamera();
+      this.app.syncZoom();
     }
-    this.surface.clampCamera();
-    this.app.syncZoom();
     this.surface.invalidate();
   }
 
@@ -2965,6 +3035,7 @@ export class Interaction {
 
   startPinch() {
     this.cancelHold();
+    PencilSound.stop();
     if (this.action && this.action.type === 'draw') {
       this.surface.wet = null;
       this.surface.wetPieces = null;

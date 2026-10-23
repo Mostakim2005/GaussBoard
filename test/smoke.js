@@ -754,8 +754,8 @@ async function run(win, app) {
       hasImage: has('[data-cmd="insert.image"]'), penCount: PENS.length
     };
   `);
-  check('the toolbar has a pen tray', toolbar.pens === toolbar.penCount && toolbar.pens === 6,
-    toolbar.pens + ' pens');
+  check('the toolbar has a pen tray', toolbar.pens === toolbar.penCount && toolbar.pens === 7,
+    toolbar.pens + ' pens (wanted 7: six pens and the pencil)');
   check('picking a pen sets its colour', toolbar.afterRed.tool === 'pen' && toolbar.afterRed.color === '#e81123');
   check('the pen in hand is the raised one, and only it',
     toolbar.afterGalaxy.raised && toolbar.raisedCount === 1 && toolbar.afterGalaxy.effect === 'galaxy');
@@ -8697,7 +8697,7 @@ async function run(win, app) {
       && keys.hl === 'H' && keys.eraser === 'E' && keys.text === 'T' && keys.note === 'N' && keys.shape === 'S',
     JSON.stringify(keys));
   check('each pen wears its own number', keys.pen === '1' && keys.red === '2' && keys.galaxy === '6'
-    && keys.pensWithKeys === 6, JSON.stringify(keys));
+    && keys.pensWithKeys === 7, JSON.stringify(keys));
   check('a digit switches straight to that pen',
     keys.afterThree.tool === 'pen' && keys.afterThree.color === keys.afterThree.want,
     JSON.stringify(keys.afterThree));
@@ -10180,6 +10180,7 @@ async function run(win, app) {
     await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
     cam.z = 0.4; cam.x = 0; cam.y = 0;          // a lot of it on screen at once
     sf.invalidate(); sf.draw();
+    sf.noSlide = true;
 
     let froze = 0;
     const realFreeze = sf._freezeScene.bind(sf);
@@ -10276,6 +10277,7 @@ async function run(win, app) {
     r.currentAfterPans = !!sf._ink && sf._ink.key === sf.freezeKey();
 
     sf._freezeScene = realFreeze;
+    sf.noSlide = false;
     a.store.clear(); a.newBoard(true);
     a.settings.autosave = true;
     a.penSeenThisSession = false; a.setTool('select');
@@ -15874,9 +15876,16 @@ module.exports.run = async (win, app) => {
       document.querySelector('#boardList [data-folder]').click(); await new Promise((res) => setTimeout(res, 300));
       const out = { crumbs: [...document.querySelectorAll('#boardList .crumb')].map((c) => c.textContent).join(' › '),
         rows: [...document.querySelectorAll('#boardList [data-board]')].map((b) => b.dataset.board).join(',') };
+      const was = a.store.doc.id;
       [...document.querySelectorAll('#boardList button')].find((b) => /New board/.test(b.textContent)).click();
+      await new Promise((res) => setTimeout(res, 150));
+      // answer "New board?" - the board is made, and filed, only then
+      const create = [...document.querySelectorAll('#overlayCard button')].find((b) => b.textContent.trim() === 'Create');
+      out.asked = !!create && document.getElementById('overlay').classList.contains('show');
+      create && create.click();
       await new Promise((res) => setTimeout(res, 200));
-      out.newFiled = F.folderOf(a.settings, a.store.doc.id) === a.boardFolder && !!a.boardFolder;
+      out.newFiled = a.store.doc.id !== was && F.folderOf(a.settings, a.store.doc.id) === a.boardFolder && !!a.boardFolder;
+      out.wasLeft = F.folderOf(a.settings, was) !== a.boardFolder;
       out.newId = a.store.doc.id;
       return out;`);
     // Move to… from the top level
@@ -15906,8 +15915,8 @@ module.exports.run = async (win, app) => {
       dragged.filed === seed.folderId && !dragged.atTop && dragged.stillOpen && dragged.saved === seed.folderId,
       `filed in ${dragged.filed} (wanted ${seed.folderId}); still listed at the top ${dragged.atTop}; panel still open ${dragged.stillOpen}; written to settings ${dragged.saved}; dragged from ${JSON.stringify(from)} to ${JSON.stringify(to)} (both on screen: ${ends && ends.fromVisible && ends.toVisible})`);
     check('opening a folder shows the path back up, the boards in it, and new boards are made inside it',
-      inside.crumbs === 'My boards › CSE221' && inside.rows === 'fold-a' && inside.newFiled,
-      `path "${inside.crumbs}"; boards here [${inside.rows}]; new board ${inside.newId} filed here ${inside.newFiled}`);
+      inside.crumbs === 'My boards › CSE221' && inside.rows === 'fold-a' && inside.asked && inside.newFiled && inside.wasLeft,
+      `path "${inside.crumbs}"; boards here [${inside.rows}]; asked "New board?": ${inside.asked}; new board ${inside.newId} filed here ${inside.newFiled}; the board open before left where it was: ${inside.wasLeft}`);
     check('Move to… lists every folder, marks where the board is now, and files it where you pick',
       moved.button && moved.filed === seed.folderId && /^top\(here\),f/.test(moved.choices),
       `button found ${moved.button}; choices ${moved.choices}; fold-b now in ${moved.filed}`);

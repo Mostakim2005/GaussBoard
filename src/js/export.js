@@ -5,7 +5,7 @@ import { pageRects } from './core/pages.js';
 import { wrapText, boxesIntersect } from './core/util.js';
 import { objectRuns, layoutRich, effective, needsRich, chipColours, chipPad } from './core/richtext.js';
 import { layoutPages } from './ui/pdfdialog.js';
-import { FONT, faceOf, CURTAIN_COLOR, drawBoardLink, linkRectsOf, getImage, setDarkBoard, isDarkBoard } from './core/render.js';
+import { FONT, faceOf, CURTAIN_COLOR, drawBoardLink, linkRectsOf, getImage, setDarkBoard, isDarkBoard, pencilDarkness, pencilWidth } from './core/render.js';
 import { refLabel, refMissing, lookupBoard } from './core/boardrefs.js';
 import { Store } from './core/store.js';
 import { useConnectorStore } from './core/connectors.js';
@@ -248,7 +248,12 @@ function svgObjects(objects, meas) {
       } else {
         const d = o.points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
         const hl = o.tool === 'highlighter';
-        parts.push(`<path d="${d}" fill="none" stroke="${o.color}" stroke-width="${o.width}" stroke-linecap="round" stroke-linejoin="round"${hl ? ` opacity="${o.opacity ?? 0.38}"` : (o.opacity != null && o.opacity < 1 ? ` opacity="${o.opacity}"` : '')}${rot}/>`);
+        // a pencil line goes out as soft graphite: its width and darkness, without the grain an SVG cannot carry
+        const pencil = !hl && o.effect === 'pencil';
+        const op = hl ? (o.opacity ?? 0.38)
+          : pencil ? +(pencilDarkness(o) * (o.opacity ?? 1)).toFixed(2)
+          : (o.opacity != null && o.opacity < 1 ? o.opacity : null);
+        parts.push(`<path d="${d}" fill="none" stroke="${o.color}" stroke-width="${pencil ? +pencilWidth(o).toFixed(2) : o.width}" stroke-linecap="round" stroke-linejoin="round"${op != null ? ` opacity="${op}"` : ''}${rot}/>`);
       }
     } else if (o.type === 'connector') {
       parts.push(connectorSvg(o));
@@ -757,13 +762,17 @@ export async function saveBoardFile(app) {
   return filePath;
 }
 
-export async function openBoardFile(app) {
+/**
+ * @param {{folder?: string|null}} opts  folder: the My boards folder this was asked for from. A board that is
+ *   new to this computer is filed there; one it already had stays wherever it is.
+ */
+export async function openBoardFile(app, opts = {}) {
   const paths = await window.board.openDialog({
     title: t('Open a board'),
     properties: ['openFile'],
     filters: [{ name: t('GazBoard file'), extensions: ['gazboard', 'openboard', 'json'] }]
   });
-  if (!paths.length) return;
+  if (!paths || !paths.length) return false;
   const buf = await window.board.readFile(paths[0]);
   const bytes = new Uint8Array(buf);
   let data;
@@ -794,8 +803,12 @@ export async function openBoardFile(app) {
   let origin = paths[0];
   try { origin = (await window.board.fileOrigin?.(paths[0])) || paths[0]; } catch { /* keep the path */ }
   data.origin = origin;
+  let before = null;
+  if (opts.folder) { try { before = new Set(((await window.board.boards.list()) || []).map((b) => b.id)); } catch { before = null; } }
   await app.loadBoard(data, { asCopy: false });
+  if (before && !before.has(app.store.doc.id)) app.fileBoardIn?.(app.store.doc.id, opts.folder);
   app.toast(t('Opened {name}', { name: data.name || t('board') }));
+  return true;
 }
 
 export const safeName = (n) => String(n || 'board').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80).trim() || 'board';

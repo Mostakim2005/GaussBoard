@@ -5,10 +5,10 @@ import { openPopover, closePopover, h, isOpen } from './popover.js';
 import {
   PEN_COLORS, PEN_EFFECTS, HIGHLIGHTER_COLORS, NOTE_COLORS, TEXT_COLORS,
   SHAPE_STROKES, SHAPE_FILLS, SHAPES, SHAPE_LABELS, shapeIcon,
-  PENS, penList, penById, rememberPen, heldPenId, penIcon, FONTS
+  PENS, penList, penById, rememberPen, heldPenId, penIcon, FONTS, PENCIL_GRAPHITE
 } from './palettes.js';
 import { EMOJI_GROUPS, searchEmoji } from '../core/emoji.js';
-import { inkPaint } from '../core/render.js';
+import { inkPaint, isDarkBoard, isDarkColor } from '../core/render.js';
 import { t } from '../i18n.js';
 
 const TOOL_ICON = {
@@ -796,6 +796,8 @@ function swatchRow(colors, current, onPick, extra = []) {
      */
     const shown = inkPaint(c);
     b.style.background = shown;
+    // dark ink in the dark theme's dark menu (a light page keeps black ink black): a light edge keeps it findable
+    if (isDarkBoard() && isDarkColor(shown, 0.2)) b.classList.add('ink-edge');
     if (shown !== c) {
       b.classList.add('sw-adaptive');
       b.title = t('{c} — follows the board: light on dark, black on white and in exports', { c });
@@ -814,7 +816,7 @@ function sizeRow(sizes, current, onPick, color = '#201f1e') {
   for (const s of sizes) {
     const b = h('button', { class: 'size' + (s === current ? ' active' : ''), title: t('{s} px', { s }) });
     const dotSize = Math.max(4, Math.min(22, s));
-    b.innerHTML = `<i style="width:${dotSize}px;height:${dotSize}px;background:${dotColor}"></i>`;
+    b.innerHTML = `<i style="width:${dotSize}px;height:${dotSize}px;background:${dotColor}"${isDarkBoard() && isDarkColor(dotColor, 0.2) ? ' class="ink-edge"' : ''}></i>`;
     b.addEventListener('click', () => { markActive(wrap, b); onPick(s); });
     wrap.appendChild(b);
   }
@@ -943,9 +945,11 @@ function emojiPicker(app) {
  */
 export function pickPenInk(app, c) {
   const s = app.settings;
-  s.penColor = c; s.penEffect = 'none';
+  // a pencil given a new colour is a coloured pencil, still a pencil
+  const effect = s.penEffect === 'pencil' ? 'pencil' : 'none';
+  s.penColor = c; s.penEffect = effect;
   const held = heldPenId(s);
-  if (held) rememberPen(s, held, { color: c, effect: 'none' });
+  if (held) rememberPen(s, held, { color: c, effect });
   app.saveSettings(); app.syncUI();
 }
 
@@ -995,11 +999,15 @@ export function openToolPopover(app, anchor, tool) {
         b.style.fontSize = '12.5px';
         b.addEventListener('click', () => {
           markActive(effects, b, 'primary');
+          const crossing = (s.penEffect === 'pencil') !== (e.id === 'pencil');
           s.penEffect = e.id;
           const held = heldPenId(s);
           if (held) rememberPen(s, held, { color: s.penColor, effect: e.id });
           app.saveSettings();
           app.syncUI();
+          // becoming a pencil (or stopping being one) changes what the menu offers: graphite, the
+          // pencil sound, erase pencil marks. Built again, so it shows them now, not next time.
+          if (crossing && anchor) { closePopover(); openToolPopover(app, anchor, 'pen'); }
         });
         return b;
       })
@@ -1018,14 +1026,28 @@ export function openToolPopover(app, anchor, tool) {
     const customInk = h('label', { class: 'sw sw-custom', title: t('Any colour — used exactly as picked, whatever the theme') });
     const customInput = h('input', { type: 'color' });
     customInput.value = s.penColor || '#201f1e';
-    customInput.addEventListener('input', () => { customInk.style.background = customInput.value; pickInk(customInput.value); });
-    customInk.style.background = s.penColor || '#201f1e';
+    // a colour wheel with the ink in hand at its middle: it reads as "pick any colour", not as one
+    // more swatch that happens to match the first (graphite twice in the pencil's menu, black twice in a pen's)
+    // The two inks the theme repaints (default black, pencil graphite) are kept for the swatches. A colour
+    // picked here is "exactly as picked", so landing on one of them by hand moves it by one shade the eye
+    // cannot see, and it stays that colour in a dark theme too.
+    const asPicked = (c) => {
+      const lc = String(c).toLowerCase();
+      return lc === '#201f1e' ? '#201f1f' : lc === PENCIL_GRAPHITE ? '#4b4a49' : c;
+    };
+    customInput.addEventListener('input', () => {
+      const c = asPicked(customInput.value);
+      customInk.style.setProperty('--ink', inkPaint(c));
+      pickInk(c);
+    });
+    customInk.style.setProperty('--ink', inkPaint(s.penColor || '#201f1e'));
     customInk.appendChild(customInput);
 
     body = h('div', {},
       penTypeSwitcher('pen'),
       h('h4', {}, t('Ink colour')),
-      swatchRow(PEN_COLORS, s.penEffect === 'none' ? s.penColor : null, (c) => {
+      // a pencil offers its own graphite first, so a coloured pencil can always go back to plain lead
+      swatchRow(s.penEffect === 'pencil' ? [PENCIL_GRAPHITE, ...PEN_COLORS] : PEN_COLORS, s.penEffect === 'none' || s.penEffect === 'pencil' ? s.penColor : null, (c) => {
         pickInk(c); closePopover();
       }, [customInk]),
       h('div', { class: 'row', style: 'margin-top:12px' }, h('label', {}, t('Effect'))),
@@ -1045,7 +1067,17 @@ export function openToolPopover(app, anchor, tool) {
           app.toast(v ? t('Hold pen still at end of stroke to snap shape') : t('Hold-to-shape disabled'), 'pen');
         })),
       h('div', { class: 'row' },
-        toggle(t('Ruler snapping'), app.ruler.snap, (v) => { app.ruler.snap = v; }))
+        toggle(t('Ruler snapping'), app.ruler.snap, (v) => { app.ruler.snap = v; })),
+      ...(s.penEffect === 'pencil' ? [
+        h('div', { class: 'row' },
+          toggle(t('Pencil sound'), s.pencilSound !== false, (v) => { s.pencilSound = v; app.saveSettings(); })),
+        h('div', { class: 'row', style: 'margin-top:6px' }, (() => {
+          const b = h('button', { class: 'btn', 'data-erase-pencil': '' }, t('Erase pencil marks'));
+          b.title = t('Removes every pencil line on this board and keeps the ink');
+          b.addEventListener('click', () => { closePopover(); app.command('edit.erasePencil'); });
+          return b;
+        })())
+      ] : [])
     );
   } else if (tool === 'brush') {
     const curColor = s.brushColor || s.penColor || '#201f1e';
@@ -1268,7 +1300,16 @@ export function openToolPopover(app, anchor, tool) {
       h('div', { class: 'menu', style: 'padding:0' },
         mkMode('partial', t('Erase parts of ink'), t('Rubs strokes out where you drag')),
         mkMode('object', t('Erase whole strokes'), t('Removes a whole stroke in one touch')),
-        mkMode('all', t('Erase everything'), t('Clears the canvas'))),
+        mkMode('all', t('Erase everything'), t('Clears the canvas')),
+        (() => {
+          const b = h('button', { class: 'menu-item', 'data-erase-pencil': '' },
+            h('span', { style: 'display:flex;flex-direction:column;gap:2px;text-align:left' },
+              h('span', {}, t('Erase pencil marks')),
+              h('small', { style: 'color:var(--text-2);font-size:11.5px' }, t('Removes every pencil line on this board and keeps the ink'))));
+          b.style.alignItems = 'flex-start';
+          b.addEventListener('click', () => { closePopover(); app.command('edit.erasePencil'); });
+          return b;
+        })()),
       h('h4', { style: 'margin-top:14px' }, t('Gesture scratch-out')),
       h('div', { style: 'display:flex;align-items:center;justify-content:space-between;padding:4px 0;' },
         h('span', { style: 'font-size:12.5px;' }, t('Scribble over ink to erase')),

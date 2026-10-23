@@ -190,6 +190,35 @@ const deletableStorageCopies = new Map();
 const dataDir = () => activeDataDir || defaultDataDir();
 async function ensureDataDir() { await fsp.mkdir(dataDir(), { recursive: true }); }
 
+/*
+ * The board index (see boards:list): kept on this computer in the app's own folder, never in the
+ * boards folder, so a shared or synced boards folder gets no extra file and two computers never
+ * fight over it. One index per boards folder. Losing it costs nothing but one slower listing.
+ */
+const boardIndexes = new Map();
+const boardIndexFile = () => path.join(app.getPath('userData'), 'board-index.json');
+let boardIndexDisk = null;
+async function boardIndex(dir) {
+  if (boardIndexes.has(dir)) return boardIndexes.get(dir);
+  if (boardIndexDisk === null) {
+    try { boardIndexDisk = JSON.parse(await fsp.readFile(boardIndexFile(), 'utf8')); } catch { boardIndexDisk = {}; }
+    if (!boardIndexDisk || typeof boardIndexDisk !== 'object' || boardIndexDisk.version !== 1) boardIndexDisk = { version: 1, dirs: {} };
+  }
+  const idx = (boardIndexDisk.dirs[dir] && typeof boardIndexDisk.dirs[dir] === 'object') ? boardIndexDisk.dirs[dir] : {};
+  boardIndexes.set(dir, idx);
+  return idx;
+}
+let boardIndexTimer = null;
+function saveBoardIndex(dir, idx) {
+  boardIndexDisk.dirs[dir] = idx;
+  const keep = Object.keys(boardIndexDisk.dirs);
+  if (keep.length > 6) for (const d of keep.slice(0, keep.length - 6)) { if (d !== dir) delete boardIndexDisk.dirs[d]; }
+  clearTimeout(boardIndexTimer);
+  boardIndexTimer = setTimeout(() => {
+    writeAtomic(boardIndexFile(), JSON.stringify(boardIndexDisk)).catch(() => { /* next time */ });
+  }, 1500);
+}
+
 async function withStorageWrite(write) {
   while (storageWriteGate) await storageWriteGate;
   storageWriteCount++;
@@ -550,16 +579,42 @@ async function applyStorageLocation(target, mode, reset = false) {
 async function readLastBoard() {
   try { const raw = JSON.parse(await fsp.readFile(lastBoardFile(), 'utf8')); return raw && typeof raw === 'object' ? raw : {}; } catch { return {}; }
 }
-async function setLastBoard(id) {
+let lastBoardQueue = Promise.resolve();
+function setLastBoard(id, dir = dataDir()) {
+  const run = lastBoardQueue.then(async () => {
   try {
     const was = await readLastBoard();
     const byFolder = was.byFolder && typeof was.byFolder === 'object' ? { ...was.byFolder } : {};
-    if (id) byFolder[dataDir()] = id; else delete byFolder[dataDir()];
+    if (id) byFolder[dir] = id; else delete byFolder[dir];
     // a handful of folders is plenty; the oldest entries go first
     const keys = Object.keys(byFolder); for (const k of keys.slice(0, Math.max(0, keys.length - 20))) delete byFolder[k];
     await writeAtomic(lastBoardFile(), JSON.stringify({ id, at: Date.now(), byFolder }));
   } catch {}
+  });
+  lastBoardQueue = run;
+  return run;
 }
+let startupRead = null;
+function readLastBoardEarly() {
+  const dir = dataDir();
+  startupRead = { dir, done: (async () => {
+    try {
+      const id = await getLastBoard();
+      if (!id || /[\\/:*?"<>|\u0000-\u001f]/.test(id) || id.startsWith('.')) return null;
+      const text = await fsp.readFile(path.join(dir, id + '.json'), 'utf8');
+      startupMark(`last board read ahead (${Math.round(text.length / 1024)} KB)`);
+      return { id, text };
+    } catch { return null; }
+  })() };
+}
+async function takeEarlyRead(dir, id) {
+  const s = startupRead;
+  startupRead = null;
+  if (!s || s.dir !== dir) return null;
+  const got = await s.done;
+  return got && got.id === id ? got.text : null;
+}
+
 async function getLastBoard() {
   const raw = await readLastBoard();
   const here = raw.byFolder && typeof raw.byFolder === 'object' ? raw.byFolder[dataDir()] : undefined;
@@ -629,6 +684,7 @@ async function migrateLegacyData() {
  *  Windows
  * ------------------------------------------------------------------ */
 let mainWindow = null;
+let revealMainWindow = null;      // shows the main window and closes the starting-up one (createWindow sets it)
 const trustedConversionFiles = new WeakMap();
 let pendingOpen = null;
 /*
@@ -735,11 +791,23 @@ function createWindow() {
   });
   Menu.setApplicationMenu(buildMenu());
   mainWindow.loadURL('app://board/index.html');
-  mainWindow.once('ready-to-show', () => {
+  let shown = false;
+  const reveal = () => {
+    if (shown || !mainWindow || mainWindow.isDestroyed()) return;
+    shown = true;
     if (saved?.maximized) mainWindow.maximize();
     mainWindow.show();
     send('window:resized');
+    closeSplash();
+    startupMark('window shown');
+    setTimeout(() => { try { findSoffice(); } catch { /* not found is an answer too */ } }, 4000);
     if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
+  };
+  revealMainWindow = reveal;
+  mainWindow.once('ready-to-show', () => {
+    startupMark('page ready');
+    if (!splash) { reveal(); return; }
+    setTimeout(reveal, 6000);
   });
   mainWindow.webContents.once('did-finish-load', () => {
     if (pendingOpen) { send('board:open', pendingOpen); pendingOpen = null; }
@@ -1128,11 +1196,20 @@ function sync() {
  *  IPC
  * ------------------------------------------------------------------ */
 function ipc() {
+  // the page, as it starts: what it is opening (shown in the starting-up window), then that it is done
+  ipcMain.on('app:startupStep', (_e, text) => { startupMark('page: ' + String(text || '').slice(0, 120)); splashStatus(text); });
+  ipcMain.on('app:startupDone', (_e, info) => {
+    startupMark('board on screen');
+    if (revealMainWindow) revealMainWindow();
+    const o = info && typeof info === 'object' ? info : {};
+    writeStartupTimes({ 'page timings (ms since the page began)': JSON.stringify(o.page || {}) });
+  });
   handleIpc('app:info', async () => ({
     version: app.getVersion(), platform: process.platform,
     electron: process.versions.electron, chrome: process.versions.chrome, boardsDir: dataDir(),
     storage: await storageInfo(),
-    libreoffice: !!findSoffice(), sofficePath: findSoffice(), userData: app.getPath('userData'),
+    libreoffice: _soffice === undefined ? null : !!_soffice, sofficePath: _soffice || null, libreofficeKnown: _soffice !== undefined,
+    userData: app.getPath('userData'),
     // the suite drives the app headlessly; it must never be stopped by a
     // consent dialog, and it must never reach the network
     smoke: process.argv.includes('--smoke'),
@@ -1308,30 +1385,47 @@ function ipc() {
   /* --- board persistence --- */
   handleIpc('boards:list', async () => {
     await ensureDataDir();
-    const files = (await fsp.readdir(dataDir())).filter((f) => f.endsWith('.json'));
+    const dir = dataDir();
+    const files = (await fsp.readdir(dir)).filter((f) => f.endsWith('.json'));
+    const index = await boardIndex(dir);
+    const seen = new Set(files);
+    let changed = false;
     const out = [];
-    for (const f of files) {
+    const one = async (f) => {
       try {
-        const st = await fsp.stat(path.join(dataDir(), f));
-        const raw = JSON.parse(await fsp.readFile(path.join(dataDir(), f), 'utf8'));
-        if (!StorageLocation.isBoardFile(raw)) continue;      // some other program's .json: not a board
-        out.push({
+        const st = await fsp.stat(path.join(dir, f));
+        const was = index[f];
+        if (was && was.mtime === st.mtimeMs && was.size === st.size) {
+          if (was.meta) out.push({ ...was.meta, modified: st.mtimeMs });
+          return;
+        }
+        const raw = JSON.parse(await fsp.readFile(path.join(dir, f), 'utf8'));
+        changed = true;
+        if (!StorageLocation.isBoardFile(raw)) { index[f] = { mtime: st.mtimeMs, size: st.size, meta: null }; return; }
+        const meta = {
           id: raw.id || path.basename(f, '.json'),
           name: raw.name || raw.title || 'Untitled board',
-          modified: st.mtimeMs,
           objects: (raw.objects || []).length,
           thumb: raw.thumb || null,
           origin: raw.origin || null,
           properties: raw.properties || null,
           tags: raw.tags || raw.properties?.tags || null,
           aliases: raw.aliases || raw.properties?.aliases || null
-        });
+        };
+        index[f] = { mtime: st.mtimeMs, size: st.size, meta };
+        out.push({ ...meta, modified: st.mtimeMs });
       } catch {}
-    }
+    };
+    for (let i = 0; i < files.length; i += 6) await Promise.all(files.slice(i, i + 6).map(one));
+    for (const f of Object.keys(index)) if (!seen.has(f)) { delete index[f]; changed = true; }
+    if (changed) saveBoardIndex(dir, index);
     return out.sort((a, b) => b.modified - a.modified);
   });
+  const safeBoardId = (id) => typeof id === 'string' && id.length > 0 && id.length <= 200
+    && !/[\\/:*?"<>|\u0000-\u001f]/.test(id) && !id.startsWith('.') && id.trim() === id;
   handleIpc('boards:load', async (_e, id) => {
     await ensureDataDir();
+    if (!safeBoardId(id)) return null;
     try {
       const raw = JSON.parse(await fsp.readFile(path.join(dataDir(), id + '.json'), 'utf8'));
       return StorageLocation.isBoardFile(raw) ? raw : null;
@@ -1344,23 +1438,13 @@ function ipc() {
     const board = (payload && typeof payload.json === 'string')
       ? { id: payload.id, json: payload.json }
       : { id: payload.id, json: JSON.stringify(payload) };
-    /*
-     * Saving normally means "this is what I am working on", so it also moves
-     * the pointer that decides what reopens next time.
-     *
-     * setLast:false is for a board written on somebody else's behalf - one
-     * that arrived over the network and was filed without being opened. That
-     * must not become the board GazBoard shows on the next launch, or
-     * accepting a student's doodle in the background would quietly replace
-     * what the teacher was working on.
-     */
+    if (!safeBoardId(board.id)) return false;
     const moveLast = !(payload && payload.setLast === false);
-    // the board and the "last open" pointer are two separate files; there is no
-    // ordering between them, so they go out together rather than one after the
-    // other
+    const dir = dataDir();
+    if (boardIndexes.has(dir)) delete boardIndexes.get(dir)[board.id + '.json'];
     await Promise.all([
-      writeAtomic(path.join(dataDir(), board.id + '.json'), board.json),
-      moveLast ? setLastBoard(board.id) : Promise.resolve()
+      writeAtomic(path.join(dir, board.id + '.json'), board.json),
+      moveLast ? setLastBoard(board.id, dir) : Promise.resolve()
     ]);
     return true;
   }));
@@ -1559,7 +1643,8 @@ function ipc() {
    * the most recently touched one. Falling back to a blank canvas while the
    * user's work sits on disk is the one thing this must never do.
    */
-  handleIpc('boards:resume', async () => {
+  handleIpc('boards:resume', async (_e, opts) => {
+    const asText = !!(opts && opts.asText);
     await ensureDataDir();
     const read = async (id) => {
       try {
@@ -1569,8 +1654,16 @@ function ipc() {
     };
     const wanted = await getLastBoard();
     if (wanted) {
-      const doc = await read(wanted);
-      if (doc) return { board: doc, reason: 'pointer' };
+      let doc = null, text = null;
+      const asked = startupSteps.length && !startupSteps.some(([w]) => w === 'page asked for the last board');
+      if (asked) startupMark('page asked for the last board');
+      text = await takeEarlyRead(dataDir(), wanted);
+      if (text === null && /^[^\\/:*?"<>|\u0000-\u001f.][^\\/:*?"<>|\u0000-\u001f]*$/.test(wanted)) {
+        try { text = await fsp.readFile(path.join(dataDir(), wanted + '.json'), 'utf8'); } catch { text = null; }
+      }
+      if (text !== null) { try { const raw = JSON.parse(text); if (StorageLocation.isBoardFile(raw)) doc = raw; } catch { doc = null; } }
+      if (asked) startupMark('last board ready to hand over');
+      if (doc) return asText ? { json: text, reason: 'pointer' } : { board: doc, reason: 'pointer' };
     }
     // pointer missing or stale - fall back to the newest board that has anything in it
     const files = (await fsp.readdir(dataDir())).filter((f) => f.endsWith('.json'));
@@ -1595,17 +1688,9 @@ function ipc() {
   handleIpc('boards:delete', (_e, id) => withStorageWrite(async () => {
     let ok = false;
     const file = path.join(dataDir(), String(id) + '.json');
-    /*
-     * Only ever a board. The folder may be one the person also uses for other
-     * things, and a file that is not a board - or an id that would reach
-     * outside the folder - is never removed, whatever the page asked for.
-     */
     let isBoard = false;
-    try { isBoard = /^[A-Za-z0-9_-]{1,128}$/.test(String(id)) && StorageLocation.isBoardFile(JSON.parse(await fsp.readFile(file, 'utf8'))); } catch {}
+    try { isBoard = safeBoardId(id) && StorageLocation.isBoardFile(JSON.parse(await fsp.readFile(file, 'utf8'))); } catch {}
     if (isBoard) { try { await fsp.unlink(file); ok = true; } catch { ok = false; } }
-    // The "last open" pointer must not go on naming a board that no longer
-    // exists, or the next launch spends its first moments trying to open a
-    // deleted file before falling back.
     try { if (await getLastBoard() === id) await setLastBoard(null); } catch {}
     return ok;
   }));
@@ -1685,7 +1770,7 @@ async function prepareConfiguredStorage() {
   if (!storedStorageLocation) return;
   for (;;) {
     const check = StorageLocation.validateBoardsDir(activeDataDir, {
-      currentDir: null, protectedDir: defaultDataDir(), appPath: app.getAppPath(), create: false
+      currentDir: null, protectedDir: defaultDataDir(), appPath: app.getAppPath(), create: false, count: false
     });
     if (check.ok) return;
     const choice = process.argv.includes('--smoke') && process.env.GAZBOARD_TEST_STORAGE_FALLBACK === 'default'
@@ -1717,6 +1802,41 @@ async function prepareConfiguredStorage() {
   }
 }
 
+const bootAt = Date.now() - Math.round(process.uptime() * 1000);
+const startupSteps = [];
+const startupMark = (what) => { startupSteps.push([what, Date.now() - bootAt]); };
+let splash = null;
+function showSplash() {
+  if (process.argv.includes('--smoke') || process.env.GAZBOARD_TEST || process.env.GAZBOARD_NO_SPLASH) return;
+  try {
+    splash = new BrowserWindow({
+      width: 420, height: 300, frame: false, resizable: false, movable: true, minimizable: false, maximizable: false,
+      fullscreenable: false, skipTaskbar: true, show: false, center: true, alwaysOnTop: false,
+      backgroundColor: nativeTheme.shouldUseDarkColors ? '#1f1f1f' : '#ffffff',
+      icon: path.join(SRC, 'assets', 'icon.png'),
+      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
+    });
+    splash.loadURL('app://board/splash.html?v=' + encodeURIComponent(app.getVersion()));
+    splash.once('ready-to-show', () => setTimeout(() => { if (splash && !splash.isDestroyed()) splash.show(); }, 250));
+    splash.on('closed', () => { splash = null; });
+  } catch { splash = null; }
+}
+function splashStatus(text) {
+  if (!splash || splash.isDestroyed()) return;
+  splash.webContents.executeJavaScript(`window.setStatus && window.setStatus(${JSON.stringify(String(text || ''))})`).catch(() => {});
+}
+function closeSplash() {
+  if (splash && !splash.isDestroyed()) { try { splash.close(); } catch { /* already going */ } }
+  splash = null;
+}
+function writeStartupTimes(extra = {}) {
+  const lines = [`GazBoard ${app.getVersion()} on ${process.platform} ${process.arch}, ${new Date().toISOString()}`,
+    `boards folder: ${activeDataDir || 'the usual place'}`];
+  for (const [what, ms] of startupSteps) lines.push(`${String(ms).padStart(6)} ms  ${what}`);
+  for (const [k, v] of Object.entries(extra)) lines.push(`${k}: ${v}`);
+  fsp.writeFile(path.join(app.getPath('userData'), 'startup-time.txt'), lines.join('\n') + '\n').catch(() => {});
+}
+
 if (!singleInstance) {
   app.quit();
 } else {
@@ -1731,16 +1851,22 @@ if (!singleInstance) {
   app.on('open-file', (e, filePath) => { e.preventDefault(); openBoardPath(filePath); });   // macOS
 
   app.whenReady().then(async () => {
+    startupMark('Electron ready');
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
       const url = webContents.getURL();
       callback(url.startsWith('app://board/') && permission === 'media');
     });
     registerProtocol();
+    showSplash();
     ipc();
+    if (storedStorageLocation && activeDataDir) splashStatus(activeDataDir);
     await prepareConfiguredStorage();
+    startupMark('boards folder checked');
     if (!storedStorageLocation) await migrateLegacyData();
     await openBoardPath(boardFileFromArgv(process.argv));
+    if (!pendingOpen) readLastBoardEarly();
     createWindow();
+    startupMark('window created');
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
   });
 }

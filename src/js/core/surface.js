@@ -1,7 +1,7 @@
 // The canvas view: sizing, the draw loop, culling, overlays.
 
 import { Camera } from './camera.js';
-import { drawBackground, drawRuling, drawObject, drawSelection, drawMemberOutline, drawLockBadge, drawGroupHint, drawLockedOutline, FONT, setDarkBoard, isDarkBoard, faceOf, inkPaint } from './render.js';
+import { drawBackground, drawRuling, drawObject, drawSelection, drawMemberOutline, drawLockBadge, drawGroupHint, drawLockedOutline, FONT, setDarkBoard, isDarkBoard, setPageColor, faceOf, inkPaint } from './render.js';
 import { worldBounds, boundsOf } from './store.js';
 import { pageRects, pageMarginRects, pageIndexForBox, pageIndexForBoxIn, stripBounds } from './pages.js';
 import { boxesIntersect } from './util.js';
@@ -85,7 +85,9 @@ export class Surface {
       clearTimeout(this._warming);
       this._warming = null;
     }
+    if (this._slideSettle != null) { clearTimeout(this._slideSettle); this._slideSettle = null; }
     this._ink = null;
+    this._inkSpare = null;
   }
 
   _watchPixelRatio() {
@@ -178,12 +180,17 @@ export class Surface {
    */
   freezeKey() {
     const cam = this.cam;
+    return `${cam.x}|${cam.y}|${this.freezeRest()}`;
+  }
+
+  /** Everything in freezeKey() EXCEPT where the camera is pointing. */
+  freezeRest() {
     const ed = this.editing ? `${this.editing.id}:${this.editing.cell || ''}` : '';
     const displayMode = replayDisplayMode(this.app?.settings);
     const repTrackId = displayMode !== 'static' && replayInkEnabled(this.app?.settings) && (this.app?.replayEngine?.active || this.app?.audioBar?.visible)
       ? (this.app?.replayEngine?.track?.id || '') : '';
     const rep = repTrackId ? `|rep:${repTrackId}:sync:${displayMode}` : `|replay-sync-off:${displayMode}`;
-    return `${this.store.rev}.${this._liveRev || 0}|${cam.x}|${cam.y}|${cam.z}|${this.width}|${this.height}|${this.dpr}|${ed}${rep}`;
+    return `${this.store.rev}.${this._liveRev || 0}|${this.cam.z}|${this.width}|${this.height}|${this.dpr}|${ed}${rep}`;
   }
 
   /**
@@ -222,6 +229,7 @@ export class Surface {
    */
   extendFreeze(obj) {
     if (!this._ink || !obj || obj.audioId) return false;
+    setPageColor(this.store.doc.background?.color);
     const cam = this.cam;
     const g = this._ink.canvas.getContext('2d');
     g.setTransform(this.dpr * cam.z, 0, 0, this.dpr * cam.z, this.dpr * cam.x, this.dpr * cam.y);
@@ -237,6 +245,7 @@ export class Surface {
       g.restore();
     } else drawObject(g, obj, onload, this.editing);
     this._ink.key = this.freezeKey();
+    this._ink.rest = this.freezeRest();
     return true;
   }
 
@@ -397,6 +406,7 @@ export class Surface {
   drawScene(ctx, w = this.width, h = this.height, onload = () => this.invalidate(), clip = null, filter = null) {
     const cam = this.cam;
     this.screenTransform(ctx);
+    setPageColor(this.store.doc.background?.color);
     const pages = this.store.doc.pages;
     /*
      * `clip` is a world-space box: paint ONLY that, and leave the rest of the
@@ -436,6 +446,10 @@ export class Surface {
     const view = cam.viewport(w, h);
     const pad = 64 / cam.z;
     const vbox = { x: view.x - pad, y: view.y - pad, w: view.w + pad * 2, h: view.h + pad * 2 };
+    // Text boxes, sticky notes and shapes have shadows and rounded padding
+    // that reach a few pixels outside their stored x/y/w/h.
+    const cpad = 24 / cam.z;
+    const clipHit = clip ? { x: clip.x - cpad, y: clip.y - cpad, w: clip.w + cpad * 2, h: clip.h + cpad * 2 } : null;
 
     /*
      * Walk the document in place rather than building a copy of it.
@@ -455,7 +469,7 @@ export class Surface {
       const wb = worldBounds(o);
       if (!boxesIntersect(vbox, wb)) continue;
       // Outside the band being repainted: its pixels are already right.
-      if (clip && !boxesIntersect(clip, wb)) continue;
+      if (clipHit && !boxesIntersect(clipHit, wb)) continue;
       visible.push(o);
     }
 
@@ -532,7 +546,80 @@ export class Surface {
     const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
     const filter = replaySceneFilter(activeTrackId, this.app?.settings);
     this.drawScene(g, this.width, this.height, () => { this._ink = null; this.invalidate(); }, null, filter);
-    return { canvas: c, key };
+    return { canvas: c, key, rest: this.freezeRest(), camX: this.cam.x, camY: this.cam.y };
+  }
+
+  /**
+   * Slide a frozen copy instead of repainting the whole board when only the
+   * camera's x/y moved.
+   */
+  _slideFrozen() {
+    if (this.noSlide) return false;
+    const prev = this._ink;
+    if (!prev || this._ephemeral || typeof document === 'undefined') return false;
+    const rest = this.freezeRest();
+    if (prev.rest !== rest) return false;
+    const d = this.dpr || 1;
+    const w = this.width, h = this.height;
+    const bw = prev.canvas.width, bh = prev.canvas.height;
+    if (bw !== Math.max(1, Math.round(w * d)) || bh !== Math.max(1, Math.round(h * d))) return false;
+    const rawX = (this.cam.x - prev.camX) * d;
+    const rawY = (this.cam.y - prev.camY) * d;
+    const dx = Math.round(rawX), dy = Math.round(rawY);
+    if (Math.abs(dx) >= bw * 0.75 || Math.abs(dy) >= bh * 0.75) return false;
+
+    let dst = this._inkSpare;
+    if (!dst || dst.width !== bw || dst.height !== bh) {
+      dst = document.createElement('canvas');
+      dst.width = bw; dst.height = bh;
+    }
+    const g = dst.getContext('2d', { alpha: false });
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(prev.canvas, dx, dy);
+
+    const z = this.cam.z;
+    const onload = () => { this._ink = null; this.invalidate(); };
+    const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
+    const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
+    const replayFilter = replaySceneFilter(activeTrackId, this.app?.settings);
+    const ax = Math.ceil(Math.abs(dx)) + 2;
+    const ay = Math.ceil(Math.abs(dy)) + 2;
+    if (dx !== 0) {
+      const sx0 = dx > 0 ? 0 : Math.max(0, bw - ax);
+      const sx1 = dx > 0 ? Math.min(bw, ax) : bw;
+      const bandL = { x: (sx0 / d - this.cam.x) / z, y: -this.cam.y / z, w: (sx1 - sx0) / (d * z), h: h / z };
+      this.drawScene(g, w, h, onload, bandL, replayFilter);
+    }
+    if (dy !== 0) {
+      const sy0 = dy > 0 ? 0 : Math.max(0, bh - ay);
+      const sy1 = dy > 0 ? Math.min(bh, ay) : bh;
+      const bandT = { x: -this.cam.x / z, y: (sy0 / d - this.cam.y) / z, w: w / z, h: (sy1 - sy0) / (d * z) };
+      this.drawScene(g, w, h, onload, bandT, replayFilter);
+    }
+
+    this._inkSpare = prev.canvas;
+    this._inkCanvas = dst;
+    this._ink = {
+      canvas: dst,
+      key: this.freezeKey(),
+      rest,
+      camX: prev.camX + dx / d,
+      camY: prev.camY + dy / d
+    };
+    this.screenTransform();
+    this.ctx.drawImage(dst, 0, 0, w, h);
+
+    if (Math.abs(rawX - dx) > 0.01 || Math.abs(rawY - dy) > 0.01) {
+      if (this._slideSettle != null) clearTimeout(this._slideSettle);
+      this._slideSettle = setTimeout(() => {
+        this._slideSettle = null;
+        if (this.wet || this.laser.length) return;
+        this._ink = null;
+        this.invalidate();
+      }, 140);
+    }
+    return true;
   }
 
   /**
@@ -580,6 +667,7 @@ export class Surface {
   /** The stroke under the pen, clipped to its own sheet. */
   _drawWet(ctx) {
     const cam = this.cam, pages = this.store.doc.pages;
+    setPageColor(this.store.doc.background?.color);
     ctx.setTransform(this.dpr * cam.z, 0, 0, this.dpr * cam.z, this.dpr * cam.x, this.dpr * cam.y);
     const onload = () => this.invalidate();
     const one = (obj) => {
@@ -617,6 +705,7 @@ export class Surface {
     const { ctx, cam } = this;
     const w = this.width, h = this.height;
     if (!w || !h) return;
+    setPageColor(this.store.doc.background?.color);
 
     /*
      * The laser repaints on every single frame while it fades, and nothing
@@ -674,6 +763,10 @@ export class Surface {
        */
       this.screenTransform();
       ctx.drawImage(this._ink.canvas, 0, 0, w, h);
+      this._painted = true;
+    } else if (this._slideFrozen()) {
+      // Only the camera's x/y moved: the old copy was shifted and only the
+      // two thin edges that came into view were painted. See _slideFrozen().
       this._painted = true;
     } else {
       /*
@@ -981,7 +1074,7 @@ export class Surface {
    * still empty and it comes back on its own.
    */
   showsGreeting() {
-    return !!this.greeting && !this.wet && !!this.store && this.store.objects.length === 0;
+    return !!this.greeting && !this.wet && !!this.store && this.store.count === 0;
   }
 
   /**

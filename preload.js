@@ -215,7 +215,7 @@ contextBridge.exposeInMainWorld('board', {
     remove: (id) => ipcRenderer.invoke('boards:delete', id),
     last: () => ipcRenderer.invoke('boards:last'),
     setLast: (id) => ipcRenderer.invoke('boards:setLast', id),
-    resume: () => ipcRenderer.invoke('boards:resume'),
+    resume: (opts) => ipcRenderer.invoke('boards:resume', opts && typeof opts === 'object' ? { asText: !!opts.asText } : undefined),
     migrate: () => ipcRenderer.invoke('boards:migrate')
   },
 
@@ -286,6 +286,9 @@ contextBridge.exposeInMainWorld('board', {
   onOpenFile: (cb) => ipcRenderer.on('board:open', (_e, data) => cb(data)),
   onWindowResized: (cb) => ipcRenderer.on('window:resized', () => cb()),
   onFlush: (cb) => ipcRenderer.on('app:flush', async () => { await cb(); ipcRenderer.send('app:flushed'); }),
+  // starting up: what is being opened (for the starting-up window), and that the board is on screen
+  startupStep: (text) => ipcRenderer.send('app:startupStep', String(text || '')),
+  startupDone: (info) => ipcRenderer.send('app:startupDone', info && typeof info === 'object' ? JSON.parse(JSON.stringify(info)) : {}),
 
   // used only by the hidden conversion window
   convertReady: (msg) => ipcRenderer.send('convert:ready', msg),

@@ -1468,6 +1468,8 @@ export function createPanels(app) {
             t('Fades floating toolbars (Replay Bar, AudioBar, zoom and page bars) while the pen is actively drawing so you can see ink underneath them.')),
           row(t('Pressure sensitivity'), mkToggle(() => s.pressure, (v) => (s.pressure = v)),
             t('Vary ink width with how hard you press - within a stroke, not just between strokes. Works with a graphics tablet, a Surface pen or an S Pen; a mouse or a finger reports no pressure and draws at one width.')),
+          row(t('Pencil sound'), mkToggle(() => s.pencilSound !== false, (v) => (s.pencilSound = v)),
+            t('A soft scratch while you draw with the pencil. It follows how fast you move.')),
           row(t('Pen side button rubs out'), mkToggle(() => s.penButtonErases !== false,
             (v) => (s.penButtonErases = v)),
             t('Hold the button on the side of your stylus while you draw and it erases instead, the way it does in Samsung\u2019s own apps. Turning a pen over to use its blunt end always erases and is not affected by this. Switch off if you would rather that button opened the right-click menu.')),
@@ -2145,7 +2147,9 @@ export function createPanels(app) {
       list = list.filter((b) => Array.isArray(b.tags) && [...activeTagFilters].every((t) => b.tags.includes(t)));
     }
     const go = (id) => { app.boardFolder = id || null; boards({ stay: true }); };
-    const keep = () => { try { localStorage.setItem('gazboard.settings', JSON.stringify(app.settings)); } catch { /* storage refused */ } app.syncBoardPath?.(); };
+    // the folder copy beside the boards (folders.json) follows too: a chosen boards folder, a second
+    // computer on it and the phone's safe copy all read their folders from there
+    const keep = () => { try { localStorage.setItem('gazboard.settings', JSON.stringify(app.settings)); } catch { /* storage refused */ } app.syncBoardPath?.(); app.queueCatalogue?.(); };
 
     /*
      * The page: a list of folders down the side (on a screen wide enough for
@@ -2211,10 +2215,10 @@ export function createPanels(app) {
 
     const actions = h('div', { class: 'gal-actions' });
     actions.appendChild(h('button', { class: 'btn primary', onclick: () => {
-      app.command('board.new');
-      // A new board is filed in the folder you are looking at.
-      if (here) { F.moveBoard(app.settings, app.store.doc.id, here); keep(); }
-      close();
+      // A new board is filed in the folder you are looking at - by newBoard itself, once the board exists.
+      // Filing it here, before "New board?" has been answered, filed the board that was still open instead.
+      // My boards stays up if "New board?" is answered Cancel
+      Promise.resolve(app.command('board.new', { folder: here })).then((made) => { if (made !== false) close(); });
     } }, t('+ New board')));
     actions.appendChild(h('div', { style: 'display:contents' },
       h('button', { class: 'btn', 'data-new-folder': '1', onclick: async () => {
@@ -2227,7 +2231,7 @@ export function createPanels(app) {
       } }, t('+ New folder')),
       // Opening a .gazboard file had a keyboard shortcut and nothing to click,
       // which is no use to anyone who does not already know it is there.
-      h('button', { class: 'btn', onclick: () => { app.command('board.open'); close(); } }, t('Open a board file…'))));
+      h('button', { class: 'btn', onclick: () => { Promise.resolve(app.command('board.open', { folder: here })).then((opened) => { if (opened !== false) close(); }); } }, t('Open a board file…'))));
 
     // The path: where you are, and every step back up. Each step is also a
     // place to drop a board or a folder.
@@ -2454,6 +2458,8 @@ export function createPanels(app) {
           h('span', { class: 'icon-btn', title: t('Delete'), html: icon('trash', 15), onclick: async (e) => { e.stopPropagation(); if (await app.confirm(t('Delete board?'), t('"{name}" will be permanently removed.', { name }), t('Delete'))) { await app.deleteBoard(b.id); boards({ stay: true }); } } })));
       tile.addEventListener('click', async () => {
         if (tile._dragged) return;
+        // the board already in front: back to it as it is, not reloaded from disk (that wipes undo)
+        if (b.id === app.store.doc.id) { if (scope === 'search') searchWords = ''; close(); return; }
         const data = await window.board.boards.load(b.id);
         if (data) { if (scope === 'search') searchWords = ''; await app.loadBoard(data); close(); }
         else if (b.id === app.store.doc.id) close();      // the board in front, not saved yet
@@ -2666,14 +2672,16 @@ export function createPanels(app) {
     app.boardFolder = here;
     const list = F.boardsIn(app.settings, all, here);
     const go = (id) => { app.boardFolder = id || null; boards({ stay: true }); };
-    const keep = () => { try { localStorage.setItem('gazboard.settings', JSON.stringify(app.settings)); } catch { /* storage refused */ } app.syncBoardPath?.(); };
+    // the folder copy beside the boards (folders.json) follows too: a chosen boards folder, a second
+    // computer on it and the phone's safe copy all read their folders from there
+    const keep = () => { try { localStorage.setItem('gazboard.settings', JSON.stringify(app.settings)); } catch { /* storage refused */ } app.syncBoardPath?.(); app.queueCatalogue?.(); };
 
     host.innerHTML = '';
     host.appendChild(h('button', { class: 'btn primary', style: 'width:100%;margin-bottom:8px', onclick: () => {
-      app.command('board.new');
-      // A new board is filed in the folder you are looking at.
-      if (here) { F.moveBoard(app.settings, app.store.doc.id, here); keep(); }
-      close();
+      // A new board is filed in the folder you are looking at - by newBoard itself, once the board exists.
+      // Filing it here, before "New board?" has been answered, filed the board that was still open instead.
+      // My boards stays up if "New board?" is answered Cancel
+      Promise.resolve(app.command('board.new', { folder: here })).then((made) => { if (made !== false) close(); });
     } }, t('+ New board')));
     host.appendChild(h('div', { style: 'display:flex;gap:8px;margin-bottom:14px' },
       h('button', { class: 'btn', style: 'flex:1', 'data-new-folder': '1', onclick: async () => {
@@ -2686,7 +2694,7 @@ export function createPanels(app) {
       } }, t('+ New folder')),
       // Opening a .gazboard file had a keyboard shortcut and nothing to click,
       // which is no use to anyone who does not already know it is there.
-      h('button', { class: 'btn', style: 'flex:1', onclick: () => { app.command('board.open'); close(); } }, t('Open a board file…'))));
+      h('button', { class: 'btn', style: 'flex:1', onclick: () => { Promise.resolve(app.command('board.open', { folder: here })).then((opened) => { if (opened !== false) close(); }); } }, t('Open a board file…'))));
 
     // The path: where you are, and every step back up. Each step is also a
     // place to drop a board or a folder.
@@ -2895,7 +2903,7 @@ export function createPanels(app) {
       );
       row.addEventListener('click', async () => {
         if (row._dragged) return;
-        if (b.id === app.store.doc.id && scope !== 'grid') { close(); return; }
+        if (b.id === app.store.doc.id) { if (scope === 'search') searchWords = ''; close(); return; }
         const data = await window.board.boards.load(b.id);
         if (data) { if (scope === 'search') searchWords = ''; await app.loadBoard(data); close(); }
       });
