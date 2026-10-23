@@ -89,6 +89,7 @@ export const DEFAULT_SETTINGS = {
   inkToShape: false, holdToShape: true, pressure: true, wheelZoom: false, mouseWheelMode: 'zoom', enableHoverToolbar: true, hiddenRibbonTools: [], returnToSelect: true, autosave: true,
   scratchOut: true, scratchSensitivity: 'medium', inkEngine: 'default', smoothCamera: true, autoDimBarsWhileInking: true,
   replaySkipSilence: false, tapStrokeToSeek: true, splitSyncScroll: false,
+  graphPhysics: true, showExcerptTethers: true, autoExportMarkdownSidecar: false,
   showGroupOutlines: true, showTabBar: true,
   edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, laserColor: '#ff2d2d',
   penOpacityEnabled: false, penOpacity: 1, laserTrailDuration: 520, boardLinkThumb: true,
@@ -2254,6 +2255,18 @@ class App {
   }
 
   /** Put every lifted cover back, for the next class. One undo takes it back. */
+  revealAllCurtains() {
+    const ids = this.store.objects.filter((o) => o.type === 'curtain' && !o.revealed).map((o) => o.id);
+    if (!ids.length) return 0;
+    for (const id of ids) this.surface.fadeOut(this.store.get(id));
+    for (const w of this.onCovers(ids)) this.surface.fadeOut(w);
+    this.setCovers(ids, true, 'reveal all answers');
+    this.dropHidden();
+    this.surface.invalidate();
+    this.syncUI();
+    return ids.length;
+  }
+
   coverAllCurtains() {
     const ids = this.store.objects.filter((o) => o.type === 'curtain' && o.revealed).map((o) => o.id);
     if (!ids.length) {
@@ -2581,6 +2594,11 @@ class App {
       case 'insert.markdown': this.insertMarkdownCard(); break;
       case 'insert.diagram': this.openVisualizationStudio(); break;
       case 'insert.video': this.openVideoInsertDialog(); break;
+      case 'view.graph': this.openGraphView(); break;
+      case 'view.pdfSidebar': this.togglePdfSidebar(); break;
+      case 'export.jsoncanvas': this.exportJsonCanvas(); break;
+      case 'insert.jsoncanvas': this.importJsonCanvas(); break;
+      case 'export.markdownSidecar': this.exportMarkdownSidecar(); break;
       case 'page.margin': this.openPageMarginDialog(); break;
       case 'board.back': this.goBack(); break;
       case 'curtain.reveal': this.revealSelectedCurtains(); break;
@@ -3039,6 +3057,92 @@ class App {
       m.openImageCompressDialog(this, imgObj);
     });
   }
+
+  openGraphView() {
+    if (!this.graphView) {
+      import('./ui/graph-view.js').then((m) => {
+        this.graphView = new m.GraphViewModal(this);
+        this.graphView.open();
+      });
+    } else {
+      this.graphView.open();
+    }
+  }
+
+  togglePdfSidebar() {
+    if (!this.pdfSidebar) {
+      import('./ui/pdf-sidebar.js').then((m) => {
+        this.pdfSidebar = new m.PdfSidebarDrawer(this);
+        this.pdfSidebar.toggle();
+      });
+    } else {
+      this.pdfSidebar.toggle();
+    }
+  }
+
+  async exportJsonCanvas() {
+    const { exportToJsonCanvas } = await import('./core/json-canvas.js');
+    const boardName = this.store?.name || 'Board';
+    const canvasObj = exportToJsonCanvas(this.store.doc);
+    const content = JSON.stringify(canvasObj, null, 2);
+    const defaultFilename = `${boardName.replace(/[^a-zA-Z0-9_\-]/g, '_')}.canvas`;
+
+    if (window.board?.saveFile) {
+      const res = await window.board.saveFile({
+        defaultName: defaultFilename,
+        content,
+        filters: [{ name: 'Obsidian Canvas (*.canvas)', extensions: ['canvas'] }]
+      });
+      if (res?.saved) {
+        this.toast(t('Exported {name}', { name: defaultFilename }));
+      }
+      return;
+    }
+
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = defaultFilename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    this.toast(t('Exported {name}', { name: defaultFilename }));
+  }
+
+  async importJsonCanvas() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.canvas,application/json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const { importFromJsonCanvas } = await import('./core/json-canvas.js');
+        const sf = this.surface;
+        const center = sf ? sf.cam.toWorld(sf.width / 2, sf.height / 2) : { x: 200, y: 200 };
+        const { objects, count } = importFromJsonCanvas(text, { offsetX: center.x - 300, offsetY: center.y - 200 });
+        if (count > 0) {
+          const ops = Object.values(objects).map(o => ({ type: 'add', id: o.id, object: o }));
+          this.store.commit(ops);
+          this.toast(t('Imported {n} objects from Canvas', { n: count }));
+        } else {
+          this.toast(t('No supported objects found in canvas file'));
+        }
+      } catch (err) {
+        this.toast(t('Failed to import Canvas: {err}', { err: err.message }));
+      }
+    };
+    input.click();
+  }
+
+  async exportMarkdownSidecar() {
+    const { exportMarkdownSidecarFile } = await import('./core/markdown-sidecar.js');
+    await exportMarkdownSidecarFile(this);
+  }
+
 
   zoomTo(z) {
     const sf = this.surface;
@@ -5105,6 +5209,8 @@ class App {
       }
     }
 
+    if (e.altKey && (e.key === 'g' || e.key === 'G')) { e.preventDefault(); this.openGraphView(); return; }
+    if (e.altKey && (e.key === 't' || e.key === 'T')) { e.preventDefault(); this.togglePdfSidebar(); return; }
     if (mod && (e.key === 'f' || e.key === 'k')) {
       e.preventDefault();
       this.toggleSearchDialog();

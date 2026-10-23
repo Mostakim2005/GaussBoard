@@ -1,6 +1,6 @@
 # GazBoard Replay — Developer Handover & Future Agent Guide
 
-> **Current handover snapshot (2026-10-23):** v5.8.0 completes Phase 4 of the architectural roadmap: SymPy/MATLAB/Wolfram Alpha Scientific Math Studio, interactive matrix dimension builder, offline arithmetic/symbolic quick evaluator, offline Image & PDF Compression Suite with live size readouts and quality scaling, in-app Video & YouTube Player with full-res native frame capture & clickable timestamp bookmark stamps, and 2-page book spread reading view with Turnout Cornell Gutter (+160px), building on Phase 3 Diagram Studio and Phase 2 Multi-Tab / Multi-Window Browsing with 100% i18n parity and zero regression failures (1,240/1,240 smoke checks passed, 1,740/1,740 locale keys). Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-5.8.0.md`](releases/RELEASE-5.8.0.md) for implementation, verification and artifact state. The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
+> **Current handover snapshot (2026-10-23):** v5.9.0 completes Phase 5 of the architectural roadmap: JSON Canvas 1.0 (`.canvas`) bidirectional import & export, interactive Knowledge Graph View modal (`GraphViewModal`), Obsidian Markdown sidecar exporter with YAML frontmatter, LiquidText-style elastic tether connectors, and Document Navigator & TOC Sidebar (`PdfSidebarDrawer`), building on Phase 4 Scientific Math/Media, Phase 3 Diagram Studio, and Phase 2 Multi-Tab / Multi-Window Browsing with 100% i18n parity and zero regression failures (1,240/1,240 smoke checks passed, 1,786/1,786 locale keys). Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-5.9.0.md`](releases/RELEASE-5.9.0.md) for implementation, verification and artifact state. The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
 
 > **Important**: This document is the primary onboarding manual for any future AI assistant, software engineer, or contributor picking up this project in a new session or clean environment. It details the complete architecture, data models, state flows, invariant guardrails, and build instructions.
 
@@ -22,10 +22,10 @@
 ## 1.1 Current Worktree and Release State (2026-10-23)
 
 - **Working repository:** `C:\Users\kazir\Documents\OpenCode\GazBoard`.
-- **Current source version:** v5.8.0, based on the local cumulative project feature line.
+- **Current source version:** v5.9.0, based on the local cumulative project feature line.
 - **Git state:** branch `feat/cumulative-fixes`.
-- **Lineage:** delivers Phase 4 Scientific Math Studio, Media, Compression & Book Reader on top of Phase 3 Diagram Studio v5.7.0.
-- **Latest release scope:** [`releases/RELEASE-5.8.0.md`](releases/RELEASE-5.8.0.md) records SymPy/MATLAB/Wolfram Alpha Math Studio, offline image & PDF compression, in-app video & YouTube player with frame snapshot cards, 2-page book spread view, and Turnout Gutter (+160px) with 100% i18n parity and 1,240/1,240 passed smoke checks. Releases ledger is at [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md).
+- **Lineage:** delivers Phase 5 Knowledge Interoperability, JSON Canvas 1.0, Graph View & Document Navigator on top of Phase 4 v5.8.0.
+- **Latest release scope:** [`releases/RELEASE-5.9.0.md`](releases/RELEASE-5.9.0.md) records JSON Canvas 1.0 bidirectional converter, interactive Knowledge Graph View modal, Markdown sidecar exporter with YAML frontmatter, LiquidText elastic tether connectors, and Document Navigator & TOC Sidebar with 100% i18n parity and 1,240/1,240 passed smoke checks. Releases ledger is at [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md).
 - **Archive policy:** keep active work here. Use the user-configured durable archive only after a release has passed checks; do not copy to historical Antigravity paths from older records.
 - **Verification/build state:** focused audit tests and locale checks pass; see [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md) for the portable artifact hash, remaining npm advisories, and architectural follow-ups.
 - **Audit attribution supplied by the project owner:** initial audit — Codex 4.6 Medium in Cursor; secondary audit/fixes — GPT-6 Luna High using Codex.

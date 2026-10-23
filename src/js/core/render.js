@@ -1137,6 +1137,35 @@ export function drawImage(ctx, o, onload) {
     ctx.lineTo(bx + size * 0.68, by + size * 0.32);
     ctx.lineTo(bx + size * 0.68, by + size * 0.57);
     ctx.stroke();
+
+    // LiquidText-style Elastic Tether line to source bounds if source bounds are available
+    const sb = o.excerptSource.bounds;
+    if (sb && typeof sb.x === 'number' && typeof sb.y === 'number' && (o.showTether ?? true)) {
+      const srcCenterX = sb.x + (sb.w || 0) / 2;
+      const srcCenterY = sb.y + (sb.h || 0) / 2;
+      const cardCenterX = o.x;
+      const cardCenterY = o.y + o.h / 2;
+      const dx = cardCenterX - srcCenterX;
+      const dy = cardCenterY - srcCenterY;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 20 && dist < 3000) {
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = '#00e5ff';
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.65;
+        ctx.moveTo(srcCenterX, srcCenterY);
+        const cpX = (srcCenterX + cardCenterX) / 2;
+        const cpY = Math.min(srcCenterY, cardCenterY) - 25;
+        ctx.quadraticCurveTo(cpX, cpY, cardCenterX, cardCenterY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(srcCenterX, srcCenterY, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#00e5ff';
+        ctx.fill();
+      }
+    }
     ctx.restore();
   }
   ctx.restore();
