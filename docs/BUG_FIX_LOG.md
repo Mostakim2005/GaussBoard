@@ -367,3 +367,81 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 * **Verification**: Covered by code-path review and the audio-bar focused test suite; menu close/dismiss behavior has not been run through a full interactive UI automation scenario.
 * **Files Touched**: `src/js/ui/audio-bar.js`.
 
+
+### BUG-033: `buildMarkdownSvgDataUri` Corrupted `xmlns` Attributes via Post-Render URL Autolinker (v5.3.0)
+* **Symptom**: Canvas Markdown cards (`drawMarkdownBlock`) failed to render when SVG `<foreignObject>` data URIs were loaded into `Image`.
+* **Cause**: `renderInlineMarkdown` ran a raw URL regex (`/(^|[\s(>])([a-zA-Z]+:\/\/[^\s<]+)/g`) after HTML tags were already emitted, matching `http://www.w3.org/2000/svg` inside `xmlns="..."` attributes and injecting `<a href="...">` inside XML attribute strings.
+* **Fix**: Mask existing HTML tags (`<...>`) and `<a ...>...</a>` blocks with null-byte tokens before autolinking raw URLs, then restore them afterward.
+* **Verification**: `test/markdown.test.mjs` (`Produces valid XHTML inside SVG <foreignObject> data URI`).
+* **Files Touched**: `src/js/core/markdown.js`.
+
+### BUG-034: Split Workspace Surface Leak, Missing `isOpen` Getter & Duplicate Wheel Handler (v5.3.0)
+* **Symptom**: Opening and closing Split Study Workspace leaked `Surface`, `ResizeObserver`, and `rAF` instances; `Ctrl+Z`/`Ctrl+Y` and `pasteAt()` ignored the left study pane; mouse wheel zoomed/panned at 2x speed on the left pane.
+* **Cause**: `app.js` checked `this.splitWorkspace?.isOpen` while `SplitWorkspace` only defined `.active`; `disable()` did not call `this.leftSurface.destroy()`; `split-workspace.js` attached a redundant `wheel` listener alongside `Interaction`'s wheel handler.
+* **Fix**: Added `get isOpen() { return this.active; }`, called `this.leftSurface.destroy()` in `disable()`, and removed the duplicate wheel listener.
+* **Verification**: `test/custom-features.test.mjs`, `test/smoke-features-5.1.0.js`.
+* **Files Touched**: `src/js/ui/split-workspace.js`, `src/js/app.js`.
+
+### BUG-035: Left Study Pane Unsaved Edits, Missing Asset Hydration/Externalization & Incomplete `swapPanes()` (v5.3.0)
+* **Symptom**: Drawing or editing on the left study pane did not auto-save or update `#tags`; images stored as `asset:<sha256>` failed to display in the left pane; `swapPanes()` lost `audioTracks`, `properties`, and camera positions.
+* **Cause**: `leftStore` lacked a `subscribe()` handler for `syncDocumentTags()` and `saveLeftBoardDebounced()`; `loadLeftBoard()`/`saveLeftBoard()` bypassed `resolveAssets()`/`externaliseAssets()`; `swapPanes()` copied only a partial subset of `doc` fields.
+* **Fix**: Subscribed `leftStore`, wired `resolveAssets()` and `externaliseAssets()` into left board load/save, and updated `swapPanes()` and `createNewStudyBoard()` to preserve full `emptyDoc()` schema and cameras.
+* **Verification**: `test/custom-features.test.mjs`, `test/smoke-features-5.1.0.js`.
+* **Files Touched**: `src/js/ui/split-workspace.js`.
+
+### BUG-036: `.gazboard` Single-Board Export/Import Omitted Audio Assets & `isBoardFile` Skipped Audio-Only Boards (v5.3.0)
+* **Symptom**: Exporting a board with recorded audio via `board:exportFile` wrote raw JSON without the audio asset files, leaving audio tracks unplayable when imported on another device.
+* **Cause**: `board:exportFile` only checked image assets and wrote raw JSON; `board:importFile` rejected ZIP containers; `storage-location.js` `isBoardFile()` did not check `audioTracks` or `properties`.
+* **Fix**: Bundled `doc.audioTracks` assets into `.gazboard` ZIP archives on export, extracted bundled assets in `board:importFile`, and updated `isBoardFile()` to recognize `audioTracks` and `properties`.
+* **Verification**: `test/storage-location.test.js`, `npm run smoke:custom`.
+* **Files Touched**: `main.js`, `storage-location.js`.
+
+### BUG-037: `ink.js` 1-Slot `WeakMap` Cache Thrashing During Replay & Per-Stroke `ctx.filter` Slowdown (v5.3.0)
+* **Symptom**: Live audio replay with neon outlines recomputed cubic Bézier and polygon paths 3 times per stroke per frame (0% cache hit rate), and Spotlight replay mode dropped frames due to per-stroke `ctx.filter` switches.
+* **Cause**: `pathCache` and `runCache` stored a single `{ w, engine, path }` entry per `o.points` reference, which was evicted whenever `drawReplayOutline` cloned the stroke with `width: o.width + 5` and `width: o.width + 6`.
+* **Fix**: Upgraded `pathCache` and `runCache` to store up to 6 `Map` entries (`${engine}:${w}`) per `pts` array, quantized replay outline width boosts to `0.5px`, and replaced per-stroke `ctx.filter` in Spotlight mode with alpha dimming.
+* **Verification**: `test/custom-features.test.mjs`, `test/replay-reading.test.mjs`.
+* **Files Touched**: `src/js/core/ink.js`, `src/js/core/surface.js`.
+
+### BUG-038: `perfectFreehand` Ignored in `runPath`, Stylus Tilt Ignored in `calligraphyPath` & `p.t` Stripped on Study Tape (v5.3.0)
+* **Symptom**: Variable-pressure strokes fell back to polygonal segments under `perfectFreehand`; calligraphy strokes ignored stylus tilt (`tiltX`/`tiltY`); freehand Study Tape strokes lost `p.t` timestamps on `finishStroke()`.
+* **Cause**: `runPath()` omitted `perfectFreehand`; `calligraphyPath()` used only static `o.angle`; `finishStroke()` called `simplify()` on `subtype === 'tape'`.
+* **Fix**: Added `perfectFreehand` support to `runPath()`, incorporated stylus `tiltX`/`tiltY` into `calligraphyPath()`, and preserved `{ x, y, p, t }` on Study Tape strokes.
+* **Verification**: `test/custom-features.test.mjs`.
+* **Files Touched**: `src/js/core/ink.js`, `src/js/core/tools.js`.
+
+### BUG-039: Modal Keydown Listener & Share Panel Interval Leaks (v5.3.0)
+* **Symptom**: Repeatedly opening `PageMarginDialog` or `NoteOverviewDrawer` stacked global `keydown` listeners; `SearchDialog` registered duplicate `Ctrl+F`/`Ctrl+K` listeners; closing the Share panel via the header X button leaked its `setInterval` poll.
+* **Fix**: Cleaned up modal `keydown` listeners on `close()`, deduplicated `SearchDialog` shortcut binding, and invoked `panels.onClose` when closing `#panel`.
+* **Verification**: `npm run smoke:custom`.
+* **Files Touched**: `src/js/ui/pagemargin-dialog.js`, `src/js/ui/note-overview.js`, `src/js/ui/search-dialog.js`, `src/js/ui/panels.js`.
+
+### BUG-040: SVG Export Flattened `brush`/`fountain` Runs and Ignored Image Crop Rectangles (v5.3.0)
+* **Symptom**: Exporting a board to SVG flattened variable-width `brush` and `fountain` strokes into uniform lines and exported cropped images uncropped.
+* **Fix**: Exported `brushRuns` and `fountainRuns` sub-paths in `svgObjects()` and cropped images via an offscreen canvas during SVG generation; prevented `drawMarkdownCardContainer` from drawing `'MD'` badge text while a text box is actively being edited.
+* **Verification**: `test/custom-features.test.mjs`, `node scripts/smoke.js`.
+* **Files Touched**: `src/js/export.js`, `src/js/core/render.js`.
+
+### BUG-041: `remapImportedBoard` Dropped `#h:` Heading Links and `excerptSource.boardId` (v5.3.0)
+* **Symptom**: Importing a linked board bundle failed to remap board IDs inside `@[Label](b:id#h:Heading)` links and `o.excerptSource.boardId`.
+* **Fix**: Extended `remapImportedBoard()` in `src/js/core/boardrefs.js` to remap `#h:...` links and `excerptSource.boardId`.
+* **Verification**: `test/excerpt.test.mjs`.
+* **Files Touched**: `src/js/core/boardrefs.js`.
+
+### BUG-042: Board Link Thumbnail Toggle & Arrowhead Helpers Bypassed `Store.update` (v5.3.0)
+* **Symptom**: Toggling a board-link card thumbnail mutated `o.thumb` without saving or recording an undo entry; `setArrowHeads()`, `stepLineWidth()`, and `cycleArrowScale()` referenced undefined `this.selectedIds`.
+* **Fix**: Routed all mutations through `this.store.update()`.
+* **Verification**: `test/custom-features.test.mjs`.
+* **Files Touched**: `src/js/ui/contextmenu.js`, `src/js/app.js`.
+
+### BUG-043: Malformed `store.commit` Calls Corrupted `undoStack` on Audio Track & Bookmark Edits (v5.3.0)
+* **Symptom**: Recording audio, importing audio, or editing bookmarks pushed `{ ops: undefined }` or `{ type: 'audioTracks' }` onto `undoStack`, throwing `TypeError: tx.ops is not iterable` on Redo and skipping autosave.
+* **Fix**: Hardened `Store.commit(label, ops)` to filter out invalid ops and updated all audio track/bookmark commits to dispatch `{ t: 'doc', before: { audioTracks }, after: { audioTracks } }`.
+* **Verification**: `test/custom-features.test.mjs`, `test/audio-bar.test.mjs`.
+* **Files Touched**: `src/js/core/store.js`, `src/js/app.js`, `src/js/ui/audio-bar.js`, `src/js/ui/replay-bar.js`, `src/js/ui/toolbar.js`, `src/js/ui/density-canvas.js`.
+
+### BUG-044: `ReplayBar` `z-index: 9000` Obscured Class Timer Controls and Side Panels (v5.3.0)
+* **Symptom**: When docked at the top, `#replayBar` sat above `#classTimer` (`z-index: 27`), `#panel` (`z-index: 35`), and `#overlay` (`z-index: 60`), intercepting clicks on the Class Timer's `+1` button.
+* **Fix**: Set `#replayBar` `z-index` to `21`.
+* **Verification**: `node scripts/smoke.js`, `npm run smoke:custom`.
+* **Files Touched**: `src/js/ui/replay-bar.js`.

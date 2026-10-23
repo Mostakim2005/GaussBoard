@@ -257,10 +257,9 @@ export class PropertiesDialog {
 
     // Metadata
     const tracks = doc.audioTracks?.length || 0;
-    this.metaEl.innerHTML = `
-      <div><strong>${t('Board ID')}:</strong> ${doc.id || 'N/A'}</div>
-      <div><strong>${t('Audio Recordings')}:</strong> ${tracks} track${tracks === 1 ? '' : 's'}</div>
-    `;
+    this.metaEl.innerHTML = '';
+    this.metaEl.appendChild(h('div', {}, h('strong', {}, `${t('Board ID')}: `), String(doc.id || 'N/A')));
+    this.metaEl.appendChild(h('div', {}, h('strong', {}, `${t('Audio Recordings')}: `), String(tracks)));
   }
 
   async addTag(raw) {

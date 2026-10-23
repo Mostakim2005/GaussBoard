@@ -15,6 +15,13 @@ export function formatTime(ms) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function cloneAudioTracks(tracks) {
+  return (tracks || []).map((item) => ({
+    ...item,
+    bookmarks: Array.isArray(item.bookmarks) ? item.bookmarks.map((bm) => ({ ...bm })) : []
+  }));
+}
+
 export function trackMenuPosition(anchor, menu, viewport) {
   const margin = 10;
   const below = viewport.height - anchor.bottom - margin;
@@ -88,9 +95,14 @@ export class AudioBar {
       width: 220,
       height: 24,
       onSeek: (ms) => this.seek(ms),
-      onBookmarkRenamed: (bm) => {
+      onBookmarkRenamed: (bm, prevName = '') => {
         if (this.app?.store) {
-          this.app.store.commit?.('rename bookmark', []);
+          const after = cloneAudioTracks(this.app.store.doc?.audioTracks);
+          const before = cloneAudioTracks(this.app.store.doc?.audioTracks).map((tr) => ({
+            ...tr,
+            bookmarks: (tr.bookmarks || []).map((b) => (b.id === bm?.id ? { ...b, name: prevName } : b))
+          }));
+          this.app.store.commit?.('rename bookmark', [{ t: 'doc', before: { audioTracks: before }, after: { audioTracks: after } }]);
         }
       }
     });
@@ -220,6 +232,7 @@ export class AudioBar {
     const replay = this.app?.replayEngine;
     if (!replay || !this.track) return;
     const tMs = Math.round(replay.currentTimeMs);
+    const before = cloneAudioTracks(this.app?.store?.doc?.audioTracks);
     if (!Array.isArray(this.track.bookmarks)) {
       this.track.bookmarks = [];
     }
@@ -230,7 +243,8 @@ export class AudioBar {
     });
     // Persist bookmark in store document
     if (this.app?.store) {
-      this.app.store.commit?.('add bookmark', []);
+      const after = cloneAudioTracks(this.app.store.doc?.audioTracks);
+      this.app.store.commit?.('add bookmark', [{ t: 'doc', before: { audioTracks: before }, after: { audioTracks: after } }]);
     }
     this.syncUI();
   }
@@ -364,18 +378,26 @@ export class AudioBar {
     this.closeSessionMenu();
   }
 
-  deleteTrack(tr) {
+  async deleteTrack(tr) {
     if (!tr) return;
-    if (confirm(t('Delete recording "{name}"?', { name: tr.name || 'recording' }))) {
+    const msg = t('Delete recording "{name}"?', { name: tr.name || t('Recording') });
+    const confirmed = this.app?.confirm
+      ? await this.app.confirm(t('Delete recording?'), msg, t('Delete'))
+      : (typeof confirm === 'function' ? confirm(msg) : true);
+    if (confirmed) {
       const list = this.app?.store?.doc?.audioTracks || [];
-      const idx = list.findIndex((t) => t.id === tr.id);
+      const idx = list.findIndex((item) => item.id === tr.id);
       if (idx >= 0) {
+        const before = cloneAudioTracks(list);
         list.splice(idx, 1);
+        const after = cloneAudioTracks(list);
         if (this.track?.id === tr.id) {
           this.close();
           if (list.length > 0) this.open(list[0]);
         }
-        if (this.app?.store) this.app.store.commit('delete recording', []);
+        if (this.app?.store) {
+          this.app.store.commit('delete recording', [{ t: 'doc', before: { audioTracks: before }, after: { audioTracks: after } }]);
+        }
         this.syncUI();
         this.closeSessionMenu();
       }
@@ -473,6 +495,38 @@ export class AudioBar {
       h('label', { class: 'toggle', style: 'margin:0;' }, syncSw)
     );
     panel.appendChild(syncRow);
+
+    // Skip dead air (silence) toggle
+    const skipSilenceSw = h('input', { type: 'checkbox', checked: !!this.app?.settings?.replaySkipSilence });
+    skipSilenceSw.addEventListener('change', () => {
+      if (this.app?.settings) {
+        this.app.settings.replaySkipSilence = skipSilenceSw.checked;
+        this.app.saveSettings();
+      }
+    });
+    const skipSilenceRow = h('div', {
+      style: 'display:flex;align-items:center;justify-content:space-between;padding:4px 0;'
+    },
+      h('span', { style: 'font-size:12px;font-weight:600;' }, t('Skip dead air (silence)')),
+      h('label', { class: 'toggle', style: 'margin:0;' }, skipSilenceSw)
+    );
+    panel.appendChild(skipSilenceRow);
+
+    // Tap stroke to seek audio toggle
+    const tapSeekSw = h('input', { type: 'checkbox', checked: this.app?.settings?.tapStrokeToSeek !== false });
+    tapSeekSw.addEventListener('change', () => {
+      if (this.app?.settings) {
+        this.app.settings.tapStrokeToSeek = tapSeekSw.checked;
+        this.app.saveSettings();
+      }
+    });
+    const tapSeekRow = h('div', {
+      style: 'display:flex;align-items:center;justify-content:space-between;padding:4px 0;'
+    },
+      h('span', { style: 'font-size:12px;font-weight:600;' }, t('Tap stroke to seek audio')),
+      h('label', { class: 'toggle', style: 'margin:0;' }, tapSeekSw)
+    );
+    panel.appendChild(tapSeekRow);
 
     // Keep playback presentation separate from Reading/Writing input mode:
     // this controls how timestamped ink is displayed, not whether the board edits.
@@ -590,7 +644,7 @@ export class AudioBar {
 
     this.btnSkipStep = h('button', {
       class: 'ab-btn ab-skip-step',
-      title: 'Click to cycle skip duration (5s, 10s, 15s, 30s) — Right-click for options',
+      title: t('Click to cycle skip duration (5s, 10s, 15s, 30s) — Right-click for options'),
       style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:2px 6px;border-radius:10px;font-size:11px;font-weight:700;color:inherit;margin:0 2px;pointer-events:auto;'
     }, `${this.skipSeconds}s`);
     this.btnSkipStep.addEventListener('click', (e) => {
@@ -605,7 +659,7 @@ export class AudioBar {
 
     this.btnPlay = h('button', {
       class: 'ab-btn ab-play',
-      title: 'Play / Pause',
+      title: t('Play / Pause'),
       style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:50%;color:inherit;pointer-events:auto;'
     });
     this.btnPlay.addEventListener('click', (e) => {
@@ -632,7 +686,7 @@ export class AudioBar {
 
     this.btnSpeed = h('button', {
       class: 'ab-btn ab-speed',
-      title: 'Speed',
+      title: t('Speed'),
       style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;color:inherit;pointer-events:auto;'
     }, '1.0×');
     this.btnSpeed.addEventListener('click', (e) => {
@@ -642,7 +696,7 @@ export class AudioBar {
 
     this.btnBookmark = h('button', {
       class: 'ab-btn ab-bm',
-      title: 'Bookmark',
+      title: t('Bookmark'),
       style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:4px;color:inherit;pointer-events:auto;',
       html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>'
     });
@@ -653,7 +707,7 @@ export class AudioBar {
 
     this.btnGhost = h('button', {
       class: 'ab-btn ab-ghost',
-      title: 'Ghost / Hidden Preview',
+      title: t('Ghost / Hidden Preview'),
       style: 'background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:4px;color:inherit;pointer-events:auto;',
       html: icon('eye', 18)
     });
@@ -730,7 +784,7 @@ export class AudioBar {
 
     const dragHandle = h('span', {
       class: 'ab-drag',
-      title: 'Drag AudioBar',
+      title: t('Drag AudioBar'),
       style: 'cursor:grab;display:flex;align-items:center;padding:0 2px;color:rgba(128,128,128,0.7);',
       html: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>'
     });
@@ -742,9 +796,9 @@ export class AudioBar {
 
     this.btnSession = h('button', {
       class: 'ab-session-btn',
-      title: 'Switch Recording Session',
+      title: t('Switch Recording Session'),
       style: 'background:rgba(128,128,128,0.12);border:none;cursor:pointer;padding:3px 8px;border-radius:12px;font-size:11.5px;font-weight:600;color:inherit;outline:none;display:none;align-items:center;gap:4px;max-width:140px;pointer-events:auto;',
-      html: '<span>🎙️</span><span class="ab-session-label">Session</span><span style="font-size:9px;opacity:0.6;">▼</span>'
+      html: `<span>🎙️</span><span class="ab-session-label">${t('Session')}</span><span style="font-size:9px;opacity:0.6;">▼</span>`
     });
     this.btnSession.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -756,8 +810,6 @@ export class AudioBar {
       class: 'audio-bar-hud',
       style: 'position:absolute;z-index:1000;display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--surface,#ffffff);color:var(--text,#111111);border:1px solid var(--line,rgba(0,0,0,0.15));border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.18);user-select:none;font-size:13px;font-family:inherit;'
     }, dragHandle, this.btnSession, this.btnRewind10, this.btnSkipStep, this.btnPlay, this.btnForward10, this.lblTime, scrubberWrap, this.btnSpeed, this.btnBookmark, this.btnGhost, this.btnSync, this.btnFollow, this.cameraMode, this.outlineEffect, this.outlineColor, this.btnClose);
-
-    this.wireDragging(dragHandle);
 
     this.wireDragging(dragHandle);
   }

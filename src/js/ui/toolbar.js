@@ -301,7 +301,7 @@ export function syncRibbonTools(app) {
   if (sep1) sep1.style.display = group1 ? '' : 'none';
 
   const hasVisiblePen = PENS.some((p) => !hidden.has('pen:' + p.id) && !hidden.has('pen'));
-  const group2 = hasVisiblePen || ['highlighter', 'tape', 'eraser'].some((id) => !hidden.has(id));
+  const group2 = hasVisiblePen || ['highlighter', 'brush', 'fountain', 'calligraphy', 'tape', 'eraser'].some((id) => !hidden.has(id));
   const sep2 = bar.querySelector('[data-sep="2"]');
   if (sep2) sep2.style.display = group2 ? '' : 'none';
 }
@@ -575,13 +575,24 @@ function wireTopBar(app) {
         app.audioRecorder = new AudioRecorder(app);
       }
       if (app.audioRecorder.state === 'recording') {
-        const track = await app.audioRecorder.stop();
-        if (track && track.assetId) {
+        const res = await app.audioRecorder.stop();
+        if (res && res.assetId) {
+          const track = {
+            id: res.id,
+            assetId: res.assetId,
+            name: `Recording ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+            durationMs: res.durationMs,
+            created: Date.now(),
+            bookmarks: []
+          };
           if (!Array.isArray(app.store.doc.audioTracks)) app.store.doc.audioTracks = [];
+          const before = app.store.doc.audioTracks.map((item) => ({ ...item, bookmarks: (item.bookmarks || []).map((b) => ({ ...b })) }));
           app.store.doc.audioTracks.push(track);
+          const after = app.store.doc.audioTracks.map((item) => ({ ...item, bookmarks: (item.bookmarks || []).map((b) => ({ ...b })) }));
+          app.store.commit('record audio', [{ t: 'doc', before: { audioTracks: before }, after: { audioTracks: after } }]);
           app.audioBar?.open(track);
           if (typeof app.persist === 'function') await app.persist();
-          if (app.replayBar?.updateAudioUI) app.replayBar.updateAudioUI();
+          if (app.replayBar?.syncAudioState) app.replayBar.syncAudioState();
           if (app.audioBar?.syncUI) app.audioBar.syncUI();
         }
         updateRecState(false);
@@ -1026,6 +1037,12 @@ export function openToolPopover(app, anchor, tool) {
           s.inkToShape = v;
           app.saveSettings();
           app.toast(v ? t('Hand-drawn shapes will be straightened') : t('Ink is left exactly as drawn'), 'pen');
+        })),
+      h('div', { class: 'row' },
+        toggle(t('Hold at end of stroke to snap shape'), s.holdToShape !== false, (v) => {
+          s.holdToShape = v;
+          app.saveSettings();
+          app.toast(v ? t('Hold pen still at end of stroke to snap shape') : t('Hold-to-shape disabled'), 'pen');
         })),
       h('div', { class: 'row' },
         toggle(t('Ruler snapping'), app.ruler.snap, (v) => { app.ruler.snap = v; }))

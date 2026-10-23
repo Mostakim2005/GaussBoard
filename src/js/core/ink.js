@@ -270,6 +270,16 @@ function runPath(pts, engine = activeInkEngine) {
     return path;
   }
 
+  if (engine === 'perfectFreehand') {
+    for (let i = 1; i < pts.length - 1; i++) {
+      const mx = pts[i].x * 0.45 + pts[i + 1].x * 0.55;
+      const my = pts[i].y * 0.45 + pts[i + 1].y * 0.55;
+      path.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+    }
+    path.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+    return path;
+  }
+
   for (let i = 1; i < pts.length - 1; i++) {
     const mx = (pts[i].x + pts[i + 1].x) / 2;
     const my = (pts[i].y + pts[i + 1].y) / 2;
@@ -362,7 +372,12 @@ export function calligraphySvgPath(o) {
   const pts = o.points;
   if (!pts || !pts.length) return '';
   const size = o.width || 12;
-  const angleDeg = o.angle ?? 35;
+  let angleDeg = o.angle ?? 35;
+  const p0 = pts[0];
+  if (p0 && typeof p0.tiltX === 'number' && (p0.tiltX !== 0 || p0.tiltY !== 0)) {
+    const tiltAngle = (Math.atan2(p0.tiltY, p0.tiltX) * 180) / Math.PI;
+    if (Number.isFinite(tiltAngle)) angleDeg = Math.round(((tiltAngle % 180) + 180) % 180);
+  }
   const flatness = o.flatness ?? 4;
   const rad = (angleDeg * Math.PI) / 180;
   const cos = Math.cos(rad);
@@ -562,7 +577,7 @@ export function pressureRuns(points, size, scale = 1) {
   return runs;
 }
 
-/* Paths are stable once a stroke is committed, so keep the last one. */
+/* Paths are stable once a stroke is committed, so keep a small per-points map. */
 const cache = new WeakMap();
 const runCache = new WeakMap();
 
@@ -574,9 +589,9 @@ export function inkRuns(stroke, scale = 1) {
   const size = stroke.width || (tool === 'brush' ? 8 : tool === 'calligraphy' ? 12 : 4);
   const band = Math.round(Math.log2(Math.max(0.05, scale)) * 2);
   const engine = activeInkEngine;
-  const key = `${size}_${tool}_${stroke.softness || ''}_${stroke.slant || ''}_${stroke.flex || ''}_${stroke.velocityThinning ?? ''}_${band}_${engine}`;
-  const hit = runCache.get(pts);
-  if (hit && hit.len === pts.length && hit.key === key) return hit.runs;
+  const key = `${pts.length}_${size}_${tool}_${stroke.softness || ''}_${stroke.slant || ''}_${stroke.flex || ''}_${stroke.velocityThinning ?? ''}_${band}_${engine}`;
+  let byKey = runCache.get(pts);
+  if (byKey && byKey.has(key)) return byKey.get(key);
   let runs;
   if (tool === 'brush') {
     runs = brushRuns(pts, size, stroke.softness, stroke.velocityThinning, scale);
@@ -585,7 +600,13 @@ export function inkRuns(stroke, scale = 1) {
   } else {
     runs = pressureRuns(pts, size, scale);
   }
-  runCache.set(pts, { len: pts.length, key, runs });
+  if (!byKey) {
+    byKey = new Map();
+    runCache.set(pts, byKey);
+  } else if (byKey.size >= 6) {
+    byKey.delete(byKey.keys().next().value);
+  }
+  byKey.set(key, runs);
   return runs;
 }
 
@@ -595,11 +616,19 @@ export function calligraphyPath(stroke) {
   const size = stroke.width || 12;
   const angle = stroke.angle ?? 35;
   const flatness = stroke.flatness ?? 4;
-  const key = `cal_${size}_${angle}_${flatness}`;
-  const hit = cache.get(pts);
-  if (hit && hit.len === pts.length && hit.key === key) return hit.path;
+  const p0 = pts[0];
+  const tiltKey = (p0 && typeof p0.tiltX === 'number') ? `${p0.tiltX}_${p0.tiltY || 0}` : '0_0';
+  const key = `cal_${pts.length}_${size}_${angle}_${flatness}_${tiltKey}`;
+  let byKey = cache.get(pts);
+  if (byKey && byKey.has(key)) return byKey.get(key);
   const path = calligraphyEnvelope(pts, size, angle, flatness);
-  cache.set(pts, { len: pts.length, key, path });
+  if (!byKey) {
+    byKey = new Map();
+    cache.set(pts, byKey);
+  } else if (byKey.size >= 6) {
+    byKey.delete(byKey.keys().next().value);
+  }
+  byKey.set(key, path);
   return path;
 }
 
@@ -609,9 +638,16 @@ export function inkPath(stroke) {
   if (stroke.tool === 'calligraphy') return calligraphyPath(stroke);
   const size = stroke.width || 4;
   const engine = activeInkEngine;
-  const hit = cache.get(pts);
-  if (hit && hit.len === pts.length && hit.size === size && hit.engine === engine) return hit.path;
+  const key = `ink_${pts.length}_${size}_${engine}`;
+  let byKey = cache.get(pts);
+  if (byKey && byKey.has(key)) return byKey.get(key);
   const path = centrelinePath(pts, size);
-  cache.set(pts, { len: pts.length, size, engine, path });
+  if (!byKey) {
+    byKey = new Map();
+    cache.set(pts, byKey);
+  } else if (byKey.size >= 6) {
+    byKey.delete(byKey.keys().next().value);
+  }
+  byKey.set(key, path);
   return path;
 }

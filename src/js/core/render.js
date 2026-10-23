@@ -56,7 +56,7 @@ function resolveWikilinkForRender(target, anchor, alias) {
  * Draws the toggleable Obsidian Card Window container around a Markdown text object.
  * Supports 4 models: 'canvas' | 'window' | 'minimal' | 'transparent'.
  */
-export function drawMarkdownCardContainer(ctx, o, isDark = darkBoard) {
+export function drawMarkdownCardContainer(ctx, o, isDark = darkBoard, hideText = false) {
   const style = o.cardStyle || (o.background && o.background !== 'none' ? 'canvas' : (o.markdown === true ? 'canvas' : 'transparent'));
   if (style === 'transparent') {
     if (o.background && o.background !== 'none') {
@@ -121,17 +121,19 @@ export function drawMarkdownCardContainer(ctx, o, isDark = darkBoard) {
       ctx.stroke();
     }
 
-    ctx.font = `600 11px ${FONT}`;
-    ctx.fillStyle = isDark ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.72)';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    const rawFirst = o.title || (o.text ? o.text.split('\n')[0].replace(/^#+\s*/, '').trim() : '');
-    const titleText = (rawFirst || t('Markdown')).slice(0, 28);
-    ctx.fillText(titleText, x + 12, y + headerH / 2);
+    if (!hideText) {
+      ctx.font = `600 11px ${FONT}`;
+      ctx.fillStyle = isDark ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.72)';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const rawFirst = o.title || (o.text ? o.text.split('\n')[0].replace(/^#+\s*/, '').trim() : '');
+      const titleText = (rawFirst || t('Markdown')).slice(0, 28);
+      ctx.fillText(titleText, x + 12, y + headerH / 2);
 
-    ctx.textAlign = 'right';
-    ctx.fillText(o.collapsed ? '▼' : '▲', x + w - 12, y + headerH / 2);
-  } else if (style === 'canvas') {
+      ctx.textAlign = 'right';
+      ctx.fillText(o.collapsed ? '▼' : '▲', x + w - 12, y + headerH / 2);
+    }
+  } else if (style === 'canvas' && !hideText) {
     const pillW = 28, pillH = 14;
     const px = x + w - pillW - 8;
     const py = y + 6;
@@ -785,7 +787,7 @@ export function drawNote(ctx, o, hideText = false, onload = null) {
 
 export function drawText(ctx, o, hideText = false, onload = null) {
   if (o.markdown !== false) {
-    drawMarkdownCardContainer(ctx, o, darkBoard);
+    drawMarkdownCardContainer(ctx, o, darkBoard, hideText);
     if (o.cardStyle === 'window' && o.collapsed) return;
   } else if (o.background && o.background !== 'none') {
     ctx.save();

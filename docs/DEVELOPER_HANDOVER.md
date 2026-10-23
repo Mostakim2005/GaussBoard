@@ -1,6 +1,6 @@
 # GazBoard Replay — Developer Handover & Future Agent Guide
 
-> **Current handover snapshot (2026-10-22):** v5.2.0 adds linked visual excerpts, split-pane clipboard/drop, heading/block references and Obsidian Markdown extensions. Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-5.2.0.md`](releases/RELEASE-5.2.0.md) for implementation, verification and artifact state. The v5.0.0 ranked audit is retained at [`releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](releases/AUDIT-POST-4.8.1-TO-5.0.0.md). The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
+> **Current handover snapshot (2026-10-23):** v5.3.0 delivers a comprehensive post-4.8.1 codebase audit, fixes 12 root-cause bugs and memory leaks, optimizes live replay stroke path caching by 6.4x, and adds 5 toggleable lateral features (`holdToShape`, `replaySkipSilence`, `tapStrokeToSeek`, `splitSyncScroll`, `autoDimBarsWhileInking`). Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-5.3.0.md`](releases/RELEASE-5.3.0.md) for implementation, verification and artifact state. The v5.0.0 ranked audit is retained at [`releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](releases/AUDIT-POST-4.8.1-TO-5.0.0.md). The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
 
 > **Important**: This document is the primary onboarding manual for any future AI assistant, software engineer, or contributor picking up this project in a new session or clean environment. It details the complete architecture, data models, state flows, invariant guardrails, and build instructions.
 
@@ -19,13 +19,13 @@
   6. *Pluggable Inking Pipeline*: Hardware DirectInk low-latency pen trail paired with pure-JS velocity-weighted cubic Bézier curve fitting (`Windows Ink` mode).
   7. *Deterministic Video Exporter*: Multi-session WebM animation pipeline with stitched audio tracks.
 
-## 1.1 Current Worktree and Release State (2026-10-22)
+## 1.1 Current Worktree and Release State (2026-10-23)
 
 - **Working repository:** `C:\Users\kazir\Documents\OpenCode\GazBoard`.
-- **Current source version:** v5.2.0, based on the local cumulative project feature line.
-- **Git state:** inspect `git status`, `git log`, and local tags at session start. The v5.2.0 tag is local; do not assume it has been pushed.
-- **Lineage:** local cumulative tags and upstream v4.9.0–v4.9.4 tags are on diverged histories. v5.2.0 continues the local line and is not a merge of upstream 4.9.x.
-- **Latest release scope:** [`releases/RELEASE-5.2.0.md`](releases/RELEASE-5.2.0.md) records excerpt linking, Markdown anchors/extensions, focused feature verification and the portable artifact. The v5.0.0 dossier retains the previous feature audit.
+- **Current source version:** v5.3.0, based on the local cumulative project feature line.
+- **Git state:** inspect `git status`, `git log`, and local tags at session start. The v5.3.0 tag is local; do not assume it has been pushed.
+- **Lineage:** local cumulative tags and upstream v4.9.0–v4.9.4 tags are on diverged histories. v5.3.0 continues the local line and is not a merge of upstream 4.9.x.
+- **Latest release scope:** [`releases/RELEASE-5.3.0.md`](releases/RELEASE-5.3.0.md) records the 12 root-cause bug fixes, 6.4x replay path cache optimization, 5 toggleable lateral features, verification counts and the portable artifact. The v5.0.0 dossier retains the previous feature audit.
 - **Archive policy:** keep active work here. Use the user-configured durable archive only after a release has passed checks; do not copy to historical Antigravity paths from older records.
 - **Verification/build state:** focused audit tests and locale checks pass; see [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md) for the portable artifact hash, remaining npm advisories, and architectural follow-ups.
 - **Audit attribution supplied by the project owner:** initial audit — Codex 4.6 Medium in Cursor; secondary audit/fixes — GPT-6 Luna High using Codex.

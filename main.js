@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, Menu, screen, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, Menu, screen, session, nativeTheme } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
@@ -129,6 +129,9 @@ function portableUserData(env = process.env) {
 }
 module.exports.portableUserData = portableUserData;
 
+if (process.argv.includes('--smoke') && nativeTheme) {
+  nativeTheme.themeSource = 'light';
+}
 if (process.env.GAZBOARD_USER_DATA) {
   fs.mkdirSync(process.env.GAZBOARD_USER_DATA, { recursive: true });
   app.setPath('userData', process.env.GAZBOARD_USER_DATA);
@@ -314,8 +317,8 @@ async function storageInfo({ count = false } = {}) {
 
 function remapImportedBoard(doc, ids) {
   const rewrite = (s) => typeof s === 'string' && s.includes('](b:')
-    ? s.replace(/@\[([^\]\n]{1,200})\]\(b:([A-Za-z0-9_-]{1,128})(#\d{1,4})?\)/g,
-      (all, name, id, page) => ids.has(id) ? `@[${name}](b:${ids.get(id)}${page || ''})` : all)
+    ? s.replace(/@\[([^\]\n]{1,200})\]\(b:([A-Za-z0-9_-]{1,128})(#(?:h:[^)\s]{1,200}|\d{1,4}))?\)/g,
+      (all, name, id, anchor) => ids.has(id) ? `@[${name}](b:${ids.get(id)}${anchor || ''})` : all)
     : s;
   const visit = (value) => {
     if (Array.isArray(value)) return value.map(visit);
@@ -323,6 +326,7 @@ function remapImportedBoard(doc, ids) {
     const out = {};
     for (const [key, item] of Object.entries(value)) out[key] = visit(item);
     if (out.type === 'boardlink' && out.board && ids.has(out.board.id)) out.board.id = ids.get(out.board.id);
+    if (out.type === 'image' && out.excerptSource && ids.has(out.excerptSource.boardId)) out.excerptSource.boardId = ids.get(out.excerptSource.boardId);
     if (out.runs && Array.isArray(out.runs)) {
       const joined = out.runs.map((r) => r.t || '').join('');
       if (joined !== out.text) delete out.runs;
@@ -670,6 +674,14 @@ async function openBoardPath(filePath) {
       const entry = zip.file('board.json');
       if (!entry) throw new Error('Invalid .gazboard archive: missing board.json');
       data = JSON.parse(await entry.async('text'));
+      for (const [relPath, fileEntry] of Object.entries(zip.files || {})) {
+        if (fileEntry.dir || !relPath.startsWith('assets/')) continue;
+        const assetId = relPath.slice('assets/'.length);
+        if (!ASSET_NAME.test(assetId)) continue;
+        const assetBuf = await fileEntry.async('nodebuffer');
+        await fsp.mkdir(assetsDir(), { recursive: true });
+        await writeAtomic(path.join(assetsDir(), assetId), assetBuf);
+      }
     } else {
       data = JSON.parse(buf.toString('utf8'));
     }
@@ -1305,7 +1317,7 @@ function ipc() {
         if (!StorageLocation.isBoardFile(raw)) continue;      // some other program's .json: not a board
         out.push({
           id: raw.id || path.basename(f, '.json'),
-          name: raw.name || 'Untitled board',
+          name: raw.name || raw.title || 'Untitled board',
           modified: st.mtimeMs,
           objects: (raw.objects || []).length,
           thumb: raw.thumb || null,

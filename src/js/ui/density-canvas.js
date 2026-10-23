@@ -1,17 +1,21 @@
 // Timeline stroke density scrubber canvas.
 // Plots stroke density ticks / intensity heatmap and bookmark pins across lecture duration.
 
+import { t } from '../i18n.js';
+
 export class DensityCanvas {
   /**
    * @param {object} opts
    * @param {number} [opts.width]   Display width in CSS pixels
    * @param {number} [opts.height]  Display height in CSS pixels
    * @param {(timeMs: number) => void} [opts.onSeek] Callback when user seeks by click/drag
+   * @param {(bm: object, prevName: string) => void} [opts.onBookmarkRenamed] Callback when bookmark is renamed
    */
-  constructor({ width = 240, height = 24, onSeek = null } = {}) {
+  constructor({ width = 240, height = 24, onSeek = null, onBookmarkRenamed = null } = {}) {
     this.width = width;
     this.height = height;
     this.onSeek = onSeek;
+    this.onBookmarkRenamed = onBookmarkRenamed;
     this.track = null;
     this.objects = null;
     this.currentTimeMs = 0;
@@ -102,7 +106,7 @@ export class DensityCanvas {
     const btnJump = document.createElement('button');
     btnJump.className = 'density-bm-jump-btn';
     btnJump.style.cssText = 'background:#ffb900;color:#000000;border:none;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;';
-    btnJump.textContent = 'Jump';
+    btnJump.textContent = t('Jump');
     btnJump.addEventListener('click', (ev) => {
       ev.stopPropagation();
       if (this.onSeek) this.onSeek(Math.round(bm.t));
@@ -113,7 +117,7 @@ export class DensityCanvas {
     btnName.className = 'density-bm-name-btn';
     btnName.style.cssText = 'background:none;border:none;color:inherit;opacity:0.8;cursor:pointer;padding:2px 4px;font-size:11px;display:inline-flex;align-items:center;';
     btnName.innerHTML = '✏️';
-    btnName.title = 'Name bookmark';
+    btnName.title = t('Name bookmark');
 
     const editWrap = document.createElement('div');
     editWrap.className = 'density-bm-edit-wrap';
@@ -121,18 +125,19 @@ export class DensityCanvas {
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.value = bm.name || '';
-    nameInput.placeholder = 'Bookmark name...';
+    nameInput.placeholder = t('Bookmark name...');
     nameInput.style.cssText = 'padding:2px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(0,0,0,0.3);color:inherit;font-size:11px;width:120px;outline:none;';
     const btnSave = document.createElement('button');
-    btnSave.textContent = 'Save';
+    btnSave.textContent = t('Save');
     btnSave.style.cssText = 'background:#ffb900;color:#000;border:none;border-radius:6px;padding:2px 6px;font-size:10.5px;font-weight:700;cursor:pointer;';
 
     const saveName = (ev) => {
       ev.stopPropagation();
+      const prevName = bm.name || '';
       bm.name = nameInput.value.trim();
       updateLabel();
       editWrap.style.display = 'none';
-      if (this.onBookmarkRenamed) this.onBookmarkRenamed(bm);
+      if (this.onBookmarkRenamed) this.onBookmarkRenamed(bm, prevName);
     };
 
     btnSave.addEventListener('click', saveName);
@@ -314,16 +319,18 @@ export class DensityCanvas {
       ctx.fillStyle = '#e91e63';
       ctx.fillRect(0, h / 2 - 2, px, 4);
 
-      // Collect all stroke timestamps for active track
-      const trackId = this.track?.id;
-      if (this.objects && trackId) {
-        const list = Array.isArray(this.objects) ? this.objects : Object.values(this.objects);
-        ctx.fillStyle = 'rgba(233, 30, 99, 0.55)';
-        for (const o of list) {
-          if (o && o.audioId === trackId && o.t0 != null) {
-            const x = Math.round((o.t0 / duration) * w);
-            ctx.fillRect(x - 0.5, 2, 1.5, h - 4);
-          }
+    }
+
+    // Collect all stroke timestamps for active track
+    const trackId = this.track?.id;
+    if (this.objects && trackId) {
+      const list = Array.isArray(this.objects) ? this.objects : Object.values(this.objects);
+      const hasWave = !!(this.waveformPeaks && this.waveformPeaks.length > 0);
+      ctx.fillStyle = hasWave ? 'rgba(0, 229, 255, 0.7)' : 'rgba(233, 30, 99, 0.55)';
+      for (const o of list) {
+        if (o && o.audioId === trackId && o.t0 != null) {
+          const x = Math.round((o.t0 / duration) * w);
+          ctx.fillRect(x - 0.5, hasWave ? h - 4 : 2, 1.5, hasWave ? 3 : h - 4);
         }
       }
     }

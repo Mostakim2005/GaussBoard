@@ -46,6 +46,10 @@ export class SplitWorkspace {
     return this.enabled;
   }
 
+  get isOpen() {
+    return this.enabled;
+  }
+
   /**
    * Mount dual-viewport workspace layout.
    */
@@ -154,6 +158,24 @@ export class SplitWorkspace {
     });
     btnSwap.addEventListener('click', () => this.swapPanes());
 
+    const syncActive = !!this.app?.settings?.splitSyncScroll;
+    const btnSyncScroll = h('button', {
+      class: 'btn-split-sync-scroll' + (syncActive ? ' active' : ''),
+      title: t('Sync pan & zoom across panes'),
+      'aria-pressed': String(syncActive),
+      style: `background:${syncActive ? 'rgba(0,120,212,0.14)' : 'none'};border:none;border-radius:6px;cursor:pointer;padding:4px;color:${syncActive ? 'var(--accent,#0078d4)' : 'inherit'};display:flex;align-items:center;`,
+      html: icon('link', 15)
+    });
+    this.btnSyncScroll = btnSyncScroll;
+    btnSyncScroll.addEventListener('click', () => {
+      if (!this.app?.settings) return;
+      const next = !this.app.settings.splitSyncScroll;
+      this.app.settings.splitSyncScroll = next;
+      this.app.saveSettings?.();
+      this.syncScrollUI();
+      this.app.toast?.(next ? t('Split view scroll synchronized') : t('Split view scroll independent'));
+    });
+
     const btnCloseSplit = h('button', {
       class: 'btn-split-close',
       title: t('Close split view'),
@@ -164,7 +186,7 @@ export class SplitWorkspace {
 
     const actionsWrap = h('div', {
       style: 'display:flex;align-items:center;gap:3px;'
-    }, btnUndo, btnRedo, btnProps, btnSwap, btnCloseSplit);
+    }, btnUndo, btnRedo, btnProps, btnSyncScroll, btnSwap, btnCloseSplit);
 
     const leftHeader = h('div', {
       class: 'split-left-header',
@@ -247,18 +269,23 @@ export class SplitWorkspace {
     this.leftStore = new Store();
     if (leftBoardData) {
       this.leftStore.load(leftBoardData);
-      if (this.pickerInput && leftBoardData.title) {
-        this.pickerInput.value = leftBoardData.title;
+      const boardName = leftBoardData.name || leftBoardData.title;
+      if (this.pickerInput && boardName) {
+        this.pickerInput.value = boardName;
       }
+      Promise.resolve(this.app?.resolveAssets?.(this.leftStore.doc)).then(() => {
+        this.leftSurface?.invalidate();
+      }).catch(() => {});
     }
     this.leftSurface = new Surface(cLeft, this.leftStore, { lowLatency: false });
     this.leftSurface.resize();
+    this._leftStoreUnsub = this.leftStore.subscribe(() => {
+      this.leftSurface?.invalidate();
+      this.saveLeftBoardDebounced();
+    });
 
     // Wire divider drag interaction
     this.wireDivider(this.divider);
-
-    // Wire left canvas navigation (wheel zooming and panning)
-    this.wireLeftCanvasNavigation(cLeft);
 
     // Proxy for dual interaction pipeline
     const leftAppProxy = new Proxy(this.app, {
@@ -267,6 +294,10 @@ export class SplitWorkspace {
         if (prop === 'surface') return this.leftSurface;
         if (prop === 'inkNibEl') return this.leftNib;
         if (prop === 'syncUI') return () => this.leftSurface?.invalidate();
+        if (prop === 'syncZoom') return () => {
+          this.syncCameraFromLeft();
+          this.leftSurface?.invalidate();
+        };
         if (prop === 'onGestureEnd') return () => this.saveLeftBoardDebounced();
         if (prop === 'setSelection') return (ids, additive = false) => {
           const sel = this.leftSurface?.selection;
@@ -287,6 +318,9 @@ export class SplitWorkspace {
       canvas: cLeft,
       inkNib: this.leftNib
     });
+
+    // Wire left canvas navigation (fallback if Interaction is not bound and sync hooks)
+    this.wireLeftCanvasNavigation(cLeft);
 
     this._resizeHandler = () => {
       if (this.leftSurface) this.leftSurface.resize();
@@ -323,12 +357,18 @@ export class SplitWorkspace {
       this._pickerOutsideClick = null;
     }
 
+    if (this._leftStoreUnsub) {
+      try { this._leftStoreUnsub(); } catch {}
+      this._leftStoreUnsub = null;
+    }
+
     if (this.leftInteraction) {
       this.leftInteraction.destroy();
       this.leftInteraction = null;
     }
 
     if (this.leftSurface) {
+      this.leftSurface.destroy?.();
       this.leftSurface.stop?.();
       this.leftSurface = null;
     }
@@ -468,15 +508,16 @@ export class SplitWorkspace {
     const leftData = this.leftStore.toJSON();
     const rightData = this.app.store.toJSON();
 
-    const prevLeftId = this.leftBoardId;
-    const prevRightId = this.app.boardId;
+    const prevLeftId = this.leftBoardId || leftData.id || null;
+    const prevRightId = this.app.store.doc?.id || this.app.boardId || rightData.id || null;
 
     this.leftStore.load(rightData);
     this.leftBoardId = prevRightId;
+    if (prevLeftId) leftData.id = prevLeftId;
     this.app.loadBoard(leftData, { asCopy: false });
 
     if (this.pickerInput) {
-      this.pickerInput.value = this.leftStore.doc?.title || t('Untitled');
+      this.pickerInput.value = this.leftStore.doc?.name || this.leftStore.doc?.title || rightData.name || rightData.title || t('Untitled');
     }
 
     if (this.leftSurface) this.leftSurface.repaintAll();
@@ -689,6 +730,9 @@ export class SplitWorkspace {
         try { data = JSON.parse(data); } catch {}
       }
       if (data) {
+        if (!data.name && data.title) data.name = data.title;
+        if (!Array.isArray(data.objects) && Array.isArray(data.elements)) data.objects = data.elements;
+        await this.app?.resolveAssets?.(data);
         this.leftBoardId = id;
         this.leftStore.load(data);
         if (this.leftSurface) {
@@ -696,7 +740,7 @@ export class SplitWorkspace {
           this.leftSurface.repaintAll();
         }
         if (this.pickerInput) {
-          this.pickerInput.value = data.title || t('Untitled');
+          this.pickerInput.value = data.name || data.title || t('Untitled');
         }
         if (this.leftPropertiesDialog) {
           this.leftPropertiesDialog.targetDoc = this.leftStore.doc;
@@ -715,11 +759,14 @@ export class SplitWorkspace {
     const name = title.trim();
     const id = `b_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
     const newDoc = {
+      schema: 2,
       v: 2,
       id,
+      name,
       title: name,
       created: Date.now(),
       modified: Date.now(),
+      objects: [],
       elements: [],
       pages: [{ id: 'p_1', x: 0, y: 0, w: 1920, h: 1080 }],
       properties: { tags: [], aliases: [] }
@@ -759,7 +806,14 @@ export class SplitWorkspace {
   async saveLeftBoard() {
     if (!this.leftBoardId || !this.leftStore) return;
     try {
-      const json = JSON.stringify(this.leftStore.toJSON());
+      const doc = this.leftStore.toJSON();
+      doc.id = this.leftBoardId;
+      if (!doc.name && this.pickerInput?.value?.trim()) {
+        doc.name = this.pickerInput.value.trim();
+      }
+      doc.title = doc.name;
+      await this.app?.externaliseAssets?.(doc);
+      const json = JSON.stringify(doc);
       if (window.board?.boards?.save) {
         await window.board.boards.save({ id: this.leftBoardId, json, setLast: false });
       }
@@ -768,19 +822,63 @@ export class SplitWorkspace {
     }
   }
 
-  wireLeftCanvasNavigation(cLeft) {
-    if (!cLeft) return;
+  syncScrollUI() {
+    if (!this.btnSyncScroll) return;
+    const syncActive = !!this.app?.settings?.splitSyncScroll;
+    this.btnSyncScroll.classList.toggle('active', syncActive);
+    this.btnSyncScroll.setAttribute('aria-pressed', String(syncActive));
+    this.btnSyncScroll.style.background = syncActive ? 'rgba(0,120,212,0.14)' : 'none';
+    this.btnSyncScroll.style.color = syncActive ? 'var(--accent,#0078d4)' : 'inherit';
+  }
 
+  syncCameraFromLeft() {
+    if (!this.enabled || !this.app?.settings?.splitSyncScroll || this._syncingCam) return;
+    const src = this.leftSurface?.cam;
+    const dst = this.app?.surface?.cam;
+    if (!src || !dst) return;
+    this._syncingCam = true;
+    try {
+      dst.x = src.x;
+      dst.y = src.y;
+      dst.z = src.z;
+      this.app.surface?.clampCamera?.();
+      this.app.surface?.invalidate?.();
+    } finally {
+      this._syncingCam = false;
+    }
+  }
+
+  syncCameraFromRight() {
+    if (!this.enabled || !this.app?.settings?.splitSyncScroll || this._syncingCam) return;
+    const src = this.app?.surface?.cam;
+    const dst = this.leftSurface?.cam;
+    if (!src || !dst) return;
+    this._syncingCam = true;
+    try {
+      dst.x = src.x;
+      dst.y = src.y;
+      dst.z = src.z;
+      this.leftSurface?.clampCamera?.();
+      this.leftSurface?.invalidate?.();
+    } finally {
+      this._syncingCam = false;
+    }
+  }
+
+  wireLeftCanvasNavigation(cLeft) {
+    if (!cLeft || this.leftInteraction) return;
     cLeft.addEventListener('wheel', (e) => {
       e.preventDefault();
       if (!this.leftSurface) return;
       const cam = this.leftSurface.cam;
-      if (e.ctrlKey) {
+      const sp = this.leftSurface.screenPoint ? this.leftSurface.screenPoint(e) : { x: e.clientX, y: e.clientY };
+      if (e.ctrlKey || e.metaKey) {
         const factor = e.deltaY < 0 ? 1.1 : 0.9;
-        cam.zoomAt?.(factor, e.clientX, e.clientY);
+        cam.zoomAt?.(sp.x, sp.y, factor);
       } else {
-        cam.pan?.(-e.deltaX, -e.deltaY);
+        cam.panBy?.(-e.deltaX, -e.deltaY);
       }
+      this.syncCameraFromLeft();
       this.leftSurface.repaintAll();
     }, { passive: false });
   }

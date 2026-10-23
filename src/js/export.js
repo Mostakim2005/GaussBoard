@@ -14,7 +14,7 @@ import { t } from './i18n.js';
 import { mathEntry, mathPng, hasMaths, inlineFit } from './core/maths.js';
 import { connectorSvg } from './core/connectors.js';
 import { loadZip } from './board-export.js';
-import { calligraphySvgPath } from './core/ink.js';
+import { calligraphySvgPath, brushRuns, fountainRuns } from './core/ink.js';
 import { isMarkdown, renderMarkdownToHtml } from './core/markdown.js';
 
 /**
@@ -232,6 +232,19 @@ function svgObjects(objects, meas) {
       if (o.tool === 'calligraphy') {
         const d = calligraphySvgPath(o);
         parts.push(`<path d="${d}" fill="${o.color}"${o.opacity != null && o.opacity < 1 ? ` opacity="${o.opacity}"` : ''}${rot}/>`);
+      } else if ((o.tool === 'brush' || o.tool === 'fountain') && o.points?.length >= 2) {
+        const runs = o.tool === 'brush'
+          ? brushRuns(o.points, o.width, o.softness || 'medium', o.velocityThinning !== false, 1)
+          : fountainRuns(o.points, o.width, o.slant ?? 45, o.flex || 'normal', 1);
+        const opAttr = o.opacity != null && o.opacity < 1 ? ` opacity="${o.opacity}"` : '';
+        parts.push(`<g${opAttr}${rot}>`);
+        for (const r of runs) {
+          const segPts = o.points.slice(r.a, r.b + 1);
+          if (!segPts.length) continue;
+          const d = segPts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+          parts.push(`<path d="${d}" fill="none" stroke="${o.color}" stroke-width="${r.width.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`);
+        }
+        parts.push(`</g>`);
       } else {
         const d = o.points.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
         const hl = o.tool === 'highlighter';
@@ -254,7 +267,8 @@ function svgObjects(objects, meas) {
       parts.push(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="4" fill="${o.color}"${rot}/>`);
       if (o.text) parts.push(textSvg(meas, o.text, o.x + 14, o.y + 14, o.w - 28, o.h - 28, { align: o.align || 'center', valign: 'middle', color: o.textColor || '#201f1e', size: o.fontSize || 22, runs: objectRuns(o), bold: o.bold, italic: o.italic, underline: o.underline, font: o.font }, rot));
     } else if (o.type === 'text') {
-      if ((o.markdown === true || o.cardStyle) && isMarkdown(o.text)) {
+      const hasMdSyntax = /(?:^|\n)\s*(?:#{1,6}\s+|>{1}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+\.\s+|\|.+\||`{3,}|~{3,})|^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)|(?:\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~]+~~|(?<!~)~(?!~)[^~\n]+(?<!~)~(?!~)|\^[^^\n]+\^|==[^=\n]+==|`[^`\n]+`|<u>[\s\S]+?<\/u>|\$\$[\s\S]+?\$\$|!?\[\[[^\]]+\]\]|\[\^[^\]]+\]|%%[\s\S]*?%%|(?:^|[\s(\[{"'])#[a-zA-Z][a-zA-Z0-9_\-/]*)/.test(o.text || '');
+      if ((o.markdown === true || o.cardStyle) && isMarkdown(o.text) && hasMdSyntax) {
         const pad = 12;
         const x = o.x - pad, y = o.y - pad, w = o.w + pad * 2, h = o.h + pad * 2;
         const bg = o.background && o.background !== 'none' ? o.background : '#ffffff';
@@ -293,7 +307,17 @@ function svgObjects(objects, meas) {
         parts.push(`<image x="${x}" y="${y}" width="${dw}" height="${dh}" href="${mathPng(e, dw, dh)}"${rot}><title>${esc(o.tex || '')}</title></image>`);
       }
     } else if (o.type === 'image') {
-      parts.push(`<image x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" href="${o.src}" preserveAspectRatio="none"${rot}/>`);
+      const img = getImage(o.src);
+      if (o.crop && o.crop.sw > 0 && o.crop.sh > 0 && img && img.complete && img.naturalWidth > 0 && typeof document !== 'undefined') {
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(o.crop.sw));
+        cv.height = Math.max(1, Math.round(o.crop.sh));
+        const cx = cv.getContext('2d');
+        cx.drawImage(img, o.crop.sx, o.crop.sy, o.crop.sw, o.crop.sh, 0, 0, cv.width, cv.height);
+        parts.push(`<image x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" href="${cv.toDataURL('image/png')}" preserveAspectRatio="none"${rot}/>`);
+      } else {
+        parts.push(`<image x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" href="${o.src}" preserveAspectRatio="none"${rot}/>`);
+      }
     } else if (o.type === 'curtain') {
       // a lifted cover is not on the board, so it is not in the picture either
       if (!o.revealed) {
@@ -714,6 +738,15 @@ export async function saveBoardFile(app) {
     const Zip = await loadZip();
     const zip = new Zip();
     zip.file('board.json', JSON.stringify(doc, null, 0));
+    for (const tr of doc.audioTracks) {
+      if (!tr?.assetId) continue;
+      try {
+        const audioBuf = await window.board?.recording?.readAsset?.(tr.assetId);
+        if (audioBuf && audioBuf.byteLength > 0) {
+          zip.file('assets/' + tr.assetId, new Uint8Array(audioBuf));
+        }
+      } catch {}
+    }
     const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 1 } });
     await window.board.writeFile(filePath, bytes.buffer);
   } else {
@@ -742,6 +775,17 @@ export async function openBoardFile(app) {
     const boardEntry = zip.file('board.json');
     if (!boardEntry) throw new Error(t('Invalid .gazboard archive: missing board.json'));
     data = JSON.parse(await boardEntry.async('text'));
+    if (window.board?.assets?.putBinaryDirect) {
+      for (const [relPath, fileEntry] of Object.entries(zip.files || {})) {
+        if (fileEntry.dir || !relPath.startsWith('assets/')) continue;
+        const assetId = relPath.slice('assets/'.length);
+        if (!assetId || /[\\/]/.test(assetId)) continue;
+        try {
+          const assetBytes = await fileEntry.async('uint8array');
+          await window.board.assets.putBinaryDirect(assetId, assetBytes);
+        } catch {}
+      }
+    }
   } else {
     data = JSON.parse(new TextDecoder().decode(buf));
   }

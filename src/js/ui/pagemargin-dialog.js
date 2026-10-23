@@ -32,11 +32,35 @@ export class PageMarginDialog {
 
   open() {
     this.close();
+    const curIdx = this.app?.currentPageIndex?.() || 0;
+    const curPage = this.app?.pages?.[curIdx];
+    if (curPage?.margins) {
+      this.margins = {
+        left: Number(curPage.margins.left ?? 40),
+        right: Number(curPage.margins.right ?? 40),
+        top: Number(curPage.margins.top ?? 40),
+        bottom: Number(curPage.margins.bottom ?? 40)
+      };
+    }
+    if (curPage?.bg || this.app?.store?.doc?.background?.color) {
+      this.color = curPage?.bg || this.app.store.doc.background.color;
+    }
     this.build();
+    this._onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        this.close();
+      }
+    };
+    if (typeof window !== 'undefined') window.addEventListener('keydown', this._onKeyDown);
     document.body.appendChild(this.el);
   }
 
   close() {
+    if (this._onKeyDown && typeof window !== 'undefined') {
+      window.removeEventListener('keydown', this._onKeyDown);
+      this._onKeyDown = null;
+    }
     if (this.el) {
       this.el.remove();
       this.el = null;
@@ -44,6 +68,11 @@ export class PageMarginDialog {
   }
 
   apply() {
+    if (this.sizePreset === 'infinite') {
+      this.app.setInfiniteCanvas?.();
+      this.close();
+      return;
+    }
     const pad = this.app.pages;
     if (!pad || !pad.length) {
       // If infinite, create a pad sheet
@@ -54,8 +83,10 @@ export class PageMarginDialog {
     const pages = this.app.pages.map((p, idx) => {
       if (this.scope === 'single' && idx !== curIdx) return p;
       // Adjust page width/height with margin expansion
-      const baseW = p.baseW || p.w || 794;
-      const baseH = p.baseH || p.h || 1122;
+      const presetW = this.sizePreset === 'letter' ? 816 : (this.sizePreset === 'a4' ? 794 : null);
+      const presetH = this.sizePreset === 'letter' ? 1056 : (this.sizePreset === 'a4' ? 1122 : null);
+      const baseW = presetW || p.baseW || p.w || 794;
+      const baseH = presetH || p.baseH || p.h || 1122;
       const extraW = Math.max(0, this.margins.left + this.margins.right - 80);
       const extraH = Math.max(0, this.margins.top + this.margins.bottom - 80);
       return {
@@ -125,6 +156,11 @@ export class PageMarginDialog {
       h('option', { value: 'letter' }, 'Letter'),
       h('option', { value: 'infinite' }, t('Infinite'))
     );
+    sizeSelect.value = this.sizePreset || 'custom';
+    sizeSelect.addEventListener('change', () => {
+      this.sizePreset = sizeSelect.value;
+      updatePreviewBox();
+    });
     const sizeRow = h('div', {
       style: 'display:flex;align-items:center;justify-content:space-between;'
     }, h('span', { style: 'font-size:13px;font-weight:600;' }, t('Size')), sizeSelect);
@@ -153,11 +189,11 @@ export class PageMarginDialog {
 
     // 4. Template presets
     const templates = [
-      { id: 'standard', title: 'Standard (Equal)', m: { left: 40, right: 40, top: 40, bottom: 40 }, icon: '◻' },
-      { id: 'cornell', title: 'Cornell (Wide Left)', m: { left: 130, right: 30, top: 40, bottom: 40 }, icon: '▍◻' },
-      { id: 'rightMargin', title: 'Wide Right', m: { left: 30, right: 130, top: 40, bottom: 40 }, icon: '◻▍' },
-      { id: 'topHeader', title: 'Top Header', m: { left: 40, right: 40, top: 100, bottom: 40 }, icon: '▀◻' },
-      { id: 'twoCol', title: 'Two Columns', m: { left: 30, right: 30, top: 40, bottom: 40 }, icon: '▥' }
+      { id: 'standard', title: t('Standard (Equal)'), m: { left: 40, right: 40, top: 40, bottom: 40 }, icon: '◻' },
+      { id: 'cornell', title: t('Cornell (Wide Left)'), m: { left: 130, right: 30, top: 40, bottom: 40 }, icon: '▍◻' },
+      { id: 'rightMargin', title: t('Wide Right'), m: { left: 30, right: 130, top: 40, bottom: 40 }, icon: '◻▍' },
+      { id: 'topHeader', title: t('Top Header'), m: { left: 40, right: 40, top: 100, bottom: 40 }, icon: '▀◻' },
+      { id: 'twoCol', title: t('Two Columns'), m: { left: 30, right: 30, top: 40, bottom: 40 }, icon: '▥' }
     ];
 
     const tplRow = h('div', { style: 'display:flex;align-items:center;justify-content:space-between;' },

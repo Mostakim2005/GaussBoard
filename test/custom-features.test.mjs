@@ -569,3 +569,161 @@ test('split workspace undo routing distinguishes pointer location over left stud
   mockApp.command('undo');
   assert.equal(primaryStore.has('p1'), false, 'Primary board stroke should now be undone');
 });
+
+test('Store.commit filters malformed non-operation entries to protect undoStack integrity', () => {
+  const store = new Store();
+  const added = store.add({ id: 'card-1', type: 'boardlink', x: 10, y: 10, w: 200, h: 90, showThumb: true });
+  assert.equal(added.showThumb, true);
+
+  store.update('card-1', { showThumb: false }, 'toggle thumbnail');
+  // Attempting to commit an array of string IDs must be ignored rather than corrupting undoStack
+  store.commit('corrupt commit', ['card-1']);
+  assert.equal(store.undoStack.length, 2);
+
+  // Undo should cleanly restore showThumb without throwing
+  store.undo();
+  assert.equal(store.get('card-1').showThumb, true);
+});
+
+test('Lateral Feature #1 (holdToShape): converts held stroke to geometric shape when enabled and is inert when disabled', () => {
+  const store = new Store();
+  const rectPoints = [
+    { x: 0, y: 0, p: 0.5, t: 0 },
+    { x: 50, y: 0, p: 0.5, t: 25 },
+    { x: 100, y: 0, p: 0.5, t: 50 },
+    { x: 100, y: 40, p: 0.5, t: 75 },
+    { x: 100, y: 80, p: 0.5, t: 100 },
+    { x: 50, y: 80, p: 0.5, t: 125 },
+    { x: 0, y: 80, p: 0.5, t: 150 },
+    { x: 0, y: 40, p: 0.5, t: 175 },
+    { x: 0, y: 0, p: 0.5, t: 200 }
+  ];
+
+  const interaction = Object.create(Interaction.prototype);
+  interaction.store = store;
+  interaction.surface = { wet: null, invalidate() {} };
+  interaction.app = {
+    tool: 'pen',
+    settings: { holdToShape: false, penColor: '#201f1e', penWidth: 4 },
+    setSelection() {},
+    toast() {}
+  };
+  interaction.action = {
+    type: 'draw',
+    tool: 'pen',
+    points: rectPoints.map((p) => ({ ...p })),
+    snappedByHold: false
+  };
+
+  // Disabled: zero effect
+  assert.equal(interaction.convertHeldStrokeToShape(), false);
+  assert.equal(store.objects.length, 0);
+
+  // Enabled: snaps rectangle and marks snappedByHold
+  interaction.app.settings.holdToShape = true;
+  assert.equal(interaction.convertHeldStrokeToShape(), true);
+  assert.equal(interaction.action.snappedByHold, true);
+  assert.equal(store.objects.length, 1);
+  assert.equal(store.objects[0].type, 'shape');
+});
+
+test('Lateral Feature #2 (replaySkipSilence): fast-forwards across silent gaps >2s when enabled and respects bookmarks', async () => {
+  const { ReplayEngine } = await import('../src/js/core/replay.js');
+  const store = new Store();
+  store.add({
+    id: 's1', type: 'stroke', audioId: 'tr-1', t0: 0, t1: 800,
+    points: [{ x: 0, y: 0, t: 0 }, { x: 20, y: 20, t: 800 }]
+  });
+  store.add({
+    id: 's2', type: 'stroke', audioId: 'tr-1', t0: 5000, t1: 6000,
+    points: [{ x: 40, y: 40, t: 5000 }, { x: 60, y: 60, t: 6000 }]
+  });
+
+  const app = {
+    store,
+    settings: { replaySkipSilence: false },
+    surface: { invalidate() {} }
+  };
+  const engine = new ReplayEngine(app);
+  engine.track = { id: 'tr-1', durationMs: 10000, bookmarks: [{ id: 'bm-1', t: 3600, name: 'Midpoint' }] };
+  engine.active = true;
+  engine.pendingSeekMs = null;
+  engine.currentTimeMs = 1300; // >400ms after s1 ended (800ms), 2300ms before bookmark (3600ms)
+
+  // Disabled: does not skip
+  assert.equal(engine.checkSkipSilence(), false);
+  assert.equal(engine.currentTimeMs, 1300);
+
+  // Enabled: skips to 250ms before the bookmark at 3600ms (3350ms), not past it
+  app.settings.replaySkipSilence = true;
+  assert.equal(engine.checkSkipSilence(), true);
+  assert.equal(engine.currentTimeMs, 3350);
+});
+
+test('Lateral Feature #3 (tapStrokeToSeek): jumps audio replay to tapped stroke timestamp when enabled', () => {
+  let openedTrack = null;
+  let seekedMs = null;
+  const track = { id: 'tr-seek', name: 'Lecture 1', durationMs: 12000 };
+  const stroke = { id: 'st-1', type: 'stroke', audioId: 'tr-seek', t0: 4250, t1: 5100, points: [{ x: 0, y: 0, t: 4250 }] };
+
+  const interaction = Object.create(Interaction.prototype);
+  interaction.store = { doc: { audioTracks: [track] } };
+  interaction.app = {
+    settings: { tapStrokeToSeek: false },
+    replayEngine: { track: null, seek: (ms) => { seekedMs = ms; } },
+    audioBar: {
+      visible: false,
+      open: (tr) => { openedTrack = tr; interaction.app.replayEngine.track = tr; },
+      seek: (ms) => { seekedMs = ms; }
+    },
+    toast() {}
+  };
+
+  // Disabled: returns false
+  assert.equal(interaction.seekToStrokeAudio(stroke), false);
+  assert.equal(seekedMs, null);
+
+  // Enabled: opens track and seeks to stroke.t0 (4250ms)
+  interaction.app.settings.tapStrokeToSeek = true;
+  assert.equal(interaction.seekToStrokeAudio(stroke), true);
+  assert.equal(openedTrack, track);
+  assert.equal(seekedMs, 4250);
+});
+
+test('Lateral Feature #4 (splitSyncScroll): synchronizes camera coordinates across panes only when enabled', async () => {
+  const { SplitWorkspace } = await import('../src/js/ui/split-workspace.js');
+  let leftInvalidated = 0;
+  let rightInvalidated = 0;
+  const app = {
+    settings: { splitSyncScroll: false },
+    surface: {
+      cam: { x: 120, y: -80, z: 1.5 },
+      invalidate() { rightInvalidated++; }
+    }
+  };
+  const sw = new SplitWorkspace(app);
+  sw.enabled = true;
+  sw.leftSurface = {
+    cam: { x: 0, y: 0, z: 1 },
+    invalidate() { leftInvalidated++; }
+  };
+
+  // Disabled: cameras remain independent
+  sw.syncCameraFromRight();
+  assert.deepEqual(sw.leftSurface.cam, { x: 0, y: 0, z: 1 });
+  assert.equal(leftInvalidated, 0);
+
+  // Enabled: right camera syncs to left camera
+  app.settings.splitSyncScroll = true;
+  sw.syncCameraFromRight();
+  assert.deepEqual({ x: sw.leftSurface.cam.x, y: sw.leftSurface.cam.y, z: sw.leftSurface.cam.z }, { x: 120, y: -80, z: 1.5 });
+  assert.equal(leftInvalidated, 1);
+
+  // Left camera syncs back to right camera
+  sw.leftSurface.cam.x = -40;
+  sw.leftSurface.cam.y = 60;
+  sw.leftSurface.cam.z = 2.0;
+  sw.syncCameraFromLeft();
+  assert.deepEqual({ x: app.surface.cam.x, y: app.surface.cam.y, z: app.surface.cam.z }, { x: -40, y: 60, z: 2.0 });
+  assert.equal(rightInvalidated, 1);
+});

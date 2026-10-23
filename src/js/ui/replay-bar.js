@@ -144,7 +144,7 @@ export class ReplayBar {
     // Drag / Grip Handle
     const handle = h('div', {
       class: 'rb-handle',
-      title: 'Drag to move \u2014 Double-click to rotate',
+      title: t('Drag to move \u2014 Double-click to rotate'),
       style: 'cursor:grab;display:flex;align-items:center;justify-content:center;padding:4px 6px;color:var(--text-2,rgba(128,128,128,0.8));user-select:none;touch-action:none;',
       html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>'
     });
@@ -159,7 +159,7 @@ export class ReplayBar {
       class: 'rb-btn rb-overview',
       title: t('Note Overview (Browse document previews, tags, aliases)'),
       style: 'display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:600;color:inherit;transition:background 0.15s;',
-      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span>Notes</span>'
+      html: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span>${t('Notes')}</span>`
     });
     this.btnOverview.addEventListener('click', () => {
       this.app.toggleNoteOverview?.();
@@ -191,7 +191,7 @@ export class ReplayBar {
       class: 'rb-btn rb-playbar',
       title: t('Audio Playback Bar (Listen and scrub synced strokes)'),
       style: 'display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:18px;font-size:12.5px;font-weight:500;color:inherit;',
-      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>Replay</span>'
+      html: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>${t('Replay')}</span>`
     });
     this.btnPlayBar.addEventListener('click', () => {
       const tracks = this.app.store?.doc?.audioTracks || [];
@@ -220,7 +220,7 @@ export class ReplayBar {
       class: 'rb-btn rb-tape',
       title: t('Study Tape (Draw freehand marker tape over notes \u2014 tap to reveal/hide)'),
       style: 'display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:500;color:inherit;transition:all 0.15s;',
-      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="17" y1="7" x2="17" y2="17"/></svg><span>Tape</span>'
+      html: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="10" rx="2"/><line x1="7" y1="7" x2="7" y2="17"/><line x1="17" y1="7" x2="17" y2="17"/></svg><span>${t('Tape')}</span>`
     });
     this.btnTape.addEventListener('click', () => {
       if (this.app.tool === 'tape') {
@@ -239,9 +239,9 @@ export class ReplayBar {
     // 6. Split Study Workspace Button
     this.btnSplit = h('button', {
       class: 'rb-btn rb-split',
-      title: 'Split Study Workspace (Dual side-by-side view for PDF and active notes)',
+      title: t('Split Study Workspace (Dual side-by-side view for PDF and active notes)'),
       style: 'display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:500;color:inherit;transition:background 0.15s;',
-      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg><span>Split</span>'
+      html: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg><span>${t('Split')}</span>`
     });
     this.btnSplit.addEventListener('click', () => {
       if (this.app.splitWorkspace) {
@@ -258,7 +258,7 @@ export class ReplayBar {
       class: 'rb-btn rb-markdown',
       title: t('Insert Markdown note (Obsidian format with tags, wikilinks, and math)'),
       style: 'display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:600;color:inherit;transition:background 0.15s;',
-      html: '<span style="font-family:monospace;font-weight:900;font-size:12px;border:1px solid currentColor;border-radius:4px;padding:0 3px;line-height:1.1;">M↓</span><span>Markdown</span>'
+      html: `<span style="font-family:monospace;font-weight:900;font-size:12px;border:1px solid currentColor;border-radius:4px;padding:0 3px;line-height:1.1;">M↓</span><span>${t('Markdown')}</span>`
     });
     this.btnMarkdown.addEventListener('click', () => {
       this.app.insertMarkdownCard?.();
@@ -269,7 +269,7 @@ export class ReplayBar {
       class: 'rb-btn rb-pagemargin',
       title: t('Adjust Page Margins (Set printable/writable page margins)'),
       style: 'display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:18px;font-size:12.5px;font-weight:500;color:inherit;transition:background 0.15s;',
-      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" stroke-dasharray="2 2"/></svg><span>Margin</span>'
+      html: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" stroke-dasharray="2 2"/></svg><span>${t('Margin')}</span>`
     });
     this.btnPageMargin.addEventListener('click', () => {
       this.app.openPageMarginDialog?.();
@@ -278,9 +278,9 @@ export class ReplayBar {
     // 7. Video Export Button
     this.btnVideo = h('button', {
       class: 'rb-btn rb-video',
-      title: 'Export Replay Video (WebM animated video export with progress & cancel)',
+      title: t('Export Replay Video (WebM animated video export with progress & cancel)'),
       style: 'display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:500;color:inherit;transition:background 0.15s;',
-      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg><span>Video</span>'
+      html: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg><span>${t('Video')}</span>`
     });
     this.btnVideo.addEventListener('click', () => {
       exportVideoFile(this.app);
@@ -301,6 +301,7 @@ export class ReplayBar {
         ? t('Scratch-Out Eraser: ON (Click to toggle, right-click for settings & targets)')
         : t('Scratch-Out Eraser: OFF (Click to toggle, right-click for settings & targets)');
     };
+    this.updateScratchUI = updateScratchUI;
     this.btnScratch.addEventListener('click', () => {
       this.app.settings.scratchOut = !(this.app.settings?.scratchOut !== false);
       this.app.saveSettings();
@@ -317,7 +318,7 @@ export class ReplayBar {
     // 9. Dock & Settings Cog Menu
     this.btnMenu = h('button', {
       class: 'rb-btn rb-menu',
-      title: 'Replay Bar Settings (Docking, Orientation & Tool Visibility)',
+      title: t('Replay Bar Settings (Docking, Orientation & Tool Visibility)'),
       style: 'display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:6px;border-radius:50%;color:inherit;',
       html: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
     });
@@ -327,7 +328,7 @@ export class ReplayBar {
     this.el = h('div', {
       id: 'replayBar',
       class: 'replay-bar-hud',
-      style: 'position:absolute;z-index:9000;display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--surface-glass,rgba(28,32,38,0.9));color:var(--text,#ffffff);border:1px solid var(--stroke-glass,rgba(255,255,255,0.16));border-radius:36px;box-shadow:0 10px 32px rgba(0,0,0,0.32),0 2px 6px rgba(0,0,0,0.18),inset 0 1px 0 rgba(255,255,255,0.12);font-family:inherit;font-size:13px;backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);transition:box-shadow 0.2s,border-color 0.2s;'
+      style: 'position:absolute;z-index:21;display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--surface-glass,rgba(28,32,38,0.9));color:var(--text,#ffffff);border:1px solid var(--stroke-glass,rgba(255,255,255,0.16));border-radius:36px;box-shadow:0 10px 32px rgba(0,0,0,0.32),0 2px 6px rgba(0,0,0,0.18),inset 0 1px 0 rgba(255,255,255,0.12);font-family:inherit;font-size:13px;backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);transition:box-shadow 0.2s,border-color 0.2s;'
     }, handle, this.btnOverview, this.btnSearch, this.btnAudio, this.btnPlayBar, this.btnMode, this.btnTape, this.btnSplit, this.btnMarkdown, this.btnPageMargin, this.btnVideo, this.btnScratch, this.btnMenu);
 
     this.updateVisibility();
@@ -374,8 +375,10 @@ export class ReplayBar {
           bookmarks: []
         };
         if (!Array.isArray(this.app.store.doc.audioTracks)) this.app.store.doc.audioTracks = [];
+        const before = this.app.store.doc.audioTracks.map((item) => ({ ...item, bookmarks: (item.bookmarks || []).map((b) => ({ ...b })) }));
         this.app.store.doc.audioTracks.push(track);
-        this.app.store.commit('record audio', []);
+        const after = this.app.store.doc.audioTracks.map((item) => ({ ...item, bookmarks: (item.bookmarks || []).map((b) => ({ ...b })) }));
+        this.app.store.commit('record audio', [{ t: 'doc', before: { audioTracks: before }, after: { audioTracks: after } }]);
         this.app.audioBar?.open(track);
         this.app.toast(t('Recording saved and loaded into AudioBar!'));
       }
@@ -502,13 +505,33 @@ export class ReplayBar {
     menu.appendChild(section(t('Orientation')));
     menu.appendChild(orientRow);
     menu.appendChild(section(t('Visible Tools')));
+    menu.appendChild(toolToggle('overview', t('Note Overview')));
+    menu.appendChild(toolToggle('search', t('OmniSearch')));
     menu.appendChild(toolToggle('audio', t('Audio (Record & Replay)')));
+    menu.appendChild(toolToggle('playbar', t('Playback HUD')));
     menu.appendChild(toolToggle('tape', t('Study Tape')));
     menu.appendChild(toolToggle('split', t('Split Workspace')));
     menu.appendChild(toolToggle('video', t('Export Video')));
     menu.appendChild(toolToggle('scratch', t('Scratch Eraser Info')));
     menu.appendChild(toolToggle('markdown', t('Markdown Note')));
     menu.appendChild(toolToggle('pagemargin', t('Page Margins')));
+
+    if (this.app?.settings) {
+      menu.appendChild(section(t('Behavior')));
+      const autoDimSw = h('input', {
+        type: 'checkbox',
+        checked: this.app.settings.autoDimBarsWhileInking !== false,
+        style: 'cursor:pointer;accent-color:#0078d4;'
+      });
+      autoDimSw.addEventListener('change', (ev) => {
+        this.app.settings.autoDimBarsWhileInking = ev.target.checked;
+        this.app.saveSettings();
+      });
+      const autoDimRow = h('label', {
+        style: 'display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:8px;cursor:pointer;transition:background 0.12s;'
+      }, h('span', { style: 'font-weight:500;' }, t('Auto-dim bars while writing')), autoDimSw);
+      menu.appendChild(autoDimRow);
+    }
 
     const closeHandler = (ev) => {
       if (!menu.contains(ev.target) && ev.target !== this.btnMenu) {

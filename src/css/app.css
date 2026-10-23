@@ -1772,3 +1772,12 @@ body.presenting.show-tools #toolbar { translate: 0 0; opacity: 1; pointer-events
   text-decoration: underline;
   font-weight: 500;
 }
+
+body.inking-active #toolbar,
+body.inking-active #replayBar,
+body.inking-active #audioBar,
+body.inking-active #pagebar {
+  opacity: 0.32;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}

@@ -1076,9 +1076,9 @@ export function buildMarkdownSvgDataUri(markdownText, options = {}) {
   const cssContent = getMarkdownInlineCss(options);
 
   const svg =
-    `<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
       `<foreignObject width="100%" height="100%">` +
-        `<div xmlns="[http://www.w3.org/1999/xhtml](http://www.w3.org/1999/xhtml)" class="gb-markdown-body">` +
+        `<div xmlns="http://www.w3.org/1999/xhtml" class="gb-markdown-body">` +
           `<style>${cssContent}</style>` +
           htmlContent +
         `</div>` +

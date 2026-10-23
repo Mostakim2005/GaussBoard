@@ -167,7 +167,7 @@ export class Store {
 
   /** Run ops as one undoable transaction. */
   commit(label, ops) {
-    ops = ops.filter(Boolean);
+    ops = (Array.isArray(ops) ? ops : []).filter((op) => op && typeof op === 'object' && typeof op.t === 'string');
     if (!ops.length) return;
     const inverse = [];
     for (const op of ops) { inverse.unshift(this._invert(op)); this._apply(op); }
@@ -379,7 +379,7 @@ export class Store {
   }
 
   load(data) {
-    const d = emptyDoc(data.name || t('Untitled board'));
+    const d = emptyDoc(data.name || data.title || t('Untitled board'));
     d.id = data.id || d.id;
     d.created = data.created || Date.now();
     d.modified = data.modified || Date.now();
@@ -396,7 +396,8 @@ export class Store {
     }
     const list = Array.isArray(data.objects) ? data.objects
       : Array.isArray(data.objectList) ? data.objectList
-        : data.objects ? Object.values(data.objects) : [];
+        : Array.isArray(data.elements) ? data.elements
+          : data.objects ? Object.values(data.objects) : [];
     for (const o of list) {
       normalizeTextObject(o);
       d.objects[o.id] = o;

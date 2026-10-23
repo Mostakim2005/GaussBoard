@@ -1462,6 +1462,10 @@ export function createPanels(app) {
           h('h5', {}, t('Inking')),
           row(t('Straighten shapes I draw'), mkToggle(() => s.inkToShape, (v) => (s.inkToShape = v)),
             t('Off by default: ink is kept exactly as you drew it. Switch on and a hand-drawn circle, box or arrow snaps to a clean shape when you lift the pen — one undo returns your ink.')),
+          row(t('Hold at end of stroke to snap shape'), mkToggle(() => s.holdToShape !== false, (v) => (s.holdToShape = v)),
+            t('Pause the pen briefly at the end of a stroke to snap a hand-drawn line, rectangle, circle, triangle, diamond or arrow into a clean shape — even when automatic shape straightening on lift is off.')),
+          row(t('Auto-dim bars while writing'), mkToggle(() => s.autoDimBarsWhileInking !== false, (v) => (s.autoDimBarsWhileInking = v)),
+            t('Fades floating toolbars (Replay Bar, AudioBar, zoom and page bars) while the pen is actively drawing so you can see ink underneath them.')),
           row(t('Pressure sensitivity'), mkToggle(() => s.pressure, (v) => (s.pressure = v)),
             t('Vary ink width with how hard you press - within a stroke, not just between strokes. Works with a graphics tablet, a Surface pen or an S Pen; a mouse or a finger reports no pressure and draws at one width.')),
           row(t('Pen side button rubs out'), mkToggle(() => s.penButtonErases !== false,
@@ -1524,6 +1528,7 @@ export function createPanels(app) {
               mkToggle(() => s.scratchOut !== false, (v) => {
                 s.scratchOut = v;
                 app.saveSettings();
+                app.replayBar?.updateScratchUI?.();
                 bodyWrap.style.display = v ? 'flex' : 'none';
               })
             );
@@ -1619,6 +1624,18 @@ export function createPanels(app) {
           h('h5', {}, t('Canvas')),
           row(t('Board link thumbnails'), mkToggle(() => s.boardLinkThumb !== false, (v) => { s.boardLinkThumb = v; app.saveSettings(); app.surface.invalidate(); }),
             t('Show thumbnail picture previews on board link cards by default.')),
+          row(t('Skip dead air (silence)'), mkToggle(() => !!s.replaySkipSilence, (v) => (s.replaySkipSilence = v)),
+            t('During audio replay, automatically fast-forwards across silent gaps longer than 2 seconds where no strokes or bookmarks occur.')),
+          row(t('Tap stroke to seek audio'), mkToggle(() => s.tapStrokeToSeek !== false, (v) => (s.tapStrokeToSeek = v)),
+            t('In Reading Mode (or with Alt+Click in Select), tapping a handwritten stroke recorded with audio jumps playback directly to when that stroke was written.')),
+          row(t('Sync dual-pane scroll & zoom'), mkToggle(() => !!s.splitSyncScroll, (v) => {
+            s.splitSyncScroll = v;
+            if (app.splitWorkspace?.btnSyncScroll) {
+              app.splitWorkspace.btnSyncScroll.style.background = v ? 'var(--accent,#0078d4)' : 'rgba(128,128,128,0.12)';
+              app.splitWorkspace.btnSyncScroll.style.color = v ? '#ffffff' : 'inherit';
+            }
+          }),
+            t('When Split Study Workspace is open, panning or zooming either board keeps the companion pane aligned.')),
           row(t('Mouse wheel action'), mkChoice([
             ['scroll', t('Page scroll / Pan (Ctrl to zoom)')],
             ['zoom', t('Zoom in/out (Ctrl to scroll)')]
@@ -2179,7 +2196,7 @@ export function createPanels(app) {
         },
           h('span', { style: 'display:flex;align-items:center;gap:6px;' },
             h('span', { style: `font-weight:700;color:${isSelected ? 'var(--accent,#0078d4)' : '#e91e63'};` }, '#'),
-            h('span', { class: 'side-name' }, tag)
+            h('span', { class: 'side-name' }, String(tag).replace(/^#+/, ''))
           ),
           h('span', { class: 'side-count' }, String(count))
         );
@@ -2422,7 +2439,7 @@ export function createPanels(app) {
             ...b.tags.slice(0, 4).map(t => h('span', {
               class: 'tag-chip',
               style: 'background:rgba(0,120,212,0.12);color:var(--accent,#0078d4);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;'
-            }, `#${t}`))
+            }, `#${String(t).replace(/^#+/, '')}`))
           )
         ] : []),
         ...(lines || [h('small', { class: 'bt-date' }, when)]),

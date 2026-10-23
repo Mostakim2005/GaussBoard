@@ -79,14 +79,16 @@ export const DEFAULT_SETTINGS = {
   emojiChar: '\u2705', emojiSize: 96, emojiRecent: [], recentBoards: [],
   textColor: '#201f1e', textSize: 32, textFont: 'hand',
   shapeKind: 'rect', arrowRoute: 'straight', arrowHeadStyle: 'filled', shapeStroke: '#201f1e', shapeFill: 'none', shapeLineWidth: 3, shapeDash: null,
-  inkToShape: false, pressure: true, wheelZoom: false, mouseWheelMode: 'zoom', enableHoverToolbar: true, hiddenRibbonTools: [], returnToSelect: true, autosave: true,
+  inkToShape: false, holdToShape: true, pressure: true, wheelZoom: false, mouseWheelMode: 'zoom', enableHoverToolbar: true, hiddenRibbonTools: [], returnToSelect: true, autosave: true,
+  scratchOut: true, scratchSensitivity: 'medium', inkEngine: 'default', smoothCamera: true, autoDimBarsWhileInking: true,
+  replaySkipSilence: false, tapStrokeToSeek: true, splitSyncScroll: false,
   showGroupOutlines: true,
   edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, laserColor: '#ff2d2d',
   penOpacityEnabled: false, penOpacity: 1, laserTrailDuration: 520, boardLinkThumb: true,
   brushColor: '#201f1e', brushWidth: 8, brushOpacity: 0.9, brushSoftness: 'medium', brushVelocityThinning: true,
   fountainColor: '#002050', fountainWidth: 4, fountainSlant: 45, fountainFlex: 'normal',
   calligraphyColor: '#1a1a1a', calligraphyWidth: 12, calligraphyAngle: 35, calligraphyFlatness: 4,
-  textMarkdown: true, defaultCardStyle: 'canvas', wikilinkDblClick: 'ask', quickActionPopovers: true,
+  textMarkdown: true, noteMarkdown: true, defaultCardStyle: 'canvas', wikilinkDblClick: 'ask', quickActionPopovers: true,
   // My boards' folders: a catalogue on this device, never inside a board (core/folders.js)
   folders: [], boardFolders: {},
   /*
@@ -2345,7 +2347,7 @@ class App {
     const s = this.store, sf = this.surface;
     switch (id) {
       case 'undo': case 'edit.undo':
-        if (this.splitWorkspace?.isOpen && this.splitWorkspace?.isPointerOverLeft) {
+        if ((this.splitWorkspace?.active || this.splitWorkspace?.isOpen) && this.splitWorkspace?.isPointerOverLeft) {
           this.splitWorkspace.leftStore?.undo();
           this.splitWorkspace.leftSurface?.repaintAll();
           this.splitWorkspace.saveLeftBoardDebounced();
@@ -2353,7 +2355,7 @@ class App {
         }
         this.textEditor.commit(); s.undo(); this.pruneSelection(); break;
       case 'redo': case 'edit.redo':
-        if (this.splitWorkspace?.isOpen && this.splitWorkspace?.isPointerOverLeft) {
+        if ((this.splitWorkspace?.active || this.splitWorkspace?.isOpen) && this.splitWorkspace?.isPointerOverLeft) {
           this.splitWorkspace.leftStore?.redo();
           this.splitWorkspace.leftSurface?.repaintAll();
           this.splitWorkspace.saveLeftBoardDebounced();
@@ -2667,14 +2669,11 @@ class App {
     const objs = this.selected.filter((o) => (o.type === 'connector' || (o.type === 'shape' && ['line', 'arrow', 'doubleArrow'].includes(o.kind))) && !o.locked);
     if (!objs.length) return;
     const kindFor = (h) => h === 'none' ? 'line' : h === 'both' ? 'doubleArrow' : 'arrow';
-    for (const o of objs) {
-      if (o.type === 'connector') {
-        this.store.update(o.id, { heads });
-      } else if (o.type === 'shape') {
-        this.store.update(o.id, { kind: kindFor(heads) });
-      }
-    }
-    this.store.commit('arrow heads', objs.map((o) => o.id));
+    this.store.updateMany(objs.map((o) => o.id), (o) => {
+      if (o.type === 'connector') return { heads };
+      if (o.type === 'shape') return { kind: kindFor(heads) };
+      return null;
+    }, 'arrow heads');
     this.surface.invalidate();
     this.syncUI();
   }
@@ -2694,12 +2693,16 @@ class App {
   stepLineWidth(delta) {
     const objs = this.selected.filter((o) => (o.type === 'connector' || o.type === 'shape' || o.type === 'stroke') && !o.locked);
     if (!objs.length) return;
-    for (const o of objs) {
+    this.store.updateMany(objs.map((o) => o.id), (o) => {
+      if (o.type === 'stroke') {
+        const cur = o.width || 4;
+        const next = Math.max(1, Math.min(44, Math.round((cur + delta) * 2) / 2));
+        return { width: next };
+      }
       const cur = o.lineWidth || (o.type === 'connector' ? 3 : 2.5);
       const next = Math.max(1, Math.min(24, Math.round((cur + delta) * 2) / 2));
-      this.store.update(o.id, { lineWidth: next });
-    }
-    this.store.commit('stroke width', objs.map((o) => o.id));
+      return { lineWidth: next };
+    }, 'stroke width');
     this.surface.invalidate();
   }
 
@@ -2707,13 +2710,12 @@ class App {
     const objs = this.selected.filter((o) => (o.type === 'connector' || (o.type === 'shape' && ['line', 'arrow', 'doubleArrow'].includes(o.kind))) && !o.locked);
     if (!objs.length) return;
     const scales = [1.0, 1.5, 2.2];
-    for (const o of objs) {
+    this.store.updateMany(objs.map((o) => o.id), (o) => {
       const cur = o.arrowScale || 1.0;
       const idx = scales.findIndex((s) => Math.abs(s - cur) < 0.1);
       const next = scales[(idx + 1) % scales.length];
-      this.store.update(o.id, { arrowScale: next });
-    }
-    this.store.commit('arrow scale', objs.map((o) => o.id));
+      return { arrowScale: next };
+    }, 'arrow scale');
     this.surface.invalidate();
   }
 
@@ -3161,6 +3163,7 @@ class App {
     // refreshed here as well as in syncUI - otherwise scrolling from page 1 to
     // page 2 leaves the navigator insisting you are still on page 1
     this.syncPageLabel();
+    if (this.settings.splitSyncScroll) this.splitWorkspace?.syncCameraFromRight?.();
     if (pct !== this._lastZoomPct) {
       if (this._lastZoomPct !== undefined) this.flashZoom(pct);
       this._lastZoomPct = pct;
@@ -3336,8 +3339,12 @@ class App {
       boardFolders: this.settings.boardFolders
     };
     this.settings = { ...DEFAULT_SETTINGS, ...keep };
+    setInkEngine(this.settings.inkEngine || 'default');
     this.saveSettings();
     this.inkTrail?.setEnabled(!!this.settings.inkTrail);
+    if (this.surface?.cam) this.surface.cam.glide = this.settings.smoothCamera !== false;
+    if (this.surface) this.surface.showGroupOutlines = this.settings.showGroupOutlines !== false;
+    this.replayBar?.updateScratchUI?.();
     this.interaction.hideInkPointer();
     this.setTool(this.tool);
     this.surface.invalidate();

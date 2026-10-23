@@ -344,8 +344,7 @@ export function updateSelectionBar(app, targetObj = null) {
     bar.appendChild(mk(t('Open the board'), 'board', () => app.openBoardRef(card.board)));
     bar.appendChild(mk(t('Link to a different board'), 'link', () => app.relinkBoardCard(card.id)));
     bar.appendChild(mk(card.showThumb !== false ? t('Hide thumbnail') : t('Show thumbnail'), 'image', () => {
-      app.store.update(card.id, { showThumb: !(card.showThumb !== false) });
-      app.store.commit('toggle thumbnail', [card.id]);
+      app.store.update(card.id, { showThumb: !(card.showThumb !== false) }, 'toggle thumbnail');
       app.surface.invalidate();
     }));
   }

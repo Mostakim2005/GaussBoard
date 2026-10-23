@@ -108,6 +108,9 @@ test('Produces valid XHTML inside SVG <foreignObject> data URI', () => {
   assert.ok(uri.startsWith('data:image/svg+xml;charset=utf-8,'));
 
   const decoded = decodeURIComponent(uri.replace('data:image/svg+xml;charset=utf-8,', ''));
+  assert.match(decoded, /xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  assert.match(decoded, /xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"/);
+  assert.doesNotMatch(decoded, /xmlns="\[/);
   assert.match(decoded, /<foreignObject width="100%" height="100%">/);
   assert.match(decoded, /<hr class="gb-md-hr" data-line="2" \/>/);
   assert.match(decoded, /<br \/>/);

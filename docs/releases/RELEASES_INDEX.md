@@ -26,6 +26,7 @@ This document provides the ledger of progressive Windows releases, from the orig
 | **v5.0.0** | Local tag `v5.0.0` | [`GazBoard-v5.0.0-Portable.exe`](../../dist-v5.0.0/GazBoard-v5.0.0-Portable.exe) | 106,255,198 B | [`RELEASE-5.0.0.md`](RELEASE-5.0.0.md) | Feature audit; replay display modes across live/export; track-index caching; calmer center camera; sample-rate-stable scratch classification; pointer focus cleanup. |
 | **v5.1.0** | Local tag `v5.1.0` | [`GazBoard-v5.1.0-Portable.exe`](../../dist-v5.1.0/GazBoard-v5.1.0-Portable.exe) | 106,259,823 B | [`RELEASE-5.1.0.md`](RELEASE-5.1.0.md) | Linked screenshot excerpts; split-pane paste/drop; board heading and block links; additional Obsidian Markdown conveniences. |
 | **v5.2.0** | Local tag `v5.2.0` | [`GazBoard-v5.2.0-Portable.exe`](../../dist-v5.2.0/GazBoard-v5.2.0-Portable.exe) | 106,265,899 B | [`RELEASE-5.2.0.md`](RELEASE-5.2.0.md) | Full audit verification; toolbar `.menu-item` compatibility & card click delegation; plain text vs Markdown card disambiguation; PWA precache sync. |
+| **v5.3.0** | Local tag `v5.3.0` | [`GazBoard-v5.3.0-Portable.exe`](../../releases/GazBoard-v5.3.0-Portable.exe) | 106,267,461 B | [`RELEASE-5.3.0.md`](RELEASE-5.3.0.md) | Deep post-4.8.1 audit (12 root-cause bugs fixed); 6.4x replay path cache speedup; 5 toggleable lateral features (`holdToShape`, `replaySkipSilence`, `tapStrokeToSeek`, `splitSyncScroll`, `autoDimBarsWhileInking`). |
 
 ---
 

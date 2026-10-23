@@ -840,13 +840,14 @@ export class Surface {
       // Highlighters normally use multiply blending to stay translucent. That
       // blend makes a neon replay colour disappear against a light board, so
       // replay feedback uses a normal source-over pen pass with explicit alpha.
+      const qBoost = Math.round(widthBoost * 2) / 2;
       const outline = {
         ...object,
         tool: 'pen',
         effect: 'none',
         color: outlineColor,
         opacity,
-        width: (object.width || 4) + widthBoost
+        width: (object.width || 4) + qBoost
       };
       ctx.save();
       ctx.globalCompositeOperation = 'source-over';
@@ -898,10 +899,9 @@ export class Surface {
       } else if (o.t0 != null && o.t0 > t) {
         if (replay.ghostMode === 'translucent') {
           ctx.save();
-          // Render unrendered future strokes in crisp light grey ink (Image 3)
+          // Render unrendered future strokes in crisp light grey ink without per-stroke offscreen filter allocation
           ctx.globalAlpha = 0.38;
-          ctx.filter = 'grayscale(1) contrast(0.8)';
-          drawObject(ctx, o, () => this.invalidate(), this.editing);
+          drawObject(ctx, { ...o, color: '#8a919e', effect: 'none' }, () => this.invalidate(), this.editing);
           ctx.restore();
         }
       }

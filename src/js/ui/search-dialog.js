@@ -171,7 +171,8 @@ export class SearchDialog {
     for (const b of matched) {
       const isCurrent = b.id === currentId;
       const title = b.name || b.title || t('Untitled');
-      const dateStr = b.updated ? new Date(b.updated).toLocaleDateString() : '';
+      const ts = b.modified || b.updated;
+      const dateStr = ts ? new Date(ts).toLocaleDateString() : '';
 
       const tagPills = [];
       if (Array.isArray(b.tags)) {
@@ -476,6 +477,53 @@ export class SearchDialog {
         type: 'toggle',
         get: () => s.boardLinkThumb !== false,
         set: (v) => { s.boardLinkThumb = v; app.saveSettings(); app.surface?.invalidate(); }
+      },
+      {
+        id: 'holdToShape',
+        title: t('Hold at end of stroke to snap shape'),
+        desc: t('Pause stylus briefly at the end of a stroke to convert it to a clean geometric shape or line'),
+        type: 'toggle',
+        get: () => s.holdToShape !== false,
+        set: (v) => { s.holdToShape = v; app.saveSettings(); }
+      },
+      {
+        id: 'autoDimBarsWhileInking',
+        title: t('Auto-dim bars while writing'),
+        desc: t('Fade floating toolbars to low opacity while actively drawing on the canvas'),
+        type: 'toggle',
+        get: () => s.autoDimBarsWhileInking !== false,
+        set: (v) => { s.autoDimBarsWhileInking = v; app.saveSettings(); }
+      },
+      {
+        id: 'replaySkipSilence',
+        title: t('Skip dead air (silence)'),
+        desc: t('Automatically fast-forward across long silent gaps (>2s) during audio replay'),
+        type: 'toggle',
+        get: () => !!s.replaySkipSilence,
+        set: (v) => { s.replaySkipSilence = v; app.saveSettings(); }
+      },
+      {
+        id: 'tapStrokeToSeek',
+        title: t('Tap stroke to seek audio'),
+        desc: t('Tap any synced stroke in Reading Mode (or Alt+Click in Select) to jump audio playback to that moment'),
+        type: 'toggle',
+        get: () => s.tapStrokeToSeek !== false,
+        set: (v) => { s.tapStrokeToSeek = v; app.saveSettings(); }
+      },
+      {
+        id: 'splitSyncScroll',
+        title: t('Sync dual-pane scroll & zoom'),
+        desc: t('Synchronize pan and zoom between the left study board and main board in Split Workspace'),
+        type: 'toggle',
+        get: () => !!s.splitSyncScroll,
+        set: (v) => {
+          s.splitSyncScroll = v;
+          app.saveSettings();
+          if (app?.splitWorkspace?.btnSyncScroll) {
+            app.splitWorkspace.btnSyncScroll.style.background = v ? 'var(--accent,#0078d4)' : 'rgba(128,128,128,0.12)';
+            app.splitWorkspace.btnSyncScroll.style.color = v ? '#ffffff' : 'inherit';
+          }
+        }
       }
     ];
 

@@ -301,9 +301,36 @@ export class ReplayEngine {
       return;
     }
 
+    this.checkSkipSilence();
+
     if (this.surface) this.surface.invalidate();
     if (this.autoFollow) this.followActiveStroke();
     this.rafToken = requestAnimationFrame(() => this.loop());
+  }
+
+  checkSkipSilence() {
+    if (!this.app?.settings?.replaySkipSilence || !this.active || this.pendingSeekMs != null) return false;
+    const strokes = this.getTrackStrokes();
+    if (!strokes.length) return false;
+    const nowMs = this.currentTimeMs;
+    let nextEventMs = Infinity;
+    for (const s of strokes) {
+      if (s?.t0 == null) continue;
+      const t1 = s.t1 != null ? s.t1 : s.t0 + 200;
+      if (s.t0 <= nowMs + 250 && nowMs <= t1 + 400) return false;
+      if (s.t0 > nowMs && s.t0 < nextEventMs) nextEventMs = s.t0;
+    }
+    if (Array.isArray(this.track?.bookmarks)) {
+      for (const bm of this.track.bookmarks) {
+        if (bm?.t != null && bm.t <= nowMs + 250 && nowMs <= bm.t + 400) return false;
+        if (bm?.t != null && bm.t > nowMs && bm.t < nextEventMs) nextEventMs = bm.t;
+      }
+    }
+    if (Number.isFinite(nextEventMs) && nextEventMs - nowMs > 2000) {
+      this.seek(Math.max(nowMs, nextEventMs - 250));
+      return true;
+    }
+    return false;
   }
 
   getActiveStroke() {

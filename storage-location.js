@@ -54,9 +54,9 @@ function boardsFolderFor(picked) {
  */
 function isBoardFile(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
-  const objs = raw.objects;
+  const objs = raw.objects ?? (raw.v === 2 ? raw.elements : undefined);
   if (!(Array.isArray(objs) || (objs && typeof objs === 'object'))) return false;
-  return typeof raw.id === 'string' || 'background' in raw || 'schema' in raw || 'name' in raw;
+  return typeof raw.id === 'string' || 'background' in raw || 'schema' in raw || 'name' in raw || 'title' in raw;
 }
 
 /** How many of GazBoard's boards are in this folder. Other .json files do not count. */

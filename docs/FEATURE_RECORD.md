@@ -233,3 +233,15 @@ This document serves as the master registry of all features, enhancements, bug f
    - All gesture math, canvas rendering, hatched patterns, and audio protocols are built natively with zero extra npm dependencies.
 6. **i18n Parity Invariant**:
    - All user-facing strings must use `t('...')` and be present across all 7 locale dictionaries (`scripts/i18n-check.js` exit code 0).
+
+
+### V 5.3.0 Comprehensive Audit, Performance Optimization & Lateral Features
+
+- Fixes 12 root-cause bugs (`BUG-033` to `BUG-044`) across Markdown SVG `<foreignObject>` XHTML escaping, Split Study Workspace lifecycle/surface disposal/asset hydration/`swapPanes()`, `.gazboard` ZIP audio bundling/extraction, `Store.commit` transaction validation, `ink.js` multi-variant path caching (6.4x faster live replay), `perfectFreehand` `runPath` support, stylus `tiltX`/`tiltY` calligraphy angle, and Study Tape `p.t` timestamp preservation.
+- Adds 5 toggleable lateral features & QoL improvements:
+  - **Hold-to-Shape (`holdToShape: true`)**: Pause pen still for 420 ms at stroke end to snap freehand strokes into clean geometric shapes.
+  - **Skip Silence During Audio Replay (`replaySkipSilence: false`)**: Fast-forward silent dead-air gaps $>2.0\text{ s}$ between recorded stroke clusters while stopping at bookmarks.
+  - **Tap Stroke to Seek Audio (`tapStrokeToSeek: true`)**: Tap a recorded stroke in Reading Mode or with Select tool while AudioBar is open to jump audio playback to `stroke.t0`.
+  - **Synchronized Split-View Scrolling (`splitSyncScroll: false`)**: Lock camera pan/zoom deltas across both Split Study Workspace panes.
+  - **Auto-Dim Floating Toolbars While Inking (`autoDimBarsWhileInking: true`)**: Smoothly fade floating HUDs to 20% opacity with `pointer-events: none` during active pen strokes.
+- See [`docs/releases/RELEASE-5.3.0.md`](docs/releases/RELEASE-5.3.0.md) for full details, performance benchmarks, and verification counts.

@@ -159,14 +159,18 @@ export class Interaction {
       if (idx !== -1) this.surface.overlays.splice(idx, 1);
     }
     this.cancelNibHide();
+    this.cancelShapeHold();
     this.stopEdgePan();
     this.hideInkPointer();
+    if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
   }
 
   /** Finish the current gesture when the OS takes focus before pointerup. */
   finishOnWindowBlur() {
     this.cancelHold();
+    this.cancelShapeHold();
     this.stopEdgePan();
+    if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
     const pointerId = this.actionId;
     const capturedIds = [...this.pointers.keys()];
     const pointer = pointerId == null ? null : this.pointers.get(pointerId);
@@ -811,7 +815,15 @@ export class Interaction {
           offer({ ...wp, p: pressure, ...(curT != null ? { t: curT } : {}), ...tilt });
         }
 
-        if (added) a.obj.bbox = bboxOfPoints(a.obj.points);
+        if (added) {
+          a.obj.bbox = bboxOfPoints(a.obj.points);
+          if (a.heldShape && a.heldAt && dist(a.heldAt, wp) * this.surface.cam.z > 14) {
+            a.heldShape = null;
+          }
+          if (this.app?.settings?.holdToShape !== false && a.obj.tool === 'pen' && !a.ruled) {
+            this.armShapeHold(a, wp);
+          }
+        }
         this.sendInkTrail(e, a, wp, pressure);
         break;
       }
@@ -1449,6 +1461,8 @@ export class Interaction {
     this.action = null;
     this.actionId = null;
     this.cancelHold();
+    this.cancelShapeHold();
+    if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
     this.app.syncUI();
     this.surface.invalidate();
     return ['shapeDraw', 'textDraw', 'draw', 'lasso', 'marquee', 'move', 'resize', 'rotate'].includes(kind);
@@ -1509,6 +1523,78 @@ export class Interaction {
     this._holdFrom = null;
   }
 
+  armShapeHold(a, wp) {
+    this.cancelShapeHold();
+    if (this.app?.settings?.holdToShape === false) return;
+    if (!a?.obj || a.obj.tool !== 'pen' || a.ruled) return;
+    this._shapeHoldTimer = setTimeout(() => {
+      this._shapeHoldTimer = null;
+      if (this.action !== a || a.pieces?.length || (a.obj.points?.length || 0) < 5) return;
+      const r = recognize(a.obj.points);
+      const fit = r ? fitError(a.obj.points, r.kind, r) : 1;
+      if (r && r.confidence > 0.6 && fit < MAX_FIT_ERROR) {
+        a.heldShape = r;
+        a.snappedByHold = true;
+        a.heldAt = { x: wp.x, y: wp.y };
+        this.surface.pulseHighlight?.({ x: r.x, y: r.y, w: r.w, h: r.h }, 320);
+        this.surface.invalidate?.();
+      }
+    }, 420);
+  }
+
+  convertHeldStrokeToShape(a = this.action) {
+    if (this.app?.settings?.holdToShape === false) return false;
+    if (!a || a.type !== 'draw' || a.ruled || a.pieces?.length) return false;
+    const pts = a.obj?.points || a.points;
+    if (!pts || pts.length < 5) return false;
+    const r = a.heldShape || recognize(pts);
+    const fit = r ? fitError(pts, r.kind, r) : 1;
+    if (!r || r.confidence <= 0.6 || fit >= MAX_FIT_ERROR) return false;
+    a.heldShape = r;
+    a.snappedByHold = true;
+    if (!a.obj && this.store) {
+      const shape = {
+        id: uid('sh'), type: 'shape', kind: r.kind === 'circle' ? 'ellipse' : r.kind,
+        x: r.x, y: r.y, w: r.w, h: r.h, rotation: 0,
+        stroke: this.app?.settings?.penColor || '#201f1e',
+        fill: 'none',
+        lineWidth: Math.max(2, (this.app?.settings?.penWidth || 4) * 0.9)
+      };
+      this.store.add(shape, 'ink to shape');
+    }
+    this.surface?.invalidate?.();
+    return true;
+  }
+
+  seekToStrokeAudio(hit, { requireActive = false } = {}) {
+    if (!hit || hit.t0 == null) return false;
+    if (this.app?.settings?.tapStrokeToSeek === false || this.app?.settings?.audioInkSync === false) return false;
+    if (requireActive && !(this.app?.replayEngine?.active || this.app?.audioBar?.visible)) return false;
+    const tracks = ((this.store || this.app?.store)?.doc?.audioTracks || []);
+    const activeTrackId = this.app?.replayEngine?.track?.id || this.app?.audioBar?.track?.id;
+    if (requireActive && (!activeTrackId || hit.audioId !== activeTrackId)) return false;
+    const track = tracks.find((tr) => tr.id === hit.audioId) || this.app?.replayEngine?.track || tracks[0];
+    if (!track) return false;
+    if (!this.app.audioBar?.visible || this.app.audioBar?.track?.id !== track.id) {
+      this.app.audioBar?.open?.(track);
+    }
+    if (typeof this.app.replayEngine?.seek === 'function') {
+      this.app.replayEngine.seek(hit.t0);
+    } else if (typeof this.app.audioBar?.seek === 'function') {
+      this.app.audioBar.seek(hit.t0);
+    }
+    const box = worldBounds(hit);
+    if (box) this.surface?.pulseHighlight?.(box);
+    return true;
+  }
+
+  cancelShapeHold() {
+    if (this._shapeHoldTimer) {
+      clearTimeout(this._shapeHoldTimer);
+      this._shapeHoldTimer = null;
+    }
+  }
+
   startMoveOnSelection(wp) {
     const sel = this.surface.selection;
     if (!sel.size || this.surface.selectionIsLocked()) return false;
@@ -1532,6 +1618,19 @@ export class Interaction {
 
     const sel = this.surface.selection;
     const hit = pick(this.store, wp, 8 / this.surface.cam.z);
+    if (hit && e.altKey && this.app?.settings?.tapStrokeToSeek !== false && this.app?.settings?.audioInkSync !== false && hit.t0 != null) {
+      const tracks = ((this.store || this.app.store)?.doc?.audioTracks || []);
+      const track = tracks.find((tr) => tr.id === hit.audioId) || this.app.replayEngine?.track || tracks[0];
+      if (track) {
+        if (!this.app.audioBar?.visible || this.app.audioBar?.track?.id !== track.id) {
+          this.app.audioBar?.open?.(track);
+        }
+        this.app.replayEngine?.seek?.(hit.t0);
+        const box = worldBounds(hit);
+        if (box) this.surface.pulseHighlight?.(box);
+        return;
+      }
+    }
     if (hit && hit.locked) {
       // selectable so it can be unlocked, but it does not move
       this.app.setSelection([hit.id]);
@@ -1720,6 +1819,9 @@ export class Interaction {
     obj.points.push(pt0);
     this.surface.wet = obj;
     this.action = act;
+    if (this.app?.settings?.autoDimBarsWhileInking !== false && typeof document !== 'undefined') {
+      document.body?.classList?.add('inking-active');
+    }
   }
 
   /**
@@ -1788,12 +1890,13 @@ export class Interaction {
       }
     }
     // F-301: Click-to-Seek (Audio Jump): tapping a synced stroke seeks audio and pulses highlight
-    if (this.app?.replayEngine?.active || this.app?.replayEngine?.track) {
+    if (this.app?.settings?.tapStrokeToSeek !== false && this.app?.settings?.audioInkSync !== false
+        && (this.app?.replayEngine?.active || this.app?.audioBar?.visible)) {
       const hit = pick(this.store, p0, 8 / z);
-      const activeTrackId = this.app.replayEngine.track?.id;
+      const activeTrackId = this.app.replayEngine?.track?.id || this.app.audioBar?.track?.id;
       if (hit && activeTrackId && hit.audioId === activeTrackId && hit.t0 != null) {
         this.discardTapMark();
-        this.app.replayEngine.seek(hit.t0);
+        this.app.replayEngine?.seek(hit.t0);
         const b = worldBounds(hit);
         if (b) this.surface.pulseHighlight(b);
         return true;
@@ -1881,6 +1984,8 @@ export class Interaction {
    * the board and there is nothing in the undo history to explain either.
    */
   discardTapMark() {
+    this.cancelShapeHold();
+    if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
     this.surface.wet = null;
     this.surface.wetPieces = null;
     this.action = null;
@@ -1937,6 +2042,8 @@ export class Interaction {
   }
 
   finishStroke(a) {
+    this.cancelShapeHold();
+    if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
     const obj = a.obj;
     this.surface.wet = null;
     this.surface.wetPieces = null;
@@ -1954,7 +2061,9 @@ export class Interaction {
     if (a.pieces && a.pieces.length) {
       const tidy = (o) => {
         o.points = o.points.map((q) => ({
-          x: +q.x.toFixed(2), y: +q.y.toFixed(2), p: +(q.p ?? 0.5).toFixed(2), t: q.t != null ? Math.round(q.t) : undefined
+          x: +q.x.toFixed(2), y: +q.y.toFixed(2), p: +(q.p ?? 0.5).toFixed(2),
+          ...(q.t != null ? { t: Math.round(q.t) } : {}),
+          ...(typeof q.tiltX === 'number' && (q.tiltX !== 0 || q.tiltY !== 0) ? { tiltX: q.tiltX, tiltY: q.tiltY || 0 } : {})
         }));
         o.bbox = bboxOfPoints(o.points);
         if (this.app?._annotatingImage) {
@@ -1977,7 +2086,10 @@ export class Interaction {
       obj.points = [p, { x: p.x + 0.6, y: p.y + 0.6, p: p.p, ...(p.t != null ? { t: p.t } : {}) }];
     }
     if (obj.subtype === 'tape') {
-      obj.points = obj.points.map((p) => ({ x: +p.x.toFixed(2), y: +p.y.toFixed(2) }));
+      obj.points = obj.points.map((p) => ({
+        x: +p.x.toFixed(2), y: +p.y.toFixed(2),
+        ...(p.t != null ? { t: Math.round(p.t) } : {})
+      }));
       obj.bbox = bboxOfPoints(obj.points);
       this.store.add(obj, 'study tape');
       this.surface.extendFreeze?.(obj);
@@ -1994,7 +2106,9 @@ export class Interaction {
     // Nothing is lost by keeping them: points are only captured when the pen
     // has moved at least ~1.2px on screen, so the density is already bounded.
     obj.points = obj.points.map((p) => ({
-      x: +p.x.toFixed(2), y: +p.y.toFixed(2), p: +(p.p ?? 0.5).toFixed(2), t: p.t != null ? Math.round(p.t) : undefined
+      x: +p.x.toFixed(2), y: +p.y.toFixed(2), p: +(p.p ?? 0.5).toFixed(2),
+      ...(p.t != null ? { t: Math.round(p.t) } : {}),
+      ...(typeof p.tiltX === 'number' && (p.tiltX !== 0 || p.tiltY !== 0) ? { tiltX: p.tiltX, tiltY: p.tiltY || 0 } : {})
     }));
     obj.bbox = bboxOfPoints(obj.points);
 
@@ -2020,8 +2134,8 @@ export class Interaction {
      */
     this.surface.extendFreeze?.(obj);
 
-    if (this.app.settings.inkToShape && obj.tool === 'pen') {
-      const r = recognize(obj.points);
+    if ((this.app.settings.inkToShape || a.heldShape) && obj.tool === 'pen') {
+      const r = a.heldShape || recognize(obj.points);
       // classified AND actually shaped like the thing it was classified as
       const fit = r ? fitError(obj.points, r.kind, r) : 1;
       if (r && r.confidence > 0.6 && fit < MAX_FIT_ERROR) {
@@ -2400,7 +2514,7 @@ export class Interaction {
   /** Re-tint the cursor after a colour change, without waiting for the pointer to move. */
   refreshInkCursor() {
     const t = this.tool;
-    if ((t !== 'pen' && t !== 'highlighter') || !this.canvas) return;
+    if (!isInkTool(t) || !this.canvas) return;
     // Mid-stroke the layer is carrying the nib, so re-tint that; the rest of
     // the time it is the system cursor, exactly as it always was.
     if (this.inkPointer) { this.showInkPointer(this.inkPointer, t); return; }

@@ -145,7 +145,8 @@ export class NoteOverviewDrawer {
     for (const b of matched) {
       const isCurrent = b.id === currentId;
       const title = b.name || b.title || t('Untitled');
-      const dateStr = b.updated ? new Date(b.updated).toLocaleDateString() : '';
+      const ts = b.modified || b.updated;
+      const dateStr = ts ? new Date(ts).toLocaleDateString() : '';
 
       // Card thumbnail
       const thumbUrl = b.thumb || (isCurrent ? this.app?.boardPictureFor?.() : null);
@@ -359,7 +360,11 @@ export class NoteOverviewDrawer {
       raw.tags = raw.properties.tags;
 
       if (window.board?.boards?.save) {
-        await window.board.boards.save({ id: board.id, json: JSON.stringify(raw) });
+        await window.board.boards.save({
+          id: board.id,
+          json: JSON.stringify(raw),
+          setLast: this.app?.store?.doc?.id === board.id
+        });
       }
       if (this.app?.store?.doc?.id === board.id) {
         this.app.store.doc.properties = this.app.store.doc.properties || {};
@@ -397,7 +402,11 @@ export class NoteOverviewDrawer {
       raw.aliases = raw.properties.aliases;
 
       if (window.board?.boards?.save) {
-        await window.board.boards.save({ id: board.id, json: JSON.stringify(raw) });
+        await window.board.boards.save({
+          id: board.id,
+          json: JSON.stringify(raw),
+          setLast: this.app?.store?.doc?.id === board.id
+        });
       }
       if (this.app?.store?.doc?.id === board.id) {
         this.app.store.doc.properties = this.app.store.doc.properties || {};
