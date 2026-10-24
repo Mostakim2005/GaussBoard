@@ -52,6 +52,9 @@ import { VisualizationDialog } from './ui/visualization-dialog.js';
 import { SidebarRibbon } from './ui/sidebar-ribbon.js';
 import { StudyRunner } from './ui/study-runner.js';
 import { syncBoardToAnki, exportBoardToApkg } from './core/anki.js';
+import { PeriodicTableModal } from './ui/periodic-table.js';
+import { PhetRunnerModal } from './ui/phet-runner.js';
+import { DictionaryPopover } from './ui/dictionary-popover.js';
 
 /** An id GazBoard itself would make: safe as a file name on every system, the phone included. */
 const plainBoardId = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id);
@@ -304,6 +307,9 @@ class App {
     this.sidebarRibbon = new SidebarRibbon(this);
     if (typeof document !== 'undefined') this.sidebarRibbon.init();
     this.studyRunner = new StudyRunner(this);
+    this.periodicTableModal = new PeriodicTableModal(this);
+    this.phetRunnerModal = new PhetRunnerModal(this);
+    this.dictionaryPopover = new DictionaryPopover(this);
     this.initMultiWindowLease();
     this.wireGlobalEvents();
     this.initDismissal();
@@ -2717,6 +2723,21 @@ class App {
 
   async exportToApkg(opts) {
     return exportBoardToApkg(this, opts);
+  }
+
+  openPeriodicTable() {
+    if (!this.periodicTableModal) this.periodicTableModal = new PeriodicTableModal(this);
+    this.periodicTableModal.show();
+  }
+
+  openPhetRunner() {
+    if (!this.phetRunnerModal) this.phetRunnerModal = new PhetRunnerModal(this);
+    this.phetRunnerModal.show();
+  }
+
+  lookupDictionary(word, at = null) {
+    if (!this.dictionaryPopover) this.dictionaryPopover = new DictionaryPopover(this);
+    this.dictionaryPopover.show(word, at);
   }
 
   toggleSearchDialog(q = '') {

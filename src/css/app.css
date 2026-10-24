@@ -3824,3 +3824,446 @@ body.theme-light .deck-stats-pill {
   border-color: rgba(15, 108, 189, 0.25);
   color: #0f6cbd;
 }
+
+/* =================================================================== */
+/* 56. STEM Engines: Periodic Table, PhET Simulation & Tech Dictionary */
+/* =================================================================== */
+
+/* Periodic Table Modal */
+.periodic-table-modal-overlay,
+.phet-runner-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 24, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.periodic-modal-card,
+.phet-modal-card {
+  width: min(920px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  background: rgba(18, 22, 34, 0.94);
+  backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 229, 255, 0.2);
+  color: #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+body.theme-light .periodic-modal-card,
+body.theme-light .phet-modal-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #1e293b;
+  box-shadow: 0 32px 64px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(15, 108, 189, 0.25);
+}
+
+.periodic-modal-header,
+.phet-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.theme-light .periodic-modal-header,
+body.theme-light .phet-modal-header {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+.periodic-modal-title,
+.phet-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.periodic-modal-close,
+.phet-modal-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.periodic-modal-close:hover,
+.phet-modal-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.periodic-modal-toolbar {
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.periodic-search-input {
+  width: 100%;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.periodic-search-input:focus {
+  border-color: #00e5ff;
+}
+
+.periodic-legend {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cat-pill {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.cat-pill.alkali { background: rgba(248, 113, 113, 0.15); color: #f87171; border-color: rgba(248, 113, 113, 0.3); }
+.cat-pill.alkaline { background: rgba(251, 146, 60, 0.15); color: #fb923c; border-color: rgba(251, 146, 60, 0.3); }
+.cat-pill.transition { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border-color: rgba(251, 191, 36, 0.3); }
+.cat-pill.metalloid { background: rgba(45, 212, 191, 0.15); color: #2dd4bf; border-color: rgba(45, 212, 191, 0.3); }
+.cat-pill.nonmetal { background: rgba(96, 165, 250, 0.15); color: #60a5fa; border-color: rgba(96, 165, 250, 0.3); }
+.cat-pill.halogen { background: rgba(129, 140, 248, 0.15); color: #818cf8; border-color: rgba(129, 140, 248, 0.3); }
+.cat-pill.noble { background: rgba(167, 139, 250, 0.15); color: #a78bfa; border-color: rgba(167, 139, 250, 0.3); }
+
+.periodic-modal-content {
+  display: flex;
+  overflow: hidden;
+  height: 480px;
+}
+
+.periodic-grid-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 6px;
+}
+
+.element-cell {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.element-cell:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  border-color: rgba(0, 229, 255, 0.5);
+}
+
+.element-cell.selected {
+  border-color: #00e5ff;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+  background: rgba(0, 229, 255, 0.12);
+}
+
+.element-cell .elem-z { font-size: 10px; opacity: 0.7; }
+.element-cell .elem-symbol { font-size: 16px; font-weight: 700; text-align: center; }
+.element-cell .elem-name { font-size: 9px; opacity: 0.8; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.element-cell.alkali .elem-symbol { color: #f87171; }
+.element-cell.alkaline .elem-symbol { color: #fb923c; }
+.element-cell.transition .elem-symbol { color: #fbbf24; }
+.element-cell.metalloid .elem-symbol { color: #2dd4bf; }
+.element-cell.nonmetal .elem-symbol { color: #60a5fa; }
+.element-cell.halogen .elem-symbol { color: #818cf8; }
+.element-cell.noble .elem-symbol { color: #a78bfa; }
+
+.periodic-inspector-pane {
+  width: 280px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+body.theme-light .periodic-inspector-pane {
+  border-left-color: rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.inspector-badge {
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  text-align: center;
+}
+
+.inspector-symbol { font-size: 32px; font-weight: 800; color: #00e5ff; }
+.inspector-name { font-size: 16px; font-weight: 700; margin-top: 4px; }
+.inspector-weight { font-size: 12px; opacity: 0.75; }
+
+.inspector-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 4px;
+}
+
+.stamp-elem-btn,
+.phet-capture-btn,
+.dict-stamp-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(168, 85, 247, 0.2));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: auto;
+  transition: all 0.15s ease;
+}
+
+.stamp-elem-btn:hover,
+.phet-capture-btn:hover,
+.dict-stamp-btn:hover {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.25), rgba(168, 85, 247, 0.3));
+  border-color: rgba(0, 229, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+/* PhET Runner Modal */
+.phet-modal-body {
+  display: flex;
+  height: 520px;
+}
+
+.phet-sidebar {
+  width: 250px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.phet-sim-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.phet-sim-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.phet-sim-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(0, 229, 255, 0.35);
+}
+
+.phet-sim-card.active {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: #00e5ff;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
+}
+
+.phet-sim-card .card-icon { font-size: 20px; }
+.phet-sim-card .card-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.phet-sim-card .card-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phet-sim-card .card-cat { font-size: 10px; opacity: 0.7; }
+
+.phet-stage-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 10px;
+}
+
+.stage-sim-name { font-size: 15px; font-weight: 700; margin: 0; }
+.stage-sim-desc { font-size: 12px; opacity: 0.75; margin: 2px 0 0; }
+
+.phet-canvas-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0f172a;
+}
+
+.phet-sim-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.phet-controls-bar {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sim-ctrl-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sim-ctrl-group label {
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+}
+
+.sim-ctrl-group input[type="range"] {
+  width: 100%;
+  accent-color: #00e5ff;
+}
+
+/* Technical Dictionary Popover */
+.tech-dict-popover {
+  position: fixed;
+  z-index: 9600;
+  width: 320px;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.dict-pop-inner {
+  background: rgba(18, 22, 34, 0.95);
+  backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 229, 255, 0.25);
+  color: #f1f5f9;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+body.theme-light .dict-pop-inner {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #1e293b;
+}
+
+.dict-pop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.dict-pop-term {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.dict-word { font-size: 15px; font-weight: 700; color: #00e5ff; }
+body.theme-light .dict-word { color: #0f6cbd; }
+.dict-ipa { font-size: 11px; font-family: monospace; opacity: 0.8; }
+.dict-pos { font-size: 11px; font-style: italic; opacity: 0.65; }
+
+.dict-speak-btn,
+.dict-close-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 6px;
+  opacity: 0.75;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.dict-speak-btn:hover,
+.dict-close-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dict-def { font-size: 12px; line-height: 1.45; margin: 0; opacity: 0.9; }
+
+.dict-colloc-box {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11px;
+}
+
+.colloc-title { font-weight: 700; color: #f59e0b; }
+.colloc-list { opacity: 0.85; }

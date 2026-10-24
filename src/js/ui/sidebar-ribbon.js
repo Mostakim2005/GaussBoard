@@ -7,6 +7,9 @@ import { icon } from './icons.js';
 import { t } from '../i18n.js';
 import { evalMathExpression } from '../core/scientific-math.js';
 import { collectStudyCards, previewNextIntervals, Rating } from '../core/fsrs.js';
+import { balanceChemicalEquation, insertReactionCard } from '../core/chemistry.js';
+import { FORMULA_CATALOG, insertFormulaCard } from '../core/formula-graph.js';
+import { DICTIONARY_DATABASE } from './dictionary-popover.js';
 
 export class SidebarRibbon {
   constructor(app) {
@@ -493,26 +496,39 @@ export class SidebarRibbon {
       placeholder: 'e.g. Fe + O2 -> Fe2O3'
     });
 
-    const chemOutput = h('div', { class: 'deck-result-box' }, '4 Fe + 3 O2 → 2 Fe2O3 (Synthesis Reaction)');
+    const chemOutput = h('div', { class: 'deck-result-box' }, '4 Fe + 3 O2 → 2 Fe2O3 (Synthesis / Redox)');
 
+    let lastChemResult = null;
     const btnBalance = h('button', { class: 'deck-action-btn primary' }, t('Balance & Explain'));
+    const btnStampReaction = h('button', { class: 'deck-action-btn', style: 'display:none;margin-top:6px;' },
+      h('span', { class: 'btn-icon' }, '📌'),
+      h('span', {}, t('Insert Reaction Card to Canvas'))
+    );
+
     btnBalance.addEventListener('click', () => {
       const eq = chemInput.value.trim();
       if (!eq) return;
-      if (eq.includes('Fe') && eq.includes('O2')) {
-        chemOutput.textContent = '4 Fe + 3 O2 → 2 Fe2O3 | Type: Synthesis / Redox (ΔH < 0 Exothermic)';
-      } else if (eq.includes('H2') && eq.includes('O2')) {
-        chemOutput.textContent = '2 H2 + O2 → 2 H2O | Type: Combustion / Synthesis';
-      } else if (eq.includes('CH4')) {
-        chemOutput.textContent = 'CH4 + 2 O2 → CO2 + 2 H2O | Complete Hydrocarbon Combustion';
-      } else {
-        chemOutput.textContent = `${eq} → Balanced stoichiometry calculated via Gaussian matrix elimination.`;
+      try {
+        const res = balanceChemicalEquation(eq);
+        lastChemResult = res;
+        chemOutput.innerHTML = `<strong>${res.balancedString}</strong><br><span style="color:#00e5ff">${res.reactionType.type}</span>: ${res.reactionType.description}`;
+        btnStampReaction.style.display = 'flex';
+      } catch (err) {
+        chemOutput.textContent = err.message || t('Could not balance equation.');
+        btnStampReaction.style.display = 'none';
+      }
+    });
+
+    btnStampReaction.addEventListener('click', () => {
+      if (lastChemResult) {
+        insertReactionCard(this.app, lastChemResult);
       }
     });
 
     chemSection.appendChild(chemInput);
     chemSection.appendChild(btnBalance);
     chemSection.appendChild(chemOutput);
+    chemSection.appendChild(btnStampReaction);
     container.appendChild(chemSection);
 
     // Interactive Modules
@@ -524,7 +540,7 @@ export class SidebarRibbon {
       h('span', {}, t('Interactive Periodic Table Dock'))
     );
     btnPeriodic.addEventListener('click', () => {
-      this.app.toast?.(t('Periodic table element inspector opened.'));
+      this.app.openPeriodicTable?.();
     });
 
     const btnPhet = h('button', { class: 'deck-action-btn' },
@@ -532,12 +548,35 @@ export class SidebarRibbon {
       h('span', {}, t('PhET Physics HTML5 Simulation Runner'))
     );
     btnPhet.addEventListener('click', () => {
-      this.app.toast?.(t('PhET physics sandbox ready (Circuit Construction & Wave Interference).'));
+      this.app.openPhetRunner?.();
     });
 
     modulesSection.appendChild(btnPeriodic);
     modulesSection.appendChild(btnPhet);
     container.appendChild(modulesSection);
+
+    // Formula Encyclopedia Section
+    const formulaSection = h('div', { class: 'deck-section' });
+    formulaSection.appendChild(h('h5', { class: 'deck-section-title' }, t('Formula Encyclopedia & Solver')));
+
+    const formulaSelect = h('select', { class: 'deck-select' });
+    FORMULA_CATALOG.forEach((f) => {
+      const opt = h('option', { value: f.id }, `${f.name} (${f.latex})`);
+      formulaSelect.appendChild(opt);
+    });
+
+    const btnStampFormula = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '📐'),
+      h('span', {}, t('Insert Formula Card to Board'))
+    );
+    btnStampFormula.addEventListener('click', () => {
+      const chosen = FORMULA_CATALOG.find((f) => f.id === formulaSelect.value);
+      if (chosen) insertFormulaCard(this.app, chosen);
+    });
+
+    formulaSection.appendChild(formulaSelect);
+    formulaSection.appendChild(btnStampFormula);
+    container.appendChild(formulaSection);
   }
 
   // --- 4. Study & FSRS Shelf ---
@@ -678,20 +717,31 @@ export class SidebarRibbon {
       placeholder: t('Enter technical term...')
     });
 
-    const dictResult = h('div', { class: 'deck-result-box' },
-      'dielectric [ˌdaɪ.ɪˈlɛk.trɪk] (noun): An electrical insulator that can be polarized by an applied electric field.\n• Collocations: dielectric breakdown, dielectric constant, dielectric loss.'
-    );
+    const dictResult = h('div', { class: 'deck-result-box' });
+    let currentEntry = DICTIONARY_DATABASE['dielectric'];
+
+    const updateDictView = (entry) => {
+      currentEntry = entry;
+      dictResult.innerHTML = `
+        <div style="font-weight:700;color:#00e5ff;font-size:13px;">${entry.word} ${entry.ipa ? `[${entry.ipa}]` : ''} <em>(${entry.pos})</em></div>
+        <p style="margin:4px 0 6px;font-size:12px;opacity:0.9;">${entry.def}</p>
+        ${entry.collocations?.length ? `<div style="font-size:11px;opacity:0.75;"><strong style="color:#f59e0b;">${t('Collocations')}:</strong> ${entry.collocations.join(', ')}</div>` : ''}
+      `;
+    };
+
+    updateDictView(currentEntry);
 
     const btnLookup = h('button', { class: 'deck-action-btn primary' }, t('Lookup Term'));
     btnLookup.addEventListener('click', () => {
       const w = wordInput.value.trim().toLowerCase();
-      if (w === 'inductance') {
-        dictResult.textContent = 'inductance [ɪnˈdʌk.təns] (noun): The property of an electric conductor by which a change in current induces an electromotive force (EMF) in both itself and in any nearby conductors.\n• Collocations: mutual inductance, self-inductance, leakage inductance.';
-      } else if (w === 'impedance') {
-        dictResult.textContent = 'impedance [ɪmˈpiː.dəns] (noun): The total opposition that a circuit offers to the flow of alternating current (AC) at a given frequency, represented as Z = R + jX.\n• Collocations: characteristic impedance, matched impedance, surge impedance.';
-      } else {
-        dictResult.textContent = `${w}: Technical definition loaded from offline engineering vocabulary dictionary.`;
-      }
+      const entry = DICTIONARY_DATABASE[w] || {
+        word: w,
+        ipa: '',
+        pos: 'noun',
+        def: t('Technical engineering term. Refer to offline textbook or datasheet.'),
+        collocations: []
+      };
+      updateDictView(entry);
     });
 
     const btnSpeak = h('button', { class: 'deck-action-btn' },
@@ -709,9 +759,20 @@ export class SidebarRibbon {
       }
     });
 
+    const btnStampWord = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '📌'),
+      h('span', {}, t('Insert Definition to Canvas'))
+    );
+    btnStampWord.addEventListener('click', () => {
+      if (currentEntry) {
+        this.app.dictionaryPopover?.stampCard?.(currentEntry);
+      }
+    });
+
     dictSection.appendChild(wordInput);
     dictSection.appendChild(btnLookup);
     dictSection.appendChild(btnSpeak);
+    dictSection.appendChild(btnStampWord);
     dictSection.appendChild(dictResult);
     container.appendChild(dictSection);
   }
