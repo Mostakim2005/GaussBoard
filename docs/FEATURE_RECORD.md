@@ -327,3 +327,26 @@ This document serves as the master registry of all features, enhancements, bug f
   - `node scripts/i18n-check.js`: 2,143 / 2,143 translated (100% parity across all 7 locales).
   - Standalone binary: [`releases/GazBoard-v6.8.0-Portable.exe`](releases/GazBoard-v6.8.0-Portable.exe) (`113,095,961 bytes` / `107.86 MiB`).
   - See [`docs/releases/RELEASE-6.8.0.md`](docs/releases/RELEASE-6.8.0.md) for full release details.
+
+
+### V 6.9.1 Phase 9 Offline Third-Party Libraries & UI/UX Discovery Entry Points Audit
+
+- **F-140**: Delivers 100% offline verification, JSON manifest fix, complete STEM workbench discovery UI integration, and 100% i18n parity:
+  1. **100% Offline Third-Party Libraries Verification** (`src/vendor/`, `CommonLibraries/`):
+     - Verified all 15 third-party offline libraries (KaTeX, PDF.js, Tesseract.js, Three.js, MathJS, Mol*, Opentype, PGFPlots/ChartJS, WordNet, etc.) with zero external CDN requests.
+     - Fixed JSON string backslash escaping in `libraries.json` manifests.
+  2. **STEM & Advanced Workbenches Discovery in Main Insert Menu** (`src/js/insert.js`, `src/js/ui/toolbar.js`):
+     - 10 dedicated discovery cards in the "+" Insert menu (Circuit Workbench, Molecule Viewer, Function Grapher, Symbolic CAS, Physics Simulation Lab, Periodic Table, WordNet Dictionary, Academic Linter, Kanban Board, Document Navigator).
+     - 1-click ribbon pinning toggle on all tool cards.
+  3. **OmniSearch Palette (<kbd>Ctrl+K</kbd>) Command Registry** (`src/js/ui/search-dialog.js`):
+     - Searchable commands and workbench shortcuts directly callable from the OmniSearch dialog.
+  4. **Runtime Libraries Status Inspector & Menu Enhancements** (`src/js/ui/panels.js`, `src/index.html`):
+     - Added "Runtime Libraries" inspector modal in More Settings menu displaying offline status and storage sizes.
+     - Added "Export Board as Video" entry in the main Export submenu.
+     - Canvas context menu shortcuts for quick workbench access.
+  5. **100% i18n Parity Across All 7 Locales** (`src/locales/*.json`):
+     - Added 45 new localization keys across all 7 dictionaries (`ar`, `bn`, `de`, `es`, `pt-BR`, `zh-Hans`, `zh-Hant`), achieving 2,238 / 2,238 keys (100% parity).
+- **Verification**:
+  - `node scripts/smoke.js --new-features`: 24 passed, 0 failed (100% pass rate).
+  - `node scripts/i18n-check.js`: 2,238 / 2,238 translated (100% parity across all 7 locales).
+  - See [`docs/releases/RELEASE-6.9.1.md`](docs/releases/RELEASE-6.9.1.md) for full release details.

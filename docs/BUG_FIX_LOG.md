@@ -478,3 +478,25 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 * **Fix**: Copied `tesseract-core.wasm.js`, `worker.min.js`, and `eng.traineddata.gz` (10.3 MB total) directly into `src/vendor/tesseract/`, updated `libraries.json` manifest (`"bundledInApp": true`), and recompiled the standalone portable binary.
 * **Verification**: `dist/GazBoard-v6.5.0-Portable.exe` (107.81 MiB).
 * **Files Touched**: `src/vendor/tesseract/*`, `C:\Users\kazir\Documents\Antigravity\CommonLibraries\libraries.json`.
+
+
+### BUG-049: Libraries Manifest JSON Windows Path Backslash Escape Syntax Error (v6.9.1)
+* **Symptom**: Parsing `src/vendor/libraries.json` and `CommonLibraries/libraries.json` failed with `SyntaxError: Bad escaped character in JSON at position ...` when hydrating offline third-party metadata.
+* **Root Cause**: Hardcoded Windows absolute paths like `"C:\Users\kazir\Documents\Antigravity\..."` contained raw single backslashes (`\U`, `\k`, `\D`, `\A`) which violated strict JSON RFC 8259 syntax specifications.
+* **Fix**: Corrected and normalized all file paths to double-escaped backslashes (`\\`) across both `src/vendor/libraries.json` and `C:\Users\kazir\Documents\Antigravity\CommonLibraries\libraries.json`.
+* **Verification**: `node -e "JSON.parse(fs.readFileSync('src/vendor/libraries.json', 'utf8'))"`.
+* **Files Touched**: `src/vendor/libraries.json`, `C:\Users\kazir\Documents\Antigravity\CommonLibraries\libraries.json`.
+
+### BUG-050: UI Discovery Entry Points Omission for STEM & Advanced Modals (v6.9.1)
+* **Symptom**: Advanced domain workbenches (Circuit Simulator, Molecule Viewer, Function Grapher, CAS, Physics Lab, Periodic Table, WordNet Dictionary, Academic Linter, Kanban Board, Document Navigator) had no direct visual access points in the user interface, requiring developer-console invocations.
+* **Root Cause**: While modules and core logic were complete and testable, user-facing discovery containers (`toolbar.js`, `insert.js`, `search-dialog.js`, `panels.js`) lacked corresponding tool cards, ribbon pinnings, command palette entries, and export actions.
+* **Fix**: Integrated 10 dedicated discovery cards into the main `+` Insert menu with 1-click ribbon pinning (📌 / 📍); added command palette actions in OmniSearch (<kbd>Ctrl+K</kbd>); registered "Runtime Libraries" inspector in More Settings menu; added context menu quick-launch shortcuts; added "Export Board as Video" in the main export menu.
+* **Verification**: `node scripts/smoke.js --new-features` (24/24 passed).
+* **Files Touched**: `src/js/ui/toolbar.js`, `src/js/insert.js`, `src/js/ui/search-dialog.js`, `src/js/ui/panels.js`, `src/index.html`.
+
+### BUG-051: Localization Parity Drift on STEM Workbench & UI Discovery Keys (v6.9.1)
+* **Symptom**: Strict internationalization check (`node scripts/i18n-check.js`) failed with 45 missing localization keys across all 7 non-English dictionaries (`ar`, `bn`, `de`, `es`, `pt-BR`, `zh-Hans`, `zh-Hant`).
+* **Root Cause**: Adding 10 new STEM tool cards, pin/unpin toggles, runtime library inspector strings, and video export menu items introduced 45 new user-facing strings without corresponding translations in the locale files.
+* **Fix**: Added accurate translations for all 45 keys across all 7 locale dictionaries (`ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, `zh-Hant.json`), bringing total key count to 2,238 / 2,238 (100% coverage).
+* **Verification**: `node scripts/i18n-check.js` (2,238 keys verified, 0 missing).
+* **Files Touched**: `src/locales/ar.json`, `src/locales/bn.json`, `src/locales/de.json`, `src/locales/es.json`, `src/locales/pt-BR.json`, `src/locales/zh-Hans.json`, `src/locales/zh-Hant.json`.

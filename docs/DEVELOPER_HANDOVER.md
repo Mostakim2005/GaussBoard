@@ -19,15 +19,21 @@
   6. *Pluggable Inking Pipeline*: Hardware DirectInk low-latency pen trail paired with pure-JS velocity-weighted cubic Bézier curve fitting (`Windows Ink` mode).
   7. *Deterministic Video Exporter*: Multi-session WebM animation pipeline with stitched audio tracks.
 
-## 1.1 Current Worktree and Release State (2026-10-23)
+## 1.1 Current Worktree and Release State (2026-10-24)
 
 - **Working repository:** `C:\Users\kazir\Documents\OpenCode\GazBoard`.
 - **Current source version:** v6.9.1, based on the local cumulative project feature line.
 - **Git state:** branch `feat/cumulative-fixes`.
-- **Lineage:** delivers Phase 5 Knowledge Interoperability, JSON Canvas 1.0, Graph View & Document Navigator on top of Phase 4 v5.8.0.
-- **Latest release scope:** [`releases/RELEASE-5.9.0.md`](releases/RELEASE-5.9.0.md) records JSON Canvas 1.0 bidirectional converter, interactive Knowledge Graph View modal, Markdown sidecar exporter with YAML frontmatter, LiquidText elastic tether connectors, and Document Navigator & TOC Sidebar with 100% i18n parity and 1,240/1,240 passed smoke checks. Releases ledger is at [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md).
+- **Lineage:** delivers Phase 9 Offline Third-Party Libraries & UI/UX Discovery Entry Points Audit on top of Phase 7/8 STEM and Linguistics engines.
+- **Latest release scope:** [`releases/RELEASE-6.9.1.md`](releases/RELEASE-6.9.1.md) records 100% offline verification of 15 vendored third-party libraries, JSON syntax escape fix in `libraries.json`, zero external CDN leaks, 10 STEM cards in Insert menu with 1-click ribbon pinning, OmniSearch (<kbd>Ctrl+K</kbd>) Tools & Commands palette, Runtime Libraries inspector, and 100% i18n parity (2,238/2,238 keys across 7 locales) with 24/24 passing new features smoke checks. Releases ledger is at [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md).
+- **Master Architecture Matrix:** [`COMPREHENSIVE_FEATURE_ARCHITECTURE_MATRIX.md`](COMPREHENSIVE_FEATURE_ARCHITECTURE_MATRIX.md) maps all 40+ features and phases from v4.8.1 to v6.9.1, file interactions, failure modes, and architectural mechanics.
+- **Hardening Execution Dossiers:**
+  - P0: [`hardening/00-P0-MISSION-CRITICAL-FOUNDATIONS.md`](hardening/00-P0-MISSION-CRITICAL-FOUNDATIONS.md) (Split Workspace, Audio-Ink Sync, Replay Scene Partitioning, Scratch Eraser, Study Tape)
+  - P1: [`hardening/01-P1-COMPUTATIONAL-ENGINES-AND-MEDIA.md`](hardening/01-P1-COMPUTATIONAL-ENGINES-AND-MEDIA.md) (MNA Circuit Sim, Semiconductors & 555, WebM/MP4 Video, Markdown/KaTeX, Calculus Grapher, Tab Persistence, Manhattan Routing)
+  - P2: [`hardening/02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md`](hardening/02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md) (3D Mol* Viewer, ChemDraw SMILES, Symbolic CAS, 3D Grapher, Dataview/Kanban, FSRS v5, Document Navigator, Physics Lab)
+  - P3: [`hardening/03-P3-UTILITIES-AND-UI-ENHANCEMENTS.md`](hardening/03-P3-UTILITIES-AND-UI-ENHANCEMENTS.md) (Stroke Opacity, Highlighter Contrast, Laser Trail, AudioBar Waveform, ReplayBar Dock, Periodic Table, Molar Mass, Technical Linter, WordNet TTS)
 - **Archive policy:** keep active work here. Use the user-configured durable archive only after a release has passed checks; do not copy to historical Antigravity paths from older records.
-- **Verification/build state:** focused audit tests and locale checks pass; see [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md) for the portable artifact hash, remaining npm advisories, and architectural follow-ups.
+- **Verification/build state:** focused audit tests and locale checks pass; see [`releases/RELEASE-6.9.1.md`](releases/RELEASE-6.9.1.md) for the portable artifact hash and test results.
 - **Audit attribution supplied by the project owner:** initial audit — Codex 4.6 Medium in Cursor; secondary audit/fixes — GPT-6 Luna High using Codex.
 - **Collaboration preferences:** the owner uses dictated English and may need intent rephrased in plain language when a request is ambiguous. When feasible, retain user-selectable alternatives rather than forcing a binary choice (especially for inking engines). The feature request is the product source of truth; propose trade-offs before removing or simplifying requested behavior.
 
@@ -36,7 +42,7 @@
 1. Read `AGENTS.md`, then `AI_BOOTSTRAP.md` and `docs/INDEX.md` to choose one layer dossier. Consult [`AI_DOCS_MAP.md`](AI_DOCS_MAP.md) only if document scope or authority is unclear. Read this handover only for current state, owner preferences, archive policy, or verification limits.
 2. Ask what the user wants to tackle next if the prompt does not specify a concrete next change. Do not infer a release, tag, EXE build, or archive update from a documentation/audit request.
 3. For a reported replay defect, start with `docs/layers/01-audio-and-replay.md`; for video-export behavior/performance, start with `docs/layers/07-video-export.md`. Confirm whether the issue is reproducible with provided/test data before changing behavior.
-4. Keep base regression and custom-feature suites distinct. The owner explicitly restricted smoke verification to features added after v4.8.1; v5.2.0 runs the custom feature suite and its focused split/excerpt smoke, not the base-only suite. Check i18n parity when UI strings change.
+4. Keep base regression and custom-feature suites distinct. The owner explicitly restricted smoke verification to features added after v4.8.1; run `node scripts/smoke.js --new-features`. Check i18n parity with `node scripts/i18n-check.js` when UI strings change.
 5. Update the release dossier, release ledger, feature record, bug log, and both documentation trees only when their content is affected. Archive only a completed and verified release snapshot.
 
 ---
@@ -58,35 +64,61 @@ GazBoard/
 │   │   ├── templates.js     # Template registry, thumbnail previews, and custom board snapshots
 │   │   ├── i18n.js          # Runtime translation loader (t('...'))
 │   │   ├── core/            # Fundamental mathematical and rendering engines
+│   │   │   ├── audio-recorder.js # Web Audio capture, finite duration guard, asset serialization
 │   │   │   ├── camera.js    # Camera viewport, 2D transforms, zoomTo, fitWidth, fitHeight
+│   │   │   ├── circuit-sim.js # Modified Nodal Analysis (MNA), reactive RLC, semiconductors, 555 timer
 │   │   │   ├── connectors.js# Line & arrow geometry, barbed arrowheads, heads converter
+│   │   │   ├── excerpts.js  # Linked excerpt regions with bidirectional source back-links
+│   │   │   ├── fsrs.js      # FSRS v5 spaced repetition algorithm and card scheduler
 │   │   │   ├── hit.js       # Spatial hit-testing, pick(), box selection, lasso
 │   │   │   ├── ink.js       # Pluggable inking engines (GazBoard, Windows Ink Bézier, Freehand)
 │   │   │   ├── inktrail.js  # Chromium Delegated Ink Trail (navigator.ink.requestPresenter)
+│   │   │   ├── markdown.js  # Obsidian GFM parser, math, callouts, footnotes, block embeds
 │   │   │   ├── pages.js     # Pad sheet layout, pageRects, margin offset computation
 │   │   │   ├── render.js    # 2D canvas drawing pipeline, dual-pass glow, audio cards, composite modes
 │   │   │   ├── replay.js    # ReplayEngine, temporal stroke scheduler, autonomous delta clock
+│   │   │   ├── scientific-math.js # Safe AST math parser, numerical calculus, Symbolic CAS
 │   │   │   ├── scratch.js   # Gesture scratch-out detector (dominant axis spatial overlap guard)
 │   │   │   ├── store.js     # Document op-log, undo/redo stacks, toJSON/load serialization
 │   │   │   ├── surface.js   # Interactive viewport canvas, dynamic HUD passes, bloom decay
+│   │   │   ├── technical-linter.js # University-level grammar, academic tone & citation linter
 │   │   │   └── tools.js     # Pointer event state machine (draw, erase, marquee, tap-to-seek)
 │   │   └── ui/              # User interface components and floating controls
+│   │       ├── academic-dictionary.js # WordNet AWL sublists 1-10, thesaurus, TTS pronunciation
 │   │       ├── audio-bar.js        # Floating draggable AudioBar HUD & Recording Panel
+│   │       ├── chemical-sketcher.js# ChemDraw-style 2D molecule drawing, SMILES parser
+│   │       ├── circuit-workbench.js# Interactive circuit schematic editor & oscilloscope HUD
 │   │       ├── density-canvas.js   # Waveform density scrubber & named bookmark editor
+│   │       ├── document-navigator.js # Document outline & TOC jump sidebar
+│   │       ├── function-grapher.js # 2D/3D surface & polar function calculus grapher
+│   │       ├── kanban-board.js     # Embedded interactive Kanban board card
+│   │       ├── molecule-viewer.js  # Mol* 3D biomolecular structure viewer bridge
 │   │       ├── note-overview.js    # Gallery card view with smart reflow action overlay
 │   │       ├── pagemargin-dialog.js# Turnout-style page margin modal with 8 draggable handles
 │   │       ├── pagepicker.js       # PDF import page range, mode (background/objects), & alignment
 │   │       ├── panels.js           # Settings panels, in-settings token search, paper selection
+│   │       ├── periodic-table.js   # Interactive periodic table & molar mass calculator
+│   │       ├── phet-runner.js      # Physics simulation lab (optics, Coulomb, momentum, sandbox)
 │   │       ├── properties-dialog.js# Obsidian-style board tags & aliases with autocomplete
 │   │       ├── replay-bar.js       # Movable ReplayBar floating HUD
-│   │       ├── search-dialog.js    # OmniSearch (Ctrl+F) multi-word fuzzy search
+│   │       ├── search-dialog.js    # OmniSearch (Ctrl+F) multi-word fuzzy search & command palette
 │   │       ├── split-workspace.js  # Dual side-by-side study workspace manager
+│   │       ├── study-runner.js     # Active-recall flashcards & image occlusion quiz runner
 │   │       └── toolbar.js          # Bottom/top toolbars, zoom presets popover, highlighter menu
+│   ├── vendor/              # 15 offline verified third-party libraries (KaTeX, PDF.js, Three.js, etc.)
 │   └── locales/             # 7 synchronized translation files (ar, bn, de, es, pt-BR, zh-Hans, zh-Hant)
 ├── docs/
-    │   ├── FEATURE_RECORD.md    # Master feature index (F-101 to F-120) and invariants
-│   ├── BUG_FIX_LOG.md       # Root-cause breakdown of all fixed bugs
+│   ├── COMPREHENSIVE_FEATURE_ARCHITECTURE_MATRIX.md # Comprehensive 40+ feature cross-subsystem matrix
+│   ├── FEATURE_RECORD.md    # Master feature index (F-101 to F-140) and invariants
+│   ├── BUG_FIX_LOG.md       # Root-cause breakdown of all fixed bugs (BUG-001 to BUG-051)
 │   ├── DEVELOPER_HANDOVER.md# This onboarding manual
+│   ├── hardening/           # P0-P3 hardening dossiers
+│   │   ├── 00-P0-MISSION-CRITICAL-FOUNDATIONS.md
+│   │   ├── 01-P1-COMPUTATIONAL-ENGINES-AND-MEDIA.md
+│   │   ├── 02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md
+│   │   └── 03-P3-UTILITIES-AND-UI-ENHANCEMENTS.md
+│   ├── layers/              # Progressive layer dossiers (01 to 07)
+│   ├── releases/            # Release dossiers and notes
 │   └── plan/                # 8-phase architectural blueprint and specs
 └── scripts/
     ├── smoke.js             # Electron headless/display smoke test suite

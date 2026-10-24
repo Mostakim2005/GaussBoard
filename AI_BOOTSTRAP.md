@@ -48,6 +48,11 @@
 | **PDF & Margins** | PDF import modes (background vs movable), margin adjustment dialog | 1. [`docs/layers/05-pdf-and-pagemargins.md`](docs/layers/05-pdf-and-pagemargins.md)<br>2. `src/js/ui/pagemargin-dialog.js` |
 | **Split View & UI** | Dual-pane study layout, OmniSearch (Ctrl+F), ribbon pinning, or tags | 1. [`docs/layers/06-workspace-and-ui.md`](docs/layers/06-workspace-and-ui.md)<br>2. `src/js/ui/split-workspace.js` & `src/js/ui/toolbar.js` |
 | **Video Exporter** | Multi-session video stitching, WebM export, camera framing, or filename behavior | 1. [`docs/layers/07-video-export.md`](docs/layers/07-video-export.md)<br>2. `src/js/export-video.js` |
+| **Circuit Sim & EE** | Headless MNA simulation, semiconductors, 555 timer, relay ladder logic, DMM & oscilloscope | 1. [`docs/plan/spec/doc6_engineering_stem_ee_and_simulation_architecture.md`](docs/plan/spec/doc6_engineering_stem_ee_and_simulation_architecture.md)<br>2. `src/js/core/circuit-sim.js` & `src/js/ui/circuit-workbench.js` |
+| **Math, CAS & Graphing** | 2D/3D function graphing, tangent/Riemann calculus, Symbolic CAS, reactive variables | 1. [`docs/hardening/01-P1-COMPUTATIONAL-ENGINES-AND-MEDIA.md`](docs/hardening/01-P1-COMPUTATIONAL-ENGINES-AND-MEDIA.md)<br>2. `src/js/ui/function-grapher.js` & `src/js/core/scientific-math.js` |
+| **Chemistry & 3D Mol** | 3D molecular structure viewer, ChemDraw 2D sketcher, SMILES parser, periodic table | 1. [`docs/hardening/02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md`](docs/hardening/02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md)<br>2. `src/js/ui/molecule-viewer.js` & `src/js/ui/chemical-sketcher.js` |
+| **Linguistics & Memory** | FSRS v5 spaced repetition, Anki bridge, WordNet academic dictionary & ESL linter | 1. [`docs/hardening/02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md`](docs/hardening/02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md)<br>2. `src/js/core/fsrs.js` & `src/js/ui/academic-dictionary.js` |
+| **Hardening Dossiers** | Priority 0–3 execution guides with line-level failure modes and defensive code | 1. [`docs/hardening/00-P0-MISSION-CRITICAL-FOUNDATIONS.md`](docs/hardening/00-P0-MISSION-CRITICAL-FOUNDATIONS.md) to `03-P3-UTILITIES-AND-UI-ENHANCEMENTS.md` |
 | **Layers (On Standby)** | Resuming the multi-layer system feature | 1. `docs/DEVELOPER_HANDOVER.md` (§6 On-Hold Features)<br>2. `docs/plan/04-quality.md` (Phase 4 Layer Architecture) |
 
 ---
@@ -80,33 +85,37 @@ If you need to understand the evolution of changes made to the original base app
 * **Epoch 2 — User Feedback Rounds 1 & 2**: Fixed 11 edge-case bugs (spatial overlap guard against `2 3 2`/`WRM` false positives, audio clock stall fallback, in-settings search tokenization, split workspace DOM mounting). (Documented in `docs/BUG_FIX_LOG.md`).
 * **Epoch 3 — User Feedback Round 3**: Added gallery `#tags` filtering, ribbon tool pinning/unpinning, external audio import, non-destructive image cropping, direct image annotation locking, and multi-session video stitching. (Documented in `docs/FEATURE_RECORD.md` Round 3).
 * **Epoch 4 — User Feedback Round 4**: Added elongated/barbed arrowheads and line converters, custom templates from files and active board snapshots, pluggable inking with Windows Ink velocity Bézier smoothing, zoom presets popover with favorites, highlighter 50% opacity and color-pop, audio skip durations (5s–30s), recording 3-dot context menu, PDF background mode, and Turnout 8-handle page margin dialog. (Documented in `docs/FEATURE_RECORD.md` Round 4).
+* **Epoch 5 — Phase 5 Knowledge Interoperability & Graph Engine (v5.9.0)**: Bidirectional JSON Canvas 1.0 import/export, interactive Obsidian-style Knowledge Graph View modal, Markdown sidecar export with YAML frontmatter, LiquidText elastic tether connectors, and hierarchical Document Navigator & TOC Sidebar. (Documented in `docs/releases/RELEASE-5.9.0.md`).
+* **Epoch 6 — Phase 6 Mathematical Foundations & Symbolic CAS (v6.6.0)**: Interactive 2D/3D Function Grapher ($y=f(x)$, $z=f(x,y)$, polar $r=f(\theta)$), tangent line & numerical calculus (definite integrals, Riemann sums), Symbolic CAS (polynomial expansion, quadratic roots, matrix determinants, LaTeX output), and offline Tesseract OCR engine. (Documented in `docs/releases/RELEASE-6.6.0.md`).
+* **Epoch 7 — Phase 7 & 8 STEM Powerhouse & Linguistics Core (v6.7.0 – v6.8.0)**: Headless MNA Circuit Simulator with semiconductors & 555 timer, ChemDraw 2D sketcher & SMILES VSEPR converter, Physics simulation labs (optics, Coulomb E-fields, momentum collisions, rigid sandbox), WordNet Academic Dictionary (AWL Sublists 1-10) with TTS pronunciation, Technical Writing Linter, and Natural Math-to-LaTeX converter. (Documented in `docs/releases/RELEASE-6.7.0.md` & `RELEASE-6.8.0.md`).
+* **Epoch 8 — Phase 9 Offline Libraries Audit & UI Discovery Hardening (v6.9.1)**: 100% offline verification of all 15 vendored third-party libraries; JSON syntax escape fix in `libraries.json`; zero external CDN leaks; main "+" Insert menu integration with 10 STEM cards and 1-click ribbon pinning; OmniSearch (<kbd>Ctrl+K</kbd>) Tools & Commands palette; Runtime Libraries inspector; and 100% i18n parity across 7 locales (2,238 keys). (Documented in `docs/releases/RELEASE-6.9.1.md`).
 
 ---
 
 ## 5. Verification Commands
 
-Choose the verification group that matches the change. Mandatory regression and custom-feature tests are separate; translation parity applies when UI strings/locales are in scope.
+Choose the verification group that matches the change. Under current active directive, skip base smoke tests and run new features suite:
 
 ```powershell
-# Mandatory regression suite
-node scripts/smoke.js
+# Custom / New Features Smoke Test (Active Directive: skip base tests, test new features):
+node scripts/smoke.js --new-features
 
-# Custom additions, separately
-npm run smoke:custom
-npm run smoke:features:4.8.4.1
-npm run smoke:features:4.8.8
-npm run smoke:replay
-npm run smoke:video
-
-# Translation parity
+# Strict 100% translation coverage check (2,238 keys across all 7 locales):
 node scripts/i18n-check.js
+
+# Full base regression suite (when explicitly requested):
+node scripts/smoke.js
 
 # Windows packaging
 npm run dist:win
 ```
 
-Current patch release notes and verification state: [`docs/releases/RELEASE-4.8.21.md`](docs/releases/RELEASE-4.8.21.md).
+Current patch release notes and verification state: [`docs/releases/RELEASE-6.9.1.md`](docs/releases/RELEASE-6.9.1.md).
 
 Current repository status, release snapshot, owner preferences, and verification limitations: [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md).
 
-See [`docs/INDEX.md`](docs/INDEX.md) for feature-to-test navigation and [`docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`](docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md) for release-specific scope.
+Comprehensive Architecture Matrix: [`docs/COMPREHENSIVE_FEATURE_ARCHITECTURE_MATRIX.md`](docs/COMPREHENSIVE_FEATURE_ARCHITECTURE_MATRIX.md).
+
+Hardening Execution Dossiers: [`docs/hardening/00-P0-MISSION-CRITICAL-FOUNDATIONS.md`](docs/hardening/00-P0-MISSION-CRITICAL-FOUNDATIONS.md) to `03-P3-UTILITIES-AND-UI-ENHANCEMENTS.md`.
+
+See [`docs/INDEX.md`](docs/INDEX.md) for feature-to-test navigation and [`docs/FEATURE_RECORD.md`](docs/FEATURE_RECORD.md) for cumulative feature records.
