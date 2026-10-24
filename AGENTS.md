@@ -58,8 +58,8 @@ The current release and source snapshot are recorded in `package.json`, `docs/IN
 Before reporting completion to the user, run these verification commands in PowerShell:
 
 ```powershell
-# 1. Full regression smoke test suite (report the actual current count):
-node scripts/smoke.js
+# 1. Custom / New Features Smoke Test (Active Directive: skip base tests, test new features):
+node scripts/smoke.js --new-features
 
 # 2. Strict 100% translation coverage check (report the actual current count):
 node scripts/i18n-check.js

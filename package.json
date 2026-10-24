@@ -8,6 +8,7 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "smoke": "node scripts/smoke.js",
+    "smoke:new": "node scripts/smoke.js --new-features",
     "smoke:custom": "node scripts/smoke-custom.js",
     "smoke:replay": "node --test test/replay-reading.test.mjs test/audio-bar.test.mjs",
     "smoke:video": "node --test test/video-framing.test.mjs",
