@@ -126,18 +126,26 @@ export class DataviewEngine {
 
   /**
    * Resolve field value from object (supports nested props e.g. 'card.stability')
+   * Hardened against prototype pollution (__proto__, prototype, constructor).
    * @param {object} obj
    * @param {string} field
    */
   static resolveField(obj, field) {
     if (!obj || !field) return '';
     const cleanField = field.trim();
+    const BLOCKED_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+    if (BLOCKED_KEYS.has(cleanField)) return '';
+
     if (cleanField.includes('.')) {
       const parts = cleanField.split('.');
       let cur = obj;
       for (const p of parts) {
-        if (cur && typeof cur === 'object') cur = cur[p];
-        else return '';
+        if (BLOCKED_KEYS.has(p)) return '';
+        if (cur && typeof cur === 'object' && Object.prototype.hasOwnProperty.call(cur, p)) {
+          cur = cur[p];
+        } else {
+          return '';
+        }
       }
       return cur !== undefined && cur !== null ? cur : '';
     }
@@ -151,6 +159,7 @@ export class DataviewEngine {
       return '';
     }
 
+    if (!Object.prototype.hasOwnProperty.call(obj, cleanField)) return '';
     const val = obj[cleanField];
     if (val === undefined || val === null) return '';
     if (typeof val === 'object') return JSON.stringify(val);
@@ -159,10 +168,25 @@ export class DataviewEngine {
 
   /**
    * Safely evaluate a basic WHERE condition without eval()
-   * Supports: contains(tags, "val"), field = "val", field != "val", field > num, field < num
+   * Supports: contains(tags, "val"), field CONTAINS "val", field = "val", field != "val", field > num, field < num, AND chaining
    */
   static evaluateCondition(clause, item) {
     const s = clause.trim();
+
+    // Multi-clause conjunction (AND)
+    if (/\s+AND\s+/i.test(s)) {
+      const subClauses = s.split(/\s+AND\s+/i);
+      return subClauses.every((sub) => DataviewEngine.evaluateCondition(sub.trim(), item));
+    }
+
+    // Infix: field CONTAINS "string" or field CONTAINS string
+    const infixContainsMatch = s.match(/^([a-zA-Z0-9_.-]+)\s+contains\s+(?:["']([^"']+)["']|([a-zA-Z0-9_.-]+))$/i);
+    if (infixContainsMatch) {
+      const field = infixContainsMatch[1];
+      const target = (infixContainsMatch[2] !== undefined ? infixContainsMatch[2] : infixContainsMatch[3]).toLowerCase();
+      const val = String(DataviewEngine.resolveField(item, field)).toLowerCase();
+      return val.includes(target);
+    }
 
     // contains(field, "string")
     const containsMatch = s.match(/contains\(\s*([a-zA-Z0-9_.-]+)\s*,\s*["']([^"']+)["']\s*\)/i);

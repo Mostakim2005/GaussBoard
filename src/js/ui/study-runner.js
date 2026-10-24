@@ -65,6 +65,14 @@ export class StudyRunner {
       this.container.parentNode.removeChild(this.container);
     }
     this.container = null;
+    // Restore all occlusions to concealed state when exiting study session (Invariant #6)
+    if (Array.isArray(this.cards)) {
+      this.cards.forEach((c) => {
+        if (c?.object) {
+          c.object.revealed = false;
+        }
+      });
+    }
     this.app.surface?.invalidate?.();
   }
 
@@ -162,17 +170,17 @@ export class StudyRunner {
     const counter = this.container?.querySelector('.hud-counter');
     const bar = this.container?.querySelector('.study-hud-bar');
     if (counter) counter.textContent = `${t('Card')} ${index + 1} / ${this.cards.length}`;
-    if (bar) bar.style.width = `${pct}%`;
+    if (bar?.style) bar.style.width = `${pct}%`;
 
     // Smoothly glide camera to card
     const box = boundsOf(item.object);
-    if (box && box.w > 0 && box.h > 0) {
-      const vw = this.app.surface.width;
-      const vh = this.app.surface.height;
+    if (box && box.w > 0 && box.h > 0 && this.app.surface?.cam?.glideTo) {
+      const vw = this.app.surface?.width || 1000;
+      const vh = this.app.surface?.height || 700;
       this.app.surface.cam.glideTo(box, vw, vh, {
         pad: 140,
         duration: 380,
-        onStep: () => this.app.surface?.invalidate()
+        onStep: () => this.app.surface?.invalidate?.()
       });
     }
 

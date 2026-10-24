@@ -132,74 +132,84 @@ export class PdfSidebarDrawer {
       value: this.tocFilter || '',
       style: 'width:100%;box-sizing:border-box;padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#eee;font-size:12px;'
     });
+
+    const listWrap = h('div', { class: 'pdf-toc-list', style: 'display:flex;flex-direction:column;gap:2px;' });
+
+    const updateList = () => {
+      listWrap.innerHTML = '';
+      const query = this.tocFilter || '';
+
+      if (Array.isArray(outline) && outline.length) {
+        const renderOutlineTree = (items, depth = 0) => {
+          for (const item of items) {
+            const title = item.title || t('Section');
+            const isMatch = !query || title.toLowerCase().includes(query);
+            const hasChildren = Array.isArray(item.items) && item.items.length > 0;
+
+            if (isMatch || hasChildren) {
+              const row = h('div', {
+                style: `padding:6px 8px;padding-left:${depth * 14 + 8}px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);transition:background 0.15s;margin-bottom:2px;`
+              },
+                h('div', { style: 'display:flex;align-items:center;gap:6px;overflow:hidden;' },
+                  h('span', { style: 'font-size:11px;color:rgba(255,255,255,0.5);' }, hasChildren ? '▼' : '•'),
+                  h('span', { style: 'font-size:12px;color:var(--text,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' }, title)
+                ),
+                h('span', { style: 'font-size:11px;color:#00e5ff;flex-shrink:0;' }, `p. ${item.pageNumber || 1}`)
+              );
+              row.addEventListener('mouseenter', () => row.style.background = 'rgba(0,229,255,0.12)');
+              row.addEventListener('mouseleave', () => row.style.background = 'rgba(255,255,255,0.04)');
+              row.addEventListener('click', () => {
+                const targetPage = item.pageNumber ? Math.max(0, Math.min(Math.max(0, pages.length - 1), item.pageNumber - 1)) : 0;
+                this.app.jumpToPage?.(targetPage);
+              });
+              listWrap.appendChild(row);
+            }
+
+            if (hasChildren) {
+              renderOutlineTree(item.items, depth + 1);
+            }
+          }
+        };
+
+        renderOutlineTree(outline, 0);
+        return;
+      }
+
+      // Fallback: Generate Outline from Page numbers & headings on each page
+      if (!pages.length) {
+        listWrap.appendChild(h('div', {
+          style: 'color:var(--text-3,rgba(255,255,255,0.5));font-size:13px;text-align:center;padding:24px;'
+        }, t('Single-page canvas (No PDF outline)')));
+        return;
+      }
+
+      pages.forEach((p, idx) => {
+        const pageTitle = p.title || `${t('Page')} ${idx + 1}`;
+        if (query && !pageTitle.toLowerCase().includes(query)) return;
+        const row = h('div', {
+          style: 'padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);margin-bottom:2px;'
+        },
+          h('span', { style: 'font-size:13px;color:var(--text,#eee);' }, pageTitle),
+          h('span', { style: 'font-size:11px;color:#00e5ff;' }, `→`)
+        );
+        row.addEventListener('mouseenter', () => row.style.background = 'rgba(0,229,255,0.12)');
+        row.addEventListener('mouseleave', () => row.style.background = 'rgba(255,255,255,0.04)');
+        row.addEventListener('click', () => {
+          this.app.jumpToPage?.(idx);
+        });
+        listWrap.appendChild(row);
+      });
+    };
+
     searchInput.addEventListener('input', (e) => {
       this.tocFilter = e.target.value.toLowerCase().trim();
-      this.render();
+      updateList();
     });
+
     searchWrap.appendChild(searchInput);
     container.appendChild(searchWrap);
-
-    const query = this.tocFilter || '';
-
-    if (Array.isArray(outline) && outline.length) {
-      const renderOutlineTree = (items, depth = 0) => {
-        for (const item of items) {
-          const title = item.title || t('Section');
-          const isMatch = !query || title.toLowerCase().includes(query);
-          const hasChildren = Array.isArray(item.items) && item.items.length > 0;
-
-          if (isMatch || hasChildren) {
-            const row = h('div', {
-              style: `padding:6px 8px;padding-left:${depth * 14 + 8}px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);transition:background 0.15s;margin-bottom:2px;`
-            },
-              h('div', { style: 'display:flex;align-items:center;gap:6px;overflow:hidden;' },
-                h('span', { style: 'font-size:11px;color:rgba(255,255,255,0.5);' }, hasChildren ? '▼' : '•'),
-                h('span', { style: 'font-size:12px;color:var(--text,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' }, title)
-              ),
-              h('span', { style: 'font-size:11px;color:#00e5ff;flex-shrink:0;' }, `p. ${item.pageNumber || 1}`)
-            );
-            row.addEventListener('mouseenter', () => row.style.background = 'rgba(0,229,255,0.12)');
-            row.addEventListener('mouseleave', () => row.style.background = 'rgba(255,255,255,0.04)');
-            row.addEventListener('click', () => {
-              this.app.jumpToPage?.(item.pageNumber ? item.pageNumber - 1 : 0);
-            });
-            container.appendChild(row);
-          }
-
-          if (hasChildren) {
-            renderOutlineTree(item.items, depth + 1);
-          }
-        }
-      };
-
-      renderOutlineTree(outline, 0);
-      return;
-    }
-
-    // Fallback: Generate Outline from Page numbers & headings on each page
-    if (!pages.length) {
-      container.appendChild(h('div', {
-        style: 'color:var(--text-3,rgba(255,255,255,0.5));font-size:13px;text-align:center;padding:24px;'
-      }, t('Single-page canvas (No PDF outline)')));
-      return;
-    }
-
-    pages.forEach((p, idx) => {
-      const pageTitle = p.title || `${t('Page')} ${idx + 1}`;
-      if (query && !pageTitle.toLowerCase().includes(query)) return;
-      const row = h('div', {
-        style: 'padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);margin-bottom:2px;'
-      },
-        h('span', { style: 'font-size:13px;color:var(--text,#eee);' }, pageTitle),
-        h('span', { style: 'font-size:11px;color:#00e5ff;' }, `→`)
-      );
-      row.addEventListener('mouseenter', () => row.style.background = 'rgba(0,229,255,0.12)');
-      row.addEventListener('mouseleave', () => row.style.background = 'rgba(255,255,255,0.04)');
-      row.addEventListener('click', () => {
-        this.app.jumpToPage?.(idx);
-      });
-      container.appendChild(row);
-    });
+    container.appendChild(listWrap);
+    updateList();
   }
 
   renderBookmarks(container) {

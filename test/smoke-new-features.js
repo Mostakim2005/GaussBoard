@@ -135,7 +135,7 @@ const browserChecks = String.raw`(async () => {
   // 16. Periodic Table Element Catalog
   try {
     const { ELEMENTS_DATA } = await import('app://board/js/ui/periodic-table.js');
-    out.periodicTable = Array.isArray(ELEMENTS_DATA) && ELEMENTS_DATA.length >= 40;
+    out.periodicTable = Array.isArray(ELEMENTS_DATA) && ELEMENTS_DATA.length >= 118;
   } catch (e) { out.periodicTable = e.message; }
 
   // 17. Academic WordNet Dictionary & Thesaurus

@@ -1251,17 +1251,22 @@ export class CircuitWorkbenchModal {
 
     try {
       const dataUrl = this.canvas.toDataURL('image/png');
-      const cam = this.app.surface?.cam || { viewport: { x: 200, y: 200, w: 800, h: 600 }, z: 1 };
-      const cx = (cam.viewport?.x || 200) + (cam.viewport?.w || 800) / 2 - 350;
-      const cy = (cam.viewport?.y || 200) + (cam.viewport?.h || 600) / 2 - 200;
+      const w = 700;
+      const h = 400;
+      const cam = this.app.surface?.cam;
+      const sw = this.app.surface?.canvas?.width || 1200;
+      const sh = this.app.surface?.canvas?.height || 800;
+      const vp = (cam && typeof cam.viewport === 'function') ? cam.viewport(sw, sh) : (cam?.viewport || { x: 100, y: 100, w: 1000, h: 700 });
+      const cx = (vp.x || 0) + (vp.w || 1000) / 2 - w / 2;
+      const cy = (vp.y || 0) + (vp.h || 700) / 2 - h / 2;
 
       const imgObj = {
         id: `c_wb_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         type: 'image',
         x: cx,
         y: cy,
-        w: 700,
-        h: 400,
+        w: w,
+        h: h,
         src: dataUrl,
         title: t('Industrial Circuit Simulation Snapshot (v6.4.0)'),
         t: Date.now() // preserve p.t timestamp
@@ -1295,17 +1300,28 @@ export class CircuitWorkbenchModal {
     }
 
     // Also add as note to canvas
-    const cam = this.app.surface?.cam || { viewport: { x: 200, y: 200 } };
+    const cam = this.app.surface?.cam;
+    const sw = this.app.surface?.canvas?.width || 1200;
+    const sh = this.app.surface?.canvas?.height || 800;
+    const vp = (cam && typeof cam.viewport === 'function') ? cam.viewport(sw, sh) : (cam?.viewport || { x: 100, y: 100, w: 1000, h: 700 });
     const noteObj = {
       id: `c_bom_${Date.now()}`,
       type: 'text',
-      x: (cam.viewport?.x || 200) + 50,
-      y: (cam.viewport?.y || 200) + 50,
+      x: (vp.x || 0) + 50,
+      y: (vp.y || 0) + 50,
       text: noteText,
       t: Date.now()
     };
     this.app.store?.add(noteObj);
     this.app.saveSoon?.();
     this.app.surface?.render?.();
+  }
+
+  destroy() {
+    this.close();
+    if (this.modal && this.modal.parentNode) {
+      this.modal.parentNode.removeChild(this.modal);
+      this.modal = null;
+    }
   }
 }

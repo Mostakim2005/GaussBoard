@@ -30,8 +30,8 @@
 - **Hardening Execution Dossiers:**
   - P0: [`hardening/00-P0-MISSION-CRITICAL-FOUNDATIONS.md`](hardening/00-P0-MISSION-CRITICAL-FOUNDATIONS.md) (Split Workspace, Audio-Ink Sync, Replay Scene Partitioning, Scratch Eraser, Study Tape)
   - P1: [`hardening/01-P1-COMPUTATIONAL-ENGINES-AND-MEDIA.md`](hardening/01-P1-COMPUTATIONAL-ENGINES-AND-MEDIA.md) (MNA Circuit Sim, Semiconductors & 555, WebM/MP4 Video, Markdown/KaTeX, Calculus Grapher, Tab Persistence, Manhattan Routing)
-  - P2: [`hardening/02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md`](hardening/02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md) (3D Mol* Viewer, ChemDraw SMILES, Symbolic CAS, 3D Grapher, Dataview/Kanban, FSRS v5, Document Navigator, Physics Lab)
-  - P3: [`hardening/03-P3-UTILITIES-AND-UI-ENHANCEMENTS.md`](hardening/03-P3-UTILITIES-AND-UI-ENHANCEMENTS.md) (Stroke Opacity, Highlighter Contrast, Laser Trail, AudioBar Waveform, ReplayBar Dock, Periodic Table, Molar Mass, Technical Linter, WordNet TTS)
+  - P2: [`hardening/02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md`](hardening/02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md) (**Fully Hardened & Audited**: 3D Mol* Viewer, ChemDraw SMILES, Symbolic CAS, 3D Grapher, Dataview/Kanban, FSRS v5, Document Navigator, Physics Lab — 7/7 unit tests verified in `test/p2-hardening.test.mjs`)
+  - P3: [`hardening/03-P3-UTILITIES-AND-UI-ENHANCEMENTS.md`](hardening/03-P3-UTILITIES-AND-UI-ENHANCEMENTS.md) (**Fully Hardened & Audited**: Stroke Opacity, Highlighter Contrast, Laser Trail, AudioBar Waveform, ReplayBar Dock, Periodic Table, Molar Mass, Technical Linter, WordNet TTS — 6/6 unit tests verified in `test/p3-hardening.test.mjs`)
 - **Archive policy:** keep active work here. Use the user-configured durable archive only after a release has passed checks; do not copy to historical Antigravity paths from older records.
 - **Verification/build state:** focused audit tests and locale checks pass; see [`releases/RELEASE-6.9.1.md`](releases/RELEASE-6.9.1.md) for the portable artifact hash and test results.
 - **Audit attribution supplied by the project owner:** initial audit — Codex 4.6 Medium in Cursor; secondary audit/fixes — GPT-6 Luna High using Codex.

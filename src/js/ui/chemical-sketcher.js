@@ -381,6 +381,26 @@ export class ChemicalSketcherModal {
         pendingBondOrder = 2;
       } else if (ch === '#') {
         pendingBondOrder = 3;
+      } else if (ch === '%') {
+        // Multi-digit ring closure %10 .. %99
+        let numStr = '';
+        while (i + 1 < clean.length && /[0-9]/.test(clean[i + 1])) {
+          numStr += clean[i + 1];
+          i++;
+        }
+        if (numStr.length > 0) {
+          const ringNum = parseInt(numStr, 10);
+          if (ringClosures.has(ringNum)) {
+            const targetIdx = ringClosures.get(ringNum);
+            if (currentIdx !== null && targetIdx !== currentIdx) {
+              this.bonds.push({ a: currentIdx, b: targetIdx, order: pendingBondOrder });
+            }
+            ringClosures.delete(ringNum);
+          } else {
+            ringClosures.set(ringNum, currentIdx);
+          }
+          pendingBondOrder = 1;
+        }
       } else if (/[0-9]/.test(ch)) {
         // Ring closure
         const ringNum = parseInt(ch, 10);
@@ -600,14 +620,23 @@ export class ChemicalSketcherModal {
     }
 
     const dataUrl = this.canvas.toDataURL('image/png');
+    const w = 360;
+    const h = 260;
+    const cam = this.app.surface?.cam;
+    const sw = this.app.surface?.canvas?.width || 1200;
+    const sh = this.app.surface?.canvas?.height || 800;
+    const vp = (cam && typeof cam.viewport === 'function') ? cam.viewport(sw, sh) : (cam?.viewport || { x: 100, y: 100, w: 1000, h: 700 });
+    const cx = (vp.x || 0) + (vp.w || 1000) / 2 - w / 2;
+    const cy = (vp.y || 0) + (vp.h || 700) / 2 - h / 2;
+
     const imgObj = {
       id: `chem_stamp_${uid()}`,
       type: 'image',
       src: dataUrl,
-      x: 100,
-      y: 100,
-      w: 360,
-      h: 260,
+      x: cx,
+      y: cy,
+      w: w,
+      h: h,
       label: t('2D Chemical Structure')
     };
 
@@ -615,5 +644,13 @@ export class ChemicalSketcherModal {
     this.app.surface?.redraw();
     this.close();
     this.app.toast?.(t('Stamped 2D chemical structure card to whiteboard!'));
+  }
+
+  destroy() {
+    this.close();
+    if (this.modal && this.modal.parentNode) {
+      this.modal.parentNode.removeChild(this.modal);
+      this.modal = null;
+    }
   }
 }

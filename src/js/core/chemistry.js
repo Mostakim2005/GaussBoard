@@ -19,29 +19,56 @@ export const ATOMIC_WEIGHTS = Object.freeze({
   La: 138.91, Ce: 140.12, Pr: 140.91, Nd: 144.24, Pm: 145, Sm: 150.36, Eu: 151.96, Gd: 157.25,
   Tb: 158.93, Dy: 162.50, Ho: 164.93, Er: 167.26, Tm: 168.93, Yb: 173.05, Lu: 174.97, Hf: 178.49,
   Ta: 180.95, W: 183.84, Re: 186.21, Os: 190.23, Ir: 192.22, Pt: 195.08, Au: 196.97, Hg: 200.59,
-  Tl: 204.38, Pb: 207.2, Bi: 208.98, Th: 232.04, Pa: 231.04, U: 238.03
+  Tl: 204.38, Pb: 207.2, Bi: 208.98, Po: 209.0, At: 210.0, Rn: 222.0, Fr: 223.0, Ra: 226.0,
+  Ac: 227.0, Th: 232.04, Pa: 231.04, U: 238.03, Np: 237.0, Pu: 244.0, Am: 243.0, Cm: 247.0,
+  Bk: 247.0, Cf: 251.0, Es: 252.0, Fm: 257.0, Md: 258.0, No: 259.0, Lr: 266.0, Rf: 267.0,
+  Db: 268.0, Sg: 269.0, Bh: 270.0, Hs: 269.0, Mt: 278.0, Ds: 281.0, Rg: 282.0, Cn: 285.0,
+  Nh: 286.0, Fl: 289.0, Mc: 290.0, Lv: 293.0, Ts: 294.0, Og: 294.0
 });
 
-/** Parse a chemical formula into an element count dictionary, supporting parentheses */
+/** Parse a chemical formula into an element count dictionary, supporting parentheses and hydration dots */
 export function parseFormula(formula) {
+  if (!formula || typeof formula !== 'string') return {};
+  const clean = formula.trim().replace(/\s+/g, '').replace(/[·•]/g, '*');
+
+  // Handle hydration notation (e.g. CuSO4*5H2O)
+  const dotIdx = clean.indexOf('*');
+  if (dotIdx !== -1) {
+    const mainPart = clean.slice(0, dotIdx);
+    const rest = clean.slice(dotIdx + 1);
+    const hydMatch = rest.match(/^(\d*)(.*)$/);
+    const mult = hydMatch && hydMatch[1] ? parseInt(hydMatch[1], 10) : 1;
+    const hydPart = hydMatch ? hydMatch[2] : rest;
+    const mainCounts = parseFormula(mainPart);
+    const hydCounts = parseFormula(hydPart);
+    for (const [elem, count] of Object.entries(hydCounts)) {
+      mainCounts[elem] = (mainCounts[elem] || 0) + count * mult;
+    }
+    return mainCounts;
+  }
+
   const regex = /([A-Z][a-z]*)(\d*)|(\()|(\))(\d*)/g;
   const stack = [{}];
   let match;
-  while ((match = regex.exec(formula)) !== null) {
+  while ((match = regex.exec(clean)) !== null) {
     const [, elem, count, openParen, closeParen, parenCount] = match;
     if (openParen) {
       stack.push({});
     } else if (closeParen) {
-      const top = stack.pop();
-      const mult = parenCount ? parseInt(parenCount, 10) : 1;
-      const current = stack[stack.length - 1];
-      for (const [e, c] of Object.entries(top)) {
-        current[e] = (current[e] || 0) + c * mult;
+      if (stack.length > 1) {
+        const top = stack.pop();
+        const mult = parenCount ? parseInt(parenCount, 10) : 1;
+        const current = stack[stack.length - 1];
+        for (const [e, c] of Object.entries(top)) {
+          current[e] = (current[e] || 0) + c * mult;
+        }
       }
     } else if (elem) {
       const c = count ? parseInt(count, 10) : 1;
       const current = stack[stack.length - 1];
-      current[elem] = (current[elem] || 0) + c;
+      if (current) {
+        current[elem] = (current[elem] || 0) + c;
+      }
     }
   }
   return stack[0] || {};

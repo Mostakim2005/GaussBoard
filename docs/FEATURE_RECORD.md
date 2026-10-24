@@ -350,3 +350,28 @@ This document serves as the master registry of all features, enhancements, bug f
   - `node scripts/smoke.js --new-features`: 24 passed, 0 failed (100% pass rate).
   - `node scripts/i18n-check.js`: 2,238 / 2,238 translated (100% parity across all 7 locales).
   - See [`docs/releases/RELEASE-6.9.1.md`](docs/releases/RELEASE-6.9.1.md) for full release details.
+
+
+### P2 & P3 Subsystems Hardening & Architectural Verification
+
+- **Hardening Scope**: Comprehensive code audit, edge-case remediation, and dedicated unit test suites for all 26 subsystems across P2 (Domain Workbenches & Simulators) and P3 (Utilities & UI Enhancements):
+  1. **P3 Utilities & UI Hardening** (`docs/hardening/03-P3-UTILITIES-AND-UI-ENHANCEMENTS.md`):
+     - *Academic Dictionary & WordNet*: Added `typeof window !== 'undefined' && 'speechSynthesis' in window` check preventing runtime crashes in test/Node environments.
+     - *Technical Linter & Academic Tone*: Protected embedded LaTeX equations (`$...$`, `$$...$$`) and code blocks from text transformation, preserving math symbols like `\big(`.
+     - *Periodic Table & Bohr Shells*: Added complete Bohr electron shell calculations for all 118 elements; handled zero/invalid inputs safely.
+     - *Chemical Formula & Molar Mass*: Safe hydration symbol parsing (`*`, `·`, `•`) and bracket handling in `parseFormula()`.
+     - *Surface Laser Trail*: Fixed `Surface.pruneLaser()` to dynamically respect custom `laserTrailDuration` settings.
+  2. **P2 Domain Workbenches & Simulators Hardening** (`docs/hardening/02-P2-DOMAIN-WORKBENCHES-AND-SIMULATORS.md`):
+     - *ChemDraw 2D Chemical Sketcher*: Added support for multi-digit SMILES ring closures (`%10`–`%99`) and centered card stamping using `cam.viewport(sw, sh)`.
+     - *Symbolic CAS & Notebook Variables*: Implemented `evaluateNotebookVariables(varMap)` with 3-color DFS cycle detection and topological sorting, eliminating circular dependency hangs.
+     - *Dataview Query Engine*: Blocked prototype pollution keys (`__proto__`, `prototype`, `constructor`); added case-insensitive infix `CONTAINS` and multi-clause `AND` parsing.
+     - *FSRS v5 Engine*: Enforced numerical stability clamps (`newStability >= 0.01`, `scheduledDays >= 10/1440`), preventing interval corruption.
+     - *AnkiConnect Bridge*: Added strict 2,500ms `AbortController` timeout to `invokeAnkiConnect()`.
+     - *PDF Sidebar Drawer*: Decoupled outline search filtering from DOM re-creation, preserving search input focus across keystrokes.
+     - *Workbench Coordinate Centering*: Standardized `cam.viewport(sw, sh)` coordinate centering across Molecule Viewer, Function Grapher, and Circuit Workbench.
+     - *Study Runner Occlusion Reset (Invariant #6)*: Ensured all whiteboard occlusions are restored to concealed state (`revealed = false`) upon exiting review sessions.
+- **Verification**:
+  - `node --test test/p2-hardening.test.mjs`: 7 passed, 0 failed (100% pass rate).
+  - `node --test test/p3-hardening.test.mjs`: 6 passed, 0 failed (100% pass rate).
+  - `node scripts/smoke.js --new-features`: 24 passed, 0 failed (100% pass rate).
+  - `node scripts/i18n-check.js`: 2,238 / 2,238 translated (100% parity across all 7 locales).

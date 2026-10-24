@@ -62,6 +62,46 @@ export const COMMON_TYPOS = [
   { match: /\bresistence\b/gi, suggestion: 'resistance' }
 ];
 
+/**
+ * Identify ranges of code blocks and LaTeX math formulas that must be protected from linter mutation
+ * @param {string} text
+ * @returns {Array<{start: number, end: number}>}
+ */
+export function getProtectedRanges(text) {
+  if (!text || typeof text !== 'string') return [];
+  const ranges = [];
+  // 1. Fenced code blocks ```...```
+  const fenceRe = /```[\s\S]*?```/g;
+  let m;
+  while ((m = fenceRe.exec(text)) !== null) {
+    ranges.push({ start: m.index, end: m.index + m[0].length });
+  }
+  // 2. Inline code `...`
+  const inlineCodeRe = /`[^`\n]+`/g;
+  while ((m = inlineCodeRe.exec(text)) !== null) {
+    ranges.push({ start: m.index, end: m.index + m[0].length });
+  }
+  // 3. Display math $$...$$
+  const displayMathRe = /\$\$[\s\S]*?\$\$/g;
+  while ((m = displayMathRe.exec(text)) !== null) {
+    ranges.push({ start: m.index, end: m.index + m[0].length });
+  }
+  // 4. Inline math $...$
+  const inlineMathRe = /(?<!\$)\$[^$\n]+\$(?!\$)/g;
+  while ((m = inlineMathRe.exec(text)) !== null) {
+    ranges.push({ start: m.index, end: m.index + m[0].length });
+  }
+  return ranges;
+}
+
+export function isInsideProtected(index, length, ranges) {
+  const end = index + length;
+  for (const r of ranges) {
+    if (index < r.end && end > r.start) return true;
+  }
+  return false;
+}
+
 export class TechnicalLinter {
   /**
    * Lint a text string and return diagnostic issues
@@ -71,12 +111,14 @@ export class TechnicalLinter {
   static lint(text) {
     if (!text || typeof text !== 'string') return [];
     const issues = [];
+    const protectedRanges = getProtectedRanges(text);
 
     // 1. Redundant / Wordy phrases
     for (const item of REDUNDANT_PHRASES) {
       let m;
       const re = new RegExp(item.match.source, item.match.flags);
       while ((m = re.exec(text)) !== null) {
+        if (isInsideProtected(m.index, m[0].length, protectedRanges)) continue;
         issues.push({
           index: m.index,
           length: m[0].length,
@@ -96,6 +138,7 @@ export class TechnicalLinter {
       let m;
       const re = new RegExp(item.match.source, item.match.flags);
       while ((m = re.exec(text)) !== null) {
+        if (isInsideProtected(m.index, m[0].length, protectedRanges)) continue;
         issues.push({
           index: m.index,
           length: m[0].length,
@@ -112,6 +155,7 @@ export class TechnicalLinter {
     const dupRegex = /\b([a-zA-Z]{2,})\s+\1\b/gi;
     let dm;
     while ((dm = dupRegex.exec(text)) !== null) {
+      if (isInsideProtected(dm.index, dm[0].length, protectedRanges)) continue;
       issues.push({
         index: dm.index,
         length: dm[0].length,
@@ -127,6 +171,7 @@ export class TechnicalLinter {
       let m;
       const re = new RegExp(item.match.source, item.match.flags);
       while ((m = re.exec(text)) !== null) {
+        if (isInsideProtected(m.index, m[0].length, protectedRanges)) continue;
         issues.push({
           index: m.index,
           length: m[0].length,
@@ -146,6 +191,7 @@ export class TechnicalLinter {
       let m;
       const re = new RegExp(item.match.source, item.match.flags);
       while ((m = re.exec(text)) !== null) {
+        if (isInsideProtected(m.index, m[0].length, protectedRanges)) continue;
         issues.push({
           index: m.index,
           length: m[0].length,
@@ -165,6 +211,7 @@ export class TechnicalLinter {
       let m;
       const re = new RegExp(item.match.source, item.match.flags);
       while ((m = re.exec(text)) !== null) {
+        if (isInsideProtected(m.index, m[0].length, protectedRanges)) continue;
         const replacement = m[0].replace(re, item.suggestion);
         issues.push({
           index: m.index,
@@ -185,6 +232,7 @@ export class TechnicalLinter {
       let m;
       const re = new RegExp(item.match.source, item.match.flags);
       while ((m = re.exec(text)) !== null) {
+        if (isInsideProtected(m.index, m[0].length, protectedRanges)) continue;
         issues.push({
           index: m.index,
           length: m[0].length,
@@ -327,15 +375,32 @@ export function calculateAcademicStyleScore(text) {
 }
 
 /**
- * Replace colloquial and informal expressions with academic equivalents
+ * Replace colloquial and informal expressions with academic equivalents,
+ * safely preserving embedded code blocks and KaTeX equations.
  * @param {string} text
  * @returns {string}
  */
 export function applyAcademicTone(text) {
   if (!text || typeof text !== 'string') return text;
-  let res = text;
+
+  // 1. Stash code blocks and KaTeX equations
+  const stash = [];
+  const placeholderRe = /```[\s\S]*?```|`[^`\n]+`|\$\$[\s\S]*?\$\$|(?<!\$)\$[^$\n]+\$(?!\$)/g;
+  const clean = text.replace(placeholderRe, (match) => {
+    const key = `__PROTECTED_STASH_${stash.length}__`;
+    stash.push({ key, match });
+    return key;
+  });
+
+  // 2. Apply academic tone replacements
+  let res = clean;
   for (const item of ACADEMIC_TONE_RULES) {
     res = res.replace(item.match, item.suggestion);
+  }
+
+  // 3. Restore equations and code blocks (using callback to avoid '$' pattern substitution)
+  for (const { key, match } of stash) {
+    res = res.replace(key, () => match);
   }
   return res;
 }

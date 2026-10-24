@@ -565,7 +565,11 @@ export class ReplayBar {
     };
 
     const onPointerUp = (e) => {
-      try { handle.releasePointerCapture(e.pointerId); } catch {}
+      try {
+        if (handle.hasPointerCapture?.(e.pointerId)) {
+          handle.releasePointerCapture(e.pointerId);
+        }
+      } catch {}
       if (dragging) {
         dragging = false;
         this.saveState();

@@ -9,6 +9,7 @@ import { uid } from '../core/util.js';
 import { calculateMolarMass } from '../core/scientific-math.js';
 
 export function getBohrShells(z) {
+  if (!z || z <= 0) return [0];
   const shellPresets = {
     1: [1], 2: [2], 3: [2, 1], 4: [2, 2], 5: [2, 3], 6: [2, 4], 7: [2, 5], 8: [2, 6], 9: [2, 7], 10: [2, 8],
     11: [2, 8, 1], 12: [2, 8, 2], 13: [2, 8, 3], 14: [2, 8, 4], 15: [2, 8, 5], 16: [2, 8, 6], 17: [2, 8, 7], 18: [2, 8, 8],
@@ -65,11 +66,88 @@ export const ELEMENTS_DATA = [
   { z: 34, s: 'Se', n: 'Selenium', w: 78.971, g: 16, p: 4, cat: 'nonmetal', conf: '[Ar] 3d¹⁰ 4s² 4p⁴', en: 2.55 },
   { z: 35, s: 'Br', n: 'Bromine', w: 79.904, g: 17, p: 4, cat: 'halogen', conf: '[Ar] 3d¹⁰ 4s² 4p⁵', en: 2.96 },
   { z: 36, s: 'Kr', n: 'Krypton', w: 83.798, g: 18, p: 4, cat: 'noble', conf: '[Ar] 3d¹⁰ 4s² 4p⁶', en: 3.00 },
+  { z: 37, s: 'Rb', n: 'Rubidium', w: 85.468, g: 1, p: 5, cat: 'alkali', conf: '[Kr] 5s¹', en: 0.82 },
+  { z: 38, s: 'Sr', n: 'Strontium', w: 87.62, g: 2, p: 5, cat: 'alkaline', conf: '[Kr] 5s²', en: 0.95 },
+  { z: 39, s: 'Y', n: 'Yttrium', w: 88.906, g: 3, p: 5, cat: 'transition', conf: '[Kr] 4d¹ 5s²', en: 1.22 },
+  { z: 40, s: 'Zr', n: 'Zirconium', w: 91.224, g: 4, p: 5, cat: 'transition', conf: '[Kr] 4d² 5s²', en: 1.33 },
+  { z: 41, s: 'Nb', n: 'Niobium', w: 92.906, g: 5, p: 5, cat: 'transition', conf: '[Kr] 4d⁴ 5s¹', en: 1.6 },
+  { z: 42, s: 'Mo', n: 'Molybdenum', w: 95.95, g: 6, p: 5, cat: 'transition', conf: '[Kr] 4d⁵ 5s¹', en: 2.16 },
+  { z: 43, s: 'Tc', n: 'Technetium', w: 98.0, g: 7, p: 5, cat: 'transition', conf: '[Kr] 4d⁵ 5s²', en: 1.9 },
+  { z: 44, s: 'Ru', n: 'Ruthenium', w: 101.07, g: 8, p: 5, cat: 'transition', conf: '[Kr] 4d⁷ 5s¹', en: 2.2 },
+  { z: 45, s: 'Rh', n: 'Rhodium', w: 102.91, g: 9, p: 5, cat: 'transition', conf: '[Kr] 4d⁸ 5s¹,', en: 2.28 },
+  { z: 46, s: 'Pd', n: 'Palladium', w: 106.42, g: 10, p: 5, cat: 'transition', conf: '[Kr] 4d¹⁰', en: 2.20 },
   { z: 47, s: 'Ag', n: 'Silver', w: 107.87, g: 11, p: 5, cat: 'transition', conf: '[Kr] 4d¹⁰ 5s¹', en: 1.93 },
+  { z: 48, s: 'Cd', n: 'Cadmium', w: 112.41, g: 12, p: 5, cat: 'transition', conf: '[Kr] 4d¹⁰ 5s²', en: 1.69 },
+  { z: 49, s: 'In', n: 'Indium', w: 114.82, g: 13, p: 5, cat: 'post-transition', conf: '[Kr] 4d¹⁰ 5s² 5p¹', en: 1.78 },
+  { z: 50, s: 'Sn', n: 'Tin', w: 118.71, g: 14, p: 5, cat: 'post-transition', conf: '[Kr] 4d¹⁰ 5s² 5p²', en: 1.96 },
+  { z: 51, s: 'Sb', n: 'Antimony', w: 121.76, g: 15, p: 5, cat: 'metalloid', conf: '[Kr] 4d¹⁰ 5s² 5p³', en: 2.05 },
+  { z: 52, s: 'Te', n: 'Tellurium', w: 127.60, g: 16, p: 5, cat: 'metalloid', conf: '[Kr] 4d¹⁰ 5s² 5p⁴', en: 2.1 },
+  { z: 53, s: 'I', n: 'Iodine', w: 126.90, g: 17, p: 5, cat: 'halogen', conf: '[Kr] 4d¹⁰ 5s² 5p⁵', en: 2.66 },
+  { z: 54, s: 'Xe', n: 'Xenon', w: 131.29, g: 18, p: 5, cat: 'noble', conf: '[Kr] 4d¹⁰ 5s² 5p⁶', en: 2.6 },
+  { z: 55, s: 'Cs', n: 'Caesium', w: 132.91, g: 1, p: 6, cat: 'alkali', conf: '[Xe] 6s¹', en: 0.79 },
+  { z: 56, s: 'Ba', n: 'Barium', w: 137.33, g: 2, p: 6, cat: 'alkaline', conf: '[Xe] 6s²', en: 0.89 },
+  { z: 57, s: 'La', n: 'Lanthanum', w: 138.91, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 5d¹ 6s²', en: 1.10 },
+  { z: 58, s: 'Ce', n: 'Cerium', w: 140.12, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f¹ 5d¹ 6s²', en: 1.12 },
+  { z: 59, s: 'Pr', n: 'Praseodymium', w: 140.91, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f³ 6s²', en: 1.13 },
+  { z: 60, s: 'Nd', n: 'Neodymium', w: 144.24, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f⁴ 6s²', en: 1.14 },
+  { z: 61, s: 'Pm', n: 'Promethium', w: 145.0, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f⁵ 6s²', en: 1.13 },
+  { z: 62, s: 'Sm', n: 'Samarium', w: 150.36, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f⁶ 6s²', en: 1.17 },
+  { z: 63, s: 'Eu', n: 'Europium', w: 151.96, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f⁷ 6s²', en: 1.2 },
+  { z: 64, s: 'Gd', n: 'Gadolinium', w: 157.25, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f⁷ 5d¹ 6s²', en: 1.20 },
+  { z: 65, s: 'Tb', n: 'Terbium', w: 158.93, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f⁹ 6s²', en: 1.2 },
+  { z: 66, s: 'Dy', n: 'Dysprosium', w: 162.50, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f¹⁰ 6s²', en: 1.22 },
+  { z: 67, s: 'Ho', n: 'Holmium', w: 164.93, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f¹¹ 6s²', en: 1.23 },
+  { z: 68, s: 'Er', n: 'Erbium', w: 167.26, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f¹² 6s²', en: 1.24 },
+  { z: 69, s: 'Tm', n: 'Thulium', w: 168.93, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f¹³ 6s²', en: 1.25 },
+  { z: 70, s: 'Yb', n: 'Ytterbium', w: 173.05, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f¹⁴ 6s²', en: 1.1 },
+  { z: 71, s: 'Lu', n: 'Lutetium', w: 174.97, g: 3, p: 6, cat: 'lanthanide', conf: '[Xe] 4f¹⁴ 5d¹ 6s²', en: 1.27 },
+  { z: 72, s: 'Hf', n: 'Hafnium', w: 178.49, g: 4, p: 6, cat: 'transition', conf: '[Xe] 4f¹⁴ 5d² 6s²', en: 1.3 },
+  { z: 73, s: 'Ta', n: 'Tantalum', w: 180.95, g: 5, p: 6, cat: 'transition', conf: '[Xe] 4f¹⁴ 5d³ 6s²', en: 1.5 },
+  { z: 74, s: 'W', n: 'Tungsten', w: 183.84, g: 6, p: 6, cat: 'transition', conf: '[Xe] 4f¹⁴ 5d⁴ 6s²', en: 2.36 },
+  { z: 75, s: 'Re', n: 'Rhenium', w: 186.21, g: 7, p: 6, cat: 'transition', conf: '[Xe] 4f¹⁴ 5d⁵ 6s²', en: 1.9 },
+  { z: 76, s: 'Os', n: 'Osmium', w: 190.23, g: 8, p: 6, cat: 'transition', conf: '[Xe] 4f¹⁴ 5d⁶ 6s²', en: 2.2 },
+  { z: 77, s: 'Ir', n: 'Iridium', w: 192.22, g: 9, p: 6, cat: 'transition', conf: '[Xe] 4f¹⁴ 5d⁷ 6s²', en: 2.20 },
+  { z: 78, s: 'Pt', n: 'Platinum', w: 195.08, g: 10, p: 6, cat: 'transition', conf: '[Xe] 4f¹⁴ 5d⁹ 6s¹', en: 2.28 },
   { z: 79, s: 'Au', n: 'Gold', w: 196.97, g: 11, p: 6, cat: 'transition', conf: '[Xe] 4f¹⁴ 5d¹⁰ 6s¹', en: 2.54 },
   { z: 80, s: 'Hg', n: 'Mercury', w: 200.59, g: 12, p: 6, cat: 'transition', conf: '[Xe] 4f¹⁴ 5d¹⁰ 6s²', en: 2.00 },
+  { z: 81, s: 'Tl', n: 'Thallium', w: 204.38, g: 13, p: 6, cat: 'post-transition', conf: '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p¹', en: 1.62 },
   { z: 82, s: 'Pb', n: 'Lead', w: 207.2, g: 14, p: 6, cat: 'post-transition', conf: '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p²', en: 2.33 },
-  { z: 92, s: 'U', n: 'Uranium', w: 238.03, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f³ 6d¹ 7s²', en: 1.38 }
+  { z: 83, s: 'Bi', n: 'Bismuth', w: 208.98, g: 15, p: 6, cat: 'post-transition', conf: '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p³', en: 2.02 },
+  { z: 84, s: 'Po', n: 'Polonium', w: 209.0, g: 16, p: 6, cat: 'post-transition', conf: '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁴', en: 2.0 },
+  { z: 85, s: 'At', n: 'Astatine', w: 210.0, g: 17, p: 6, cat: 'halogen', conf: '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁵', en: 2.2 },
+  { z: 86, s: 'Rn', n: 'Radon', w: 222.0, g: 18, p: 6, cat: 'noble', conf: '[Xe] 4f¹⁴ 5d¹⁰ 6s² 6p⁶', en: 2.2 },
+  { z: 87, s: 'Fr', n: 'Francium', w: 223.0, g: 1, p: 7, cat: 'alkali', conf: '[Rn] 7s¹', en: 0.7 },
+  { z: 88, s: 'Ra', n: 'Radium', w: 226.0, g: 2, p: 7, cat: 'alkaline', conf: '[Rn] 7s²', en: 0.9 },
+  { z: 89, s: 'Ac', n: 'Actinium', w: 227.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 6d¹ 7s²', en: 1.1 },
+  { z: 90, s: 'Th', n: 'Thorium', w: 232.04, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 6d² 7s²', en: 1.3 },
+  { z: 91, s: 'Pa', n: 'Protactinium', w: 231.04, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f² 6d¹ 7s²', en: 1.5 },
+  { z: 92, s: 'U', n: 'Uranium', w: 238.03, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f³ 6d¹ 7s²', en: 1.38 },
+  { z: 93, s: 'Np', n: 'Neptunium', w: 237.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f⁴ 6d¹ 7s²', en: 1.36 },
+  { z: 94, s: 'Pu', n: 'Plutonium', w: 244.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f⁶ 7s²', en: 1.28 },
+  { z: 95, s: 'Am', n: 'Americium', w: 243.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f⁷ 7s²', en: 1.3 },
+  { z: 96, s: 'Cm', n: 'Curium', w: 247.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f⁷ 6d¹ 7s²', en: 1.3 },
+  { z: 97, s: 'Bk', n: 'Berkelium', w: 247.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f⁹ 7s²', en: 1.3 },
+  { z: 98, s: 'Cf', n: 'Californium', w: 251.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f¹⁰ 7s²', en: 1.3 },
+  { z: 99, s: 'Es', n: 'Einsteinium', w: 252.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f¹¹ 7s²', en: 1.3 },
+  { z: 100, s: 'Fm', n: 'Fermium', w: 257.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f¹² 7s²', en: 1.3 },
+  { z: 101, s: 'Md', n: 'Mendelevium', w: 258.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f¹³ 7s²', en: 1.3 },
+  { z: 102, s: 'No', n: 'Nobelium', w: 259.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f¹⁴ 7s²', en: 1.3 },
+  { z: 103, s: 'Lr', n: 'Lawrencium', w: 266.0, g: 3, p: 7, cat: 'actinide', conf: '[Rn] 5f¹⁴ 7s² 7p¹', en: 1.3 },
+  { z: 104, s: 'Rf', n: 'Rutherfordium', w: 267.0, g: 4, p: 7, cat: 'transition', conf: '[Rn] 5f¹⁴ 6d² 7s²', en: null },
+  { z: 105, s: 'Db', n: 'Dubnium', w: 268.0, g: 5, p: 7, cat: 'transition', conf: '[Rn] 5f¹⁴ 6d³ 7s²', en: null },
+  { z: 106, s: 'Sg', n: 'Seaborgium', w: 269.0, g: 6, p: 7, cat: 'transition', conf: '[Rn] 5f¹⁴ 6d⁴ 7s²', en: null },
+  { z: 107, s: 'Bh', n: 'Bohrium', w: 270.0, g: 7, p: 7, cat: 'transition', conf: '[Rn] 5f¹⁴ 6d⁵ 7s²', en: null },
+  { z: 108, s: 'Hs', n: 'Hassium', w: 269.0, g: 8, p: 7, cat: 'transition', conf: '[Rn] 5f¹⁴ 6d⁶ 7s²', en: null },
+  { z: 109, s: 'Mt', n: 'Meitnerium', w: 278.0, g: 9, p: 7, cat: 'transition', conf: '[Rn] 5f¹⁴ 6d⁷ 7s²', en: null },
+  { z: 110, s: 'Ds', n: 'Darmstadtium', w: 281.0, g: 10, p: 7, cat: 'transition', conf: '[Rn] 5f¹⁴ 6d⁸ 7s²', en: null },
+  { z: 111, s: 'Rg', n: 'Roentgenium', w: 282.0, g: 11, p: 7, cat: 'transition', conf: '[Rn] 5f¹⁴ 6d⁹ 7s²', en: null },
+  { z: 112, s: 'Cn', n: 'Copernicium', w: 285.0, g: 12, p: 7, cat: 'transition', conf: '[Rn] 5f¹⁴ 6d¹⁰ 7s²', en: null },
+  { z: 113, s: 'Nh', n: 'Nihonium', w: 286.0, g: 13, p: 7, cat: 'post-transition', conf: '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p¹', en: null },
+  { z: 114, s: 'Fl', n: 'Flerovium', w: 289.0, g: 14, p: 7, cat: 'post-transition', conf: '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p²', en: null },
+  { z: 115, s: 'Mc', n: 'Moscovium', w: 290.0, g: 15, p: 7, cat: 'post-transition', conf: '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p³', en: null },
+  { z: 116, s: 'Lv', n: 'Livermorium', w: 293.0, g: 16, p: 7, cat: 'post-transition', conf: '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁴', en: null },
+  { z: 117, s: 'Ts', n: 'Tennessine', w: 294.0, g: 17, p: 7, cat: 'halogen', conf: '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁵', en: null },
+  { z: 118, s: 'Og', n: 'Oganesson', w: 294.0, g: 18, p: 7, cat: 'noble', conf: '[Rn] 5f¹⁴ 6d¹⁰ 7s² 7p⁶', en: null }
 ];
 
 export class PeriodicTableModal {
@@ -248,7 +326,12 @@ export class PeriodicTableModal {
   }
 
   stampElementCard(el) {
-    const view = this.app.surface.cam.viewport(this.app.surface.width, this.app.surface.height);
+    const cam = this.app.surface?.cam;
+    const sw = this.app.surface?.width || 800;
+    const sh = this.app.surface?.height || 600;
+    const view = (cam && typeof cam.viewport === 'function')
+      ? cam.viewport(sw, sh)
+      : (cam?.viewport && typeof cam.viewport.x === 'number' ? cam.viewport : { x: 200, y: 200, w: sw, h: sh });
     const cx = view.x + view.w / 2;
     const cy = view.y + view.h / 2;
 

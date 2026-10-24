@@ -65,6 +65,7 @@ export class SidebarRibbon {
     this.syncCategoryVisibility();
 
     if (typeof window !== 'undefined') {
+      let proximityTimer = null;
       window.addEventListener('pointerdown', (e) => {
         if (!this.inkingAutoHide || !this.expanded || !this.doubleLayer) return;
         const target = e.target;
@@ -72,6 +73,30 @@ export class SidebarRibbon {
           this.doubleLayer = false;
           this.syncState();
         }
+      });
+
+      // Debounced inking proximity auto-collapse: collapses extended shelf when pen draws near ribbon boundary
+      window.addEventListener('pointermove', (e) => {
+        if (!this.inkingAutoHide || !this.expanded || !this.doubleLayer || !this.container) return;
+        if (e.buttons === 0) return;
+        const target = e.target;
+        if (!target || target.tagName !== 'CANVAS') return;
+
+        if (proximityTimer) return;
+        proximityTimer = setTimeout(() => {
+          proximityTimer = null;
+          if (!this.container || !this.expanded || !this.doubleLayer) return;
+          const rect = this.container.getBoundingClientRect();
+          const margin = 48;
+          const nearRibbon = this.position === 'right'
+            ? e.clientX >= (rect.left - margin)
+            : e.clientX <= (rect.right + margin);
+
+          if (nearRibbon) {
+            this.doubleLayer = false;
+            this.syncState();
+          }
+        }, 120);
       });
     }
   }

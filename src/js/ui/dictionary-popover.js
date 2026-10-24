@@ -157,16 +157,29 @@ export class DictionaryPopover {
 
   hide() {
     if (this.container) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch {}
+      }
       this.container.remove();
       this.container = null;
     }
   }
 
   speak(word) {
-    if ('speechSynthesis' in window) {
-      const u = new SpeechSynthesisUtterance(word);
-      u.rate = 0.9;
-      window.speechSynthesis.speak(u);
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(word);
+        u.rate = 0.9;
+        const timer = setTimeout(() => {
+          try { window.speechSynthesis.cancel(); } catch {}
+        }, 4000);
+        u.onend = () => clearTimeout(timer);
+        u.onerror = () => clearTimeout(timer);
+        window.speechSynthesis.speak(u);
+      } catch {
+        this.app.toast?.(t('Web Speech API is not supported in this environment.'));
+      }
     } else {
       this.app.toast?.(t('Web Speech API is not supported in this environment.'));
     }

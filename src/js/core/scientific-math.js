@@ -412,9 +412,129 @@ export function evalMathExpression(tex) {
 }
 
 /**
- * Reactive Notebook Variable State Manager
+ * Reactive Notebook Variable State Manager & DAG Cycle Detector
  * Binds variables (e.g. V_supply = 48, R_1 = 12) across whiteboard notes
  */
+export function evaluateNotebookVariables(varMap) {
+  const entries = new Map();
+  if (varMap instanceof Map) {
+    for (const [k, v] of varMap.entries()) {
+      if (k && typeof k === 'string') entries.set(k.trim(), v);
+    }
+  } else if (varMap && typeof varMap === 'object') {
+    for (const [k, v] of Object.entries(varMap)) {
+      if (k && typeof k === 'string') entries.set(k.trim(), v);
+    }
+  }
+
+  const values = {};
+  const errors = {};
+  const deps = new Map();
+  const rawExprs = new Map();
+
+  const RESERVED = new Set([
+    'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sqrt', 'exp',
+    'log', 'ln', 'log10', 'log2', 'abs', 'pi', 'e', 'Math', 'x',
+    'Infinity', 'NaN', 'true', 'false', 'null', 'undefined'
+  ]);
+
+  // Classify numeric vs expression
+  for (const [k, v] of entries.entries()) {
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      values[k] = v;
+      deps.set(k, []);
+    } else if (typeof v === 'string') {
+      const trimmed = v.trim();
+      const num = Number(trimmed);
+      if (!isNaN(num) && trimmed !== '') {
+        values[k] = num;
+        deps.set(k, []);
+      } else {
+        rawExprs.set(k, trimmed);
+        const tokens = trimmed.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || [];
+        const filtered = tokens.filter(tok => !RESERVED.has(tok) && entries.has(tok));
+        deps.set(k, [...new Set(filtered)]);
+      }
+    } else {
+      errors[k] = 'Invalid variable value';
+    }
+  }
+
+  // Cycle detection with 3-color DFS
+  // 0 = unvisited, 1 = visiting, 2 = visited
+  const state = new Map();
+  const path = [];
+  const cycleNodes = new Set();
+  const topoOrder = [];
+
+  function dfs(node) {
+    state.set(node, 1);
+    path.push(node);
+
+    const neighbors = deps.get(node) || [];
+    for (const next of neighbors) {
+      const nextState = state.get(next) || 0;
+      if (nextState === 1) {
+        // Cycle found
+        const cycleStartIdx = path.indexOf(next);
+        const cyclePath = path.slice(cycleStartIdx).concat(next);
+        const cycleMsg = `Cyclic dependency: ${cyclePath.join(' -> ')}`;
+        for (let i = cycleStartIdx; i < path.length; i++) {
+          cycleNodes.add(path[i]);
+          errors[path[i]] = cycleMsg;
+        }
+      } else if (nextState === 0) {
+        dfs(next);
+      }
+    }
+
+    path.pop();
+    state.set(node, 2);
+    topoOrder.push(node);
+  }
+
+  for (const k of entries.keys()) {
+    if (!state.has(k)) {
+      dfs(k);
+    }
+  }
+
+  // Evaluate expressions in topological order
+  for (const node of topoOrder) {
+    if (cycleNodes.has(node) || errors[node]) continue;
+    if (Object.prototype.hasOwnProperty.call(values, node)) continue;
+
+    const expr = rawExprs.get(node);
+    if (!expr) continue;
+
+    // Check if any dependency had errors
+    const neighbors = deps.get(node) || [];
+    let hasDepError = false;
+    for (const dep of neighbors) {
+      if (errors[dep]) {
+        errors[node] = `Dependency error in ${dep}`;
+        hasDepError = true;
+        break;
+      }
+    }
+    if (hasDepError) continue;
+
+    try {
+      const val = parseMathExpressionSafely(expr, values);
+      if (typeof val === 'number' && Number.isFinite(val)) {
+        values[node] = val;
+      } else {
+        errors[node] = `Expression could not be evaluated: ${expr}`;
+      }
+    } catch (err) {
+      errors[node] = `Syntax error: ${err.message}`;
+    }
+  }
+
+  const ok = Object.keys(errors).length === 0;
+  return { ok, values, errors };
+}
+
 export class NotebookVariables {
   constructor() {
     this.vars = new Map();
@@ -422,7 +542,16 @@ export class NotebookVariables {
 
   set(name, val) {
     if (!name || typeof name !== 'string') return;
-    this.vars.set(name.trim(), Number(val));
+    const cleanName = name.trim();
+    if (typeof val === 'number') {
+      this.vars.set(cleanName, val);
+    } else if (typeof val === 'string') {
+      const trimmed = val.trim();
+      const num = Number(trimmed);
+      this.vars.set(cleanName, !isNaN(num) && trimmed !== '' ? num : trimmed);
+    } else {
+      this.vars.set(cleanName, Number(val));
+    }
   }
 
   get(name) {
@@ -438,15 +567,44 @@ export class NotebookVariables {
   }
 
   /**
+   * Resolves all notebook variables, detecting cyclic dependencies
+   * and updating internal state with evaluated numeric values.
+   */
+  resolveAll() {
+    const res = evaluateNotebookVariables(this.vars);
+    if (res.values) {
+      for (const [k, v] of Object.entries(res.values)) {
+        this.vars.set(k, v);
+      }
+    }
+    return res;
+  }
+
+  /**
+   * Resolves a single variable name
+   */
+  resolve(name) {
+    const res = evaluateNotebookVariables(this.vars);
+    const cleanName = name?.trim();
+    if (res.values && Object.prototype.hasOwnProperty.call(res.values, cleanName)) {
+      return { ok: true, value: res.values[cleanName] };
+    }
+    return { ok: false, error: res.errors[cleanName] || 'Variable not found' };
+  }
+
+  /**
    * Evaluates an algebraic expression substituting reactive variables
    * @param {string} expr e.g. "V_supply / R_1"
    * @returns {{ ok: boolean, result?: string, numeric?: number }}
    */
   evaluate(expr) {
     if (!expr || typeof expr !== 'string') return { ok: false };
+    this.resolveAll();
     const varsObj = {};
     for (const [k, v] of this.vars.entries()) {
-      varsObj[k] = v;
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        varsObj[k] = v;
+      }
     }
     try {
       const val = parseMathExpressionSafely(expr, varsObj);
@@ -723,7 +881,7 @@ export class SymbolicCAS {
 }
 
 /**
- * Atomic weights lookup dictionary for standard elements
+ * Atomic weights lookup dictionary for all 118 periodic table elements (g/mol)
  */
 export const ATOMIC_WEIGHTS = {
   H: 1.008, He: 4.003, Li: 6.94, Be: 9.012, B: 10.81, C: 12.011, N: 14.007, O: 15.999, F: 18.998, Ne: 20.180,
@@ -732,14 +890,17 @@ export const ATOMIC_WEIGHTS = {
   Cu: 63.546, Zn: 65.38, Ga: 69.723, Ge: 72.630, As: 74.922, Se: 78.971, Br: 79.904, Kr: 83.798, Rb: 85.468,
   Sr: 87.62, Y: 88.906, Zr: 91.224, Nb: 92.906, Mo: 95.95, Tc: 98.0, Ru: 101.07, Rh: 102.91, Pd: 106.42,
   Ag: 107.87, Cd: 112.41, In: 114.82, Sn: 118.71, Sb: 121.76, Te: 127.60, I: 126.90, Xe: 131.29, Cs: 132.91,
-  Ba: 137.33, La: 138.91, Ce: 140.12, Pr: 140.91, Nd: 144.24, Sm: 150.36, Eu: 151.96, Gd: 157.25, Tb: 158.93,
-  Dy: 162.50, Ho: 164.93, Er: 167.26, Tm: 168.93, Yb: 173.05, Lu: 174.97, Hf: 178.49, Ta: 180.95, W: 183.84,
-  Re: 186.21, Os: 190.23, Ir: 192.22, Pt: 195.08, Au: 196.97, Hg: 200.59, Tl: 204.38, Pb: 207.2, Bi: 208.98,
-  Th: 232.04, Pa: 231.04, U: 238.03
+  Ba: 137.33, La: 138.91, Ce: 140.12, Pr: 140.91, Nd: 144.24, Pm: 145.0, Sm: 150.36, Eu: 151.96, Gd: 157.25,
+  Tb: 158.93, Dy: 162.50, Ho: 164.93, Er: 167.26, Tm: 168.93, Yb: 173.05, Lu: 174.97, Hf: 178.49, Ta: 180.95,
+  W: 183.84, Re: 186.21, Os: 190.23, Ir: 192.22, Pt: 195.08, Au: 196.97, Hg: 200.59, Tl: 204.38, Pb: 207.2,
+  Bi: 208.98, Po: 209.0, At: 210.0, Rn: 222.0, Fr: 223.0, Ra: 226.0, Ac: 227.0, Th: 232.04, Pa: 231.04, U: 238.03,
+  Np: 237.0, Pu: 244.0, Am: 243.0, Cm: 247.0, Bk: 247.0, Cf: 251.0, Es: 252.0, Fm: 257.0, Md: 258.0, No: 259.0,
+  Lr: 266.0, Rf: 267.0, Db: 268.0, Sg: 269.0, Bh: 270.0, Hs: 269.0, Mt: 278.0, Ds: 281.0, Rg: 282.0, Cn: 285.0,
+  Nh: 286.0, Fl: 289.0, Mc: 290.0, Lv: 293.0, Ts: 294.0, Og: 294.0
 };
 
 /**
- * Parses a chemical formula (e.g. "Ca(OH)2", "C6H12O6", "K4[Fe(CN)6]", "CuSO4*5H2O")
+ * Parses a chemical formula (e.g. "Ca(OH)2", "C6H12O6", "K4[Fe(CN)6]", "CuSO4*5H2O", "CuSO4·5H2O")
  * and computes total molar mass and elemental mass percentages.
  * @param {string} formula
  * @returns {{ ok: boolean, molarMass: number, formula: string, composition: Array<{ elem: string, count: number, mass: number, percent: number }>, error?: string }}
@@ -747,7 +908,7 @@ export const ATOMIC_WEIGHTS = {
 export function calculateMolarMass(formula) {
   if (!formula || typeof formula !== 'string') return { ok: false, error: 'Empty formula' };
   try {
-    const clean = formula.trim().replace(/\s+/g, '');
+    const clean = formula.trim().replace(/\s+/g, '').replace(/[·•]/g, '*');
     let hydrateMultiplier = 1;
     let mainPart = clean;
     let hydratePart = '';
@@ -770,6 +931,9 @@ export function calculateMolarMass(formula) {
           while (j < str.length && depth > 0) {
             if (str[j] === openChar) depth++;
             else if (str[j] === closeChar) depth--;
+            else if ((openChar === '(' && str[j] === ']') || (openChar === '[' && str[j] === ')')) {
+              throw new Error('Mismatched brackets');
+            }
             j++;
           }
           if (depth !== 0) throw new Error('Unbalanced brackets');
@@ -784,6 +948,8 @@ export function calculateMolarMass(formula) {
           for (const [elem, cnt] of Object.entries(subCounts)) {
             counts[elem] = (counts[elem] || 0) + cnt * mult;
           }
+        } else if (str[i] === ')' || str[i] === ']') {
+          throw new Error('Unbalanced brackets');
         } else if (/[A-Z]/.test(str[i])) {
           let elem = str[i];
           i++;
@@ -821,6 +987,10 @@ export function calculateMolarMass(formula) {
       const mass = weight * count;
       totalMass += mass;
       composition.push({ elem, count, mass });
+    }
+
+    if (totalMass <= 0 || composition.length === 0) {
+      throw new Error('Formula contains no valid elements');
     }
 
     composition.forEach((item) => {

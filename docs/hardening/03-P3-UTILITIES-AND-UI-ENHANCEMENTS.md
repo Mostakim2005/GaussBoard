@@ -1,7 +1,7 @@
 # GazBoard Hardening Dossier — Priority 3 (P3): Utilities & UI Enhancements
 
 > **Target Audience**: AI Coding Agent / Core Systems Engineer  
-> **Status**: Ready for Sequential Execution (Execute directly following P2)  
+> **Status**: **Fully Hardened & Audited (All 13 Subsystems Verified)**  
 > **Hardening Tier**: **`P3 — Low Risk / Self-Contained Utilities`**  
 > **Objective**: Polish and harden standalone educational tools, linguistics linters, audio/replay HUD widgets, and stroke rendering parameters.
 
@@ -214,4 +214,20 @@ node scripts/smoke.js --new-features
 
 # 2. Strict translation verification (must remain 2,238 / 2,238 keys):
 node scripts/i18n-check.js
+
+# 3. P3 Hardening Test Suite:
+node --test test/p3-hardening.test.mjs
 ```
+
+---
+
+## 6. Audit & Hardening Completion Log
+
+| Subsystem | Audit Scope | Fragility / Bugs Identified | Hardening Implemented | Verification State |
+| :--- | :--- | :--- | :--- | :--- |
+| **WordNet Academic Dictionary & TTS (`F-138`)** | `src/js/ui/academic-dictionary.js`, `src/js/ui/dictionary-popover.js` | 1. `window.speechSynthesis` stall on Windows N without timeout fallback.<br>2. `AcademicDictionaryModal.close()` did not cancel speech.<br>3. `stampCard()` attempted to access `cam.viewport.x` when `cam.viewport` was a function, producing `NaN` coordinates. | Added 4s watchdog timeout, cancel on close/hide, defensive SSR `typeof window` check, and resolved viewport coordinate calculation. | PASS (6/6 unit tests, 24/24 smoke) |
+| **Technical Writing Linter & Readability (`F-135`, `F-136`)** | `src/js/core/technical-linter.js` | 1. LaTeX math equations (`$x$`, `$$x^2$$`) and code blocks (` ``` `, `` ` ``) were not protected, allowing regexes to corrupt LaTeX symbols (e.g. `\big(` -> `\substantial(`).<br>2. Division-by-zero protection in F-K readability. | Implemented `getProtectedRanges()` and `isInsideProtected()`; masked code/math blocks during academic tone transformation; guarded sentence and word counts. | PASS |
+| **118-Element Periodic Table & Molar Mass (`F-132`, `F-136`)** | `src/js/ui/periodic-table.js`, `src/js/core/scientific-math.js`, `src/js/core/chemistry.js` | 1. Hydration middle dots (`·` / `•`) failed to parse in molar mass calculation.<br>2. Unbalanced bracket edge cases (`CaOH)2`, `Ca(OH`) either crashed or silently produced bad values.<br>3. Periodic table only contained 41 elements. | Expanded `ELEMENTS_DATA` to full 118 elements; added transuranic atomic weights up to Og (118); normalized hydration dots; strictly validated brackets; guarded zero-mass division. | PASS |
+| **Floating HUDs & Toolbars (`F-105`, `F-109`, `F-130`)** | `src/js/ui/audio-bar.js`, `src/js/ui/replay-bar.js`, `src/js/ui/sidebar-ribbon.js` | 1. `audio-bar.js` lacked pointer capture, drag dead-zone, and bounds clamping.<br>2. `replay-bar.js` did not guard `hasPointerCapture()` on release.<br>3. `sidebar-ribbon.js` lacked debouncing during pen drawing near 48px boundary. | Added pointer capture and 6px deadzone to `AudioBar`; added safe pointer release; added debounced inking proximity auto-collapse (120ms). | PASS |
+| **Rendering Parameters & Laser Pointer (`F-111`, `F-112`, `F-114`)** | `src/js/core/surface.js`, `src/js/core/render.js` | 1. Laser pointer trail duration setting was ignored by `headFade` (hardcoded to 520ms).<br>2. Highlighter blending in dark mode used `multiply` indiscriminately, resulting in black/invisible ink. | Connected `headFade` to `app.settings.laserTrailDuration`; conditioned `multiply` composite operation on `!lightInk()` to preserve luminance in dark mode. | PASS |
+

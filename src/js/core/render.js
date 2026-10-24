@@ -665,7 +665,7 @@ export function drawStroke(ctx, o) {
   ctx.save();
   if (highlighter) {
     ctx.globalAlpha = o.opacity ?? 0.5;
-    ctx.globalCompositeOperation = (o.colorPop !== false) ? 'multiply' : 'source-over';
+    ctx.globalCompositeOperation = (o.colorPop !== false && !lightInk()) ? 'multiply' : 'source-over';
   } else if (o.opacity != null && o.opacity < 1) {
     ctx.globalAlpha = o.opacity;
   }

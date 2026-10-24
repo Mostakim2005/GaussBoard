@@ -847,9 +847,14 @@ export class MoleculeViewerModal {
     if (!this.canvas || !this.app) return;
     try {
       const dataUrl = this.canvas.toDataURL('image/png');
-      const cam = this.app.surface?.cam || { viewport: { x: 200, y: 200, w: 800, h: 600 } };
-      const cx = (cam.viewport?.x || 200) + (cam.viewport?.w || 800) / 2 - 250;
-      const cy = (cam.viewport?.y || 200) + (cam.viewport?.h || 600) / 2 - 180;
+      const cam = this.app.surface?.cam;
+      const sw = this.app.surface?.width || 800;
+      const sh = this.app.surface?.height || 600;
+      const view = (cam && typeof cam.viewport === 'function')
+        ? cam.viewport(sw, sh)
+        : (cam?.viewport && typeof cam.viewport.x === 'number' ? cam.viewport : { x: 200, y: 200, w: sw, h: sh });
+      const cx = view.x + view.w / 2 - 250;
+      const cy = view.y + view.h / 2 - 180;
 
       const obj = {
         id: `mol_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
@@ -871,5 +876,15 @@ export class MoleculeViewerModal {
     } catch (e) {
       this.app.toast?.(t('Unable to stamp molecule: {error}', { error: e.message }));
     }
+  }
+
+  destroy() {
+    this.close();
+    if (this.modal) {
+      this.modal.remove();
+      this.modal = null;
+    }
+    this.canvas = null;
+    this.ctx = null;
   }
 }

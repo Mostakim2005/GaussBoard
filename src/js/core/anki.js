@@ -33,18 +33,30 @@ export async function checkAnkiConnect(url = ANKI_CONNECT_URL) {
 }
 
 /**
- * Invoke an AnkiConnect action
+ * Invoke an AnkiConnect action with strict timeout guard
  */
-export async function invokeAnkiConnect(action, params = {}, url = ANKI_CONNECT_URL) {
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, version: 6, params })
-  });
-  if (!resp.ok) throw new Error(`AnkiConnect HTTP error: ${resp.status}`);
-  const data = await resp.json();
-  if (data.error) throw new Error(data.error);
-  return data.result;
+export async function invokeAnkiConnect(action, params = {}, url = ANKI_CONNECT_URL, timeoutMs = 2500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, version: 6, params }),
+      signal: controller.signal
+    });
+    if (!resp.ok) throw new Error(`AnkiConnect HTTP error: ${resp.status}`);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    return data.result;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`AnkiConnect request timed out after ${timeoutMs}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

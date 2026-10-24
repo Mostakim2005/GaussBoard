@@ -177,6 +177,15 @@ export function repeat(card, rating, now = Date.now(), w = DEFAULT_FSRS_WEIGHTS)
     }
   }
 
+  // Numerical Stability & Scheduled Days Sanity Clamps (Hardening)
+  if (!Number.isFinite(newStability) || newStability < 0.01) {
+    newStability = Math.max(0.01, isNaN(newStability) ? 0.1 : newStability);
+  }
+  if (!Number.isFinite(scheduledDays) || scheduledDays < (10 / 1440)) {
+    scheduledDays = Math.max(10 / 1440, isNaN(scheduledDays) ? 1 : scheduledDays);
+  }
+  newDifficulty = clamp(newDifficulty, 1.0, 10.0);
+
   const nextDue = Math.round(now + scheduledDays * 86400 * 1000);
 
   return {

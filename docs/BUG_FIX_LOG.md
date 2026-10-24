@@ -41,6 +41,11 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 | **BUG-046** | Content Security Policy `EvalError` in Mathematical Evaluator & Grapher | High | Security / CSP | Resolved in v6.5.0 |
 | **BUG-047** | Localization Parity Drift on New Scientific & CAS Workbench Keys | Medium | i18n Parity | Resolved in v6.5.0 |
 | **BUG-048** | Offline Tesseract OCR Engine Omitted from Electron Binary Distribution | High | Packaging / Offline Engine | Resolved in v6.5.0 |
+| **BUG-049** | Libraries Manifest JSON Windows Path Backslash Escape Syntax Error | High | Manifest / JSON | Resolved in v6.9.1 |
+| **BUG-050** | UI Discovery Entry Points Omission for STEM & Advanced Modals | High | UI / Discovery | Resolved in v6.9.1 |
+| **BUG-051** | Localization Parity Drift on STEM Workbench & UI Discovery Keys | Medium | i18n Parity | Resolved in v6.9.1 |
+| **BUG-052** | P3 Hardening: Academic Dictionary TTS, Linter Math Guard, Periodic Table Edge Cases & Laser Lifespan | High | Utilities / Linter | Resolved |
+| **BUG-053** | P2 Hardening: SMILES % Rings, NotebookVariables DAG Cycles, Dataview Prototype Pollution, Anki Timeout & PDF Sidebar Focus | Critical | Domain Workbenches | Resolved |
 
 ---
 
@@ -500,3 +505,27 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 * **Fix**: Added accurate translations for all 45 keys across all 7 locale dictionaries (`ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, `zh-Hant.json`), bringing total key count to 2,238 / 2,238 (100% coverage).
 * **Verification**: `node scripts/i18n-check.js` (2,238 keys verified, 0 missing).
 * **Files Touched**: `src/locales/ar.json`, `src/locales/bn.json`, `src/locales/de.json`, `src/locales/es.json`, `src/locales/pt-BR.json`, `src/locales/zh-Hans.json`, `src/locales/zh-Hant.json`.
+
+
+### BUG-052: P3 Hardening: Academic Dictionary TTS, Linter Math Guard, Periodic Table Edge Cases & Laser Lifespan
+* **Symptom**: Academic Dictionary crashed in environments without Web Speech API; Technical Linter corrupted LaTeX math `\big(` and code blocks; Periodic Table failed on high atomic numbers / zero Bohr shells; laser trail duration ignored custom life settings in `Surface.pruneLaser()`.
+* **Fix**:
+  1. Added `typeof window !== 'undefined' && 'speechSynthesis' in window` guard to `academic-dictionary.js` and `dictionary-popover.js`.
+  2. Protected embedded LaTeX equations (`$...$`, `$$...$$`) and code blocks in `technical-linter.js` before applying academic tone transforms, preventing math symbol corruption.
+  3. Added Bohr shells computation for all 118 elements in `periodic-table.js` and safe hydration character splitting in `chemistry.js`.
+  4. Updated `Surface.pruneLaser()` to respect `this.app?.settings?.laserTrailDuration` dynamically.
+* **Verification**: `node --test test/p3-hardening.test.mjs` (6/6 passed).
+* **Files Touched**: `src/js/ui/academic-dictionary.js`, `src/js/ui/dictionary-popover.js`, `src/js/core/technical-linter.js`, `src/js/ui/periodic-table.js`, `src/js/core/chemistry.js`, `src/js/core/surface.js`.
+
+### BUG-053: P2 Hardening: SMILES % Rings, NotebookVariables DAG Cycles, Dataview Prototype Pollution, Anki Timeout & PDF Sidebar Focus
+* **Symptom**: SMILES parser failed on multi-digit ring closures (`%10`..`%99`); cross-referencing reactive variables caused infinite loops and UI freezes; Dataview queries allowed prototype pollution via `__proto__`; AnkiConnect hung indefinitely without timeouts; PDF sidebar search input lost focus on every keystroke; workbench card stamping used fixed uncentered coordinates; study runner exited leaving occlusions exposed.
+* **Fix**:
+  1. Added `%` multi-digit ring closure tokenizer in `chemical-sketcher.js`.
+  2. Implemented `evaluateNotebookVariables(varMap)` with 3-color DFS cycle detection and topological sorting in `scientific-math.js`.
+  3. Blocked `__proto__`, `prototype`, and `constructor` keys in `dataview.js` and added case-insensitive infix `CONTAINS` and `AND` support.
+  4. Added strict 2,500ms `AbortController` timeout to `invokeAnkiConnect()` in `anki.js`.
+  5. Isolated outline list rendering in `pdf-sidebar.js` so search `<input>` is preserved in DOM without losing focus.
+  6. Standardized `cam.viewport(sw, sh)` coordinate centering across `molecule-viewer.js`, `chemical-sketcher.js`, `function-grapher.js`, and `circuit-workbench.js`.
+  7. Restored `c.object.revealed = false` on all cards in `StudyRunner.stop()`, protecting Invariant #6.
+* **Verification**: `node --test test/p2-hardening.test.mjs` (7/7 passed), `node scripts/smoke.js --new-features` (24/24 passed), `node scripts/i18n-check.js` (2,238 keys verified).
+* **Files Touched**: `src/js/ui/chemical-sketcher.js`, `src/js/core/scientific-math.js`, `src/js/core/dataview.js`, `src/js/core/anki.js`, `src/js/core/fsrs.js`, `src/js/ui/pdf-sidebar.js`, `src/js/ui/function-grapher.js`, `src/js/ui/circuit-workbench.js`, `src/js/ui/study-runner.js`, `src/js/ui/molecule-viewer.js`.

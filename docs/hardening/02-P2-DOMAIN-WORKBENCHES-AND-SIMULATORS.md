@@ -1,7 +1,7 @@
 # GazBoard Hardening Dossier — Priority 2 (P2): Domain Workbenches & Simulators
 
 > **Target Audience**: AI Coding Agent / Core Systems Engineer  
-> **Status**: Ready for Sequential Execution (Execute directly following P1)  
+> **Status**: **Fully Hardened & Audited (P2 Tier Complete)**  
 > **Hardening Tier**: **`P2 — Moderate Hardening Priority`**  
 > **Objective**: Hardening specialized scientific workbenches, 3D molecular viewers, chemical parsers, query engines, and spaced repetition runners.
 
@@ -289,9 +289,43 @@ export async function runOcrSafe(canvasElement, onProgress) {
 After completing hardening in this tier, execute these verification commands in PowerShell:
 
 ```powershell
-# 1. Verify custom features and domain workbenches:
+# 1. Custom / New Features Smoke Test:
 node scripts/smoke.js --new-features
 
-# 2. Strict translation verification (must remain 2,238 / 2,238 keys):
+# 2. Strict 100% translation coverage check (2,238 / 2,238 keys):
 node scripts/i18n-check.js
+
+# 3. Dedicated P2 Hardening unit test suite:
+node --test test/p2-hardening.test.mjs
 ```
+
+---
+
+## 7. P2 Hardening Implementation & Audit Completion Log
+
+### 7.1 Key Vulnerabilities Identified & Resolved
+
+| Subsystem | Vulnerability / Bug Identified | Root Cause | Engineering Solution Implemented |
+|---|---|---|---|
+| **3D Molecule Viewer** (`molecule-viewer.js`) | Fixed stamping coordinates at dummy defaults (x=200, y=200); WebGL context retention leak. | Mistakenly accessed `cam.viewport` as a static property instead of calling method `cam.viewport(sw, sh)`. | Invoked `cam.viewport(sw, sh)` to dynamically center card on user's active viewport; added `destroy()` for clean WebGL resource disposal. |
+| **ChemDraw 2D Sketcher** (`chemical-sketcher.js`) | Multi-digit SMILES ring closures (`%10`..`%99`) ignored; card stamping uncentered. | SMILES tokenizer only matched `/[0-9]/`, treating `%` as non-matching character and misinterpreting `%10` as ring 1; `cam.viewport` not called. | Added `%` multi-digit ring closure tokenizer; updated `stampToCanvas()` with `cam.viewport(sw, sh)` centering; added `destroy()`. |
+| **Symbolic CAS / NotebookVariables** (`scientific-math.js`) | Infinite recursion and main-thread freezing on circular variable references (e.g. `a = b + 1`, `b = a + 1`). | Linear evaluation without cycle detection or dependency tracking. | Implemented `evaluateNotebookVariables(varMap)` with 3-color DFS cycle detection and topological sorting; independent variables continue evaluating cleanly. |
+| **Dataview Query Engine** (`dataview.js`) | Object prototype pollution via `__proto__`, `prototype`, `constructor`; limited WHERE clause filtering. | Unvalidated dynamic property path access `cur[p]`; lack of infix `field CONTAINS target` or multi-clause `AND` support. | Added explicit blocklist for prototype keys (`__proto__`, `prototype`, `constructor`); added case-insensitive infix `CONTAINS` and conjunction `AND` parser. |
+| **FSRS v5 Engine** (`fsrs.js`) | Review schedule corruption (negative or NaN stability / scheduled days) under anomalous clocks or extreme histories. | Unclamped stability calculations on forget/recall transitions. | Enforced stability minimum `Math.max(0.01, newStability)`, scheduled interval minimum `Math.max(10 / 1440, scheduledDays)`, and difficulty clamp `[1.0, 10.0]`. |
+| **AnkiConnect Bridge** (`anki.js`) | Main thread and UI hanging when desktop Anki is unresponsive or closed. | `invokeAnkiConnect` executed `fetch('http://127.0.0.1:8765')` without an `AbortController` timeout budget. | Added strict 2,500ms `AbortController` timeout to `invokeAnkiConnect`, gracefully reporting connection timeout. |
+| **PDF Sidebar Navigator** (`pdf-sidebar.js`) | Input focus destroyed on the first keystroke in the TOC search input; potential out-of-bounds page navigation. | Search `input` event listener triggered `this.render()`, replacing `this.el` and destroying the DOM element being typed into. | Refactored `renderToc()` to isolate list updates (`updateList()`), preserving the search `<input>` in the DOM; clamped `jumpToPage` to valid bounds. |
+| **Function Grapher** (`function-grapher.js`) | Stamped plots placed at fixed dummy coordinates (350, 320) regardless of canvas pan/zoom. | Evaluated `cam.viewport?.x` instead of `cam.viewport(sw, sh)`. | Updated `stampToCanvas()` to compute `cx, cy` using `cam.viewport(sw, sh)`; added `destroy()`. |
+| **Circuit Workbench** (`circuit-workbench.js`) | Snapshot card and BOM note stamped at fixed fallback coordinates (250, 300). | Evaluated `cam.viewport?.x` instead of calling `cam.viewport(sw, sh)`. | Updated `stampToWhiteboard()` and `exportBOM()` with `cam.viewport(sw, sh)`; preserved `p.t` timestamp; added `destroy()`. |
+| **Study Runner** (`study-runner.js`) | Whiteboard occlusions permanently left in revealed state upon exiting review session (violating Invariant #6). | In `hideOne` mode, all non-target occlusions are marked `revealed = true`. Exiting without reset left all cards visible on the whiteboard. | Added automatic restoration in `stop()` resetting `c.object.revealed = false` on all cards, guaranteeing Invariant #6 compliance. |
+
+### 7.2 Verification Results
+
+1. **Dedicated Unit Test Suite** (`test/p2-hardening.test.mjs`):
+   - **7 / 7 tests passing** (85.9ms duration).
+2. **Dedicated P3 Unit Test Suite** (`test/p3-hardening.test.mjs`):
+   - **6 / 6 tests passing** (104.1ms duration, zero regression).
+3. **Custom Features Smoke Test** (`node scripts/smoke.js --new-features`):
+   - **24 / 24 tests passing** with 0 errors.
+4. **Strict Translation Coverage Check** (`node scripts/i18n-check.js`):
+   - **2,238 / 2,238 keys translated** across all 7 locales (`ar`, `bn`, `de`, `es`, `pt-BR`, `zh-Hans`, `zh-Hant`) with 0 left over and 0 problems.
+

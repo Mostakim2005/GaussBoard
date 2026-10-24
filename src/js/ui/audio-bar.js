@@ -818,30 +818,47 @@ export class AudioBar {
     if (!handle) return;
     let startX = 0, startY = 0, initialX = 0, initialY = 0;
     let dragging = false;
+    let movedPastThreshold = false;
 
     const onPointerMove = (e) => {
-      if (!dragging) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
+      if (!movedPastThreshold) {
+        if (Math.hypot(dx, dy) < 6) return;
+        movedPastThreshold = true;
+        dragging = true;
+      }
       this.box.x = initialX + dx;
       this.box.y = initialY + dy;
       this.place();
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (e) => {
+      try {
+        if (handle.hasPointerCapture?.(e.pointerId)) {
+          handle.releasePointerCapture(e.pointerId);
+        }
+      } catch {}
       dragging = false;
+      movedPastThreshold = false;
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
     };
 
     handle.addEventListener('pointerdown', (e) => {
-      dragging = true;
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      try { handle.setPointerCapture(e.pointerId); } catch {}
+      dragging = false;
+      movedPastThreshold = false;
       startX = e.clientX;
       startY = e.clientY;
       initialX = this.box.x;
       initialY = this.box.y;
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerUp);
     });
   }
 

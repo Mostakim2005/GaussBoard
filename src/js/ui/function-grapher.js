@@ -896,17 +896,22 @@ export class FunctionGrapherModal {
     if (!this.canvas || !this.app) return;
     try {
       const dataUrl = this.canvas.toDataURL('image/png');
-      const cam = this.app.surface?.cam || { viewport: { x: 200, y: 200, w: 800, h: 600 } };
-      const cx = (cam.viewport?.x || 200) + (cam.viewport?.w || 800) / 2 - 250;
-      const cy = (cam.viewport?.y || 200) + (cam.viewport?.h || 600) / 2 - 180;
+      const w = 520;
+      const h = 360;
+      const cam = this.app.surface?.cam;
+      const sw = this.app.surface?.canvas?.width || 1200;
+      const sh = this.app.surface?.canvas?.height || 800;
+      const vp = (cam && typeof cam.viewport === 'function') ? cam.viewport(sw, sh) : (cam?.viewport || { x: 100, y: 100, w: 1000, h: 700 });
+      const cx = (vp.x || 0) + (vp.w || 1000) / 2 - w / 2;
+      const cy = (vp.y || 0) + (vp.h || 700) / 2 - h / 2;
 
       const obj = {
         id: `graph_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
         type: 'image',
         x: cx,
         y: cy,
-        w: 520,
-        h: 360,
+        w: w,
+        h: h,
         src: dataUrl,
         title: `Function Plot: f(x) = ${this.expression}`,
         t: Date.now()
@@ -919,6 +924,14 @@ export class FunctionGrapherModal {
       this.close();
     } catch (e) {
       this.app.toast?.(t('Unable to stamp graph: {error}', { error: e.message }));
+    }
+  }
+
+  destroy() {
+    this.close();
+    if (this.modal && this.modal.parentNode) {
+      this.modal.parentNode.removeChild(this.modal);
+      this.modal = null;
     }
   }
 }

@@ -659,6 +659,9 @@ export class AcademicDictionaryModal {
   }
 
   close() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch {}
+    }
     if (this.modal) {
       this.modal.classList.remove('visible');
     }
@@ -886,21 +889,38 @@ export class AcademicDictionaryModal {
   }
 
   speakWord(word) {
-    if (!('speechSynthesis' in window)) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       this.app.toast?.(t('Speech synthesis not supported in this environment.'));
       return;
     }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(word);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.88; // slightly measured academic cadence
-    window.speechSynthesis.speak(utterance);
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(word);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.88; // slightly measured academic cadence
+
+      // Fallback timer: prevents speech queue lockup if Windows N or audio driver stalls
+      const timer = setTimeout(() => {
+        try { window.speechSynthesis.cancel(); } catch {}
+      }, 4000);
+
+      utterance.onend = () => clearTimeout(timer);
+      utterance.onerror = () => clearTimeout(timer);
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      this.app.toast?.(t('Speech synthesis not supported in this environment.'));
+    }
   }
 
   stampCard(entry) {
-    const cam = this.app.surface?.cam || { viewport: { x: 200, y: 200, w: 800, h: 600 } };
-    const cx = cam.viewport ? cam.viewport.x + cam.viewport.w / 2 : 400;
-    const cy = cam.viewport ? cam.viewport.y + cam.viewport.h / 2 : 300;
+    const cam = this.app.surface?.cam;
+    const sw = this.app.surface?.width || 800;
+    const sh = this.app.surface?.height || 600;
+    const view = (cam && typeof cam.viewport === 'function')
+      ? cam.viewport(sw, sh)
+      : (cam?.viewport && typeof cam.viewport.x === 'number' ? cam.viewport : { x: 200, y: 200, w: sw, h: sh });
+    const cx = view.x + view.w / 2;
+    const cy = view.y + view.h / 2;
 
     const note = {
       id: uid(),
@@ -917,8 +937,8 @@ export class AcademicDictionaryModal {
         `---`,
         `**Definition:** ${entry.def}`,
         ``,
-        `**Synonyms:** ${entry.synonyms.join(', ')}`,
-        `**Collocations:** ${entry.collocations.join(' • ')}`,
+        `**Synonyms:** ${(entry.synonyms || []).join(', ')}`,
+        `**Collocations:** ${(entry.collocations || []).join(' • ')}`,
         ``,
         `> _"${entry.example}"_`
       ].join('\n')

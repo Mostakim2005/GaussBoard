@@ -1125,7 +1125,9 @@ export class Surface {
     const cam = this.cam;
     const rgb = hexToRgb(this.laserColor || '#ff2d2d');
     const head = pts[pts.length - 1];
-    const headFade = 1 - Math.min(1, (now - head.t) / Surface.LASER_LIFE);
+    const life = this.app?.settings?.laserTrailDuration != null ? this.app.settings.laserTrailDuration : Surface.LASER_LIFE;
+    const effectiveLife = life > 0 ? life : Surface.LASER_LIFE;
+    const headFade = 1 - Math.min(1, (now - head.t) / effectiveLife);
     if (headFade <= 0) return;
 
     const sp = pts.map((p) => cam.toScreen(p.x, p.y));
