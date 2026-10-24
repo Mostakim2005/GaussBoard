@@ -488,6 +488,201 @@ export class IndustrialCircuitSim {
             }
           }
         }
+
+        // Discrete Diodes & Zener Diodes
+        if (comp.type === 'diode' || comp.type === 'zener_diode') {
+          const potA = potentials.get(`${comp.id}:A`);
+          const potK = potentials.get(`${comp.id}:K`);
+          if (potA && !potK) {
+            if (potA.rms >= 0.7) {
+              potentials.set(`${comp.id}:K`, { instant: potA.instant - 0.7, rms: Math.max(0, potA.rms - 0.7), isDC: potA.isDC });
+              changed = true;
+            }
+          } else if (comp.type === 'zener_diode' && potK && !potA) {
+            const vz = comp.zenerVoltage || 5.1;
+            if (potK.rms >= vz) {
+              potentials.set(`${comp.id}:A`, { instant: potK.instant - vz, rms: Math.max(0, potK.rms - vz), isDC: potK.isDC });
+              changed = true;
+            }
+          }
+        }
+
+        // Light Emitting Diodes (LED)
+        if (comp.type === 'led') {
+          const potA = potentials.get(`${comp.id}:A`);
+          const potK = potentials.get(`${comp.id}:K`);
+          let vFwd = 0;
+          if (potA && potK) {
+            vFwd = potA.rms - potK.rms;
+          } else if (potA) {
+            vFwd = potA.rms;
+          }
+          comp.lit = vFwd >= (comp.forwardVoltage || 1.8);
+          if (potA && !potK && vFwd >= 1.8) {
+            potentials.set(`${comp.id}:K`, { instant: potA.instant - 1.8, rms: Math.max(0, potA.rms - 1.8), isDC: potA.isDC });
+            changed = true;
+          }
+        }
+
+        // Bipolar Junction Transistors (BJT NPN & PNP)
+        if (comp.type === 'bjt_npn') {
+          const potB = potentials.get(`${comp.id}:B`);
+          const potE = potentials.get(`${comp.id}:E`);
+          const potC = potentials.get(`${comp.id}:C`);
+          const vBE = (potB ? potB.rms : 0) - (potE ? potE.rms : 0);
+          comp.active = vBE >= 0.65;
+          if (comp.active && potC && !potE) {
+            potentials.set(`${comp.id}:E`, { instant: potC.instant, rms: Math.max(0, potC.rms - 0.2), isDC: true });
+            changed = true;
+          } else if (comp.active && potE && !potC) {
+            potentials.set(`${comp.id}:C`, { instant: potE.instant, rms: potE.rms + 0.2, isDC: true });
+            changed = true;
+          }
+        } else if (comp.type === 'bjt_pnp') {
+          const potB = potentials.get(`${comp.id}:B`);
+          const potE = potentials.get(`${comp.id}:E`);
+          const potC = potentials.get(`${comp.id}:C`);
+          const vEB = (potE ? potE.rms : 0) - (potB ? potB.rms : 0);
+          comp.active = vEB >= 0.65;
+          if (comp.active && potE && !potC) {
+            potentials.set(`${comp.id}:C`, { instant: potE.instant, rms: Math.max(0, potE.rms - 0.2), isDC: true });
+            changed = true;
+          }
+        }
+
+        // Field-Effect Transistors (MOSFET N-Channel & P-Channel)
+        if (comp.type === 'mosfet_n') {
+          const potG = potentials.get(`${comp.id}:G`);
+          const potS = potentials.get(`${comp.id}:S`);
+          const vGS = (potG ? potG.rms : 0) - (potS ? potS.rms : 0);
+          comp.active = vGS >= (comp.vth || 2.0);
+          if (comp.active) {
+            const [p1, p2] = [`${comp.id}:D`, `${comp.id}:S`];
+            const pot1 = potentials.get(p1);
+            const pot2 = potentials.get(p2);
+            if (pot1 && !pot2) { potentials.set(p2, pot1); changed = true; }
+            else if (pot2 && !pot1) { potentials.set(p1, pot2); changed = true; }
+          }
+        } else if (comp.type === 'mosfet_p') {
+          const potG = potentials.get(`${comp.id}:G`);
+          const potS = potentials.get(`${comp.id}:S`);
+          const vSG = (potS ? potS.rms : 0) - (potG ? potG.rms : 0);
+          comp.active = vSG >= (comp.vth || 2.0);
+          if (comp.active) {
+            const [p1, p2] = [`${comp.id}:S`, `${comp.id}:D`];
+            const pot1 = potentials.get(p1);
+            const pot2 = potentials.get(p2);
+            if (pot1 && !pot2) { potentials.set(p2, pot1); changed = true; }
+            else if (pot2 && !pot1) { potentials.set(p1, pot2); changed = true; }
+          }
+        }
+
+        // Operational Amplifier (Op-Amp LM741 / Rail-to-Rail)
+        if (comp.type === 'opamp') {
+          const potP = potentials.get(`${comp.id}:IN+`);
+          const potN = potentials.get(`${comp.id}:IN-`);
+          const potVpos = potentials.get(`${comp.id}:V+`);
+          const potVneg = potentials.get(`${comp.id}:V-`);
+          const vPos = potVpos ? potVpos.rms : 12.0;
+          const vNeg = potVneg ? potVneg.rms : 0.0;
+          const vp = potP ? potP.rms : 0;
+          const vn = potN ? potN.rms : 0;
+          const gain = comp.openLoopGain || 100000;
+          let vOut = Math.min(vPos - 1.2, Math.max(vNeg, (vp - vn) * gain));
+          if (comp.configuredGain) {
+            vOut = Math.min(vPos - 1.2, Math.max(vNeg, vp * comp.configuredGain));
+          }
+          const curOut = potentials.get(`${comp.id}:OUT`);
+          if (!curOut || Math.abs(curOut.rms - vOut) > 0.05) {
+            potentials.set(`${comp.id}:OUT`, { instant: vOut, rms: vOut, isDC: true });
+            changed = true;
+          }
+        }
+
+        // 555 Timer IC (Astable / Monostable)
+        if (comp.type === 'timer_555') {
+          const potVcc = potentials.get(`${comp.id}:8`);
+          const vcc = potVcc ? potVcc.rms : 5.0;
+          comp.stateTimer = (comp.stateTimer || 0) + dt;
+          const period = comp.period || 0.6;
+          if (comp.stateTimer >= period) {
+            comp.stateTimer = 0;
+            comp.high = !comp.high;
+          }
+          const outV = comp.high ? Math.max(0, vcc - 1.2) : 0;
+          const curOut = potentials.get(`${comp.id}:3`);
+          if (!curOut || curOut.rms !== outV) {
+            potentials.set(`${comp.id}:3`, { instant: outV, rms: outV, isDC: true });
+            changed = true;
+          }
+          if (!comp.high) {
+            potentials.set(`${comp.id}:7`, { instant: 0, rms: 0, isDC: true });
+          }
+        }
+
+        // Digital Logic Gates (AND, OR, NOT, NAND, NOR, XOR, XNOR)
+        if (comp.type === 'logic_gate') {
+          const potA = potentials.get(`${comp.id}:A`);
+          const potB = potentials.get(`${comp.id}:B`);
+          const inA = potA && potA.rms >= 2.0;
+          const inB = potB && potB.rms >= 2.0;
+          let out = false;
+          switch (comp.gateType || 'AND') {
+            case 'AND': out = inA && inB; break;
+            case 'OR':  out = inA || inB; break;
+            case 'NOT': out = !inA; break;
+            case 'NAND': out = !(inA && inB); break;
+            case 'NOR':  out = !(inA || inB); break;
+            case 'XOR':  out = inA !== inB; break;
+            case 'XNOR': out = inA === inB; break;
+          }
+          const outV = out ? 5.0 : 0.0;
+          const curOut = potentials.get(`${comp.id}:Y`);
+          if (!curOut || curOut.rms !== outV) {
+            potentials.set(`${comp.id}:Y`, { instant: outV, rms: outV, isDC: true });
+            changed = true;
+          }
+        }
+
+        // 7-Segment Display (Common Cathode)
+        if (comp.type === 'display_7seg') {
+          const segs = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'DP'];
+          comp.litSegs = {};
+          for (const s of segs) {
+            const pot = potentials.get(`${comp.id}:${s}`);
+            comp.litSegs[s] = pot && pot.rms >= 2.0;
+          }
+        }
+
+        // Capacitors (Transient Voltage State)
+        if (comp.type === 'capacitor') {
+          const p1 = `${comp.id}:1`;
+          const p2 = `${comp.id}:2`;
+          const pot1 = potentials.get(p1);
+          const pot2 = potentials.get(p2);
+          const vApplied = (pot1 ? pot1.rms : 0) - (pot2 ? pot2.rms : 0);
+          const tau = comp.capacitance ? comp.capacitance * 1000 : 0.15;
+          comp.vCap = (comp.vCap || 0) + (vApplied - (comp.vCap || 0)) * Math.min(1, dt / tau);
+          if (pot1 && !pot2) {
+            potentials.set(p2, { instant: pot1.instant - comp.vCap, rms: Math.max(0, pot1.rms - comp.vCap), isDC: pot1.isDC });
+            changed = true;
+          }
+        }
+
+        // Inductors (Transient Current Continuity)
+        if (comp.type === 'inductor') {
+          const p1 = `${comp.id}:1`;
+          const p2 = `${comp.id}:2`;
+          const pot1 = potentials.get(p1);
+          const pot2 = potentials.get(p2);
+          if (pot1 && !pot2) {
+            potentials.set(p2, pot1);
+            changed = true;
+          } else if (pot2 && !pot1) {
+            potentials.set(p1, pot2);
+            changed = true;
+          }
+        }
       }
 
       // Propagate across external connecting wires
@@ -826,6 +1021,110 @@ export class IndustrialCircuitSim {
       x: 520,
       y: 330
     });
+  }
+
+  /**
+   * Load Analog/Digital Preset: 555 Timer Astable LED Flasher
+   */
+  loadPreset555Flasher() {
+    this.clear();
+    this.addComponent({ id: 'VDC1', type: 'dc_supply', name: '9V Battery DC', x: 60, y: 80 });
+    this.addComponent({ id: 'IC1', type: 'timer_555', name: 'NE555 Timer IC', period: 0.5, x: 260, y: 70 });
+    this.addComponent({ id: 'LED1', type: 'led', name: 'LED1 (Red Pulse)', forwardVoltage: 1.8, color: '#ef4444', x: 460, y: 90 });
+    this.addComponent({ id: 'C1', type: 'capacitor', name: 'C1 (10µF Timing)', capacitance: 0.00001, x: 260, y: 260 });
+    this.addComponent({ id: 'R1', type: 'terminal_block', name: 'R1/R2 Resistor Array', x: 460, y: 260 });
+
+    this.addWire('VDC1:+', 'IC1:8', '#e81123'); // VCC
+    this.addWire('VDC1:-', 'IC1:1', '#0078d4'); // GND
+    this.addWire('IC1:3', 'LED1:A', '#e81123'); // OUT -> LED Anode
+    this.addWire('LED1:K', 'VDC1:-', '#0078d4'); // LED Cathode -> GND
+    this.dmm.red = 'IC1:3';
+    this.dmm.black = 'IC1:1';
+  }
+
+  /**
+   * Load Analog Preset: LM741 Op-Amp Inverting Amplifier (10x Gain)
+   */
+  loadPresetOpAmp() {
+    this.clear();
+    this.addComponent({ id: 'VDC1', type: 'dc_supply', name: '±12V Dual Supply', x: 60, y: 80 });
+    this.addComponent({ id: 'OA1', type: 'opamp', name: 'LM741 Op-Amp', configuredGain: 10, x: 280, y: 80 });
+    this.addComponent({ id: 'POT1', type: 'pushbutton', name: 'Input AC/DC Signal (1V)', pressed: true, x: 60, y: 260 });
+    this.addComponent({ id: 'LED1', type: 'led', name: 'Output Saturation LED', forwardVoltage: 2.0, color: '#22c55e', x: 500, y: 90 });
+
+    this.addWire('VDC1:+', 'OA1:V+', '#e81123');
+    this.addWire('VDC1:-', 'OA1:V-', '#0078d4');
+    this.addWire('POT1:1', 'OA1:IN+', '#ffd94a');
+    this.addWire('OA1:OUT', 'LED1:A', '#ffd94a');
+    this.addWire('LED1:K', 'VDC1:-', '#0078d4');
+    this.dmm.red = 'OA1:OUT';
+    this.dmm.black = 'VDC1:-';
+  }
+
+  /**
+   * Load Semiconductor Preset: BJT Common Emitter Switch
+   */
+  loadPresetBJT() {
+    this.clear();
+    this.addComponent({ id: 'VDC1', type: 'dc_supply', name: '12V DC Supply', x: 60, y: 80 });
+    this.addComponent({ id: 'Q1', type: 'bjt_npn', name: '2N3904 NPN BJT', x: 290, y: 90 });
+    this.addComponent({ id: 'SW1', type: 'pushbutton', name: 'Base Trigger Switch', pressed: false, x: 100, y: 260 });
+    this.addComponent({ id: 'LED1', type: 'led', name: 'Collector Load LED', forwardVoltage: 1.8, color: '#3b82f6', x: 500, y: 90 });
+
+    this.addWire('VDC1:+', 'LED1:A', '#e81123');
+    this.addWire('LED1:K', 'Q1:C', '#e81123');
+    this.addWire('Q1:E', 'VDC1:-', '#0078d4');
+    this.addWire('SW1:2', 'Q1:B', '#ffd94a');
+    this.addWire('VDC1:+', 'SW1:1', '#e81123');
+    this.dmm.red = 'Q1:C';
+    this.dmm.black = 'Q1:E';
+  }
+
+  /**
+   * Load Digital Logic Preset: Full Adder Circuit
+   */
+  loadPresetLogicAdder() {
+    this.clear();
+    this.addComponent({ id: 'VDC1', type: 'dc_supply', name: '5V VCC Supply', x: 50, y: 60 });
+    this.addComponent({ id: 'IN_A', type: 'pushbutton', name: 'Bit Input A', pressed: true, x: 50, y: 190 });
+    this.addComponent({ id: 'IN_B', type: 'pushbutton', name: 'Bit Input B', pressed: false, x: 50, y: 310 });
+    this.addComponent({ id: 'G_XOR', type: 'logic_gate', gateType: 'XOR', name: 'XOR (Sum Bit)', x: 280, y: 120 });
+    this.addComponent({ id: 'G_AND', type: 'logic_gate', gateType: 'AND', name: 'AND (Carry Bit)', x: 280, y: 280 });
+    this.addComponent({ id: 'LED_S', type: 'led', name: 'Sum Output LED', color: '#22c55e', x: 500, y: 120 });
+    this.addComponent({ id: 'LED_C', type: 'led', name: 'Carry Output LED', color: '#ef4444', x: 500, y: 280 });
+
+    this.addWire('VDC1:+', 'IN_A:1', '#e81123');
+    this.addWire('VDC1:+', 'IN_B:1', '#e81123');
+    this.addWire('IN_A:2', 'G_XOR:A', '#ffd94a');
+    this.addWire('IN_A:2', 'G_AND:A', '#ffd94a');
+    this.addWire('IN_B:2', 'G_XOR:B', '#00e5ff');
+    this.addWire('IN_B:2', 'G_AND:B', '#00e5ff');
+    this.addWire('G_XOR:Y', 'LED_S:A', '#22c55e');
+    this.addWire('G_AND:Y', 'LED_C:A', '#ef4444');
+    this.addWire('LED_S:K', 'VDC1:-', '#0078d4');
+    this.addWire('LED_C:K', 'VDC1:-', '#0078d4');
+    this.dmm.red = 'G_XOR:Y';
+    this.dmm.black = 'VDC1:-';
+  }
+
+  /**
+   * Load Rectifier Preset: Bridge Rectifier & RC Filter
+   */
+  loadPresetBridgeRectifier() {
+    this.clear();
+    this.addComponent({ id: 'AC1', type: 'power_source_1p', name: '230V AC Mains', x: 60, y: 80 });
+    this.addComponent({ id: 'D1', type: 'diode', name: '1N4007 Bridge D1', x: 260, y: 80 });
+    this.addComponent({ id: 'D2', type: 'diode', name: '1N4007 Bridge D2', x: 260, y: 200 });
+    this.addComponent({ id: 'C1', type: 'capacitor', name: '470µF Filter Cap', capacitance: 0.00047, x: 420, y: 140 });
+    this.addComponent({ id: 'HL1', type: 'pilot_light', name: 'DC Output Lamp', ratedVoltage: 24, x: 600, y: 140 });
+
+    this.addWire('AC1:L', 'D1:A', '#8b4513');
+    this.addWire('D1:K', 'C1:1', '#e81123');
+    this.addWire('C1:1', 'HL1:X1', '#e81123');
+    this.addWire('C1:2', 'AC1:N', '#0078d4');
+    this.addWire('HL1:X2', 'AC1:N', '#0078d4');
+    this.dmm.red = 'C1:1';
+    this.dmm.black = 'C1:2';
   }
 
   /**

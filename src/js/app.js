@@ -57,6 +57,7 @@ import { PhetRunnerModal } from './ui/phet-runner.js';
 import { DictionaryPopover } from './ui/dictionary-popover.js';
 import { CircuitWorkbenchModal } from './ui/circuit-workbench.js';
 import { MoleculeViewerModal } from './ui/molecule-viewer.js';
+import { ChemicalSketcherModal } from './ui/chemical-sketcher.js';
 import { FunctionGrapherModal } from './ui/function-grapher.js';
 
 /** An id GazBoard itself would make: safe as a file name on every system, the phone included. */
@@ -314,6 +315,7 @@ class App {
     this.phetRunnerModal = new PhetRunnerModal(this);
     this.dictionaryPopover = new DictionaryPopover(this);
     this.moleculeViewerModal = new MoleculeViewerModal(this);
+    this.chemicalSketcherModal = new ChemicalSketcherModal(this);
     this.functionGrapherModal = new FunctionGrapherModal(this);
     this.initMultiWindowLease();
     this.wireGlobalEvents();
@@ -2746,6 +2748,11 @@ class App {
     if (!this.moleculeViewerModal) this.moleculeViewerModal = new MoleculeViewerModal(this);
     if (moleculeId) this.moleculeViewerModal.loadMolecule(moleculeId);
     this.moleculeViewerModal.show();
+  }
+
+  openChemicalSketcher() {
+    if (!this.chemicalSketcherModal) this.chemicalSketcherModal = new ChemicalSketcherModal(this);
+    this.chemicalSketcherModal.show();
   }
 
   openFunctionGrapher(preset = 'quadratic') {

@@ -4979,3 +4979,231 @@ body.theme-light .dict-word { color: #0f6cbd; }
   font-family: 'Consolas', 'Courier New', monospace;
 }
 
+/* 2D Chemical Structure Sketcher & SMILES Studio (v6.7.0) */
+.chem-sketcher-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 10005;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.chem-sketcher-backdrop.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.chem-sketcher-modal {
+  width: 92vw;
+  max-width: 1040px;
+  height: 84vh;
+  max-height: 700px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #f8fafc;
+}
+
+.chem-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: rgba(30, 41, 59, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 12px;
+}
+
+.chem-title-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chem-title-area h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.chem-badge {
+  font-size: 11px;
+  font-weight: bold;
+  background: #0284c7;
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.chem-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chem-btn {
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f8fafc;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chem-btn:hover {
+  background: #334155;
+  border-color: #38bdf8;
+}
+
+.chem-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 6px;
+}
+
+.chem-close-btn:hover {
+  color: #ffffff;
+}
+
+.chem-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.chem-palette {
+  width: 240px;
+  background: rgba(15, 23, 42, 0.7);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.palette-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.elem-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.elem-btn {
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  font-weight: bold;
+  font-size: 13px;
+  padding: 6px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.12s;
+}
+
+.elem-btn:hover, .elem-btn.active {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.bond-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.bond-btn, .tool-btn {
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: left;
+}
+
+.bond-btn:hover, .bond-btn.active, .tool-btn:hover {
+  background: #0284c7;
+  border-color: #38bdf8;
+}
+
+.chem-smiles-select {
+  width: 100%;
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+  padding: 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.smiles-input-group {
+  display: flex;
+  gap: 4px;
+}
+
+.chem-smiles-input {
+  flex: 1;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #38bdf8;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.chem-parse-btn {
+  background: #0284c7;
+  border: none;
+  color: #ffffff;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.chem-canvas-wrap {
+  flex: 1;
+  position: relative;
+  background: #020617;
+}
+
+.chem-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+

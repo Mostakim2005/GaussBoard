@@ -35,6 +35,34 @@ export const SIMULATION_PRESETS = [
     category: 'Mechanics',
     icon: '⏱️',
     desc: 'Analyze period, oscillation frequency, and gravitational acceleration.'
+  },
+  {
+    id: 'optics',
+    name: 'Geometrical Optics & Ray Tracing',
+    category: 'Optics',
+    icon: '🔍',
+    desc: 'Interactive convex/concave lens ray tracing: principal rays, real/virtual images, and magnification.'
+  },
+  {
+    id: 'electric_field',
+    name: 'Coulomb Electric Field & Dipole',
+    category: 'Electromagnetism',
+    icon: '🧲',
+    desc: 'Visualize electric field vector lines and equipotential contour rings for point charges.'
+  },
+  {
+    id: 'collisions',
+    name: '2D Momentum & Elastic Collisions',
+    category: 'Mechanics',
+    icon: '🎱',
+    desc: 'Analyze conservation of momentum (p = mv) and kinetic energy across elastic/inelastic impacts.'
+  },
+  {
+    id: 'rigid_sandbox',
+    name: 'Interactive 2D Rigid-Body Sandbox',
+    category: 'Mechanics',
+    icon: '📦',
+    desc: 'Dynamic physics sandbox with gravity, surface friction, restitution, and draggable bodies.'
   }
 ];
 
@@ -49,8 +77,23 @@ export class PhetRunnerModal {
       resistance: 500,
       angle: 45,
       speed: 25,
-      frequency: 2.0
+      frequency: 2.0,
+      focalLength: 80,
+      objectDistance: 160,
+      objectHeight: 50,
+      charge1: 5,
+      charge2: -5,
+      mass1: 2.0,
+      mass2: 1.0,
+      elasticity: 0.95
     };
+
+    // Rigid body sandbox particles
+    this.sandboxBodies = [
+      { x: 150, y: 50, vx: 2, vy: 0, r: 18, color: '#38bdf8', mass: 1 },
+      { x: 300, y: 70, vx: -1.5, vy: 0, r: 24, color: '#ec4899', mass: 2 },
+      { x: 450, y: 90, vx: 0.8, vy: 0, r: 16, color: '#22c55e', mass: 0.8 }
+    ];
   }
 
   show() {
@@ -208,10 +251,67 @@ export class PhetRunnerModal {
         this.simState.speed = parseInt(e.target.value, 10);
         bar.querySelector('#valS').textContent = `${this.simState.speed} m/s`;
       });
+    } else if (simId === 'optics') {
+      bar.innerHTML = `
+        <div class="sim-ctrl-group">
+          <label>Focal Length f: <span id="valF">${this.simState.focalLength} mm</span></label>
+          <input type="range" id="sliderF" min="40" max="140" step="5" value="${this.simState.focalLength}">
+        </div>
+        <div class="sim-ctrl-group">
+          <label>Object Distance dₒ: <span id="valDo">${this.simState.objectDistance} mm</span></label>
+          <input type="range" id="sliderDo" min="50" max="240" step="5" value="${this.simState.objectDistance}">
+        </div>
+      `;
+      bar.querySelector('#sliderF').addEventListener('input', (e) => {
+        this.simState.focalLength = parseInt(e.target.value, 10);
+        bar.querySelector('#valF').textContent = `${this.simState.focalLength} mm`;
+      });
+      bar.querySelector('#sliderDo').addEventListener('input', (e) => {
+        this.simState.objectDistance = parseInt(e.target.value, 10);
+        bar.querySelector('#valDo').textContent = `${this.simState.objectDistance} mm`;
+      });
+    } else if (simId === 'electric_field') {
+      bar.innerHTML = `
+        <div class="sim-ctrl-group">
+          <label>Charge q₁: <span id="valQ1">${this.simState.charge1 > 0 ? '+' : ''}${this.simState.charge1} µC</span></label>
+          <input type="range" id="sliderQ1" min="-10" max="10" step="1" value="${this.simState.charge1}">
+        </div>
+        <div class="sim-ctrl-group">
+          <label>Charge q₂: <span id="valQ2">${this.simState.charge2 > 0 ? '+' : ''}${this.simState.charge2} µC</span></label>
+          <input type="range" id="sliderQ2" min="-10" max="10" step="1" value="${this.simState.charge2}">
+        </div>
+      `;
+      bar.querySelector('#sliderQ1').addEventListener('input', (e) => {
+        this.simState.charge1 = parseInt(e.target.value, 10);
+        bar.querySelector('#valQ1').textContent = `${this.simState.charge1 > 0 ? '+' : ''}${this.simState.charge1} µC`;
+      });
+      bar.querySelector('#sliderQ2').addEventListener('input', (e) => {
+        this.simState.charge2 = parseInt(e.target.value, 10);
+        bar.querySelector('#valQ2').textContent = `${this.simState.charge2 > 0 ? '+' : ''}${this.simState.charge2} µC`;
+      });
+    } else if (simId === 'collisions') {
+      bar.innerHTML = `
+        <div class="sim-ctrl-group">
+          <label>Mass m₁: <span id="valM1">${this.simState.mass1.toFixed(1)} kg</span></label>
+          <input type="range" id="sliderM1" min="0.5" max="5.0" step="0.5" value="${this.simState.mass1}">
+        </div>
+        <div class="sim-ctrl-group">
+          <label>Elasticity e: <span id="valE">${this.simState.elasticity.toFixed(2)}</span></label>
+          <input type="range" id="sliderE" min="0" max="1" step="0.05" value="${this.simState.elasticity}">
+        </div>
+      `;
+      bar.querySelector('#sliderM1').addEventListener('input', (e) => {
+        this.simState.mass1 = parseFloat(e.target.value);
+        bar.querySelector('#valM1').textContent = `${this.simState.mass1.toFixed(1)} kg`;
+      });
+      bar.querySelector('#sliderE').addEventListener('input', (e) => {
+        this.simState.elasticity = parseFloat(e.target.value);
+        bar.querySelector('#valE').textContent = this.simState.elasticity.toFixed(2);
+      });
     } else {
       bar.innerHTML = `
         <div class="sim-ctrl-group">
-          <label>Wave Frequency: <span id="valF">${this.simState.frequency} Hz</span></label>
+          <label>Frequency: <span id="valF">${this.simState.frequency} Hz</span></label>
           <input type="range" id="sliderF" min="0.5" max="5" step="0.1" value="${this.simState.frequency}">
         </div>
       `;
@@ -237,6 +337,16 @@ export class PhetRunnerModal {
         this.drawOhmsLaw(ctx, canvas.width, canvas.height, t);
       } else if (this.activeSimId === 'projectile') {
         this.drawProjectile(ctx, canvas.width, canvas.height, t);
+      } else if (this.activeSimId === 'optics') {
+        this.drawOptics(ctx, canvas.width, canvas.height, t);
+      } else if (this.activeSimId === 'electric_field') {
+        this.drawElectricField(ctx, canvas.width, canvas.height, t);
+      } else if (this.activeSimId === 'collisions') {
+        this.drawCollisions(ctx, canvas.width, canvas.height, t);
+      } else if (this.activeSimId === 'pendulum') {
+        this.drawPendulum(ctx, canvas.width, canvas.height, t);
+      } else if (this.activeSimId === 'rigid_sandbox') {
+        this.drawRigidSandbox(ctx, canvas.width, canvas.height, t);
       } else {
         this.drawWaves(ctx, canvas.width, canvas.height, t);
       }
@@ -401,6 +511,317 @@ export class PhetRunnerModal {
       ctx.arc(src2.x, src2.y, r, 0, Math.PI * 2);
       ctx.stroke();
     }
+  }
+
+  drawPendulum(ctx, w, h, t) {
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, w, h);
+
+    const pivotX = w / 2;
+    const pivotY = 35;
+    const length = 180;
+    const thetaMax = 0.55; // rad (~32 deg)
+    const omega = 2.2;
+    const theta = thetaMax * Math.cos(omega * t);
+
+    const bobX = pivotX + length * Math.sin(theta);
+    const bobY = pivotY + length * Math.cos(theta);
+
+    // Support stand
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(pivotX - 50, pivotY); ctx.lineTo(pivotX + 50, pivotY);
+    ctx.stroke();
+
+    // Rod
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pivotX, pivotY); ctx.lineTo(bobX, bobY);
+    ctx.stroke();
+
+    // Pivot pin
+    ctx.fillStyle = '#e2e8f0';
+    ctx.beginPath();
+    ctx.arc(pivotX, pivotY, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bob
+    ctx.fillStyle = '#f59e0b';
+    ctx.shadowColor = '#f59e0b';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(bobX, bobY, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Energy Bars
+    const pe = 0.5 * (1 - Math.cos(theta));
+    const ke = 0.5 * Math.sin(thetaMax) * Math.sin(thetaMax) - pe;
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(30, h - 30, Math.max(0, ke) * 350, 14);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(30, h - 50, Math.max(0, pe) * 350, 14);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('Potential Energy (PE)', 30, h - 55);
+    ctx.fillText('Kinetic Energy (KE)', 30, h - 35);
+  }
+
+  drawOptics(ctx, w, h, t) {
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, w, h);
+
+    const f = this.simState.focalLength;
+    const do_val = this.simState.objectDistance;
+    const ho = this.simState.objectHeight;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    // Optical Axis
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(20, cy); ctx.lineTo(w - 20, cy);
+    ctx.stroke();
+
+    // Convex Lens
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 10, h * 0.4, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Focal points F1 and F2
+    ctx.fillStyle = '#fde047';
+    ctx.beginPath();
+    ctx.arc(cx - f, cy, 4, 0, Math.PI * 2);
+    ctx.arc(cx + f, cy, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = '10px sans-serif';
+    ctx.fillText('F₁', cx - f - 4, cy + 16);
+    ctx.fillText('F₂', cx + f - 4, cy + 16);
+
+    // Object Arrow
+    const ox = cx - do_val;
+    const oy = cy - ho;
+    ctx.strokeStyle = '#22c55e';
+    ctx.fillStyle = '#22c55e';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(ox, cy); ctx.lineTo(ox, oy);
+    ctx.stroke();
+    // Arrowhead
+    ctx.beginPath();
+    ctx.moveTo(ox - 5, oy + 8); ctx.lineTo(ox, oy); ctx.lineTo(ox + 5, oy + 8);
+    ctx.fill();
+
+    // Calculate Image
+    const di = (f * do_val) / (do_val - f);
+    const hi = -ho * (di / do_val);
+    const ix = cx + di;
+    const iy = cy - hi;
+
+    // Principal Rays
+    ctx.lineWidth = 1.2;
+    // Ray 1: Parallel to lens -> through F2
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+    ctx.beginPath();
+    ctx.moveTo(ox, oy); ctx.lineTo(cx, oy); ctx.lineTo(cx + Math.min(260, di * 1.4), cy + (oy - cy) + (Math.min(260, di * 1.4) / di) * (iy - (cy + (oy - cy))));
+    ctx.stroke();
+
+    // Ray 2: Through optical center (cx, cy)
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+    ctx.beginPath();
+    ctx.moveTo(ox, oy); ctx.lineTo(cx + Math.min(260, di * 1.4), cy + (Math.min(260, di * 1.4) / do_val) * ho);
+    ctx.stroke();
+
+    // Draw Image Arrow
+    if (Number.isFinite(di) && Math.abs(di) < 320) {
+      ctx.strokeStyle = '#ec4899';
+      ctx.fillStyle = '#ec4899';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(ix, cy); ctx.lineTo(ix, iy);
+      ctx.stroke();
+      ctx.beginPath();
+      const dir = hi < 0 ? 1 : -1;
+      ctx.moveTo(ix - 5, iy - dir * 8); ctx.lineTo(ix, iy); ctx.lineTo(ix + 5, iy - dir * 8);
+      ctx.fill();
+    }
+
+    // Readout
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '11px sans-serif';
+    ctx.fillText(`Image Distance dᵢ = ${di.toFixed(1)} mm | Magnification M = ${(di / do_val).toFixed(2)}x`, 24, 28);
+  }
+
+  drawElectricField(ctx, w, h, t) {
+    ctx.fillStyle = '#090d16';
+    ctx.fillRect(0, 0, w, h);
+
+    const c1 = { x: w * 0.35, y: h * 0.5, q: this.simState.charge1 };
+    const c2 = { x: w * 0.65, y: h * 0.5, q: this.simState.charge2 };
+
+    // Vector field arrows grid
+    ctx.lineWidth = 1.2;
+    for (let x = 30; x < w - 20; x += 35) {
+      for (let y = 30; y < h - 20; y += 35) {
+        const dx1 = x - c1.x, dy1 = y - c1.y;
+        const d1 = Math.hypot(dx1, dy1) || 1;
+        const e1x = (c1.q / (d1 * d1)) * (dx1 / d1);
+        const e1y = (c1.q / (d1 * d1)) * (dy1 / d1);
+
+        const dx2 = x - c2.x, dy2 = y - c2.y;
+        const d2 = Math.hypot(dx2, dy2) || 1;
+        const e2x = (c2.q / (d2 * d2)) * (dx2 / d2);
+        const e2y = (c2.q / (d2 * d2)) * (dy2 / d2);
+
+        const ex = e1x + e2x;
+        const ey = e1y + e2y;
+        const mag = Math.hypot(ex, ey) || 0.0001;
+        const arrowLen = Math.min(18, mag * 8000);
+
+        ctx.strokeStyle = `rgba(56, 189, 248, ${Math.min(1, mag * 4000)})`;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (ex / mag) * arrowLen, y + (ey / mag) * arrowLen);
+        ctx.stroke();
+      }
+    }
+
+    // Point Charges
+    [c1, c2].forEach(c => {
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 14, 0, Math.PI * 2);
+      ctx.fillStyle = c.q >= 0 ? '#ef4444' : '#3b82f6';
+      ctx.shadowColor = ctx.fillStyle;
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(c.q >= 0 ? '+' : '−', c.x, c.y);
+    });
+  }
+
+  drawCollisions(ctx, w, h, t) {
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, w, h);
+
+    const m1 = this.simState.mass1;
+    const m2 = this.simState.mass2;
+    const e = this.simState.elasticity;
+
+    // Track
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(30, h * 0.65); ctx.lineTo(w - 30, h * 0.65);
+    ctx.stroke();
+
+    // Collision kinematics cycle
+    const cycle = (t * 1.5) % 4; // 0 to 4s cycle
+    let x1, x2, v1, v2;
+    const v1_init = 60, v2_init = -40;
+
+    if (cycle < 2) {
+      // Approaching
+      x1 = 60 + v1_init * cycle;
+      x2 = w - 60 + v2_init * cycle;
+      v1 = v1_init;
+      v2 = v2_init;
+    } else {
+      // Rebounding after impact at cycle = 2
+      const postT = cycle - 2;
+      const v1_post = ((m1 - e * m2) / (m1 + m2)) * v1_init + (((1 + e) * m2) / (m1 + m2)) * v2_init;
+      const v2_post = (((1 + e) * m1) / (m1 + m2)) * v1_init + ((m2 - e * m1) / (m1 + m2)) * v2_init;
+      x1 = (60 + v1_init * 2) + v1_post * postT;
+      x2 = (w - 60 + v2_init * 2) + v2_post * postT;
+      v1 = v1_post;
+      v2 = v2_post;
+    }
+
+    const r1 = Math.max(12, Math.min(28, 12 * Math.sqrt(m1)));
+    const r2 = Math.max(12, Math.min(28, 12 * Math.sqrt(m2)));
+
+    // Ball 1
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.arc(x1, h * 0.65 - r1, r1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ball 2
+    ctx.fillStyle = '#ec4899';
+    ctx.beginPath();
+    ctx.arc(x2, h * 0.65 - r2, r2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Stats
+    const pTotal = m1 * v1 + m2 * v2;
+    const keTotal = 0.5 * m1 * v1 * v1 + 0.5 * m2 * v2 * v2;
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Total Momentum p = ${pTotal.toFixed(1)} kg·m/s (Conserved)`, 24, 30);
+    ctx.fillText(`Total Kinetic Energy KE = ${(keTotal / 1000).toFixed(2)} kJ`, 24, 50);
+  }
+
+  drawRigidSandbox(ctx, w, h, t) {
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, w, h);
+
+    // Floor and walls
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(20, h - 30); ctx.lineTo(w - 20, h - 30);
+    ctx.moveTo(20, 20); ctx.lineTo(20, h - 30);
+    ctx.moveTo(w - 20, 20); ctx.lineTo(w - 20, h - 30);
+    ctx.stroke();
+
+    const g = 0.35;
+    const restitution = 0.82;
+
+    // Step physics
+    for (const b of this.sandboxBodies) {
+      b.vy += g;
+      b.x += b.vx;
+      b.y += b.vy;
+
+      // Floor bounce
+      if (b.y + b.r >= h - 30) {
+        b.y = h - 30 - b.r;
+        b.vy = -b.vy * restitution;
+        b.vx *= 0.98; // Friction
+      }
+      // Wall bounce
+      if (b.x - b.r <= 20) {
+        b.x = 20 + b.r;
+        b.vx = -b.vx * restitution;
+      } else if (b.x + b.r >= w - 20) {
+        b.x = w - 20 - b.r;
+        b.vx = -b.vx * restitution;
+      }
+
+      // Draw body
+      ctx.fillStyle = b.color;
+      ctx.shadowColor = b.color;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('Interactive 2D Rigid Bodies (Gravity, Surface Friction & Elastic Restitution)', 30, 25);
   }
 
   captureFrameToBoard() {

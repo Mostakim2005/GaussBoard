@@ -834,6 +834,15 @@ export class MoleculeViewerModal {
     };
   }
 
+  loadCustomMolecule(customMol) {
+    if (!customMol || !Array.isArray(customMol.atoms)) return;
+    this.currentMolecule = customMol;
+    this.selectedAtoms = [];
+    this.measureInfo = null;
+    this.updateInfoDisplay();
+    this.render();
+  }
+
   stampToCanvas() {
     if (!this.canvas || !this.app) return;
     try {

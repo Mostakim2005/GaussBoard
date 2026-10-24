@@ -114,11 +114,21 @@ export class CircuitWorkbenchModal {
     presetSelect.innerHTML = `
       <option value="dol">${t('Direct-On-Line (DOL) Starter')}</option>
       <option value="rev">${t('Forward-Reverse Interlock')}</option>
+      <option value="555">${t('NE555 Timer Astable LED Flasher')}</option>
+      <option value="opamp">${t('LM741 Op-Amp Inverting Amplifier (10x)')}</option>
+      <option value="bjt">${t('BJT Common Emitter Switch (2N3904)')}</option>
+      <option value="adder">${t('Digital Logic Full Adder (XOR / AND)')}</option>
+      <option value="rectifier">${t('Bridge Rectifier & RC Filter')}</option>
       <option value="clear">${t('Empty Breadboard (Custom Wiring)')}</option>
     `;
     presetSelect.addEventListener('change', (e) => {
       if (e.target.value === 'dol') this.sim.loadPresetDOL();
       else if (e.target.value === 'rev') this.sim.loadPresetForwardReverse();
+      else if (e.target.value === '555') this.sim.loadPreset555Flasher();
+      else if (e.target.value === 'opamp') this.sim.loadPresetOpAmp();
+      else if (e.target.value === 'bjt') this.sim.loadPresetBJT();
+      else if (e.target.value === 'adder') this.sim.loadPresetLogicAdder();
+      else if (e.target.value === 'rectifier') this.sim.loadPresetBridgeRectifier();
       else if (e.target.value === 'clear') this.sim.clear();
       this.rebuildPortHitboxes();
     });
@@ -473,6 +483,49 @@ export class CircuitWorkbenchModal {
       } else if (comp.type === 'pilot_light') {
         this.registerPort(`${comp.id}:X1`, cx + 20, cy + 70, 'X1');
         this.registerPort(`${comp.id}:X2`, cx + 60, cy + 70, 'X2');
+      } else if (comp.type === 'power_source_1p') {
+        this.registerPort(`${comp.id}:L`, cx + 25, cy + 20, 'L');
+        this.registerPort(`${comp.id}:N`, cx + 65, cy + 20, 'N');
+        this.registerPort(`${comp.id}:PE`, cx + 105, cy + 20, 'PE');
+      } else if (comp.type === 'dc_supply') {
+        this.registerPort(`${comp.id}:+`, cx + 30, cy + 25, '+');
+        this.registerPort(`${comp.id}:-`, cx + 80, cy + 25, '-');
+      } else if (comp.type === 'diode' || comp.type === 'zener_diode') {
+        this.registerPort(`${comp.id}:A`, cx + 20, cy + 30, 'A');
+        this.registerPort(`${comp.id}:K`, cx + 80, cy + 30, 'K');
+      } else if (comp.type === 'led') {
+        this.registerPort(`${comp.id}:A`, cx + 20, cy + 30, 'A');
+        this.registerPort(`${comp.id}:K`, cx + 80, cy + 30, 'K');
+      } else if (comp.type === 'bjt_npn' || comp.type === 'bjt_pnp') {
+        this.registerPort(`${comp.id}:B`, cx + 15, cy + 45, 'B');
+        this.registerPort(`${comp.id}:C`, cx + 75, cy + 20, 'C');
+        this.registerPort(`${comp.id}:E`, cx + 75, cy + 70, 'E');
+      } else if (comp.type === 'mosfet_n' || comp.type === 'mosfet_p') {
+        this.registerPort(`${comp.id}:G`, cx + 15, cy + 45, 'G');
+        this.registerPort(`${comp.id}:D`, cx + 75, cy + 20, 'D');
+        this.registerPort(`${comp.id}:S`, cx + 75, cy + 70, 'S');
+      } else if (comp.type === 'opamp') {
+        this.registerPort(`${comp.id}:IN+`, cx + 15, cy + 25, 'IN+');
+        this.registerPort(`${comp.id}:IN-`, cx + 15, cy + 65, 'IN-');
+        this.registerPort(`${comp.id}:V+`, cx + 50, cy + 10, 'V+');
+        this.registerPort(`${comp.id}:V-`, cx + 50, cy + 80, 'V-');
+        this.registerPort(`${comp.id}:OUT`, cx + 95, cy + 45, 'OUT');
+      } else if (comp.type === 'timer_555') {
+        this.registerPort(`${comp.id}:8`, cx + 20, cy + 15, '8');
+        this.registerPort(`${comp.id}:4`, cx + 50, cy + 15, '4');
+        this.registerPort(`${comp.id}:3`, cx + 80, cy + 15, '3');
+        this.registerPort(`${comp.id}:7`, cx + 110, cy + 15, '7');
+        this.registerPort(`${comp.id}:1`, cx + 20, cy + 95, '1');
+        this.registerPort(`${comp.id}:2`, cx + 50, cy + 95, '2');
+        this.registerPort(`${comp.id}:5`, cx + 80, cy + 95, '5');
+        this.registerPort(`${comp.id}:6`, cx + 110, cy + 95, '6');
+      } else if (comp.type === 'logic_gate') {
+        this.registerPort(`${comp.id}:A`, cx + 15, cy + 25, 'A');
+        this.registerPort(`${comp.id}:B`, cx + 15, cy + 65, 'B');
+        this.registerPort(`${comp.id}:Y`, cx + 90, cy + 45, 'Y');
+      } else if (comp.type === 'capacitor' || comp.type === 'inductor') {
+        this.registerPort(`${comp.id}:1`, cx + 20, cy + 30, '1');
+        this.registerPort(`${comp.id}:2`, cx + 80, cy + 30, '2');
       }
     }
   }
@@ -684,10 +737,198 @@ export class CircuitWorkbenchModal {
       case 'pilot_light':
         this.drawPilotLight(ctx, comp);
         break;
+      case 'dc_supply':
+      case 'power_source_1p':
+        this.drawDCSupply(ctx, comp);
+        break;
+      case 'diode':
+      case 'zener_diode':
+        this.drawDiode(ctx, comp);
+        break;
+      case 'led':
+        this.drawLED(ctx, comp);
+        break;
+      case 'bjt_npn':
+      case 'bjt_pnp':
+      case 'mosfet_n':
+      case 'mosfet_p':
+        this.drawBJT(ctx, comp);
+        break;
+      case 'opamp':
+        this.drawOpAmp(ctx, comp);
+        break;
+      case 'timer_555':
+        this.drawTimer555(ctx, comp);
+        break;
+      case 'logic_gate':
+        this.drawLogicGate(ctx, comp);
+        break;
+      case 'capacitor':
+      case 'inductor':
+        this.drawCapacitor(ctx, comp);
+        break;
       default:
         break;
     }
     ctx.restore();
+  }
+
+  drawDCSupply(ctx, comp) {
+    const cx = comp.x;
+    const cy = comp.y;
+    ctx.fillStyle = '#1e293b';
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.roundRect(cx, cy, 110, 60, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText(comp.name || 'DC Supply', cx + 10, cy + 50);
+  }
+
+  drawDiode(ctx, comp) {
+    const cx = comp.x;
+    const cy = comp.y;
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1.5;
+    ctx.roundRect(cx, cy + 15, 100, 30, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    // Silver cathode stripe
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(cx + 70, cy + 15, 10, 30);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText(comp.name || '1N4007', cx + 15, cy + 34);
+  }
+
+  drawLED(ctx, comp) {
+    const cx = comp.x;
+    const cy = comp.y;
+    ctx.fillStyle = '#1e293b';
+    ctx.roundRect(cx, cy + 10, 100, 40, 6);
+    ctx.fill();
+
+    // Bulb glow
+    ctx.beginPath();
+    ctx.arc(cx + 50, cy + 30, 14, 0, Math.PI * 2);
+    ctx.fillStyle = comp.lit ? (comp.color || '#ef4444') : '#475569';
+    if (comp.lit) {
+      ctx.shadowColor = comp.color || '#ef4444';
+      ctx.shadowBlur = 15;
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText(comp.name || 'LED', cx + 10, cy + 62);
+  }
+
+  drawBJT(ctx, comp) {
+    const cx = comp.x;
+    const cy = comp.y;
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1.5;
+    ctx.roundRect(cx, cy, 90, 85, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText(comp.name || '2N3904', cx + 12, cy + 48);
+
+    // Indicator status dot
+    ctx.beginPath();
+    ctx.arc(cx + 78, cy + 45, 4, 0, Math.PI * 2);
+    ctx.fillStyle = comp.active ? '#22c55e' : '#64748b';
+    ctx.fill();
+  }
+
+  drawOpAmp(ctx, comp) {
+    const cx = comp.x;
+    const cy = comp.y;
+    ctx.fillStyle = '#1e293b';
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 2;
+
+    // Triangular op-amp schematic body
+    ctx.beginPath();
+    ctx.moveTo(cx + 10, cy + 10);
+    ctx.lineTo(cx + 100, cy + 45);
+    ctx.lineTo(cx + 10, cy + 80);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText('+', cx + 16, cy + 30);
+    ctx.fillText('−', cx + 16, cy + 68);
+    ctx.fillText('LM741', cx + 32, cy + 48);
+  }
+
+  drawTimer555(ctx, comp) {
+    const cx = comp.x;
+    const cy = comp.y;
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#eab308';
+    ctx.lineWidth = 2;
+    ctx.roundRect(cx, cy, 130, 110, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    // Notch
+    ctx.beginPath();
+    ctx.arc(cx + 65, cy, 8, 0, Math.PI);
+    ctx.fillStyle = '#1e293b';
+    ctx.fill();
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('NE555 TIMER', cx + 25, cy + 55);
+
+    // Live pulse indicator
+    ctx.beginPath();
+    ctx.arc(cx + 115, cy + 55, 6, 0, Math.PI * 2);
+    ctx.fillStyle = comp.high ? '#22c55e' : '#334155';
+    ctx.fill();
+  }
+
+  drawLogicGate(ctx, comp) {
+    const cx = comp.x;
+    const cy = comp.y;
+    ctx.fillStyle = '#1e293b';
+    ctx.strokeStyle = '#06b6d4';
+    ctx.lineWidth = 2;
+    ctx.roundRect(cx, cy + 10, 105, 70, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText(comp.gateType || 'AND', cx + 32, cy + 50);
+  }
+
+  drawCapacitor(ctx, comp) {
+    const cx = comp.x;
+    const cy = comp.y;
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 1.5;
+    ctx.roundRect(cx, cy + 10, 100, 45, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText(comp.name || 'Capacitor', cx + 12, cy + 36);
   }
 
   drawPowerSource(ctx, comp) {

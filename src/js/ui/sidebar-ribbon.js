@@ -645,6 +645,14 @@ export class SidebarRibbon {
       this.app.openMoleculeViewer?.();
     });
 
+    const btnSketcher = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '⚗️'),
+      h('span', {}, t('2D Chemical Sketcher & SMILES Studio'))
+    );
+    btnSketcher.addEventListener('click', () => {
+      this.app.openChemicalSketcher?.();
+    });
+
     const btnPhet = h('button', { class: 'deck-action-btn' },
       h('span', { class: 'btn-icon' }, '⚛️'),
       h('span', {}, t('PhET Physics HTML5 Simulation Runner'))
@@ -655,6 +663,7 @@ export class SidebarRibbon {
 
     modulesSection.appendChild(btnPeriodic);
     modulesSection.appendChild(btnMolecule);
+    modulesSection.appendChild(btnSketcher);
     modulesSection.appendChild(btnPhet);
     container.appendChild(modulesSection);
 

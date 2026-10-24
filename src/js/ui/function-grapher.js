@@ -55,6 +55,16 @@ export class FunctionGrapherModal {
     this.integralA = -2.0;
     this.integralB = 2.0;
 
+    // Multi-Mode Graphing State (2D, 3D Surface, Polar)
+    this.graphMode = '2d'; // '2d' | '3d' | 'polar'
+    this.expr3D = 'sin(x) * cos(y)';
+    this.rotX = 55; // Elevation
+    this.rotZ = 45; // Azimuth
+    this.zoom3D = 1.0;
+    this.isOrbiting = false;
+    this.orbitStart = { x: 0, y: 0 };
+    this.exprPolar = '2 * (1 + cos(t))';
+
     // Pan state
     this.isPanning = false;
     this.panStart = { x: 0, y: 0 };
@@ -125,6 +135,16 @@ export class FunctionGrapherModal {
       <span class="graph-badge">v6.5.0 CAS</span>
     `;
 
+    // Mode Switcher Tabs
+    const modeTabs = document.createElement('div');
+    modeTabs.className = 'graph-mode-tabs';
+    modeTabs.style.cssText = 'display:inline-flex;gap:4px;margin:0 8px;background:#1e293b;padding:3px;border-radius:6px;';
+    modeTabs.innerHTML = `
+      <button class="mode-tab-btn active" data-mode="2d" style="padding:3px 8px;border:none;border-radius:4px;background:#38bdf8;color:#0f172a;font-weight:bold;font-size:11px;cursor:pointer;">📈 ${t('2D')}</button>
+      <button class="mode-tab-btn" data-mode="3d" style="padding:3px 8px;border:none;border-radius:4px;background:transparent;color:#94a3b8;font-weight:bold;font-size:11px;cursor:pointer;">🌐 ${t('3D Surface')}</button>
+      <button class="mode-tab-btn" data-mode="polar" style="padding:3px 8px;border:none;border-radius:4px;background:transparent;color:#94a3b8;font-weight:bold;font-size:11px;cursor:pointer;">🌀 ${t('Polar')}</button>
+    `;
+
     // Presets dropdown
     const presetSelect = document.createElement('select');
     presetSelect.className = 'graph-select';
@@ -146,9 +166,38 @@ export class FunctionGrapherModal {
     exprInput.value = this.expression;
     exprInput.placeholder = t('Enter function e.g. x^2 - 4, sin(x)...');
     exprInput.addEventListener('input', (e) => {
-      this.expression = e.target.value.trim();
-      this.fn = this.compileExpression(this.expression);
+      if (this.graphMode === '3d') {
+        this.expr3D = e.target.value.trim() || 'x^2 - y^2';
+      } else if (this.graphMode === 'polar') {
+        this.exprPolar = e.target.value.trim() || '2 * (1 + cos(t))';
+      } else {
+        this.expression = e.target.value.trim();
+        this.fn = this.compileExpression(this.expression);
+      }
       this.render();
+    });
+
+    modeTabs.querySelectorAll('.mode-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        modeTabs.querySelectorAll('.mode-tab-btn').forEach(b => {
+          b.style.background = 'transparent';
+          b.style.color = '#94a3b8';
+        });
+        btn.style.background = '#38bdf8';
+        btn.style.color = '#0f172a';
+        this.graphMode = btn.dataset.mode;
+        if (this.graphMode === '3d') {
+          exprInput.value = this.expr3D;
+          exprInput.placeholder = t('z = f(x, y), e.g. sin(x)*cos(y), x^2 - y^2');
+        } else if (this.graphMode === 'polar') {
+          exprInput.value = this.exprPolar;
+          exprInput.placeholder = t('r = f(t), e.g. 2*(1 + cos(t)), sin(4*t)');
+        } else {
+          exprInput.value = this.expression;
+          exprInput.placeholder = t('Enter function e.g. x^2 - 4, sin(x)...');
+        }
+        this.render();
+      });
     });
 
     // Stamp button
@@ -163,6 +212,7 @@ export class FunctionGrapherModal {
     btnClose.addEventListener('click', () => this.close());
 
     header.appendChild(titleArea);
+    header.appendChild(modeTabs);
     header.appendChild(presetSelect);
     header.appendChild(exprInput);
     header.appendChild(btnStamp);
@@ -178,12 +228,26 @@ export class FunctionGrapherModal {
 
     // Pan & Zoom handlers
     this.canvas.addEventListener('mousedown', (e) => {
-      this.isPanning = true;
-      this.panStart = { x: e.clientX, y: e.clientY };
-      this.viewStart = { xMin: this.xMin, xMax: this.xMax, yMin: this.yMin, yMax: this.yMax };
+      if (this.graphMode === '3d') {
+        this.isOrbiting = true;
+        this.orbitStart = { x: e.clientX, y: e.clientY };
+      } else {
+        this.isPanning = true;
+        this.panStart = { x: e.clientX, y: e.clientY };
+        this.viewStart = { xMin: this.xMin, xMax: this.xMax, yMin: this.yMin, yMax: this.yMax };
+      }
     });
 
     window.addEventListener('mousemove', (e) => {
+      if (this.graphMode === '3d' && this.isOrbiting) {
+        const dx = e.clientX - this.orbitStart.x;
+        const dy = e.clientY - this.orbitStart.y;
+        this.rotZ += dx * 0.6;
+        this.rotX = Math.max(15, Math.min(85, this.rotX + dy * 0.5));
+        this.orbitStart = { x: e.clientX, y: e.clientY };
+        this.render();
+        return;
+      }
       if (!this.isPanning) return;
       const rect = this.canvas.getBoundingClientRect();
       const dxPx = e.clientX - this.panStart.x;
@@ -200,10 +264,11 @@ export class FunctionGrapherModal {
 
     window.addEventListener('mouseup', () => {
       this.isPanning = false;
+      this.isOrbiting = false;
     });
 
     this.canvas.addEventListener('mousemove', (e) => {
-      if (this.isPanning) return;
+      if (this.isPanning || this.isOrbiting || this.graphMode !== '2d') return;
       const rect = this.canvas.getBoundingClientRect();
       const px = e.clientX - rect.left;
       const py = e.clientY - rect.top;
@@ -221,16 +286,20 @@ export class FunctionGrapherModal {
 
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const zoomFactor = e.deltaY < 0 ? 0.85 : 1.15;
-      const xMid = (this.xMin + this.xMax) / 2;
-      const yMid = (this.yMin + this.yMax) / 2;
-      const xSpan = (this.xMax - this.xMin) * zoomFactor;
-      const ySpan = (this.yMax - this.yMin) * zoomFactor;
+      if (this.graphMode === '3d') {
+        this.zoom3D = Math.max(0.4, Math.min(2.5, this.zoom3D * (e.deltaY < 0 ? 1.1 : 0.9)));
+      } else {
+        const zoomFactor = e.deltaY < 0 ? 0.85 : 1.15;
+        const xMid = (this.xMin + this.xMax) / 2;
+        const yMid = (this.yMin + this.yMax) / 2;
+        const xSpan = (this.xMax - this.xMin) * zoomFactor;
+        const ySpan = (this.yMax - this.yMin) * zoomFactor;
 
-      this.xMin = xMid - xSpan / 2;
-      this.xMax = xMid + xSpan / 2;
-      this.yMin = yMid - ySpan / 2;
-      this.yMax = yMid + ySpan / 2;
+        this.xMin = xMid - xSpan / 2;
+        this.xMax = xMid + xSpan / 2;
+        this.yMin = yMid - ySpan / 2;
+        this.yMax = yMid + ySpan / 2;
+      }
       this.render();
     }, { passive: false });
 
@@ -387,6 +456,14 @@ export class FunctionGrapherModal {
 
   render() {
     if (!this.ctx) return;
+    if (this.graphMode === '3d') {
+      this.render3DSurface();
+      return;
+    }
+    if (this.graphMode === 'polar') {
+      this.renderPolar();
+      return;
+    }
     const ctx = this.ctx;
     const w = this.canvas.width / (window.devicePixelRatio || 1);
     const h = this.canvas.height / (window.devicePixelRatio || 1);
@@ -651,6 +728,168 @@ export class FunctionGrapherModal {
       if (readDfx) readDfx.textContent = Number.isFinite(slope) ? slope.toFixed(2) : 'NaN';
       if (readArea) readArea.textContent = integralArea.toFixed(2);
     }
+  }
+
+  render3DSurface() {
+    const ctx = this.ctx;
+    const w = this.canvas.width / (window.devicePixelRatio || 1);
+    const h = this.canvas.height / (window.devicePixelRatio || 1);
+    const cx = w / 2;
+    const cy = h / 2;
+
+    ctx.fillStyle = '#090d16';
+    ctx.fillRect(0, 0, w, h);
+
+    const radZ = (this.rotZ * Math.PI) / 180;
+    const radX = (this.rotX * Math.PI) / 180;
+    const scale = 38 * this.zoom3D;
+
+    const project = (x, y, z) => {
+      const x1 = x * Math.cos(radZ) - y * Math.sin(radZ);
+      const y1 = x * Math.sin(radZ) + y * Math.cos(radZ);
+      const z1 = z;
+      const y2 = y1 * Math.cos(radX) - z1 * Math.sin(radX);
+      const z2 = y1 * Math.sin(radX) + z1 * Math.cos(radX);
+      return {
+        sx: cx + x1 * scale,
+        sy: cy - z2 * scale + y2 * 0.18,
+        depth: y2,
+        z: z
+      };
+    };
+
+    const N = 24;
+    const minCoord = -3.5, maxCoord = 3.5;
+    const step = (maxCoord - minCoord) / N;
+
+    // Evaluate points matrix
+    const grid = [];
+    for (let i = 0; i <= N; i++) {
+      grid[i] = [];
+      const x = minCoord + i * step;
+      for (let j = 0; j <= N; j++) {
+        const y = minCoord + j * step;
+        let z = 0;
+        try {
+          const val = parseMathExpressionSafely(this.expr3D, { x, y });
+          z = Number.isFinite(val) ? Math.max(-4, Math.min(4, val)) : 0;
+        } catch {
+          z = 0;
+        }
+        grid[i][j] = project(x, y, z);
+      }
+    }
+
+    // Generate Quads
+    const quads = [];
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const p1 = grid[i][j];
+        const p2 = grid[i + 1][j];
+        const p3 = grid[i + 1][j + 1];
+        const p4 = grid[i][j + 1];
+        const avgDepth = (p1.depth + p2.depth + p3.depth + p4.depth) / 4;
+        const avgZ = (p1.z + p2.z + p3.z + p4.z) / 4;
+        quads.push({ p1, p2, p3, p4, depth: avgDepth, z: avgZ });
+      }
+    }
+
+    // Sort quads by depth descending (painter's algorithm)
+    quads.sort((a, b) => b.depth - a.depth);
+
+    // Draw quads
+    for (const q of quads) {
+      const normZ = Math.max(0, Math.min(1, (q.z + 3) / 6));
+      const hue = (1 - normZ) * 240; // blue to red
+      ctx.fillStyle = `hsl(${hue}, 80%, 48%)`;
+      ctx.strokeStyle = `hsl(${hue}, 85%, 26%)`;
+      ctx.lineWidth = 0.8;
+
+      ctx.beginPath();
+      ctx.moveTo(q.p1.sx, q.p1.sy);
+      ctx.lineTo(q.p2.sx, q.p2.sy);
+      ctx.lineTo(q.p3.sx, q.p3.sy);
+      ctx.lineTo(q.p4.sx, q.p4.sy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // HUD Label
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText(`z = f(x, y) = ${this.expr3D}`, 16, 24);
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px sans-serif';
+    ctx.fillText(`Elevation: ${Math.round(this.rotX)}° | Azimuth: ${Math.round(this.rotZ)}° (Drag to rotate, Wheel to zoom)`, 16, 42);
+  }
+
+  renderPolar() {
+    const ctx = this.ctx;
+    const w = this.canvas.width / (window.devicePixelRatio || 1);
+    const h = this.canvas.height / (window.devicePixelRatio || 1);
+    const cx = w / 2;
+    const cy = h / 2;
+
+    ctx.fillStyle = '#090d16';
+    ctx.fillRect(0, 0, w, h);
+
+    // Polar Grid (Concentric Circles)
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1;
+    const maxR = 6;
+    const scale = (Math.min(w, h) * 0.42) / maxR;
+
+    for (let r = 1; r <= maxR; r++) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * scale, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Radial Rays
+    for (let deg = 0; deg < 360; deg += 30) {
+      const rad = (deg * Math.PI) / 180;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(rad) * maxR * scale, cy + Math.sin(rad) * maxR * scale);
+      ctx.stroke();
+    }
+
+    // Plot Polar Curve r = f(theta)
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#38bdf8';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+
+    const steps = 360;
+    let started = false;
+    for (let i = 0; i <= steps * 2; i++) {
+      const theta = (i * Math.PI) / 180;
+      let r = 0;
+      try {
+        const val = parseMathExpressionSafely(this.exprPolar, { t: theta, theta });
+        r = Number.isFinite(val) ? val : 0;
+      } catch {
+        r = 0;
+      }
+      const sx = cx + r * Math.cos(theta) * scale;
+      const sy = cy - r * Math.sin(theta) * scale;
+
+      if (!started) {
+        ctx.moveTo(sx, sy);
+        started = true;
+      } else {
+        ctx.lineTo(sx, sy);
+      }
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // HUD Label
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText(`r(θ) = ${this.exprPolar}`, 16, 24);
   }
 
   stampToCanvas() {

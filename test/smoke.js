@@ -17281,6 +17281,39 @@ module.exports.run = async (win, app) => {
       results.symbolicCAS = sol?.root === -4 && diff === '3x^{2}' && evalRes?.numeric === 3 && molar?.ok === true && molar?.molarMass > 98;
     } catch (e) { results.symbolicCAS = e.message; }
 
+    try {
+      const { IndustrialCircuitSim } = await import("app://board/js/core/circuit-sim.js");
+      const sim = new IndustrialCircuitSim();
+      sim.loadPreset555Flasher();
+      sim.step(0.001);
+      const has555 = Array.from(sim.components.values()).some(c => c.type === "timer_555");
+      const hasLED = Array.from(sim.components.values()).some(c => c.type === "led");
+      results.circuitSimPhase7 = has555 && hasLED && sim.components.size > 0 && sim.wires.length > 0;
+    } catch (e) { results.circuitSimPhase7 = e.message; }
+
+    try {
+      const { ChemicalSketcherModal, SMILES_PRESETS } = await import("app://board/js/ui/chemical-sketcher.js");
+      const sketcher = new ChemicalSketcherModal(window.app);
+      sketcher.parseSMILES("CC(=O)Oc1ccccc1C(=O)O");
+      results.chemicalSketcher = SMILES_PRESETS.length >= 7 && sketcher.atoms.length > 5;
+    } catch (e) { results.chemicalSketcher = e.message; }
+
+    try {
+      const { SIMULATION_PRESETS } = await import("app://board/js/ui/phet-runner.js");
+      const hasOptics = SIMULATION_PRESETS.some(p => p.id === "optics");
+      const hasCollisions = SIMULATION_PRESETS.some(p => p.id === "collisions");
+      const hasEField = SIMULATION_PRESETS.some(p => p.id === "electric_field");
+      const hasRigid = SIMULATION_PRESETS.some(p => p.id === "rigid_sandbox");
+      results.physicsSimPhase7 = SIMULATION_PRESETS.length >= 8 && hasOptics && hasCollisions && hasEField && hasRigid;
+    } catch (e) { results.physicsSimPhase7 = e.message; }
+
+    try {
+      const { FunctionGrapherModal } = await import("app://board/js/ui/function-grapher.js");
+      const fg = new FunctionGrapherModal(window.app);
+      fg.graphMode = "3d";
+      results.functionGrapher3D = typeof fg.render3DSurface === "function" && typeof fg.renderPolar === "function";
+    } catch (e) { results.functionGrapher3D = e.message; }
+
     return results;
   `);
 
@@ -17295,6 +17328,10 @@ module.exports.run = async (win, app) => {
   check('FunctionGrapherModal compiles expression and evaluates domain', replaySuite.functionGrapher === true, JSON.stringify(replaySuite.functionGrapher));
   check('TechnicalLinter detects wordiness, duplicate words, and passive voice', replaySuite.technicalLinter === true, JSON.stringify(replaySuite.technicalLinter));
   check('SymbolicCAS solves equations and evaluates reactive notebook variables', replaySuite.symbolicCAS === true, JSON.stringify(replaySuite.symbolicCAS));
+  check('IndustrialCircuitSim simulates 555 timer and discrete semiconductors', replaySuite.circuitSimPhase7 === true, JSON.stringify(replaySuite.circuitSimPhase7));
+  check('ChemicalSketcherModal parses SMILES and prepares 2D/3D chemical structures', replaySuite.chemicalSketcher === true, JSON.stringify(replaySuite.chemicalSketcher));
+  check('SIMULATION_PRESETS includes optics, electric field, collisions, and rigid sandbox', replaySuite.physicsSimPhase7 === true, JSON.stringify(replaySuite.physicsSimPhase7));
+  check('FunctionGrapherModal provides 3D surface and polar curve graphing', replaySuite.functionGrapher3D === true, JSON.stringify(replaySuite.functionGrapher3D));
 
   /* ---- errors ---- */
   const errs = await js(`return window.__errors || [];`);
