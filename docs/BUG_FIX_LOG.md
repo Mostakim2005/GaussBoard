@@ -37,6 +37,10 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 | **BUG-032** | Closed Recording Menu Could Acquire a Delayed Dismiss Listener | Low | AudioBar Lifecycle | Resolved in v5.0.0 |
 | **BUG-033** | Markdown Heading Anchors Were Not Distinguished from Pad Pages | Medium | Board Links / Markdown | Resolved in v5.1.0 |
 | **BUG-034** | Split Workspace Could Not Receive In-App Excerpt Clipboard or Drop | Medium | Split Workspace / Clipboard | Resolved in v5.1.0 |
+| **BUG-045** | Relative Import Path Resolution Mismatch in UI Subsystem Modules | Medium | ES Modules / Workbench | Resolved in v6.4.0 |
+| **BUG-046** | Content Security Policy `EvalError` in Mathematical Evaluator & Grapher | High | Security / CSP | Resolved in v6.5.0 |
+| **BUG-047** | Localization Parity Drift on New Scientific & CAS Workbench Keys | Medium | i18n Parity | Resolved in v6.5.0 |
+| **BUG-048** | Offline Tesseract OCR Engine Omitted from Electron Binary Distribution | High | Packaging / Offline Engine | Resolved in v6.5.0 |
 
 ---
 
@@ -445,3 +449,32 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 * **Fix**: Set `#replayBar` `z-index` to `21`.
 * **Verification**: `node scripts/smoke.js`, `npm run smoke:custom`.
 * **Files Touched**: `src/js/ui/replay-bar.js`.
+
+
+### BUG-045: Relative Import Path Resolution Mismatch in UI Subsystem Modules (v6.4.0)
+* **Symptom**: Workbench modules in `src/js/ui/` failed to import i18n helpers when referencing `../core/i18n.js` instead of `../i18n.js`.
+* **Root Cause**: Directory reorganization had placed `i18n.js` in `src/js/i18n.js` directly, but new workbench modules attempted to import from `src/js/core/i18n.js`.
+* **Fix**: Normalized import paths across `circuit-workbench.js`, `diagram-builder.js`, `simulation-runner.js`, and `periodic-table.js` to `import { t } from '../i18n.js'`.
+* **Verification**: `node scripts/smoke.js`.
+* **Files Touched**: `src/js/ui/circuit-workbench.js`, `src/js/ui/diagram-builder.js`, `src/js/ui/simulation-runner.js`, `src/js/ui/periodic-table.js`.
+
+### BUG-046: Content Security Policy `EvalError` in Mathematical Evaluator & Grapher (v6.5.0)
+* **Symptom**: Function grapher expressions and Symbolic CAS evaluations threw `EvalError: Refused to evaluate a string as JavaScript because 'unsafe-eval' is not an allowed source of script in the following Content Security Policy directive: "script-src 'self' app: 'wasm-unsafe-eval'"`.
+* **Root Cause**: `function-grapher.js` and `scientific-math.js` attempted to use `new Function('x', ...)` and `Function(...)()` to compile math expressions entered by users.
+* **Fix**: Implemented `parseMathExpressionSafely(exprStr, vars)`—a pure, zero-dependency Recursive Descent Abstract Syntax Tree (AST) evaluator that parses tokens, respects operator precedence (`^`, `*`, `/`, `+`, `-`), unary negation, parenthetical grouping, mathematical constants (`pi`, `e`, `tau`), and math functions (`sin`, `cos`, `tan`, `sqrt`, `exp`, `log`, `abs`, etc.) with zero use of `eval()` or `new Function()`.
+* **Verification**: `node scripts/smoke.js` (1,244 passed, 0 failed).
+* **Files Touched**: `src/js/ui/function-grapher.js`, `src/js/core/scientific-math.js`.
+
+### BUG-047: Localization Parity Drift on New Scientific & CAS Workbench Keys (v6.5.0)
+* **Symptom**: `node scripts/smoke.js` and `node scripts/i18n-check.js` flagged 38 missing localization keys across all 7 non-English dictionaries (`ar`, `bn`, `de`, `es`, `pt-BR`, `zh-Hans`, `zh-Hant`).
+* **Root Cause**: Phase 5 added user-facing UI controls in `molecule-viewer.js`, `function-grapher.js`, and `technical-linter.js` that had not yet been translated across all supported languages.
+* **Fix**: Added high-accuracy native translations for all 38 keys across `src/locales/{ar,bn,de,es,pt-BR,zh-Hans,zh-Hant}.json`, achieving 100% parity (2,030 / 2,030 keys).
+* **Verification**: `node scripts/i18n-check.js` (all 7 locales passing 100%).
+* **Files Touched**: `src/locales/ar.json`, `src/locales/bn.json`, `src/locales/de.json`, `src/locales/es.json`, `src/locales/pt-BR.json`, `src/locales/zh-Hans.json`, `src/locales/zh-Hant.json`.
+
+### BUG-048: Offline Tesseract OCR Engine Omitted from Electron Binary Distribution (v6.5.0)
+* **Symptom**: Portable `.exe` build could not run OCR on scanned PDF text because Tesseract WASM binaries and English traineddata were located only in the shared central `C:\Users\kazir\Documents\Antigravity\CommonLibraries\` folder rather than bundled inside the app.
+* **Root Cause**: `src/vendor/tesseract/` was not populated during the initial packaging step.
+* **Fix**: Copied `tesseract-core.wasm.js`, `worker.min.js`, and `eng.traineddata.gz` (10.3 MB total) directly into `src/vendor/tesseract/`, updated `libraries.json` manifest (`"bundledInApp": true`), and recompiled the standalone portable binary.
+* **Verification**: `dist/GazBoard-v6.5.0-Portable.exe` (107.81 MiB).
+* **Files Touched**: `src/vendor/tesseract/*`, `C:\Users\kazir\Documents\Antigravity\CommonLibraries\libraries.json`.

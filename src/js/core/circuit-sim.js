@@ -168,6 +168,7 @@ export class IndustrialCircuitSim {
     this.frequency = 50; // Hz
     this.gridVoltageRMS = 230; // Phase-to-Neutral (V)
     this.grid3PhaseRMS = 400; // Line-to-Line (V)
+    this.dcSupplyVoltage = 24.0; // Variable DC Power Supply (0-30V)
 
     // Components dictionary: id -> Component
     this.components = new Map();
@@ -175,13 +176,15 @@ export class IndustrialCircuitSim {
     // Wires list: { id, from: 'comp:port', to: 'comp:port', color, current: 0 }
     this.wires = [];
 
-    // Multimeter virtual probes: { red: 'comp:port' | null, black: 'comp:port' | null, mode: 'VAC'|'VDC'|'AAC'|'ADC'|'RES'|'CONT' }
+    // Multimeter virtual probes: { red: 'comp:port' | null, black: 'comp:port' | null, mode: 'VAC'|'VDC'|'AAC'|'ADC'|'RES'|'CONT'|'WATT' }
     this.dmm = {
       red: null,
       black: null,
-      mode: 'VAC', // 'VAC', 'VDC', 'AAC', 'ADC', 'RES', 'CONT'
+      mode: 'VAC', // 'VAC', 'VDC', 'AAC', 'ADC', 'RES', 'CONT', 'WATT'
       reading: 0,
-      unit: 'V AC'
+      unit: 'V AC',
+      powerWatts: 0,
+      overheatWarning: false
     };
 
     // Oscilloscope sample buffer (time, chA, chB)
@@ -260,7 +263,7 @@ export class IndustrialCircuitSim {
     const vL2 = Math.SQRT2 * this.gridVoltageRMS * Math.sin(omega * t - (2 * Math.PI) / 3);
     const vL3 = Math.SQRT2 * this.gridVoltageRMS * Math.sin(omega * t - (4 * Math.PI) / 3);
     const vN = 0;
-    const vDC24 = 24.0;
+    const vDC = Number.isFinite(this.dcSupplyVoltage) ? this.dcSupplyVoltage : 24.0;
 
     // Port potentials map: 'comp:port' -> { instant: number, rms: number, isDC: boolean }
     const potentials = new Map();
@@ -282,7 +285,7 @@ export class IndustrialCircuitSim {
         setPort(`${comp.id}:N`, vN, 0, false);
         setPort(`${comp.id}:PE`, 0, 0, false);
       } else if (comp.type === 'dc_supply') {
-        setPort(`${comp.id}:+`, vDC24, 24.0, true);
+        setPort(`${comp.id}:+`, vDC, vDC, true);
         setPort(`${comp.id}:-`, 0, 0, true);
       }
     }
@@ -590,6 +593,12 @@ export class IndustrialCircuitSim {
     let vBlack = potBlack ? potBlack.rms : 0;
     let vDiff = Math.abs(vRed - vBlack);
 
+    // Calculate approximate branch current and power dissipation P = V * I
+    const branchResistance = 35; // typical industrial load impedance (Ohms)
+    const branchCurrent = vDiff > 0.5 ? vDiff / branchResistance : 0;
+    this.dmm.powerWatts = Math.round(vDiff * branchCurrent * 10) / 10;
+    this.dmm.overheatWarning = this.dmm.powerWatts > 120;
+
     switch (this.dmm.mode) {
       case 'VAC':
         this.dmm.reading = vDiff.toFixed(1);
@@ -600,12 +609,16 @@ export class IndustrialCircuitSim {
         this.dmm.unit = 'V DC';
         break;
       case 'AAC':
-        this.dmm.reading = (vDiff > 10 ? 2.85 : 0).toFixed(2);
+        this.dmm.reading = (vDiff > 10 ? branchCurrent : 0).toFixed(2);
         this.dmm.unit = 'A AC';
         break;
       case 'ADC':
-        this.dmm.reading = '0.00';
+        this.dmm.reading = (potRed && potRed.isDC ? branchCurrent : 0).toFixed(2);
         this.dmm.unit = 'A DC';
+        break;
+      case 'WATT':
+        this.dmm.reading = this.dmm.powerWatts.toFixed(1);
+        this.dmm.unit = 'W (Power)';
         break;
       case 'RES':
         if (this.dmm.red && this.dmm.black) {

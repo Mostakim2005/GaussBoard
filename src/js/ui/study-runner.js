@@ -258,15 +258,54 @@ export class StudyRunner {
     const counter = this.container.querySelector('.hud-counter');
 
     if (counter) counter.textContent = t('Session Complete');
+    const retentionPct = this.stats.reviewed > 0 ? Math.round(((this.stats.good + this.stats.easy) / this.stats.reviewed) * 100) : 100;
     if (prompt) {
-      prompt.innerHTML = `<strong>🎉 ${t('Great work!')}</strong><br>${t('Reviewed {count} cards. Retention stability updated via FSRS v5.', { count: this.stats.reviewed })}`;
+      prompt.innerHTML = `
+        <strong>🎉 ${t('Great work!')}</strong><br>
+        ${t('Reviewed {count} cards. Retention accuracy: {pct}%.', { count: this.stats.reviewed, pct: retentionPct })}<br>
+        <span style="font-size:11px;color:#94a3b8;">Again: ${this.stats.again} &bull; Hard: ${this.stats.hard} &bull; Good: ${this.stats.good} &bull; Easy: ${this.stats.easy}</span>
+      `;
     }
 
     if (actions) {
       actions.innerHTML = `
-        <button class="study-hud-btn primary" style="min-width: 140px;">${t('Finish & Return')}</button>
+        <button class="study-hud-btn btn-stamp-scorecard" style="min-width: 130px;">📸 ${t('Stamp Scorecard')}</button>
+        <button class="study-hud-btn primary btn-finish" style="min-width: 130px;">${t('Finish & Return')}</button>
       `;
-      actions.querySelector('button').addEventListener('click', () => this.stop());
+      actions.querySelector('.btn-stamp-scorecard')?.addEventListener('click', () => this.stampScorecard());
+      actions.querySelector('.btn-finish')?.addEventListener('click', () => this.stop());
     }
+  }
+
+  stampScorecard() {
+    const view = this.app.surface?.cam?.viewport ? this.app.surface.cam.viewport(this.app.surface.width, this.app.surface.height) : { x: 200, y: 200, w: 800, h: 600 };
+    const cx = view.x + view.w / 2;
+    const cy = view.y + view.h / 2;
+
+    const retentionPct = this.stats.reviewed > 0 ? Math.round(((this.stats.good + this.stats.easy) / this.stats.reviewed) * 100) : 100;
+    const dateStr = new Date().toLocaleDateString();
+
+    const cardText = `🧠 **${t('Active Recall Review Scorecard')}** — ${dateStr}\n\n` +
+      `• **${t('Total Cards Reviewed')}**: ${this.stats.reviewed}\n` +
+      `• **${t('Retention Accuracy')}**: ${retentionPct}%\n` +
+      `• **${t('FSRS Breakdown')}**: Again: ${this.stats.again} | Hard: ${this.stats.hard} | Good: ${this.stats.good} | Easy: ${this.stats.easy}\n\n` +
+      `_Algorithm: Pure JavaScript FSRS v5 (Free Spaced Repetition Scheduler)_`;
+
+    const note = {
+      id: `scorecard_${Date.now()}`,
+      type: 'text',
+      x: cx - 150,
+      y: cy - 90,
+      w: 300,
+      h: 180,
+      text: cardText,
+      size: 15,
+      color: '#10b981'
+    };
+
+    this.app.store?.add(note, 'stamp study scorecard');
+    this.app.surface?.invalidate?.();
+    this.app.toast?.(t('Review scorecard stamped to whiteboard!'));
+    this.stop();
   }
 }

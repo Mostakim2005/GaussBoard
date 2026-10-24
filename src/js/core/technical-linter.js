@@ -141,4 +141,88 @@ export class TechnicalLinter {
     });
     return md;
   }
+
+  /**
+   * Automatically apply all safe suggestions (wordiness, redundancy, typos)
+   * @param {string} text
+   * @returns {{ text: string, count: number }}
+   */
+  static fixAll(text) {
+    if (!text || typeof text !== 'string') return { text, count: 0 };
+    const issues = TechnicalLinter.lint(text).filter((i) => Boolean(i.suggestion));
+    if (!issues.length) return { text, count: 0 };
+
+    // Sort descending by index so offsets don't invalidate subsequent edits
+    issues.sort((a, b) => b.index - a.index);
+    let result = text;
+    let count = 0;
+    for (const iss of issues) {
+      result = result.slice(0, iss.index) + iss.suggestion + result.slice(iss.index + iss.length);
+      count++;
+    }
+    return { text: result, count };
+  }
 }
+
+/**
+ * Estimate syllable count for an English word
+ * @param {string} word
+ * @returns {number}
+ */
+export function countSyllables(word) {
+  if (!word) return 0;
+  let w = word.toLowerCase().replace(/[^a-z]/g, '');
+  if (w.length <= 3) return 1;
+  w = w.replace(/(?:[^laeiouy]|ed|es|e)$/, '');
+  w = w.replace(/^y/, '');
+  const matches = w.match(/[aeiouy]{1,2}/g);
+  return matches ? matches.length : 1;
+}
+
+/**
+ * Compute Flesch Reading Ease and Flesch-Kincaid Grade Level
+ * @param {string} text
+ * @returns {{ score: number, grade: number, level: string, words: number, sentences: number, syllables: number }}
+ */
+export function calculateReadability(text) {
+  if (!text || typeof text !== 'string') {
+    return { score: 100, grade: 0, level: 'Very Easy', words: 0, sentences: 0, syllables: 0 };
+  }
+  const words = text.trim().match(/\b[a-zA-Z0-9'-]+\b/g) || [];
+  const sentences = text.trim().split(/[.!?]+/).filter((s) => s.trim().length > 0) || [];
+  const wCount = words.length;
+  const sCount = Math.max(1, sentences.length);
+  if (wCount === 0) {
+    return { score: 100, grade: 0, level: 'Very Easy', words: 0, sentences: 0, syllables: 0 };
+  }
+
+  let totalSyllables = 0;
+  for (const w of words) {
+    totalSyllables += countSyllables(w);
+  }
+
+  // Flesch Reading Ease: 206.835 - 1.015*(words/sentences) - 84.6*(syllables/words)
+  const score = Math.max(0, Math.min(100, 206.835 - 1.015 * (wCount / sCount) - 84.6 * (totalSyllables / wCount)));
+
+  // Flesch-Kincaid Grade Level: 0.39*(words/sentences) + 11.8*(syllables/words) - 15.59
+  const grade = Math.max(0, 0.39 * (wCount / sCount) + 11.8 * (totalSyllables / wCount) - 15.59);
+
+  let level = 'Standard';
+  if (score >= 90) level = 'Very Easy (5th Grade)';
+  else if (score >= 80) level = 'Easy (6th Grade)';
+  else if (score >= 70) level = 'Fairly Easy (7th Grade)';
+  else if (score >= 60) level = 'Standard (8th-9th Grade)';
+  else if (score >= 50) level = 'Fairly Difficult (High School)';
+  else if (score >= 30) level = 'Difficult (College)';
+  else level = 'Very Difficult (Academic/Professional)';
+
+  return {
+    score: Math.round(score * 10) / 10,
+    grade: Math.round(grade * 10) / 10,
+    level,
+    words: wCount,
+    sentences: sCount,
+    syllables: totalSyllables
+  };
+}
+

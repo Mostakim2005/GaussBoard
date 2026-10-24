@@ -39,6 +39,13 @@ This document serves as the master registry of all features, enhancements, bug f
 | **F-127** | Split-Pane Excerpt Transfer | `src/js/ui/split-workspace.js`<br>`src/js/app.js`<br>`test/smoke-features-5.1.0.js` | Verified in v5.1.0 | Routes the in-app clipboard to the left board when the pointer is there and accepts excerpt drag/drop into the reference pane while retaining independent board stores. |
 | **F-128** | Markdown Heading and Block Links | `src/js/core/boardrefs.js`<br>`src/js/core/markdown.js`<br>`src/js/app.js`<br>`test/excerpt.test.mjs` | Verified in v5.1.0 | Supports board heading anchors, local `[[#Heading]]` links and `[[#^block-id]]`; numeric anchors remain pad-page links and aliases survive conversion. |
 | **F-129** | Obsidian Markdown Quality-of-Life Syntax | `src/js/core/markdown.js`<br>`test/markdown.test.mjs` | Verified in v5.1.0 | Adds highlight, subscript/superscript, footnotes, hidden comments, tilde fences and hidden block-ID markers while keeping editable source text. |
+| **F-130** | Double-Layered Sidebar Ribbon Menu & Brand Switcher | `src/js/ui/workbench-ribbon.js`<br>`src/css/workbench-ribbon.css` | Verified in v6.1.0 | Primary and secondary collapsible tool rails with Glassmorphism and Material 3 design, text labels, icons, tooltips, left/right docking, brand switcher (GaussBoard/JazaBoard/GazBoard), and circuit/engineering stencils. |
+| **F-131** | Memory & Spaced Repetition Suite (FSRS v5, AnkiConnect & LiquidText) | `src/js/core/spaced-repetition.js`<br>`src/js/ui/study-runner.js`<br>`src/js/ui/excerpt-drawer.js` | Verified in v6.2.0 | Pure JS Free Spaced Repetition Scheduler (FSRS v5) calculating stability $S$, difficulty $D$, retrievability $R$, active-recall review runner (<kbd>Ctrl+Shift+R</kbd>) with rating buttons (Again, Hard, Good, Easy), direct AnkiConnect HTTP bridge (`127.0.0.1:8765`), standards-compliant `.apkg` export, and LiquidText-style excerpt cards with elastic tethers. |
+| **F-132** | STEM Revision Engines & Interactive Simulation Runner | `src/js/core/scientific-math.js`<br>`src/js/ui/periodic-table.js`<br>`src/js/ui/simulation-runner.js`<br>`src/js/ui/formula-modal.js` | Verified in v6.3.0 | Pure JS Gaussian elimination chemical equation balancer and stoichiometry calculator, 118-element periodic table modal, offline HTML5 PhET simulation runner modal with frame capture to canvas, STEM formula encyclopedia, and offline technical lexicon with Web Speech API text-to-speech. |
+| **F-133** | 2.5D Industrial Circuit Simulation & Headless MNA Engine | `src/js/core/circuit-sim.js`<br>`src/js/ui/circuit-workbench.js`<br>`src/js/ui/diagram-builder.js` | Verified in v6.4.0 | Real-time Modified Nodal Analysis (MNA) DC/transient solver with Newton-Raphson non-linear iterations, interactive 2.5D workbench (<kbd>Ctrl+Shift+E</kbd>) with magnetic terminal snapping, animated current flow particles, live dual-probe Digital Multimeter (DMM) with audio buzzer, dual-trace virtual oscilloscope, Web Audio mechanical sound effects, and Relay Ladder Logic (RLL) exporter. |
+| **F-134** | 3D Molecular Structure Viewer & Crystallography Modal | `src/js/ui/molecule-viewer.js`<br>`src/js/vendor/3Dmol-min.js` | Verified in v6.5.0 | Pure Canvas 2D/3D depth-sorted molecular viewer (<kbd>Ctrl+Shift+M</kbd>) with CPK atom coloring, Ball & Stick/VDW/Wireframe representations, 6 built-in STEM models (Water, Methane, Benzene, Caffeine, DNA, Buckminsterfullerene), auto-spin orbit, and 1-click whiteboard image snapshot. |
+| **F-135** | Dynamic 2D Calculus Function Grapher, Symbolic CAS & Linter | `src/js/ui/function-grapher.js`<br>`src/js/core/scientific-math.js`<br>`src/js/core/technical-linter.js` | Verified in v6.5.0 | Safe Recursive Descent AST mathematical expression parser (zero `eval`/`new Function`), dynamic 2D Cartesian function grapher (<kbd>Ctrl+Shift+G</kbd>) with tangent derivative slider and Riemann definite integral area shading, `SymbolicCAS` linear solver & polynomial differentiation, reactive `NotebookVariables`, and rule-based ESL / technical writing linter. |
+| **F-136** | Phase 6 Lateral Features & Quality-of-Life Suite | `src/js/ui/function-grapher.js`<br>`src/js/ui/molecule-viewer.js`<br>`src/js/ui/circuit-workbench.js`<br>`src/js/ui/periodic-table.js`<br>`src/js/core/scientific-math.js`<br>`src/js/core/technical-linter.js`<br>`src/js/ui/study-runner.js` | Verified in v6.6.0 | Desmos/GeoGebra dual-function curve comparison $g(x)$ in `#ec4899`, live curve trace crosshair with coordinate pill `(x, y)`, automated roots ($y=0$) & extrema ($dy/dx=0$) target rings; MolView/PyMOL click-to-measure bond distance (Å) and bond angle (°) with custom PDB/XYZ importer; EveryCircuit/Multisim live DC voltage slider ($0\text{V}-30\text{V}$) and DMM Wattage mode (`W`) with thermal overheat alarm badge; Ptable/ChemDraw Bohr shell concentric orbital rings and chemical formula molar mass calculator (e.g. `Ca(OH)2`, `CuSO4*5H2O`); Hemingway/Grammarly Flesch-Kincaid readability scoring and 1-click auto-fix; Anki/RemNote active recall review scorecard with whiteboard stamping; 100% i18n parity across 7 locales (2,061 keys). |
 
 ---
 
@@ -245,3 +252,30 @@ This document serves as the master registry of all features, enhancements, bug f
   - **Synchronized Split-View Scrolling (`splitSyncScroll: false`)**: Lock camera pan/zoom deltas across both Split Study Workspace panes.
   - **Auto-Dim Floating Toolbars While Inking (`autoDimBarsWhileInking: true`)**: Smoothly fade floating HUDs to 20% opacity with `pointer-events: none` during active pen strokes.
 - See [`docs/releases/RELEASE-5.3.0.md`](docs/releases/RELEASE-5.3.0.md) for full details, performance benchmarks, and verification counts.
+
+### V 6.6.0 Phase 6 Lateral Features & Quality-of-Life Suite
+
+- Delivers a comprehensive suite of competitive lateral features, quality-of-life improvements, and professional workflows inspired by industry benchmarks:
+  1. **Desmos/GeoGebra Dual-Function & Trace Mode** (`src/js/ui/function-grapher.js`):
+     - Multi-function comparison overlay plotting $g(x)$ simultaneously with distinct curve color (`#ec4899` pink).
+     - Live curve trace crosshair cursor snapping to the active function curve with dynamic floating coordinate tooltips `(x, y)`.
+     - Automated roots detection ($y = 0$, emerald green `#10b981` target rings) and local extrema detection ($dy/dx = 0$, purple `#a855f7` pins).
+  2. **MolView/PyMOL 3D Molecular Measurement & Custom Importer** (`src/js/ui/molecule-viewer.js`):
+     - Interactive click-to-measure tool: 2 clicks compute 3D Euclidean bond distance ($d$ in Å) with dashed measurement line and floating distance tag; 3 clicks compute bond angle ($\theta^\circ$).
+     - Custom PDB / XYZ coordinate text importer modal with centroid auto-centering and automated covalent bond detection.
+  3. **EveryCircuit/Multisim Live DC Supply Voltage & Power Dissipation** (`src/js/ui/circuit-workbench.js`, `src/js/core/circuit-sim.js`):
+     - Live DC voltage slider ($0\text{V} - 30\text{V}$) adjusting active DC power rails dynamically during running simulation without resetting netlists.
+     - Multimeter Wattage mode (`W`) measuring branch dissipation ($P = V \times I$) with an automatic thermal overload alarm (`🔥 OVERHEAT` at $>120\text{W}$).
+  4. **Ptable/ChemDraw Bohr Orbitals & Chemical Molar Mass Calculator** (`src/js/ui/periodic-table.js`, `src/js/core/scientific-math.js`):
+     - Concentric Bohr Shell electron orbitals diagram in inspector showing $K, L, M, N\dots$ shell counts.
+     - Chemical Molar Mass Calculator evaluating formula weights (e.g. `Ca(OH)2` $\to 74.092\text{ g/mol}$, `CuSO4*5H2O` $\to 249.677\text{ g/mol}$) with stoichiometric mass percentages and canvas stamp.
+  5. **Hemingway Readability Engine & 1-Click Auto-Fix** (`src/js/core/technical-linter.js`):
+     - `calculateReadability(text)` computing Flesch Reading Ease ($0-100$) and US Grade Level scores.
+     - `TechnicalLinter.fixAll(text)` 1-click transformation auto-substituting concise phrasing and spelling fixes.
+  6. **Anki/RemNote Active Recall Scorecard & Whiteboard Stamp** (`src/js/ui/study-runner.js`):
+     - Session completion scorecard displaying retention accuracy %, rating distribution, and `[📸 Stamp Scorecard]` button creating an active-recall study log on the canvas.
+- **Verification**:
+  - `node scripts/smoke.js`: 1,244 passed, 0 failed (100% pass rate).
+  - `node scripts/i18n-check.js`: 2,061 / 2,061 translated (100% parity across all 7 locales).
+  - Standalone binary: [`releases/GazBoard-v6.6.0-Portable.exe`](releases/GazBoard-v6.6.0-Portable.exe) (`113,060,623 bytes` / `107.82 MiB`).
+  - See [`docs/releases/RELEASE-6.6.0.md`](docs/releases/RELEASE-6.6.0.md) for full release details.

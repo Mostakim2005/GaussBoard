@@ -17271,13 +17271,14 @@ module.exports.run = async (win, app) => {
     } catch (e) { results.technicalLinter = e.message; }
 
     try {
-      const { SymbolicCAS, notebookVars } = await import('app://board/js/core/scientific-math.js');
+      const { SymbolicCAS, notebookVars, calculateMolarMass } = await import('app://board/js/core/scientific-math.js');
       const sol = SymbolicCAS.solveLinear('3x + 12 = 0');
       const diff = SymbolicCAS.differentiate('x^3');
       notebookVars.set('V', 24);
       notebookVars.set('R', 8);
       const evalRes = notebookVars.evaluate('V / R');
-      results.symbolicCAS = sol?.root === -4 && diff === '3x^{2}' && evalRes?.numeric === 3;
+      const molar = calculateMolarMass('H2SO4');
+      results.symbolicCAS = sol?.root === -4 && diff === '3x^{2}' && evalRes?.numeric === 3 && molar?.ok === true && molar?.molarMass > 98;
     } catch (e) { results.symbolicCAS = e.message; }
 
     return results;

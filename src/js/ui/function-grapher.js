@@ -35,6 +35,9 @@ export class FunctionGrapherModal {
     // Graph state
     this.expression = 'x^2 - 4';
     this.fn = this.compileExpression(this.expression);
+    this.compareExpression = '';
+    this.fn2 = null;
+    this.showComparison = false;
 
     // View boundaries
     this.xMin = -6;
@@ -45,6 +48,9 @@ export class FunctionGrapherModal {
     // Calculus parameters
     this.showDerivative = true;
     this.showIntegral = true;
+    this.showTrace = true;
+    this.showKeyPoints = true;
+    this.tracePos = null;
     this.tangentX = 1.0;
     this.integralA = -2.0;
     this.integralB = 2.0;
@@ -196,6 +202,23 @@ export class FunctionGrapherModal {
       this.isPanning = false;
     });
 
+    this.canvas.addEventListener('mousemove', (e) => {
+      if (this.isPanning) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const w = rect.width;
+      const x = this.xMin + (px / w) * (this.xMax - this.xMin);
+      const y = this.fn(x);
+      this.tracePos = { px, py, x, y };
+      this.render();
+    });
+
+    this.canvas.addEventListener('mouseleave', () => {
+      this.tracePos = null;
+      this.render();
+    });
+
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 0.85 : 1.15;
@@ -248,9 +271,58 @@ export class FunctionGrapherModal {
           <div>Area = <b id="read-area" style="color:#38bdf8;">0.00</b></div>
         </div>
       </div>
+
+      <div class="calculus-section">
+        <h5>📈 ${t('Curve Analysis & Comparison')}</h5>
+        <label class="graph-toggle-row">
+          <input type="checkbox" id="chk-compare">
+          <span>${t('Overlay g(x)')}</span>
+        </label>
+        <input type="text" id="input-compare-expr" class="graph-expr-input" style="width:100%;margin-top:4px;" placeholder="e.g. cos(x), 2*x - 1" value="cos(x)">
+        <label class="graph-toggle-row" style="margin-top:8px;">
+          <input type="checkbox" id="chk-trace" checked>
+          <span>${t('Live Curve Trace Cursor')}</span>
+        </label>
+        <label class="graph-toggle-row">
+          <input type="checkbox" id="chk-keypoints" checked>
+          <span>${t('Show Roots & Extrema')}</span>
+        </label>
+        <div style="display:flex;gap:8px;font-size:11px;margin-top:6px;">
+          <span style="color:#10b981;">● ${t('Root (y=0)')}</span>
+          <span style="color:#a855f7;">● ${t('Extrema (dy/dx=0)')}</span>
+        </div>
+      </div>
     `;
 
     // Bind sidebar controls
+    const chkCompare = sidebar.querySelector('#chk-compare');
+    const inputCompare = sidebar.querySelector('#input-compare-expr');
+    chkCompare.addEventListener('change', (e) => {
+      this.showComparison = e.target.checked;
+      if (this.showComparison && !this.fn2) {
+        this.compareExpression = inputCompare.value.trim();
+        this.fn2 = this.compileExpression(this.compareExpression);
+      }
+      this.render();
+    });
+    inputCompare.addEventListener('input', (e) => {
+      this.compareExpression = e.target.value.trim();
+      this.fn2 = this.compileExpression(this.compareExpression);
+      if (this.showComparison) this.render();
+    });
+
+    const chkTrace = sidebar.querySelector('#chk-trace');
+    chkTrace.addEventListener('change', (e) => {
+      this.showTrace = e.target.checked;
+      if (!this.showTrace) this.tracePos = null;
+      this.render();
+    });
+
+    const chkKeyPoints = sidebar.querySelector('#chk-keypoints');
+    chkKeyPoints.addEventListener('change', (e) => {
+      this.showKeyPoints = e.target.checked;
+      this.render();
+    });
     const chkTangent = sidebar.querySelector('#chk-tangent');
     chkTangent.addEventListener('change', (e) => {
       this.showDerivative = e.target.checked;
@@ -420,6 +492,80 @@ export class FunctionGrapherModal {
     }
     ctx.stroke();
 
+    // 3b. Plot Comparison Curve g(x) if enabled
+    if (this.showComparison && this.fn2) {
+      ctx.strokeStyle = '#ec4899';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      let started2 = false;
+      for (let px = 0; px <= w; px += 2) {
+        const x = this.xMin + (px / w) * (this.xMax - this.xMin);
+        const y = this.fn2(x);
+        if (Number.isFinite(y) && y >= this.yMin - 10 && y <= this.yMax + 10) {
+          const py = toScreenY(y);
+          if (!started2) {
+            ctx.moveTo(px, py);
+            started2 = true;
+          } else {
+            ctx.lineTo(px, py);
+          }
+        } else {
+          started2 = false;
+        }
+      }
+      ctx.stroke();
+    }
+
+    // 3c. Roots and Extrema Detection & Markers
+    if (this.showKeyPoints) {
+      const samples = 120;
+      const step = (this.xMax - this.xMin) / samples;
+      let prevY = this.fn(this.xMin);
+      let prevDy = (this.fn(this.xMin + 0.001) - prevY) / 0.001;
+
+      for (let i = 1; i <= samples; i++) {
+        const curX = this.xMin + i * step;
+        const curY = this.fn(curX);
+        const curDy = (this.fn(curX + 0.001) - curY) / 0.001;
+
+        // Root detection (y sign change)
+        if (Number.isFinite(prevY) && Number.isFinite(curY) && prevY * curY < 0) {
+          const rootX = curX - curY * (step / (curY - prevY));
+          const sx = toScreenX(rootX);
+          const sy = toScreenY(0);
+          if (sx >= 0 && sx <= w) {
+            ctx.fillStyle = '#10b981';
+            ctx.beginPath();
+            ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        }
+
+        // Extrema detection (derivative dy sign change)
+        if (Number.isFinite(prevDy) && Number.isFinite(curDy) && prevDy * curDy < 0) {
+          const extX = curX - curDy * (step / (curDy - prevDy));
+          const extY = this.fn(extX);
+          const sx = toScreenX(extX);
+          const sy = toScreenY(extY);
+          if (sx >= 0 && sx <= w && sy >= 0 && sy <= h) {
+            ctx.fillStyle = '#a855f7';
+            ctx.beginPath();
+            ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        }
+
+        prevY = curY;
+        prevDy = curDy;
+      }
+    }
+
     // 4. Tangent Line & Derivative at x₀
     const x0 = this.tangentX;
     const y0 = this.fn(x0);
@@ -447,6 +593,53 @@ export class FunctionGrapherModal {
       ctx.beginPath();
       ctx.arc(toScreenX(x0), toScreenY(y0), 5, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    // 5. Live Curve Trace Crosshair & Coordinate Tooltip
+    if (this.showTrace && this.tracePos && Number.isFinite(this.tracePos.y)) {
+      const sx = toScreenX(this.tracePos.x);
+      const sy = toScreenY(this.tracePos.y);
+
+      // Dotted crosshair guides
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(sx, 0);
+      ctx.lineTo(sx, h);
+      ctx.moveTo(0, sy);
+      ctx.lineTo(w, sy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Glowing snap dot on curve
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Tooltip Pill
+      const label = `(${this.tracePos.x.toFixed(2)}, ${this.tracePos.y.toFixed(2)})`;
+      ctx.font = 'bold 11px sans-serif';
+      const textWidth = ctx.measureText(label).width;
+      const boxW = textWidth + 14;
+      const boxH = 22;
+      const boxX = Math.min(w - boxW - 8, Math.max(8, sx + 10));
+      const boxY = Math.min(h - boxH - 8, Math.max(8, sy - 28));
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(boxX, boxY, boxW, boxH);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText(label, boxX + 7, boxY + 15);
     }
 
     // Update Sidebar Readouts

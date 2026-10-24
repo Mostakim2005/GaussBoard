@@ -554,3 +554,120 @@ export class SymbolicCAS {
   }
 }
 
+/**
+ * Atomic weights lookup dictionary for standard elements
+ */
+export const ATOMIC_WEIGHTS = {
+  H: 1.008, He: 4.003, Li: 6.94, Be: 9.012, B: 10.81, C: 12.011, N: 14.007, O: 15.999, F: 18.998, Ne: 20.180,
+  Na: 22.990, Mg: 24.305, Al: 26.982, Si: 28.085, P: 30.974, S: 32.06, Cl: 35.45, Ar: 39.948, K: 39.098,
+  Ca: 40.078, Sc: 44.956, Ti: 47.867, V: 50.942, Cr: 51.996, Mn: 54.938, Fe: 55.845, Co: 58.933, Ni: 58.693,
+  Cu: 63.546, Zn: 65.38, Ga: 69.723, Ge: 72.630, As: 74.922, Se: 78.971, Br: 79.904, Kr: 83.798, Rb: 85.468,
+  Sr: 87.62, Y: 88.906, Zr: 91.224, Nb: 92.906, Mo: 95.95, Tc: 98.0, Ru: 101.07, Rh: 102.91, Pd: 106.42,
+  Ag: 107.87, Cd: 112.41, In: 114.82, Sn: 118.71, Sb: 121.76, Te: 127.60, I: 126.90, Xe: 131.29, Cs: 132.91,
+  Ba: 137.33, La: 138.91, Ce: 140.12, Pr: 140.91, Nd: 144.24, Sm: 150.36, Eu: 151.96, Gd: 157.25, Tb: 158.93,
+  Dy: 162.50, Ho: 164.93, Er: 167.26, Tm: 168.93, Yb: 173.05, Lu: 174.97, Hf: 178.49, Ta: 180.95, W: 183.84,
+  Re: 186.21, Os: 190.23, Ir: 192.22, Pt: 195.08, Au: 196.97, Hg: 200.59, Tl: 204.38, Pb: 207.2, Bi: 208.98,
+  Th: 232.04, Pa: 231.04, U: 238.03
+};
+
+/**
+ * Parses a chemical formula (e.g. "Ca(OH)2", "C6H12O6", "K4[Fe(CN)6]", "CuSO4*5H2O")
+ * and computes total molar mass and elemental mass percentages.
+ * @param {string} formula
+ * @returns {{ ok: boolean, molarMass: number, formula: string, composition: Array<{ elem: string, count: number, mass: number, percent: number }>, error?: string }}
+ */
+export function calculateMolarMass(formula) {
+  if (!formula || typeof formula !== 'string') return { ok: false, error: 'Empty formula' };
+  try {
+    const clean = formula.trim().replace(/\s+/g, '');
+    let hydrateMultiplier = 1;
+    let mainPart = clean;
+    let hydratePart = '';
+    const hydrateMatch = clean.match(/[\*\.](?:(\d+))?([A-Za-z0-9\(\)\[\]]+)$/);
+    if (hydrateMatch) {
+      hydrateMultiplier = hydrateMatch[1] ? parseInt(hydrateMatch[1], 10) : 1;
+      hydratePart = hydrateMatch[2];
+      mainPart = clean.slice(0, hydrateMatch.index);
+    }
+
+    function parseGroup(str) {
+      const counts = {};
+      let i = 0;
+      while (i < str.length) {
+        if (str[i] === '(' || str[i] === '[') {
+          const openChar = str[i];
+          const closeChar = openChar === '(' ? ')' : ']';
+          let depth = 1;
+          let j = i + 1;
+          while (j < str.length && depth > 0) {
+            if (str[j] === openChar) depth++;
+            else if (str[j] === closeChar) depth--;
+            j++;
+          }
+          if (depth !== 0) throw new Error('Unbalanced brackets');
+          const subCounts = parseGroup(str.slice(i + 1, j - 1));
+          i = j;
+          let numStr = '';
+          while (i < str.length && /\d/.test(str[i])) {
+            numStr += str[i];
+            i++;
+          }
+          const mult = numStr ? parseInt(numStr, 10) : 1;
+          for (const [elem, cnt] of Object.entries(subCounts)) {
+            counts[elem] = (counts[elem] || 0) + cnt * mult;
+          }
+        } else if (/[A-Z]/.test(str[i])) {
+          let elem = str[i];
+          i++;
+          if (i < str.length && /[a-z]/.test(str[i])) {
+            elem += str[i];
+            i++;
+          }
+          let numStr = '';
+          while (i < str.length && /\d/.test(str[i])) {
+            numStr += str[i];
+            i++;
+          }
+          const cnt = numStr ? parseInt(numStr, 10) : 1;
+          counts[elem] = (counts[elem] || 0) + cnt;
+        } else {
+          i++;
+        }
+      }
+      return counts;
+    }
+
+    const totalCounts = parseGroup(mainPart);
+    if (hydratePart) {
+      const hydCounts = parseGroup(hydratePart);
+      for (const [elem, cnt] of Object.entries(hydCounts)) {
+        totalCounts[elem] = (totalCounts[elem] || 0) + cnt * hydrateMultiplier;
+      }
+    }
+
+    let totalMass = 0;
+    const composition = [];
+    for (const [elem, count] of Object.entries(totalCounts)) {
+      const weight = ATOMIC_WEIGHTS[elem] || 0;
+      if (!weight) throw new Error(`Unknown element: ${elem}`);
+      const mass = weight * count;
+      totalMass += mass;
+      composition.push({ elem, count, mass });
+    }
+
+    composition.forEach((item) => {
+      item.percent = Math.round((item.mass / totalMass) * 10000) / 100;
+    });
+
+    return {
+      ok: true,
+      formula: clean,
+      molarMass: Math.round(totalMass * 1000) / 1000,
+      composition: composition.sort((a, b) => b.percent - a.percent)
+    };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+

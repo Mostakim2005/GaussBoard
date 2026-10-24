@@ -6,6 +6,27 @@
 
 import { t } from '../i18n.js';
 import { uid } from '../core/util.js';
+import { calculateMolarMass } from '../core/scientific-math.js';
+
+export function getBohrShells(z) {
+  const shellPresets = {
+    1: [1], 2: [2], 3: [2, 1], 4: [2, 2], 5: [2, 3], 6: [2, 4], 7: [2, 5], 8: [2, 6], 9: [2, 7], 10: [2, 8],
+    11: [2, 8, 1], 12: [2, 8, 2], 13: [2, 8, 3], 14: [2, 8, 4], 15: [2, 8, 5], 16: [2, 8, 6], 17: [2, 8, 7], 18: [2, 8, 8],
+    19: [2, 8, 8, 1], 20: [2, 8, 8, 2], 26: [2, 8, 14, 2], 29: [2, 8, 18, 1], 30: [2, 8, 18, 2],
+    47: [2, 8, 18, 18, 1], 79: [2, 8, 18, 32, 18, 1], 80: [2, 8, 18, 32, 18, 2], 82: [2, 8, 18, 32, 18, 4], 92: [2, 8, 18, 32, 21, 9, 2]
+  };
+  if (shellPresets[z]) return shellPresets[z];
+  const capacities = [2, 8, 18, 32, 32, 18, 8];
+  const shells = [];
+  let remaining = z;
+  for (const cap of capacities) {
+    if (remaining <= 0) break;
+    const take = Math.min(remaining, cap);
+    shells.push(take);
+    remaining -= take;
+  }
+  return shells;
+}
 
 export const ELEMENTS_DATA = [
   { z: 1, s: 'H', n: 'Hydrogen', w: 1.008, g: 1, p: 1, cat: 'nonmetal', conf: '1s¹', en: 2.20 },
@@ -154,6 +175,15 @@ export class PeriodicTableModal {
     const pane = this.container?.querySelector('.periodic-inspector-pane');
     if (!pane || !el) return;
 
+    const shells = getBohrShells(el.z);
+    const shellsStr = shells.join(', ');
+
+    // Generate concentric Bohr SVG rings
+    const svgRings = shells.map((cnt, idx) => {
+      const r = 18 + (idx + 1) * 12;
+      return `<circle cx="100" cy="80" r="${r}" fill="none" stroke="rgba(56,189,248,0.3)" stroke-width="1" stroke-dasharray="2,2"/>`;
+    }).join('');
+
     pane.innerHTML = `
       <div class="inspector-badge ${el.cat}">
         <div class="inspector-z">${el.z}</div>
@@ -164,18 +194,57 @@ export class PeriodicTableModal {
       <div class="inspector-details">
         <div class="detail-row"><span>${t('Category')}:</span><strong>${el.cat}</strong></div>
         <div class="detail-row"><span>${t('Configuration')}:</span><strong>${el.conf}</strong></div>
+        <div class="detail-row"><span>${t('Bohr Shells')}:</span><strong style="color:#38bdf8;">${shellsStr}</strong></div>
         <div class="detail-row"><span>${t('Electronegativity')}:</span><strong>${el.en !== null ? el.en : '—'}</strong></div>
         <div class="detail-row"><span>${t('Group / Period')}:</span><strong>Group ${el.g}, Period ${el.p}</strong></div>
       </div>
+
+      <div class="bohr-diagram-box" style="text-align:center;margin:8px 0;background:rgba(0,0,0,0.25);border-radius:8px;padding:4px;">
+        <svg viewBox="0 0 200 160" width="100%" height="90">
+          ${svgRings}
+          <circle cx="100" cy="80" r="12" fill="#38bdf8"/>
+          <text x="100" y="84" text-anchor="middle" font-size="10" font-weight="bold" fill="#0f172a">${el.s}</text>
+        </svg>
+      </div>
+
       <button class="stamp-elem-btn">
         <span>📌</span>
         <span>${t('Insert Element Tile to Canvas')}</span>
       </button>
+
+      <div class="molar-calc-box" style="margin-top:10px;padding:10px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.08);">
+        <h5 style="margin:0 0 6px 0;font-size:12px;color:#38bdf8;">⚗️ ${t('Formula Molar Mass Calculator')}</h5>
+        <div style="display:flex;gap:4px;">
+          <input type="text" class="molar-input" placeholder="${t('e.g. H2SO4, Ca(OH)2...')}" value="${el.s}2O" style="flex:1;background:#1e293b;border:1px solid #475569;border-radius:4px;color:#fff;padding:4px 8px;font-size:12px;">
+          <button class="molar-calc-btn" style="background:#0284c7;color:#fff;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-weight:bold;">${t('Calc')}</button>
+        </div>
+        <div class="molar-result" style="font-size:12px;color:#10b981;margin-top:6px;min-height:18px;"></div>
+      </div>
     `;
 
     pane.querySelector('.stamp-elem-btn').addEventListener('click', () => {
       this.stampElementCard(el);
     });
+
+    const molarInput = pane.querySelector('.molar-input');
+    const molarBtn = pane.querySelector('.molar-calc-btn');
+    const molarResult = pane.querySelector('.molar-result');
+
+    const runMolarCalc = () => {
+      const val = molarInput.value.trim();
+      const res = calculateMolarMass(val);
+      if (res.ok) {
+        molarResult.innerHTML = `<b>${res.molarMass} g/mol</b> &bull; ${res.composition.slice(0, 3).map((c) => `${c.elem}:${c.percent}%`).join(' ')}`;
+      } else {
+        molarResult.innerHTML = `<span style="color:#ef4444;">${res.error || t('Invalid formula')}</span>`;
+      }
+    };
+
+    molarBtn.addEventListener('click', runMolarCalc);
+    molarInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') runMolarCalc();
+    });
+    runMolarCalc();
   }
 
   stampElementCard(el) {

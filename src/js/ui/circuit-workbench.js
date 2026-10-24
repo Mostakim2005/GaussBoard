@@ -148,6 +148,23 @@ export class CircuitWorkbenchModal {
       colorGroup.appendChild(dot);
     });
 
+    // DC Supply Voltage Slider Control
+    const dcControl = document.createElement('div');
+    dcControl.className = 'workbench-dc-control';
+    dcControl.style.cssText = 'display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.05);padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);';
+    dcControl.innerHTML = `
+      <span style="font-size:11px;color:#94a3b8;white-space:nowrap;">${t('DC Supply')}:</span>
+      <input type="range" class="workbench-dc-slider" min="0" max="30" step="0.5" value="${this.sim.dcSupplyVoltage || 24}" style="width:70px;cursor:pointer;">
+      <b class="workbench-dc-val" style="color:#00f0ff;font-size:12px;min-width:38px;">${(this.sim.dcSupplyVoltage || 24).toFixed(1)}V</b>
+    `;
+    const dcSlider = dcControl.querySelector('.workbench-dc-slider');
+    const dcVal = dcControl.querySelector('.workbench-dc-val');
+    dcSlider.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      this.sim.dcSupplyVoltage = v;
+      dcVal.textContent = `${v.toFixed(1)}V`;
+    });
+
     // Action Buttons
     const btnReset = document.createElement('button');
     btnReset.className = 'workbench-btn';
@@ -182,6 +199,7 @@ export class CircuitWorkbenchModal {
 
     header.appendChild(titleArea);
     header.appendChild(presetSelect);
+    header.appendChild(dcControl);
     header.appendChild(colorGroup);
     header.appendChild(btnReset);
     header.appendChild(btnSnap);
@@ -260,11 +278,13 @@ export class CircuitWorkbenchModal {
         <div class="dmm-lcd">
           <span class="dmm-digits">0.0</span>
           <span class="dmm-unit">V AC</span>
+          <span class="dmm-heat-badge" style="display:none;position:absolute;top:2px;right:6px;font-size:9px;color:#ef4444;font-weight:bold;">🔥 OVERHEAT</span>
         </div>
         <div class="dmm-dial-row">
           <button class="dmm-dial-btn active" data-mode="VAC">V~</button>
           <button class="dmm-dial-btn" data-mode="VDC">V=</button>
           <button class="dmm-dial-btn" data-mode="AAC">A~</button>
+          <button class="dmm-dial-btn" data-mode="WATT">W</button>
           <button class="dmm-dial-btn" data-mode="RES">Ω</button>
           <button class="dmm-dial-btn" data-mode="CONT">🔊</button>
         </div>
@@ -323,6 +343,11 @@ export class CircuitWorkbenchModal {
     if (unit) unit.textContent = this.sim.dmm.unit;
     if (redTarget) redTarget.textContent = this.sim.dmm.red || t('None');
     if (blackTarget) blackTarget.textContent = this.sim.dmm.black || t('None');
+
+    const heatBadge = this.dmmWidget.querySelector('.dmm-heat-badge');
+    if (heatBadge) {
+      heatBadge.style.display = this.sim.dmm.overheatWarning ? 'inline-block' : 'none';
+    }
 
     // Update Oscilloscope Canvas if visible
     if (this.scopeVisible && this.scopeCtx) {
