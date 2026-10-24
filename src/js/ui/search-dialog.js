@@ -11,10 +11,13 @@ export class SearchDialog {
     this.el = null;
     this.input = null;
     this.boardsContainer = null;
+    this.toolsContainer = null;
     this.settingsContainer = null;
     this.secBoards = null;
+    this.secTools = null;
     this.secSettings = null;
     this.secDivider = null;
+    this.secToolsDivider = null;
     this.emptyNotice = null;
     this.visible = false;
     this.boardsList = [];
@@ -70,7 +73,19 @@ export class SearchDialog {
       style: 'height:1px;background:var(--line,rgba(0,0,0,0.08));margin:16px 0;'
     });
 
-    // Section 2: Settings
+    // Section 2: Tools & Commands
+    this.toolsContainer = h('div', { class: 'search-section-tools' });
+    this.secTools = h('div', { style: 'margin-top:4px;' },
+      h('div', { style: 'font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-2,rgba(128,128,128,0.85));margin-bottom:8px;' }, t('Tools & Commands')),
+      this.toolsContainer
+    );
+
+    this.secToolsDivider = h('div', {
+      class: 'search-section-divider',
+      style: 'height:1px;background:var(--line,rgba(0,0,0,0.08));margin:16px 0;'
+    });
+
+    // Section 3: Settings
     this.settingsContainer = h('div', { class: 'search-section-settings' });
     this.secSettings = h('div', { style: 'margin-top:4px;' },
       h('div', { style: 'font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-2,rgba(128,128,128,0.85));margin-bottom:8px;' }, t('Setting Name')),
@@ -80,12 +95,12 @@ export class SearchDialog {
     // Empty state notice
     this.emptyNotice = h('div', {
       style: 'display:none;padding:32px 16px;text-align:center;font-size:13.5px;color:var(--text-2,rgba(128,128,128,0.8));font-style:italic;'
-    }, t('No matching boards or settings found'));
+    }, t('No matching boards, tools, or settings found'));
 
     const scrollArea = h('div', {
       class: 'omni-search-scroll',
       style: 'overflow-y:auto;flex:1;padding-right:4px;margin-top:4px;display:flex;flex-direction:column;'
-    }, this.secBoards, this.secDivider, this.secSettings, this.emptyNotice);
+    }, this.secBoards, this.secDivider, this.secTools, this.secToolsDivider, this.secSettings, this.emptyNotice);
 
     const card = h('div', {
       class: 'omni-search-card',
@@ -134,19 +149,86 @@ export class SearchDialog {
   filter() {
     const q = (this.input.value || '').trim().toLowerCase();
     const boardCount = this.renderBoards(q);
+    const toolCount = this.renderTools(q);
     const settingCount = this.renderSettings(q);
 
-    if (boardCount === 0 && settingCount === 0) {
+    const total = boardCount + toolCount + settingCount;
+    if (total === 0) {
       if (this.secBoards) this.secBoards.style.display = 'none';
       if (this.secDivider) this.secDivider.style.display = 'none';
+      if (this.secTools) this.secTools.style.display = 'none';
+      if (this.secToolsDivider) this.secToolsDivider.style.display = 'none';
       if (this.secSettings) this.secSettings.style.display = 'none';
       if (this.emptyNotice) this.emptyNotice.style.display = 'block';
     } else {
       if (this.emptyNotice) this.emptyNotice.style.display = 'none';
       if (this.secBoards) this.secBoards.style.display = boardCount > 0 ? 'block' : 'none';
+      if (this.secDivider) this.secDivider.style.display = (boardCount > 0 && (toolCount > 0 || settingCount > 0)) ? 'block' : 'none';
+      if (this.secTools) this.secTools.style.display = toolCount > 0 ? 'block' : 'none';
+      if (this.secToolsDivider) this.secToolsDivider.style.display = (toolCount > 0 && settingCount > 0) ? 'block' : 'none';
       if (this.secSettings) this.secSettings.style.display = settingCount > 0 ? 'block' : 'none';
-      if (this.secDivider) this.secDivider.style.display = (boardCount > 0 && settingCount > 0) ? 'block' : 'none';
     }
+  }
+
+  renderTools(q) {
+    if (!this.toolsContainer) return 0;
+    this.toolsContainer.innerHTML = '';
+    const app = this.app;
+    const tokens = q ? q.toLowerCase().split(/\s+/).filter(Boolean) : [];
+
+    const tools = [
+      { id: 'workbench.circuit', title: t('Circuit Simulation Workbench'), desc: t('2.5D schematic editor, DOL starter, oscilloscope and multimeter'), shortcut: 'Ctrl+Shift+E', action: () => app.openCircuitWorkbench?.() },
+      { id: 'math.grapher', title: t('2D Function Grapher & Calculus'), desc: t('Symbolic derivatives, roots, tangent slopes, and integral visualizer'), shortcut: 'Ctrl+Shift+G', action: () => app.openFunctionGrapher?.() },
+      { id: 'science.molecule', title: t('3D Molecular Structure Viewer'), desc: t('Interactive 3D Mol* molecular renderer and PDB visualizer'), shortcut: 'Ctrl+Shift+M', action: () => app.openMoleculeViewer?.() },
+      { id: 'science.sketcher', title: t('2D Chemical Sketcher & SMILES'), desc: t('Draw chemical structures and export SMILES formulas'), shortcut: 'Ctrl+Shift+K', action: () => app.openChemicalSketcher?.() },
+      { id: 'science.periodic', title: t('Interactive Periodic Table'), desc: t('Element trends, atomic mass, electronegativity and orbital configurations'), shortcut: '', action: () => app.openPeriodicTable?.() },
+      { id: 'science.phet', title: t('PhET Simulation Lab'), desc: t('Interactive HTML5 simulations for physics, chemistry, and biology'), shortcut: '', action: () => app.openPhetRunner?.() },
+      { id: 'esl.dictionary', title: t('Academic Dictionary & Thesaurus'), desc: t('Offline technical lexicon, collocations, pronunciations, and grammar rules'), shortcut: 'Ctrl+Shift+D', action: () => app.openAcademicDictionary?.() },
+      { id: 'study.session', title: t('Active Study Session & FSRS Review'), desc: t('Spaced repetition revision, image occlusion, and Anki sync'), shortcut: 'Ctrl+Shift+R', action: () => app.startStudySession?.() },
+      { id: 'view.graph', title: t('Knowledge Graph View'), desc: t('Interactive force-directed map of board links and tags'), shortcut: 'Alt+G', action: () => app.openGraphView?.() },
+      { id: 'view.pdfSidebar', title: t('Document Navigator & TOC'), desc: t('PDF hierarchical outline tree, bookmarks, and search filter'), shortcut: 'Alt+T', action: () => app.togglePdfSidebar?.() },
+      { id: 'tool.ribbon', title: t('Toggle Engineering Ribbon'), desc: t('Open or close the dual-layered STEM & Engineering workbench'), shortcut: 'Ctrl+B', action: () => app.toggleSidebarRibbon?.() },
+      { id: 'insert.kanban', title: t('Insert Kanban Board'), desc: t('Stamp an interactive 3-column task board onto the canvas'), shortcut: '', action: () => app.command?.('insert.kanban') },
+      { id: 'insert.dataview', title: t('Run Dataview Query Table'), desc: t('Query canvas objects and stamp an interactive table card'), shortcut: '', action: () => app.command?.('insert.dataview') },
+      { id: 'export.video', title: t('Export Video / Audio Replay'), desc: t('Export recorded board drawing session as MP4 or WebM video'), shortcut: '', action: () => app.command?.('export.video') },
+      { id: 'help.libraries', title: t('Inspect Runtime Libraries'), desc: t('View all 15 vendored offline libraries, versions, and paths'), shortcut: '', action: () => app.command?.('help.libraries') }
+    ];
+
+    const matched = tools.filter((tool) => {
+      if (!tokens.length) return true;
+      const haystack = `${tool.title} ${tool.desc} ${tool.shortcut}`.toLowerCase();
+      return tokens.every((tok) => haystack.includes(tok));
+    }).slice(0, 8);
+
+    if (matched.length === 0) return 0;
+
+    for (const tool of matched) {
+      const row = h('div', {
+        class: 'search-tool-row',
+        style: 'display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:10px;cursor:pointer;margin-bottom:4px;transition:background 0.12s;'
+      },
+        h('div', { style: 'display:flex;flex-direction:column;gap:2px;' },
+          h('div', { style: 'display:flex;align-items:center;gap:6px;' },
+            h('span', { style: 'font-weight:600;font-size:13.5px;' }, tool.title),
+            tool.shortcut ? h('kbd', { style: 'font-size:10.5px;padding:1px 5px;background:var(--desk,#f0f0f2);color:var(--text-2,#666);border-radius:4px;border:1px solid rgba(0,0,0,0.1);' }, tool.shortcut) : ''
+          ),
+          h('span', { style: 'font-size:11.5px;color:var(--text-2,rgba(128,128,128,0.85));' }, tool.desc)
+        ),
+        h('button', {
+          class: 'btn-run-tool',
+          style: 'padding:4px 10px;border-radius:8px;border:none;background:var(--accent,#0078d4);color:#ffffff;font-size:12px;font-weight:600;cursor:pointer;'
+        }, t('Launch'))
+      );
+
+      row.addEventListener('click', () => {
+        this.close();
+        tool.action();
+      });
+      row.addEventListener('mouseenter', () => { row.style.background = 'var(--desk,#f5f5f7)'; });
+      row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
+      this.toolsContainer.appendChild(row);
+    }
+    return matched.length;
   }
 
   renderBoards(q) {

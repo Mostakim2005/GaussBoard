@@ -128,6 +128,11 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(item(t('Insert document…'), 'doc', () => app.command('insert.document')));
     menu.appendChild(item(t('Insert diagram…'), 'shapes', () => app.openVisualizationStudio?.()));
     menu.appendChild(item(t('Insert video / YouTube…'), 'video', () => app.openVideoInsertDialog?.()));
+    menu.appendChild(item(t('Engineering Ribbon'), 'shapes', () => app.toggleSidebarRibbon?.(), { key: 'Ctrl+B' }));
+    menu.appendChild(item(t('Circuit Workbench…'), 'shapes', () => app.openCircuitWorkbench?.(), { key: 'Ctrl+Shift+E' }));
+    menu.appendChild(item(t('Function Grapher…'), 'maths', () => app.openFunctionGrapher?.(), { key: 'Ctrl+Shift+G' }));
+    menu.appendChild(item(t('Knowledge Graph…'), 'shapes', () => app.openGraphView?.(), { key: 'Alt+G' }));
+    menu.appendChild(item(t('Document Navigator & TOC…'), 'doc', () => app.togglePdfSidebar?.(), { key: 'Alt+T' }));
     menu.appendChild(h('div', { class: 'menu-sep' }));
     menu.appendChild(item(t('Templates…'), 'template', () => app.panels.templates()));
     menu.appendChild(item(t('Canvas…'), 'palette', () => app.panels.background()));

@@ -2659,6 +2659,47 @@ class App {
       case 'help.about': this.showAbout(); break;
       case 'help.libraries': import('./ui/library-inspector.js').then(m => m.showLibraryInspector(this)); break;
       case 'help.checkUpdates': this.checkForUpdates({ force: true, silent: false }); break;
+      case 'workbench.circuit': this.openCircuitWorkbench(); break;
+      case 'math.grapher': this.openFunctionGrapher(); break;
+      case 'science.molecule': this.openMoleculeViewer(); break;
+      case 'science.sketcher': this.openChemicalSketcher(); break;
+      case 'science.periodic': this.openPeriodicTable(); break;
+      case 'science.phet': this.openPhetRunner(); break;
+      case 'esl.dictionary': this.openAcademicDictionary(); break;
+      case 'study.session': this.startStudySession(); break;
+      case 'tool.ribbon': this.toggleSidebarRibbon(); break;
+      case 'search.omni': this.toggleSearchDialog(); break;
+      case 'insert.kanban':
+        import('./core/kanban.js').then(({ KanbanManager }) => {
+          const view = this.surface?.cam ? this.surface.cam.viewport(this.surface.width, this.surface.height) : { x: 0, y: 0, w: 800, h: 600 };
+          const boardObj = KanbanManager.createDefault(view.x + view.w / 2 - 300, view.y + view.h / 2 - 200, t('Sprint Board'));
+          this.store?.add(boardObj, 'kanban');
+          this.surface?.damageAll();
+          this.toast(t('Kanban board inserted'));
+        });
+        break;
+      case 'insert.dataview':
+        import('./core/dataview.js').then(({ DataviewEngine }) => {
+          const query = window.prompt(t('Enter Dataview query:'), 'TABLE name, type WHERE type != "" LIMIT 10');
+          if (!query) return;
+          const res = DataviewEngine.execute(query, this.store);
+          const view = this.surface?.cam ? this.surface.cam.viewport(this.surface.width, this.surface.height) : { x: 0, y: 0, w: 800, h: 600 };
+          const cardObj = {
+            id: 'card_' + Date.now(),
+            type: 'card',
+            x: view.x + view.w / 2 - 220,
+            y: view.y + view.h / 2 - 150,
+            w: 440,
+            h: 300,
+            title: `Dataview — ${query.slice(0, 24)}`,
+            html: res.html,
+            text: `Dataview Query: ${query}`
+          };
+          this.store?.add(cardObj, 'dataview');
+          this.surface?.damageAll();
+          this.toast(t('Dataview query results stamped'));
+        });
+        break;
       case 'tab.new': this.tabBar?.newTab(); break;
       case 'tab.close': this.tabBar?.closeActiveTab(); break;
       case 'tab.next': this.tabBar?.nextTab(); break;
@@ -4823,7 +4864,18 @@ class App {
       [t('Insert image or document'), t('Drag a file onto the canvas')],
       ['h', t('Tabs & Boards')],
       [t('New tab'), 'Ctrl+T'], [t('Close tab'), 'Ctrl+W'], [t('Next / previous tab'), 'Ctrl+Tab / Ctrl+Shift+Tab'],
-      [t('Jump to tab 1–9'), 'Ctrl+1–9']
+      [t('Jump to tab 1–9'), 'Ctrl+1–9'],
+      ['h', t('Engineering & STEM Workstation')],
+      [t('Engineering Ribbon'), 'Ctrl+B'],
+      [t('OmniSearch (Boards & Settings)'), 'Ctrl+K / Ctrl+F'],
+      [t('Circuit Simulation Workbench'), 'Ctrl+Shift+E'],
+      [t('2D Function Grapher & Calculus'), 'Ctrl+Shift+G'],
+      [t('3D Molecular Structure Viewer'), 'Ctrl+Shift+M'],
+      [t('2D Chemical Sketcher & SMILES'), 'Ctrl+Shift+K'],
+      [t('Academic Dictionary & Thesaurus'), 'Ctrl+Shift+D'],
+      [t('Active Study Session & FSRS'), 'Ctrl+Shift+R'],
+      [t('Knowledge Graph View'), 'Alt+G'],
+      [t('Document Navigator & TOC'), 'Alt+T']
     ];
     const grid = h('div', { class: 'sc-grid' });
     for (const [a, b] of rows) {

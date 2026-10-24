@@ -1,6 +1,6 @@
 # GazBoard Replay — Developer Handover & Future Agent Guide
 
-> **Current handover snapshot (2026-10-24):** v6.9.0 represents Phase 9 (Advanced Canvas, Workspace & Media Productivity) of the Engineering Notebook architecture. It delivers client-side MP4 video container export via `mp4-muxer` and WebCodecs; Obsidian-style Dataview query engine (`TABLE`/`LIST`); in-canvas sprint Kanban cards; Manhattan 90° orthogonal elbow routing and cardinal magnetic snap ports (`n`, `s`, `e`, `w`); hierarchical PDF outline tree search & custom page bookmarks; multi-tab `WorkspaceSessionManager` saving/restoring to `localStorage`; knowledge graph connected component community clustering with colored halos; horizontal & vertical split study layouts with Excerpt Shelf Dock; ribbon category customizer and proximity inking auto-hide; with 100% i18n parity across all 7 locales (2,194/2,194 keys) and passing new features checks (24 passed). Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-6.9.0.md`](releases/RELEASE-6.9.0.md) for implementation, verification and artifact state. The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
+> **Current handover snapshot (2026-10-24):** v6.9.1 represents the Comprehensive Offline Libraries & UI/UX Discovery Entry Points Audit release. It provides 100% offline verification of all 15 vendored third-party libraries; JSON syntax escape fix in `libraries.json`; zero external CDN leaks; main "+" Insert menu integration with 10 STEM & advanced cards and 1-click ribbon pinning; OmniSearch (<kbd>Ctrl+K</kbd>) Tools & Commands search palette; main Export video entry; More menu Runtime Libraries inspector; Canvas context menu shortcuts; with 100% i18n parity across all 7 locales (2,238/2,238 keys) and passing new features checks (24 passed). Read [`INDEX.md`](INDEX.md) for routing and [`releases/RELEASE-6.9.1.md`](releases/RELEASE-6.9.1.md) for implementation, verification and artifact state. The quick router is [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md).
 
 > **Important**: This document is the primary onboarding manual for any future AI assistant, software engineer, or contributor picking up this project in a new session or clean environment. It details the complete architecture, data models, state flows, invariant guardrails, and build instructions.
 
@@ -22,7 +22,7 @@
 ## 1.1 Current Worktree and Release State (2026-10-23)
 
 - **Working repository:** `C:\Users\kazir\Documents\OpenCode\GazBoard`.
-- **Current source version:** v6.9.0, based on the local cumulative project feature line.
+- **Current source version:** v6.9.1, based on the local cumulative project feature line.
 - **Git state:** branch `feat/cumulative-fixes`.
 - **Lineage:** delivers Phase 5 Knowledge Interoperability, JSON Canvas 1.0, Graph View & Document Navigator on top of Phase 4 v5.8.0.
 - **Latest release scope:** [`releases/RELEASE-5.9.0.md`](releases/RELEASE-5.9.0.md) records JSON Canvas 1.0 bidirectional converter, interactive Knowledge Graph View modal, Markdown sidecar exporter with YAML frontmatter, LiquidText elastic tether connectors, and Document Navigator & TOC Sidebar with 100% i18n parity and 1,240/1,240 passed smoke checks. Releases ledger is at [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md).
