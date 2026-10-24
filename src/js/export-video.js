@@ -8,6 +8,7 @@ import { boundsOf } from './core/store.js';
 import { stripBounds } from './core/pages.js';
 import { replayDisplayMode, replayGhostMode, replaySceneFilter, replayStrokesForTrack } from './core/replay-clock.js';
 import { h } from './ui/popover.js';
+import { Muxer, ArrayBufferTarget } from '../vendor/mp4-muxer.mjs';
 
 export const VIDEO_EXPORT_PRESETS = Object.freeze({
   '720p30': Object.freeze({ width: 1280, height: 720, fps: 30 }),
@@ -22,12 +23,13 @@ export function uniqueExportSuffix(now = new Date()) {
   return now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 }
 
-export function videoExportFilename(boardName, suffix = uniqueExportSuffix(), trackName = '') {
+export function videoExportFilename(boardName, suffix = uniqueExportSuffix(), trackName = '', format = 'webm') {
   const safe = (value, fallback) => String(value || fallback)
     .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/g, '').trim() || fallback;
   const board = safe(boardName, 'Board');
   const track = trackName ? `-${safe(trackName, 'Recording')}` : '';
-  return `${board}${track}-replay-${suffix}.webm`;
+  const ext = format === 'mp4' ? 'mp4' : 'webm';
+  return `${board}${track}-replay-${suffix}.${ext}`;
 }
 
 export function boundsForObjects(objects, pages = []) {
@@ -316,11 +318,10 @@ export class VideoExporter {
   }
 
   /**
-   * Sequentially stitches multiple recordings and stroke sessions into a single WebM video.
+   * Sequentially stitches multiple recordings and stroke sessions into a standalone MP4 or WebM video.
    */
-  async exportStitchedReplayVideo({ tracks, width = 1920, height = 1080, fps = 30, onProgress = null, cameraMode = VIDEO_CAMERA_MODES.FIXED, fixedFrame = VIDEO_FIXED_FRAMES.RECORDING } = {}) {
+  async exportStitchedReplayVideo({ tracks, width = 1920, height = 1080, fps = 30, onProgress = null, cameraMode = VIDEO_CAMERA_MODES.FIXED, fixedFrame = VIDEO_FIXED_FRAMES.RECORDING, format = 'mp4' } = {}) {
     if (!tracks || !tracks.length) throw new Error('No audio tracks specified for video export');
-    if (tracks.length === 1) return this.exportReplayVideo({ track: tracks[0], width, height, fps, onProgress, cameraMode, fixedFrame });
 
     this.cancelled = false;
     const canvas = document.createElement('canvas');
@@ -334,12 +335,52 @@ export class VideoExporter {
     let rec = null;
     let activeAudio = null;
     let activeSource = null;
+    let mp4Muxer = null;
+    let mp4Target = null;
+    let videoEncoder = null;
+    let frameCount = 0;
+
     const displayMode = replayDisplayMode(this.app?.settings);
     const replayClock = {
       track: null, currentTimeMs: 0,
       ghostMode: replayGhostMode(this.app?.settings, this.app?.replayEngine?.ghostMode, displayMode),
       displayMode
     };
+
+    if (format === 'mp4' && typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined') {
+      try {
+        mp4Target = new ArrayBufferTarget();
+        mp4Muxer = new Muxer({
+          target: mp4Target,
+          video: {
+            codec: 'avc',
+            width,
+            height
+          },
+          fastStart: 'in-memory'
+        });
+
+        videoEncoder = new VideoEncoder({
+          output: (chunk, meta) => {
+            mp4Muxer.addVideoChunk(chunk, meta);
+          },
+          error: (err) => console.warn('VideoEncoder error:', err)
+        });
+
+        videoEncoder.configure({
+          codec: 'avc1.4d002a',
+          width,
+          height,
+          bitrate: 4_000_000,
+          framerate: fps
+        });
+      } catch (err) {
+        console.warn('Could not initialize WebCodecs MP4 encoder, falling back to MediaRecorder WebM:', err);
+        videoEncoder = null;
+        mp4Muxer = null;
+      }
+    }
+
     try {
     videoStream = canvas.captureStream ? canvas.captureStream(fps) : null;
     if (!videoStream) throw new Error('Canvas captureStream not supported in this environment');
@@ -439,6 +480,15 @@ export class VideoExporter {
           sf.drawReplaySession(ctx, replayClock);
           ctx.restore();
 
+          if (videoEncoder && videoEncoder.state === 'configured') {
+            try {
+              const frame = new VideoFrame(canvas, { timestamp: Math.round((cumulativeElapsedMs + curMs) * 1000) });
+              videoEncoder.encode(frame, { keyFrame: frameCount % (fps * 2) === 0 });
+              frame.close();
+              frameCount++;
+            } catch {}
+          }
+
           if (videoTrack?.requestFrame) {
             try { videoTrack.requestFrame(); } catch {}
           }
@@ -457,6 +507,18 @@ export class VideoExporter {
     setTimeout(() => {
       if (rec.state !== 'inactive') rec.stop();
     }, 200);
+
+    if (videoEncoder && mp4Muxer) {
+      try {
+        await videoEncoder.flush();
+        videoEncoder.close();
+        mp4Muxer.finalize();
+        const buf = mp4Target.buffer;
+        return { blob: new Blob([buf], { type: 'video/mp4' }), durationMs: cumulativeElapsedMs };
+      } catch (err) {
+        console.warn('MP4 finalization failed, falling back to WebM blob:', err);
+      }
+    }
 
     const blob = await completionPromise;
     return { blob, durationMs: cumulativeElapsedMs };
@@ -513,6 +575,11 @@ export async function pickRecordingsForVideoExport(app, trackOverride = null) {
       h('option', { value: '1080p30' }, '1080p · 30 fps'),
       h('option', { value: '1080p60' }, '1080p · 60 fps'));
     preset.value = '1080p30';
+
+    const formatSelect = h('select', { 'aria-label': t('Video format'), style: 'padding:7px 9px;border-radius:7px;background:var(--surface-2);color:var(--text);border:1px solid var(--stroke)' },
+      h('option', { value: 'mp4' }, 'MP4 Video (.mp4)'),
+      h('option', { value: 'webm' }, 'WebM Video (.webm)'));
+    formatSelect.value = 'mp4';
 
     const cameraMode = h('select', { 'aria-label': t('Video framing'), style: 'padding:7px 9px;border-radius:7px;background:var(--surface-2);color:var(--text);border:1px solid var(--stroke)' },
       h('option', { value: VIDEO_CAMERA_MODES.FIXED }, t('Fixed view')),
@@ -602,7 +669,12 @@ export async function pickRecordingsForVideoExport(app, trackOverride = null) {
         return;
       }
       overlay.remove();
-      resolve({ tracks: chosen, stitch: stitchTogether, video: { ...VIDEO_EXPORT_PRESETS[preset.value], cameraMode: cameraMode.value, fixedFrame: fixedFrame.value } });
+      resolve({
+        tracks: chosen,
+        stitch: stitchTogether,
+        format: formatSelect.value,
+        video: { ...VIDEO_EXPORT_PRESETS[preset.value], cameraMode: cameraMode.value, fixedFrame: fixedFrame.value }
+      });
     };
 
     actionRow.appendChild(btnCancel);
@@ -610,6 +682,8 @@ export async function pickRecordingsForVideoExport(app, trackOverride = null) {
 
     card.appendChild(titleRow);
     card.appendChild(desc);
+    card.appendChild(h('label', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px' },
+      t('Video format'), formatSelect));
     card.appendChild(h('label', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px' },
       t('Video quality'), preset));
     card.appendChild(h('label', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px' },
@@ -638,21 +712,25 @@ export async function exportVideoFile(app, track = null) {
   selectedTracks = picked.tracks;
   shouldStitch = track ? false : picked.stitch;
   video = picked.video || video;
+  const format = picked.format || 'mp4';
+  const filterName = format === 'mp4' ? 'MP4 Video' : 'WebM Video';
+  const filterExt = format === 'mp4' ? 'mp4' : 'webm';
 
   if (!selectedTracks.length) return null;
 
   if (shouldStitch || selectedTracks.length === 1) {
     const filePath = await window.board.saveDialog({
       title: t('Save a copy'),
-      defaultPath: videoExportFilename(app.store.doc.name),
-      filters: [{ name: 'WebM Video', extensions: ['webm'] }]
+      defaultPath: videoExportFilename(app.store.doc.name, uniqueExportSuffix(), '', format),
+      filters: [{ name: filterName, extensions: [filterExt] }]
     });
     if (!filePath) return null;
 
     const exporter = new VideoExporter(app);
     let progress = null;
     if (typeof app.showProgress === 'function') {
-      progress = app.showProgress(t('Export Video (WebM)'), t('Exporting replay video ({pct}%)...', { pct: 0 }));
+      const exportTitle = t('Export Video ({format})', { format: format.toUpperCase() }) || t('Export Video (WebM)');
+      progress = app.showProgress(exportTitle, t('Exporting replay video ({pct}%)...', { pct: 0 }));
       const card = document.getElementById('overlayCard');
       if (card) {
         const btnCancel = document.createElement('button');
@@ -671,6 +749,7 @@ export async function exportVideoFile(app, track = null) {
       const { blob } = await exporter.exportStitchedReplayVideo({
         tracks: selectedTracks,
         ...video,
+        format,
         onProgress: (pct) => {
           const rounded = Math.round(pct * 100);
           progress?.update(pct, t('Exporting replay video ({pct}%)...', { pct: rounded }));
@@ -698,21 +777,22 @@ export async function exportVideoFile(app, track = null) {
       const safeName = (tr.name || `Recording-${i + 1}`).replace(/[^a-zA-Z0-9_\-]/g, '_');
       const filePath = await window.board.saveDialog({
         title: t('Save {name}', { name: tr.name || 'Recording' }),
-        defaultPath: videoExportFilename(app.store.doc.name, uniqueExportSuffix(), safeName),
-        filters: [{ name: 'WebM Video', extensions: ['webm'] }]
+        defaultPath: videoExportFilename(app.store.doc.name, uniqueExportSuffix(), safeName, format),
+        filters: [{ name: filterName, extensions: [filterExt] }]
       });
       if (!filePath) continue;
 
       const exporter = new VideoExporter(app);
       let progress = null;
       if (typeof app.showProgress === 'function') {
-        progress = app.showProgress(t('Export Video (WebM)'), t('Exporting {name} ({pct}%)...', { name: tr.name || '', pct: 0 }));
+        progress = app.showProgress(t('Export Video ({format})', { format: format.toUpperCase() }), t('Exporting {name} ({pct}%)...', { name: tr.name || '', pct: 0 }));
       }
 
       try {
-        const { blob } = await exporter.exportReplayVideo({
-          track: tr,
+        const { blob } = await exporter.exportStitchedReplayVideo({
+          tracks: [tr],
           ...video,
+          format,
           onProgress: (pct) => {
             const rounded = Math.round(pct * 100);
             progress?.update(pct, t('Exporting {name} ({pct}%)...', { name: tr.name || '', pct: rounded }));

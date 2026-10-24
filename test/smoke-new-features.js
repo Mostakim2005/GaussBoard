@@ -177,7 +177,37 @@ const browserChecks = String.raw`(async () => {
     out.imageOcclusion = initialMode === 'hideAll' && toggledMode === 'hideOne' && typeof cloze?.tsv === 'string';
   } catch (e) { out.imageOcclusion = e.message; }
 
-  // 21. No Uncaught Renderer Errors
+  // 21. Dataview Query Engine & In-Canvas Kanban Cards
+  try {
+    const { DataviewEngine } = await import('app://board/js/core/dataview.js');
+    const { KanbanManager } = await import('app://board/js/core/kanban.js');
+    const dvRes = DataviewEngine.execute('TABLE name, type WHERE type != "" LIMIT 5', app.store);
+    const kanban = KanbanManager.createDefault(100, 100, 'Test Kanban');
+    out.dataviewAndKanban = dvRes.ok && dvRes.type === 'table' && kanban.type === 'kanban' && kanban.columns.length === 3;
+  } catch (e) { out.dataviewAndKanban = e.message; }
+
+  // 22. Smart Orthogonal Connectors & Snap Ports
+  try {
+    const { routeOrthogonal, snapPortPoints, route } = await import('app://board/js/core/connectors.js');
+    const ports = snapPortPoints({ x: 10, y: 20, w: 100, h: 60 });
+    const ortho = routeOrthogonal({ x: 0, y: 0 }, 'e', { x: 100, y: 80 }, 'w');
+    out.connectorsAndSnapPorts = ports.length === 4 && ortho.length >= 4 && ortho[0].x === 0;
+  } catch (e) { out.connectorsAndSnapPorts = e.message; }
+
+  // 23. Workspace Session Save & Knowledge Graph Community Clustering
+  try {
+    const { WorkspaceSessionManager } = await import('app://board/js/ui/tabs.js');
+    const { GraphViewModal } = await import('app://board/js/ui/graph-view.js');
+    const saved = WorkspaceSessionManager.saveSession('SmokeSession', [{ id: 'b1', title: 'Board 1' }], 'b1');
+    const listed = WorkspaceSessionManager.listSessions();
+    const gv = new GraphViewModal(app);
+    gv.nodes = [{ id: '1', x: 0, y: 0 }, { id: '2', x: 50, y: 50 }];
+    gv.edges = [{ from: '1', to: '2' }];
+    gv.detectCommunities();
+    out.workspaceSessionAndGraph = saved.name === 'SmokeSession' && listed.length > 0 && typeof gv.detectCommunities === 'function' && gv.communities.length > 0;
+  } catch (e) { out.workspaceSessionAndGraph = e.message; }
+
+  // 24. No Uncaught Renderer Errors
   const errs = window.__errors || [];
   out.rendererErrors = errs.length === 0;
 
@@ -207,6 +237,9 @@ async function run(win, app) {
     academicStyleAndTone: 'Academic style scoring (0-100%) and formal scholarly tone elevation',
     naturalMathAndCAS: 'Natural language math-to-LaTeX converter and symbolic quadratic CAS solver',
     imageOcclusion: 'Image occlusion dual review modes (Hide All vs Hide One) and cloze deck export',
+    dataviewAndKanban: 'Dataview query engine and Kanban board card creation',
+    connectorsAndSnapPorts: 'Orthogonal 90-degree routing and magnetic snap ports',
+    workspaceSessionAndGraph: 'Multi-tab workspace session save and knowledge graph clustering halos',
     rendererErrors: 'No uncaught renderer errors'
   };
 

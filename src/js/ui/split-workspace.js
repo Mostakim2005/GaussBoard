@@ -23,6 +23,8 @@ export class SplitWorkspace {
     this.wrapper = null;
     this.leftPane = null;
     this.rightPane = null;
+    this.orientation = 'vertical'; // 'vertical' | 'horizontal'
+    this.excerptDockEl = null;
     this.divider = null;
     this.leftStore = null;
     this.leftSurface = null;
@@ -176,6 +178,25 @@ export class SplitWorkspace {
       this.app.toast?.(next ? t('Split view scroll synchronized') : t('Split view scroll independent'));
     });
 
+    const btnOrient = h('button', {
+      class: 'btn-split-orient',
+      title: t('Toggle vertical / horizontal layout'),
+      style: 'background:none;border:none;cursor:pointer;padding:4px;color:inherit;display:flex;align-items:center;font-size:13px;',
+      html: '⬌'
+    });
+    btnOrient.addEventListener('click', () => {
+      this.toggleOrientation();
+      btnOrient.innerHTML = this.orientation === 'horizontal' ? '⬍' : '⬌';
+    });
+
+    const btnExcerpt = h('button', {
+      class: 'btn-split-excerpt-dock',
+      title: t('Toggle excerpt shelf dock'),
+      style: 'background:none;border:none;cursor:pointer;padding:3px 6px;color:inherit;display:flex;align-items:center;font-size:11px;gap:3px;border-radius:4px;border:1px solid rgba(0,0,0,0.1);',
+      html: '<span>📦</span><span>' + t('Excerpts') + '</span>'
+    });
+    btnExcerpt.addEventListener('click', () => this.toggleExcerptDock());
+
     const btnCloseSplit = h('button', {
       class: 'btn-split-close',
       title: t('Close split view'),
@@ -186,7 +207,7 @@ export class SplitWorkspace {
 
     const actionsWrap = h('div', {
       style: 'display:flex;align-items:center;gap:3px;'
-    }, btnUndo, btnRedo, btnProps, btnSyncScroll, btnSwap, btnCloseSplit);
+    }, btnUndo, btnRedo, btnProps, btnSyncScroll, btnOrient, btnExcerpt, btnSwap, btnCloseSplit);
 
     const leftHeader = h('div', {
       class: 'split-left-header',
@@ -430,11 +451,126 @@ export class SplitWorkspace {
 
   setRatio(r) {
     this.ratio = Math.max(0.2, Math.min(0.8, r));
-    if (this.leftPane) {
-      this.leftPane.style.width = `${(this.ratio * 100).toFixed(1)}%`;
+    if (this.orientation === 'horizontal') {
+      if (this.leftPane) {
+        this.leftPane.style.width = '100%';
+        this.leftPane.style.height = `${(this.ratio * 100).toFixed(1)}%`;
+      }
+      if (this.rightPane) {
+        this.rightPane.style.width = '100%';
+        this.rightPane.style.height = `${((1 - this.ratio) * 100).toFixed(1)}%`;
+      }
+    } else {
+      if (this.leftPane) {
+        this.leftPane.style.width = `${(this.ratio * 100).toFixed(1)}%`;
+        this.leftPane.style.height = '100%';
+      }
+      if (this.rightPane) {
+        this.rightPane.style.width = `${((1 - this.ratio) * 100).toFixed(1)}%`;
+        this.rightPane.style.height = '100%';
+      }
     }
     if (this.leftSurface) this.leftSurface.resize();
     if (this.app?.surface) this.app.surface.resize();
+  }
+
+  setOrientation(mode = 'vertical') {
+    this.orientation = mode === 'horizontal' ? 'horizontal' : 'vertical';
+    if (!this.wrapper) return;
+    if (this.orientation === 'horizontal') {
+      this.wrapper.style.flexDirection = 'column';
+      if (this.divider) {
+        this.divider.style.width = '100%';
+        this.divider.style.height = '6px';
+        this.divider.style.cursor = 'row-resize';
+      }
+    } else {
+      this.wrapper.style.flexDirection = 'row';
+      if (this.divider) {
+        this.divider.style.width = '6px';
+        this.divider.style.height = '100%';
+        this.divider.style.cursor = 'col-resize';
+      }
+    }
+    this.setRatio(this.ratio);
+  }
+
+  toggleOrientation() {
+    this.setOrientation(this.orientation === 'vertical' ? 'horizontal' : 'vertical');
+    this.app.toast?.(this.orientation === 'horizontal' ? t('Split layout: Horizontal (Top / Bottom)') : t('Split layout: Vertical (Left / Right)'));
+  }
+
+  toggleExcerptDock() {
+    if (this.excerptDockEl) {
+      this.excerptDockEl.remove();
+      this.excerptDockEl = null;
+      return;
+    }
+    const dock = h('div', {
+      class: 'split-excerpt-dock',
+      style: 'position:absolute;bottom:0;left:0;right:0;height:120px;background:rgba(20,24,30,0.95);backdrop-filter:blur(10px);border-top:1px solid rgba(255,255,255,0.15);z-index:90;display:flex;flex-direction:column;padding:8px 12px;box-shadow:0 -4px 16px rgba(0,0,0,0.3);'
+    });
+
+    const dockHeader = h('div', {
+      style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;'
+    },
+      h('div', { style: 'font-size:12px;font-weight:700;color:#00e5ff;display:flex;align-items:center;gap:6px;' },
+        '📦', h('span', {}, t('Excerpt Shelf Dock'))
+      ),
+      h('button', {
+        class: 'btn btn-ghost',
+        style: 'padding:1px 6px;font-size:12px;line-height:1;',
+        title: t('Close shelf')
+      }, '✕')
+    );
+    dockHeader.children[1].addEventListener('click', () => {
+      dock.remove();
+      this.excerptDockEl = null;
+    });
+
+    const dockScroll = h('div', {
+      style: 'flex:1;display:flex;gap:10px;overflow-x:auto;align-items:center;'
+    });
+
+    const leftObjects = Object.values(this.leftStore?.doc?.objects || {});
+    const rightObjects = Object.values(this.app?.store?.doc?.objects || {});
+    const excerpts = [...leftObjects, ...rightObjects].filter(o => o && o.type === 'image' && o.excerptSource);
+
+    if (!excerpts.length) {
+      dockScroll.appendChild(h('div', {
+        style: 'font-size:12px;color:rgba(255,255,255,0.45);padding:10px;'
+      }, t('No excerpts found on boards yet. Select content and use Copy Excerpt to capture.')));
+    } else {
+      excerpts.forEach((ex, idx) => {
+        const thumb = h('div', {
+          style: 'flex-shrink:0;height:70px;width:90px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:2px;',
+          title: t('Click to drop excerpt onto active board')
+        },
+          ex.src ? h('img', { src: ex.src, style: 'max-width:100%;max-height:50px;object-fit:contain;' }) : h('span', {}, '🖼️'),
+          h('span', { style: 'font-size:10px;color:rgba(255,255,255,0.7);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center;' }, ex.excerptSource?.boardName || `Excerpt ${idx + 1}`)
+        );
+
+        thumb.addEventListener('click', () => {
+          if (this.app?.surface?.cam) {
+            const view = this.app.surface.cam.viewport(this.app.surface.width, this.app.surface.height);
+            const center = { x: view.x + view.w / 2, y: view.y + view.h / 2 };
+            const newObj = JSON.parse(JSON.stringify(ex));
+            newObj.id = 'img_' + Date.now();
+            newObj.x = center.x - (newObj.w || 200) / 2;
+            newObj.y = center.y - (newObj.h || 150) / 2;
+            this.app.store?.add(newObj, 'paste_excerpt');
+            this.app.surface?.damageAll();
+            this.app.toast?.(t('Excerpt stamped onto canvas'));
+          }
+        });
+        dockScroll.appendChild(thumb);
+      });
+    }
+
+    dock.appendChild(dockHeader);
+    dock.appendChild(dockScroll);
+    this.wrapper.appendChild(dock);
+    this.excerptDockEl = dock;
   }
 
   /** Paste the shared in-app clipboard into the left pane when it owns focus. */
@@ -479,9 +615,15 @@ export class SplitWorkspace {
     const onPointerMove = (e) => {
       if (!dragging || !this.wrapper) return;
       const rect = this.wrapper.getBoundingClientRect();
-      if (rect.width <= 0) return;
-      const x = e.clientX - rect.left;
-      this.setRatio(x / rect.width);
+      if (this.orientation === 'horizontal') {
+        if (rect.height <= 0) return;
+        const y = e.clientY - rect.top;
+        this.setRatio(y / rect.height);
+      } else {
+        if (rect.width <= 0) return;
+        const x = e.clientX - rect.left;
+        this.setRatio(x / rect.width);
+      }
     };
 
     const onPointerUp = (e) => {

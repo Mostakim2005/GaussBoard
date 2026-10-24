@@ -1,7 +1,7 @@
 {
   "name": "gazboard",
   "productName": "GazBoard",
-  "version": "6.8.0",
+  "version": "6.9.0",
   "description": "A free-form digital whiteboard - offline replica of the classic Microsoft Whiteboard 21.x experience, with Word / PowerPoint / PDF import.",
   "main": "main.js",
   "scripts": {
@@ -195,6 +195,7 @@
   },
   "desktopName": "gazboard.desktop",
   "dependencies": {
-    "electron-updater": "6.8.10"
+    "electron-updater": "6.8.10",
+    "mp4-muxer": "^5.2.2"
   }
 }

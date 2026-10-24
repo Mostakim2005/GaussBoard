@@ -3,7 +3,7 @@
  * Force-directed network visualizer showing boards, tags, wikilinks, and excerpts as interactive nodes.
  */
 
-import { h } from './util.js';
+import { h } from './popover.js';
 import { t } from '../i18n.js';
 
 export class GraphViewModal {
@@ -21,9 +21,89 @@ export class GraphViewModal {
     this.hoveredNode = null;
     this.lastMouse = { x: 0, y: 0 };
     this.searchQuery = '';
+    this.clustering = true;
+    this.communities = [];
     this.el = null;
     this.canvas = null;
     this.ctx = null;
+  }
+
+  detectCommunities() {
+    const adj = new Map();
+    for (const n of this.nodes) adj.set(n.id, []);
+    for (const e of this.edges) {
+      if (adj.has(e.from)) adj.get(e.from).push(e.to);
+      if (adj.has(e.to)) adj.get(e.to).push(e.from);
+    }
+
+    const visited = new Set();
+    const communities = [];
+    const colors = [
+      { fill: 'rgba(0, 229, 255, 0.08)', stroke: 'rgba(0, 229, 255, 0.35)' },
+      { fill: 'rgba(255, 152, 0, 0.08)', stroke: 'rgba(255, 152, 0, 0.35)' },
+      { fill: 'rgba(81, 207, 102, 0.08)', stroke: 'rgba(81, 207, 102, 0.35)' },
+      { fill: 'rgba(218, 119, 242, 0.08)', stroke: 'rgba(218, 119, 242, 0.35)' },
+      { fill: 'rgba(77, 171, 247, 0.08)', stroke: 'rgba(77, 171, 247, 0.35)' },
+      { fill: 'rgba(255, 107, 107, 0.08)', stroke: 'rgba(255, 107, 107, 0.35)' }
+    ];
+
+    let colorIdx = 0;
+    const nodeMap = new Map(this.nodes.map(n => [n.id, n]));
+
+    for (const n of this.nodes) {
+      if (visited.has(n.id)) continue;
+      const queue = [n.id];
+      visited.add(n.id);
+      const comp = [];
+
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        const nodeObj = nodeMap.get(curr);
+        if (nodeObj) comp.push(nodeObj);
+        const neighbors = adj.get(curr) || [];
+        for (const nbr of neighbors) {
+          if (!visited.has(nbr)) {
+            visited.add(nbr);
+            queue.push(nbr);
+          }
+        }
+      }
+
+      if (comp.length > 0) {
+        const palette = colors[colorIdx % colors.length];
+        colorIdx++;
+        communities.push({
+          id: `comm_${communities.length + 1}`,
+          nodes: comp,
+          haloColor: palette.fill,
+          strokeColor: palette.stroke,
+          cx: 0,
+          cy: 0,
+          radius: 0
+        });
+      }
+    }
+    this.communities = communities;
+    this.updateCommunityBounds();
+  }
+
+  updateCommunityBounds() {
+    for (const c of this.communities) {
+      if (!c.nodes.length) continue;
+      let sumX = 0, sumY = 0;
+      for (const n of c.nodes) {
+        sumX += n.x;
+        sumY += n.y;
+      }
+      c.cx = sumX / c.nodes.length;
+      c.cy = sumY / c.nodes.length;
+      let maxDist = 0;
+      for (const n of c.nodes) {
+        const d = Math.hypot(n.x - c.cx, n.y - c.cy) + (n.radius || 12);
+        if (d > maxDist) maxDist = d;
+      }
+      c.radius = maxDist;
+    }
   }
 
   async buildGraphData() {
@@ -135,6 +215,7 @@ export class GraphViewModal {
 
   open() {
     this.buildGraphData().then(() => {
+      this.detectCommunities();
       this.renderModal();
       this.startSimulation();
     });
@@ -171,6 +252,16 @@ export class GraphViewModal {
       if (this.running) this.startSimulation();
     });
 
+    const toggleClusteringBtn = h('button', {
+      class: `btn btn-ghost ${this.clustering ? 'active' : ''}`,
+      style: 'padding:4px 8px;font-size:12px;'
+    }, this.clustering ? t('Clusters ON') : t('Clusters OFF'));
+    toggleClusteringBtn.addEventListener('click', () => {
+      this.clustering = !this.clustering;
+      toggleClusteringBtn.textContent = this.clustering ? t('Clusters ON') : t('Clusters OFF');
+      toggleClusteringBtn.classList.toggle('active', this.clustering);
+    });
+
     const resetZoomBtn = h('button', {
       class: 'btn btn-ghost',
       style: 'padding:4px 8px;font-size:12px;',
@@ -193,7 +284,7 @@ export class GraphViewModal {
       style: 'display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.1);'
     },
       h('div', { style: 'display:flex;align-items:center;gap:12px;' }, titleEl, countBadge),
-      h('div', { style: 'display:flex;align-items:center;gap:8px;' }, searchInput, togglePhysicsBtn, resetZoomBtn, closeBtn)
+      h('div', { style: 'display:flex;align-items:center;gap:8px;' }, searchInput, togglePhysicsBtn, toggleClusteringBtn, resetZoomBtn, closeBtn)
     );
 
     this.canvas = h('canvas', {
@@ -431,6 +522,24 @@ export class GraphViewModal {
     ctx.scale(this.zoom, this.zoom);
 
     const nodeMap = new Map(this.nodes.map(n => [n.id, n]));
+
+    // Draw Community Clustering Halos
+    if (this.clustering && Array.isArray(this.communities)) {
+      this.updateCommunityBounds();
+      for (const comm of this.communities) {
+        if (comm.nodes.length < 2) continue;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(comm.cx, comm.cy, comm.radius + 18, 0, Math.PI * 2);
+        ctx.fillStyle = comm.haloColor;
+        ctx.fill();
+        ctx.strokeStyle = comm.strokeColor;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
 
     // Draw Edges
     for (const edge of this.edges) {

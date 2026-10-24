@@ -54,8 +54,34 @@ export class SidebarRibbon {
 
   init() {
     if (this.container) return;
+    this.inkingAutoHide = typeof localStorage !== 'undefined' ? (localStorage.getItem('gazboard_ribbon_autohide') !== 'false') : true;
+    try {
+      this.hiddenCategories = typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem('gazboard_ribbon_hidden_cats') || '[]') : [];
+    } catch {
+      this.hiddenCategories = [];
+    }
     this.build();
     this.syncState();
+    this.syncCategoryVisibility();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pointerdown', (e) => {
+        if (!this.inkingAutoHide || !this.expanded || !this.doubleLayer) return;
+        const target = e.target;
+        if (target && target.tagName === 'CANVAS' && !this.container?.contains(target)) {
+          this.doubleLayer = false;
+          this.syncState();
+        }
+      });
+    }
+  }
+
+  syncCategoryVisibility() {
+    if (!this.catButtons) return;
+    for (const [id, btn] of Object.entries(this.catButtons)) {
+      const isHidden = Array.isArray(this.hiddenCategories) && this.hiddenCategories.includes(id);
+      btn.style.display = isHidden ? 'none' : 'flex';
+    }
   }
 
   build() {
@@ -1055,8 +1081,49 @@ export class SidebarRibbon {
       this.app.openGraphView?.();
     });
 
+    const btnKanban = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '📋'),
+      h('span', {}, t('Insert Kanban Board'))
+    );
+    btnKanban.addEventListener('click', async () => {
+      const { KanbanManager } = await import('../core/kanban.js');
+      const view = this.app.surface?.cam ? this.app.surface.cam.viewport(this.app.surface.width, this.app.surface.height) : { x: 0, y: 0, w: 800, h: 600 };
+      const boardObj = KanbanManager.createDefault(view.x + view.w / 2 - 300, view.y + view.h / 2 - 200, t('Sprint Board'));
+      this.app.store?.add(boardObj, 'kanban');
+      this.app.surface?.damageAll();
+      this.app.toast?.(t('Kanban board inserted'));
+    });
+
+    const btnDataview = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '📊'),
+      h('span', {}, t('Run Dataview Query Table'))
+    );
+    btnDataview.addEventListener('click', async () => {
+      const { DataviewEngine } = await import('../core/dataview.js');
+      const query = window.prompt(t('Enter Dataview query:'), 'TABLE name, type WHERE type != "" LIMIT 10');
+      if (!query) return;
+      const res = DataviewEngine.execute(query, this.app.store);
+      const view = this.app.surface?.cam ? this.app.surface.cam.viewport(this.app.surface.width, this.app.surface.height) : { x: 0, y: 0, w: 800, h: 600 };
+      const cardObj = {
+        id: 'card_' + Date.now(),
+        type: 'card',
+        x: view.x + view.w / 2 - 220,
+        y: view.y + view.h / 2 - 150,
+        w: 440,
+        h: 300,
+        title: `Dataview — ${query.slice(0, 24)}`,
+        html: res.html,
+        text: `Dataview Query: ${query}`
+      };
+      this.app.store?.add(cardObj, 'dataview');
+      this.app.surface?.damageAll();
+      this.app.toast?.(t('Dataview query results stamped'));
+    });
+
     diagSection.appendChild(btnMermaid);
     diagSection.appendChild(btnKnowledgeGraph);
+    diagSection.appendChild(btnKanban);
+    diagSection.appendChild(btnDataview);
     container.appendChild(diagSection);
 
     // LiquidText Synthesis
@@ -1220,5 +1287,60 @@ export class SidebarRibbon {
     brandSection.appendChild(brandPresets);
     brandSection.appendChild(btnSaveBrand);
     container.appendChild(brandSection);
+
+    // Spine Categories Visibility Customizer
+    const customSection = h('div', { class: 'deck-section' });
+    customSection.appendChild(h('h5', { class: 'deck-section-title' }, t('Category Spine Visibility')));
+    customSection.appendChild(h('p', { style: 'font-size:12px;opacity:0.75;margin:0 0 8px;' }, t('Choose which category icons appear on the vertical rail:')));
+
+    const catList = [
+      { id: 'circuits', label: t('Circuits & EE') },
+      { id: 'math', label: t('Math & CAS') },
+      { id: 'stem', label: t('STEM Science') },
+      { id: 'study', label: t('Study & FSRS') },
+      { id: 'esl', label: t('ESL & Voice') },
+      { id: 'diagrams', label: t('Diagrams & PDF') }
+    ];
+
+    catList.forEach(c => {
+      const isVisible = !this.hiddenCategories.includes(c.id);
+      const row = h('label', { style: 'display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0;cursor:pointer;' },
+        h('input', {
+          type: 'checkbox',
+          checked: isVisible,
+          onchange: (e) => {
+            if (e.target.checked) {
+              this.hiddenCategories = this.hiddenCategories.filter(id => id !== c.id);
+            } else {
+              if (!this.hiddenCategories.includes(c.id)) this.hiddenCategories.push(c.id);
+            }
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('gazboard_ribbon_hidden_cats', JSON.stringify(this.hiddenCategories));
+            }
+            this.syncCategoryVisibility();
+          }
+        }),
+        h('span', {}, c.label)
+      );
+      customSection.appendChild(row);
+    });
+
+    // Inking Auto-Hide Toggle
+    const autoHideRow = h('label', { style: 'display:flex;align-items:center;gap:8px;font-size:12.5px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);cursor:pointer;' },
+      h('input', {
+        type: 'checkbox',
+        checked: this.inkingAutoHide,
+        onchange: (e) => {
+          this.inkingAutoHide = e.target.checked;
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('gazboard_ribbon_autohide', String(this.inkingAutoHide));
+          }
+          this.app.toast?.(this.inkingAutoHide ? t('Inking auto-hide enabled') : t('Inking auto-hide disabled'));
+        }
+      }),
+      h('span', {}, t('Auto-collapse tool shelf while drawing'))
+    );
+    customSection.appendChild(autoHideRow);
+    container.appendChild(customSection);
   }
 }

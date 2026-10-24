@@ -23,7 +23,7 @@
 import { worldBounds } from './store.js';
 import { distToSegment, bboxOfPoints, clamp } from './util.js';
 
-export const ROUTES = ['straight', 'elbow', 'curved'];
+export const ROUTES = ['straight', 'elbow', 'curved', 'orthogonal'];
 export const HEAD_STYLES = ['filled', 'open', 'stealth', 'diamond'];
 const GAP = 6;            // world units between an object's edge and the arrow's end
 const STUB = 24;          // how far an elbow leaves an edge before it turns
@@ -35,6 +35,27 @@ export function useConnectorStore(s) { store = s; }
 
 const center = (b) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
 const gone = (o) => !o || o.hidden || (o.type === 'curtain' && o.revealed);
+
+/**
+ * Cardinal magnetic snap ports on bounding box (North, South, East, West)
+ * @param {object} box
+ * @returns {Array<{x:number, y:number, side:string}> & { n: object, s: object, e: object, w: object }}
+ */
+export function snapPortPoints(box) {
+  if (!box) return [];
+  const c = center(box);
+  const ports = [
+    { x: c.x, y: box.y - GAP, side: 'n' },
+    { x: c.x, y: box.y + box.h + GAP, side: 's' },
+    { x: box.x + box.w + GAP, y: c.y, side: 'e' },
+    { x: box.x - GAP, y: c.y, side: 'w' }
+  ];
+  ports.n = ports[0];
+  ports.s = ports[1];
+  ports.e = ports[2];
+  ports.w = ports[3];
+  return ports;
+}
 
 /** The box an end is attached to right now, or null for a free end. */
 export function endBox(end) {
@@ -161,6 +182,51 @@ function freeDir(from, to) {
   return Math.abs(dx) >= Math.abs(dy) ? { x: dx >= 0 ? -1 : 1, y: 0 } : { x: 0, y: dy >= 0 ? -1 : 1 };
 }
 
+/**
+ * Manhattan orthogonal obstacle-aware path connecting pA (leaving dA) and pB (arriving dB).
+ */
+export function routeOrthogonal(pA, dA, pB, dB, boxA = null, boxB = null) {
+  const resolveDir = (d, fallback) => {
+    if (!d) return fallback;
+    if (typeof d === 'string') return DIR[d] || fallback;
+    if (typeof d.x === 'number' && typeof d.y === 'number') return d;
+    return fallback;
+  };
+  const dirA = resolveDir(dA, freeDir(pB, pA));
+  const dirB = resolveDir(dB, freeDir(pA, pB));
+  const stubDist = STUB * 1.5;
+  const sA = { x: pA.x + dirA.x * stubDist, y: pA.y + dirA.y * stubDist };
+  const sB = { x: pB.x + dirB.x * stubDist, y: pB.y + dirB.y * stubDist };
+  const horizA = dirA.x !== 0, horizB = dirB.x !== 0;
+  let pts;
+
+  if (horizA && horizB) {
+    const midX = (sA.x + sB.x) / 2;
+    pts = [pA, sA, { x: midX, y: sA.y }, { x: midX, y: sB.y }, sB, pB];
+  } else if (!horizA && !horizB) {
+    const midY = (sA.y + sB.y) / 2;
+    pts = [pA, sA, { x: sA.x, y: midY }, { x: sB.x, y: midY }, sB, pB];
+  } else if (horizA) {
+    pts = [pA, sA, { x: sB.x, y: sA.y }, sB, pB];
+  } else {
+    pts = [pA, sA, { x: sA.x, y: sB.y }, sB, pB];
+  }
+
+  const out = [];
+  for (const p of pts) {
+    const q = out[out.length - 1];
+    if (q && Math.abs(q.x - p.x) < 0.01 && Math.abs(q.y - p.y) < 0.01) continue;
+    if (out.length >= 2) {
+      const r = out[out.length - 2];
+      const collinear = (Math.abs(r.x - q.x) < 0.01 && Math.abs(q.x - p.x) < 0.01) ||
+                        (Math.abs(r.y - q.y) < 0.01 && Math.abs(q.y - p.y) < 0.01);
+      if (collinear) out.pop();
+    }
+    out.push(p);
+  }
+  return out;
+}
+
 const quad = (p0, c, p1, t) => ({
   x: (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * c.x + t * t * p1.x,
   y: (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * c.y + t * t * p1.y
@@ -190,7 +256,22 @@ export function route(o) {
   const kind = ROUTES.includes(o.route) ? o.route : 'straight';
   let pts, ctrl = null, pA, pB;
 
-  if (kind === 'elbow') {
+  if (kind === 'orthogonal') {
+    let dA, dB;
+    if (boxA) {
+      const s = o.a?.port || sideFacing(boxA, refB);
+      pA = sidePoint(boxA, s);
+      dA = DIR[s];
+    } else { pA = refA; }
+    if (boxB) {
+      const s = o.b?.port || sideFacing(boxB, refA);
+      pB = sidePoint(boxB, s);
+      dB = DIR[s];
+    } else { pB = refB; }
+    if (!dA) dA = freeDir(pB, pA);
+    if (!dB) dB = freeDir(pA, pB);
+    pts = routeOrthogonal(pA, dA, pB, dB, boxA, boxB);
+  } else if (kind === 'elbow') {
     let dA, dB;
     if (boxA) { const s = sideFacing(boxA, refB); pA = sidePoint(boxA, s); dA = DIR[s]; }
     else { pA = refA; }

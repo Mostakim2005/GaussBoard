@@ -1,6 +1,58 @@
 // tabs.js — Multi-Tab Browsing Strip & In-Memory Session Cache
 import { t } from '../i18n.js';
 
+export class WorkspaceSessionManager {
+  static STORAGE_KEY = 'gazboard_workspace_sessions';
+
+  static listSessions() {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(this.STORAGE_KEY) : null;
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  static saveSession(name, tabs, activeId) {
+    const sessions = this.listSessions();
+    const cleanName = (name || `Session ${new Date().toLocaleDateString()}`).trim();
+    const existingIdx = sessions.findIndex(s => s.name === cleanName);
+    const sessionData = {
+      name: cleanName,
+      savedAt: Date.now(),
+      tabs: (tabs || []).map(t => ({ id: t.id, title: t.title })),
+      activeId: activeId || null
+    };
+    if (existingIdx >= 0) {
+      sessions[existingIdx] = sessionData;
+    } else {
+      sessions.unshift(sessionData);
+    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(sessions.slice(0, 30)));
+      }
+    } catch (e) {
+      console.warn('Failed to persist workspace session:', e);
+    }
+    return sessionData;
+  }
+
+  static deleteSession(name) {
+    const sessions = this.listSessions().filter(s => s.name !== name);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(sessions));
+      }
+    } catch {}
+    return sessions;
+  }
+
+  static getSession(name) {
+    return this.listSessions().find(s => s.name === name) || null;
+  }
+}
+
 export class TabBar {
   constructor(app) {
     this.app = app;
@@ -366,6 +418,13 @@ export class TabBar {
         <span>${t('Duplicate tab')}</span>
       </button>
       <div class="gb-tab-menu-divider"></div>
+      <button class="gb-tab-menu-item" data-action="save-session">
+        <span>💾 ${t('Save workspace session…')}</span>
+      </button>
+      <button class="gb-tab-menu-item" data-action="restore-session">
+        <span>📂 ${t('Restore workspace session…')}</span>
+      </button>
+      <div class="gb-tab-menu-divider"></div>
       <button class="gb-tab-menu-item" data-action="close-others">
         <span>${t('Close other tabs')}</span>
       </button>
@@ -395,6 +454,10 @@ export class TabBar {
         window.board?.newWindow?.({ boardId: tabId });
       } else if (action === 'duplicate') {
         await this.duplicateTab(tabId);
+      } else if (action === 'save-session') {
+        this.promptSaveSession();
+      } else if (action === 'restore-session') {
+        this.promptRestoreSession();
       } else if (action === 'close-others') {
         await this.closeOtherTabs(tabId);
       } else if (action === 'close') {
@@ -446,6 +509,46 @@ export class TabBar {
     } else {
       this.render();
     }
+  }
+
+  saveCurrentSession(name) {
+    this.cacheCurrentSession();
+    return WorkspaceSessionManager.saveSession(name, this.tabs, this.activeId);
+  }
+
+  async restoreSession(name) {
+    const session = WorkspaceSessionManager.getSession(name);
+    if (!session || !session.tabs.length) return false;
+    this.tabs = [...session.tabs];
+    this.render();
+    if (session.activeId) {
+      await this.switchTab(session.activeId);
+    } else if (this.tabs.length) {
+      await this.switchTab(this.tabs[0].id);
+    }
+    return true;
+  }
+
+  promptSaveSession() {
+    const name = window.prompt(t('Enter session name to save open tabs:'), `Session ${new Date().toLocaleDateString()}`);
+    if (!name) return;
+    this.saveCurrentSession(name);
+    this.app.toast?.(t('Workspace session saved: {name}', { name }));
+  }
+
+  promptRestoreSession() {
+    const sessions = WorkspaceSessionManager.listSessions();
+    if (!sessions.length) {
+      this.app.toast?.(t('No saved sessions found'));
+      return;
+    }
+    const sessionNames = sessions.map(s => s.name).join('\n');
+    const chosen = window.prompt(t('Enter name of session to restore:\n\n{list}', { list: sessionNames }), sessions[0].name);
+    if (!chosen) return;
+    this.restoreSession(chosen).then(ok => {
+      if (ok) this.app.toast?.(t('Restored session: {name}', { name: chosen }));
+      else this.app.toast?.(t('Could not restore session'));
+    });
   }
 
   toggleVisibility(visible) {

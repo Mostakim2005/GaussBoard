@@ -185,6 +185,19 @@
       "bundledPath": "src/vendor/math.min.js",
       "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\mathjs\\math.min.js",
       "status": "ready"
+    },
+    {
+      "id": "mp4-muxer",
+      "name": "MP4 Muxer",
+      "version": "5.2.2",
+      "category": "Media & Video Export",
+      "description": "Pure JavaScript MP4 (ISOBMFF) container muxer enabling direct fast client-side MP4 video generation without external FFmpeg binaries.",
+      "license": "MIT",
+      "homepage": "https://github.com/Vanilagy/mp4-muxer",
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/mp4-muxer.mjs",
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\mp4-muxer\\mp4-muxer.mjs",
+      "status": "ready"
     }
   ]
 }

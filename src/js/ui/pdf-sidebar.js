@@ -4,7 +4,7 @@
  * and active-recall Study Tape index with 1-click reveal/conceal controls.
  */
 
-import { h } from './util.js';
+import { h } from './popover.js';
 import { t } from '../i18n.js';
 
 export class PdfSidebarDrawer {
@@ -66,25 +66,31 @@ export class PdfSidebarDrawer {
     // Tab buttons
     const tabToc = h('button', {
       class: `btn btn-ghost ${this.activeTab === 'toc' ? 'active' : ''}`,
-      style: `flex:1;padding:6px;font-size:12px;border-bottom:2px solid ${this.activeTab === 'toc' ? '#00e5ff' : 'transparent'};border-radius:0;`
+      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'toc' ? '#00e5ff' : 'transparent'};border-radius:0;`
     }, t('TOC / Outline'));
     tabToc.addEventListener('click', () => { this.activeTab = 'toc'; this.render(); });
 
+    const tabBookmarks = h('button', {
+      class: `btn btn-ghost ${this.activeTab === 'bookmarks' ? 'active' : ''}`,
+      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'bookmarks' ? '#00e5ff' : 'transparent'};border-radius:0;`
+    }, t('Bookmarks'));
+    tabBookmarks.addEventListener('click', () => { this.activeTab = 'bookmarks'; this.render(); });
+
     const tabPages = h('button', {
       class: `btn btn-ghost ${this.activeTab === 'pages' ? 'active' : ''}`,
-      style: `flex:1;padding:6px;font-size:12px;border-bottom:2px solid ${this.activeTab === 'pages' ? '#00e5ff' : 'transparent'};border-radius:0;`
+      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'pages' ? '#00e5ff' : 'transparent'};border-radius:0;`
     }, t('Pages'));
     tabPages.addEventListener('click', () => { this.activeTab = 'pages'; this.render(); });
 
     const tabTape = h('button', {
       class: `btn btn-ghost ${this.activeTab === 'tape' ? 'active' : ''}`,
-      style: `flex:1;padding:6px;font-size:12px;border-bottom:2px solid ${this.activeTab === 'tape' ? '#00e5ff' : 'transparent'};border-radius:0;`
+      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'tape' ? '#00e5ff' : 'transparent'};border-radius:0;`
     }, t('Study Index'));
     tabTape.addEventListener('click', () => { this.activeTab = 'tape'; this.render(); });
 
     const tabNav = h('div', {
       style: 'display:flex;background:rgba(0,0,0,0.2);border-bottom:1px solid rgba(255,255,255,0.08);'
-    }, tabToc, tabPages, tabTape);
+    }, tabToc, tabBookmarks, tabPages, tabTape);
 
     // Content container
     const body = h('div', {
@@ -93,6 +99,8 @@ export class PdfSidebarDrawer {
 
     if (this.activeTab === 'toc') {
       this.renderToc(body);
+    } else if (this.activeTab === 'bookmarks') {
+      this.renderBookmarks(body);
     } else if (this.activeTab === 'pages') {
       this.renderPages(body);
     } else {
@@ -116,22 +124,55 @@ export class PdfSidebarDrawer {
     const pages = this.app.store?.doc?.pages || [];
     const outline = this.app.store?.doc?.pdfOutline;
 
+    // Search filter input
+    const searchWrap = h('div', { style: 'margin-bottom:8px;' });
+    const searchInput = h('input', {
+      type: 'text',
+      placeholder: t('Search outline…'),
+      value: this.tocFilter || '',
+      style: 'width:100%;box-sizing:border-box;padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#eee;font-size:12px;'
+    });
+    searchInput.addEventListener('input', (e) => {
+      this.tocFilter = e.target.value.toLowerCase().trim();
+      this.render();
+    });
+    searchWrap.appendChild(searchInput);
+    container.appendChild(searchWrap);
+
+    const query = this.tocFilter || '';
+
     if (Array.isArray(outline) && outline.length) {
-      // Document has native PDF outline
-      for (const item of outline) {
-        const itemRow = h('div', {
-          style: 'padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);transition:background 0.15s;'
-        },
-          h('span', { style: 'font-size:13px;color:var(--text,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' }, item.title || t('Section')),
-          h('span', { style: 'font-size:11px;color:var(--text-3,rgba(255,255,255,0.5));' }, `p. ${item.pageNumber || 1}`)
-        );
-        itemRow.addEventListener('mouseenter', () => itemRow.style.background = 'rgba(0,229,255,0.12)');
-        itemRow.addEventListener('mouseleave', () => itemRow.style.background = 'rgba(255,255,255,0.04)');
-        itemRow.addEventListener('click', () => {
-          this.app.jumpToPage?.(item.pageNumber ? item.pageNumber - 1 : 0);
-        });
-        container.appendChild(itemRow);
-      }
+      const renderOutlineTree = (items, depth = 0) => {
+        for (const item of items) {
+          const title = item.title || t('Section');
+          const isMatch = !query || title.toLowerCase().includes(query);
+          const hasChildren = Array.isArray(item.items) && item.items.length > 0;
+
+          if (isMatch || hasChildren) {
+            const row = h('div', {
+              style: `padding:6px 8px;padding-left:${depth * 14 + 8}px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);transition:background 0.15s;margin-bottom:2px;`
+            },
+              h('div', { style: 'display:flex;align-items:center;gap:6px;overflow:hidden;' },
+                h('span', { style: 'font-size:11px;color:rgba(255,255,255,0.5);' }, hasChildren ? '▼' : '•'),
+                h('span', { style: 'font-size:12px;color:var(--text,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' }, title)
+              ),
+              h('span', { style: 'font-size:11px;color:#00e5ff;flex-shrink:0;' }, `p. ${item.pageNumber || 1}`)
+            );
+            row.addEventListener('mouseenter', () => row.style.background = 'rgba(0,229,255,0.12)');
+            row.addEventListener('mouseleave', () => row.style.background = 'rgba(255,255,255,0.04)');
+            row.addEventListener('click', () => {
+              this.app.jumpToPage?.(item.pageNumber ? item.pageNumber - 1 : 0);
+            });
+            container.appendChild(row);
+          }
+
+          if (hasChildren) {
+            renderOutlineTree(item.items, depth + 1);
+          }
+        }
+      };
+
+      renderOutlineTree(outline, 0);
       return;
     }
 
@@ -145,8 +186,9 @@ export class PdfSidebarDrawer {
 
     pages.forEach((p, idx) => {
       const pageTitle = p.title || `${t('Page')} ${idx + 1}`;
+      if (query && !pageTitle.toLowerCase().includes(query)) return;
       const row = h('div', {
-        style: 'padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);'
+        style: 'padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);margin-bottom:2px;'
       },
         h('span', { style: 'font-size:13px;color:var(--text,#eee);' }, pageTitle),
         h('span', { style: 'font-size:11px;color:#00e5ff;' }, `→`)
@@ -156,6 +198,85 @@ export class PdfSidebarDrawer {
       row.addEventListener('click', () => {
         this.app.jumpToPage?.(idx);
       });
+      container.appendChild(row);
+    });
+  }
+
+  renderBookmarks(container) {
+    if (!this.app.store?.doc) return;
+    this.app.store.doc.bookmarks = this.app.store.doc.bookmarks || [];
+    const bookmarks = this.app.store.doc.bookmarks;
+
+    const addBtn = h('button', {
+      class: 'btn btn-primary',
+      style: 'width:100%;margin-bottom:12px;padding:7px;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;'
+    }, '+ ', t('Bookmark current view'));
+
+    addBtn.addEventListener('click', () => {
+      const curPage = this.app.currentPageIndex?.() || 0;
+      const defaultName = `${t('Bookmark')} ${bookmarks.length + 1} (${t('Page')} ${curPage + 1})`;
+      const name = window.prompt(t('Enter bookmark title:'), defaultName);
+      if (!name) return;
+
+      const bm = {
+        id: 'bm_' + Date.now(),
+        title: name.trim(),
+        pageIndex: curPage,
+        cam: this.app.surface?.cam ? {
+          x: this.app.surface.cam.x,
+          y: this.app.surface.cam.y,
+          z: this.app.surface.cam.z
+        } : null,
+        created: Date.now()
+      };
+      bookmarks.push(bm);
+      this.app.store._touch?.();
+      this.render();
+      this.app.toast?.(t('Bookmark added'));
+    });
+    container.appendChild(addBtn);
+
+    if (!bookmarks.length) {
+      container.appendChild(h('div', {
+        style: 'color:var(--text-3,rgba(255,255,255,0.5));font-size:13px;text-align:center;padding:24px;'
+      }, t('No bookmarks saved yet. Click above to bookmark key pages or views.')));
+      return;
+    }
+
+    bookmarks.forEach((bm, idx) => {
+      const row = h('div', {
+        style: 'padding:8px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);margin-bottom:4px;'
+      },
+        h('div', {
+          style: 'flex:1;cursor:pointer;overflow:hidden;',
+          title: t('Click to jump to bookmark')
+        },
+          h('div', { style: 'font-size:13px;color:#eee;font-weight:600;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;' }, bm.title),
+          h('div', { style: 'font-size:11px;color:rgba(255,255,255,0.45);' }, `${t('Page')} ${(bm.pageIndex || 0) + 1}`)
+        ),
+        h('button', {
+          class: 'btn btn-ghost',
+          style: 'padding:2px 6px;color:#ff6b6b;font-size:13px;',
+          title: t('Delete bookmark')
+        }, '🗑️')
+      );
+
+      row.children[0].addEventListener('click', () => {
+        this.app.jumpToPage?.(bm.pageIndex || 0);
+        if (bm.cam && this.app.surface?.cam) {
+          this.app.surface.cam.x = bm.cam.x;
+          this.app.surface.cam.y = bm.cam.y;
+          this.app.surface.cam.z = bm.cam.z;
+          this.app.surface.damageAll();
+        }
+      });
+
+      row.children[1].addEventListener('click', () => {
+        bookmarks.splice(idx, 1);
+        this.app.store._touch?.();
+        this.render();
+      });
+
       container.appendChild(row);
     });
   }
