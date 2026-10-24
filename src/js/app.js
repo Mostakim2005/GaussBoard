@@ -49,6 +49,7 @@ import { SearchDialog } from './ui/search-dialog.js';
 import { NoteOverviewDrawer } from './ui/note-overview.js';
 import { TabBar } from './ui/tabs.js';
 import { VisualizationDialog } from './ui/visualization-dialog.js';
+import { SidebarRibbon } from './ui/sidebar-ribbon.js';
 
 /** An id GazBoard itself would make: safe as a file name on every system, the phone included. */
 const plainBoardId = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id);
@@ -91,6 +92,7 @@ export const DEFAULT_SETTINGS = {
   replaySkipSilence: false, tapStrokeToSeek: true, splitSyncScroll: false,
   graphPhysics: true, showExcerptTethers: true, autoExportMarkdownSidecar: false,
   showGroupOutlines: true, showTabBar: true,
+  sidebarRibbonVisible: false, sidebarRibbonPosition: 'left', sidebarRibbonStyle: 'glassmorphism', sidebarRibbonCategory: 'circuits',
   edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, laserColor: '#ff2d2d',
   penOpacityEnabled: false, penOpacity: 1, laserTrailDuration: 520, boardLinkThumb: true,
   brushColor: '#201f1e', brushWidth: 8, brushOpacity: 0.9, brushSoftness: 'medium', brushVelocityThinning: true,
@@ -297,6 +299,8 @@ class App {
     this.tabBar = new TabBar(this);
     if (typeof document !== 'undefined') this.tabBar.init();
     this.visualizationStudio = new VisualizationDialog(this);
+    this.sidebarRibbon = new SidebarRibbon(this);
+    if (typeof document !== 'undefined') this.sidebarRibbon.init();
     this.initMultiWindowLease();
     this.wireGlobalEvents();
     this.initDismissal();
@@ -2686,6 +2690,14 @@ class App {
   }
 
   toggleReadingMode() { this.setReadingMode(!this.readingMode); }
+
+  toggleSidebarRibbon() {
+    if (!this.sidebarRibbon) {
+      this.sidebarRibbon = new SidebarRibbon(this);
+      if (typeof document !== 'undefined') this.sidebarRibbon.init();
+    }
+    this.sidebarRibbon.toggle();
+  }
 
   toggleSearchDialog(q = '') {
     if (!this.searchDialog) this.searchDialog = new SearchDialog(this);
@@ -5215,6 +5227,11 @@ class App {
 
     if (e.altKey && (e.key === 'g' || e.key === 'G')) { e.preventDefault(); this.openGraphView(); return; }
     if (e.altKey && (e.key === 't' || e.key === 'T')) { e.preventDefault(); this.togglePdfSidebar(); return; }
+    if (mod && (e.key === 'b' || e.key === 'B')) {
+      e.preventDefault();
+      this.toggleSidebarRibbon();
+      return;
+    }
     if (mod && (e.key === 'f' || e.key === 'k')) {
       e.preventDefault();
       this.toggleSearchDialog();

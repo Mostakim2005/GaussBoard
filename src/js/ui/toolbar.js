@@ -542,6 +542,14 @@ function wireTopBar(app) {
     });
   }
 
+  // Sidebar Ribbon (Workbench) Button
+  const btnRibbon = document.getElementById('btnSidebarRibbon');
+  if (btnRibbon) {
+    btnRibbon.addEventListener('click', () => {
+      app.toggleSidebarRibbon?.();
+    });
+  }
+
   // Top Bar Embedded Audio Record Button
   const btnTopRec = document.getElementById('btnTopRecord');
   const lblTopTime = document.getElementById('topRecTime');
