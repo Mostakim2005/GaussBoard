@@ -50,6 +50,8 @@ import { NoteOverviewDrawer } from './ui/note-overview.js';
 import { TabBar } from './ui/tabs.js';
 import { VisualizationDialog } from './ui/visualization-dialog.js';
 import { SidebarRibbon } from './ui/sidebar-ribbon.js';
+import { StudyRunner } from './ui/study-runner.js';
+import { syncBoardToAnki, exportBoardToApkg } from './core/anki.js';
 
 /** An id GazBoard itself would make: safe as a file name on every system, the phone included. */
 const plainBoardId = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id);
@@ -301,6 +303,7 @@ class App {
     this.visualizationStudio = new VisualizationDialog(this);
     this.sidebarRibbon = new SidebarRibbon(this);
     if (typeof document !== 'undefined') this.sidebarRibbon.init();
+    this.studyRunner = new StudyRunner(this);
     this.initMultiWindowLease();
     this.wireGlobalEvents();
     this.initDismissal();
@@ -2697,6 +2700,23 @@ class App {
       if (typeof document !== 'undefined') this.sidebarRibbon.init();
     }
     this.sidebarRibbon.toggle();
+  }
+
+  startStudySession(opts) {
+    if (!this.studyRunner) this.studyRunner = new StudyRunner(this);
+    return this.studyRunner.start(opts);
+  }
+
+  stopStudySession() {
+    this.studyRunner?.stop();
+  }
+
+  async syncToAnki(opts) {
+    return syncBoardToAnki(this, opts);
+  }
+
+  async exportToApkg(opts) {
+    return exportBoardToApkg(this, opts);
   }
 
   toggleSearchDialog(q = '') {
@@ -5230,6 +5250,11 @@ class App {
     if (mod && (e.key === 'b' || e.key === 'B')) {
       e.preventDefault();
       this.toggleSidebarRibbon();
+      return;
+    }
+    if (mod && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+      e.preventDefault();
+      this.startStudySession();
       return;
     }
     if (mod && (e.key === 'f' || e.key === 'k')) {

@@ -6,6 +6,7 @@ import { h } from './popover.js';
 import { icon } from './icons.js';
 import { t } from '../i18n.js';
 import { evalMathExpression } from '../core/scientific-math.js';
+import { collectStudyCards, previewNextIntervals, Rating } from '../core/fsrs.js';
 
 export class SidebarRibbon {
   constructor(app) {
@@ -546,8 +547,35 @@ export class SidebarRibbon {
     );
     container.appendChild(desc);
 
+    const studyCards = collectStudyCards(this.app.store);
+    const dueCards = studyCards.filter((c) => c.isDue);
+
+    // Live Stats Badge
+    const statsRow = h('div', { style: 'display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;' });
+    const pillTotal = h('div', { class: 'deck-stats-pill' }, `📚 ${t('Cards')}: ${studyCards.length}`);
+    const pillDue = h('div', { class: 'deck-stats-pill', style: dueCards.length ? 'color:#ef4444;border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.08);' : '' }, `⏰ ${t('Due')}: ${dueCards.length}`);
+    statsRow.appendChild(pillTotal);
+    statsRow.appendChild(pillDue);
+    container.appendChild(statsRow);
+
     const srsSection = h('div', { class: 'deck-section' });
     srsSection.appendChild(h('h5', { class: 'deck-section-title' }, t('Active Recall & Occlusion')));
+
+    const btnStartReview = h('button', { class: 'deck-action-btn primary' },
+      h('span', { class: 'btn-icon' }, '🚀'),
+      h('span', {}, t('Start Active Review Session (Ctrl+Shift+R)'))
+    );
+    btnStartReview.addEventListener('click', () => {
+      this.app.startStudySession?.();
+    });
+
+    const btnReviewDue = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '⏰'),
+      h('span', {}, t('Review Due Cards Only'))
+    );
+    btnReviewDue.addEventListener('click', () => {
+      this.app.startStudySession?.({ onlyDue: true });
+    });
 
     const btnStudyTape = h('button', { class: 'deck-action-btn' },
       h('span', { class: 'btn-icon' }, '🩹'),
@@ -559,6 +587,8 @@ export class SidebarRibbon {
       this.app.toast?.(t('Study Tape active: Drag strips over labels to occlude them for revision.'));
     });
 
+    srsSection.appendChild(btnStartReview);
+    srsSection.appendChild(btnReviewDue);
     srsSection.appendChild(btnStudyTape);
     container.appendChild(srsSection);
 
@@ -568,10 +598,10 @@ export class SidebarRibbon {
 
     const ratingGrid = h('div', { style: 'display:grid;grid-template-columns:repeat(4, 1fr);gap:6px;margin-top:6px;' });
     const rates = [
-      { label: 'Again', color: '#e53e3e', interval: '<10m' },
-      { label: 'Hard', color: '#dd6b20', interval: '1d' },
-      { label: 'Good', color: '#3182ce', interval: '3d' },
-      { label: 'Easy', color: '#38a169', interval: '7d' }
+      { label: t('Again'), color: '#e53e3e', interval: '<10m' },
+      { label: t('Hard'), color: '#dd6b20', interval: '1d' },
+      { label: t('Good'), color: '#3182ce', interval: '3d' },
+      { label: t('Easy'), color: '#38a169', interval: '7d' }
     ];
 
     rates.forEach((r) => {
@@ -596,16 +626,34 @@ export class SidebarRibbon {
       h('span', { class: 'btn-icon' }, '🔄'),
       h('span', {}, t('Sync to Desktop Anki (AnkiConnect :8765)'))
     );
-    btnAnkiSync.addEventListener('click', () => {
-      this.app.toast?.(t('Pushed 12 cards to AnkiConnect.'));
+    btnAnkiSync.addEventListener('click', async () => {
+      btnAnkiSync.disabled = true;
+      btnAnkiSync.textContent = t('Syncing to AnkiConnect...');
+      const res = await this.app.syncToAnki?.();
+      btnAnkiSync.disabled = false;
+      btnAnkiSync.innerHTML = `<span class="btn-icon">🔄</span><span>${t('Sync to Desktop Anki (AnkiConnect :8765)')}</span>`;
+      if (res?.ok) {
+        this.app.toast?.(t('Successfully pushed {count} cards to Anki deck "{deck}"!', { count: res.count, deck: res.deckName }));
+      } else if (res?.error) {
+        this.app.toast?.(res.error);
+      }
     });
 
     const btnApkgExport = h('button', { class: 'deck-action-btn' },
       h('span', { class: 'btn-icon' }, '📦'),
       h('span', {}, t('Export Flashcards to .apkg (AnkiDroid / iOS)'))
     );
-    btnApkgExport.addEventListener('click', () => {
-      this.app.toast?.(t('Exported .apkg package successfully.'));
+    btnApkgExport.addEventListener('click', async () => {
+      btnApkgExport.disabled = true;
+      btnApkgExport.textContent = t('Exporting .apkg...');
+      const res = await this.app.exportToApkg?.();
+      btnApkgExport.disabled = false;
+      btnApkgExport.innerHTML = `<span class="btn-icon">📦</span><span>${t('Export Flashcards to .apkg (AnkiDroid / iOS)')}</span>`;
+      if (res?.ok) {
+        this.app.toast?.(t('Exported {count} cards to {name}', { count: res.count, name: res.filePath?.split(/[\\/]/).pop() || '.apkg' }));
+      } else if (res?.error && !res.cancelled) {
+        this.app.toast?.(res.error);
+      }
     });
 
     exportSection.appendChild(btnAnkiSync);
@@ -702,6 +750,14 @@ export class SidebarRibbon {
     const pdfSection = h('div', { class: 'deck-section' });
     pdfSection.appendChild(h('h5', { class: 'deck-section-title' }, t('LiquidText PDF Excerpt Anchors')));
 
+    const btnMakeExcerpt = h('button', { class: 'deck-action-btn primary' },
+      h('span', { class: 'btn-icon' }, '✂️'),
+      h('span', {}, t('Extract Excerpt from Selection'))
+    );
+    btnMakeExcerpt.addEventListener('click', () => {
+      this.app.copyAsExcerpt?.();
+    });
+
     const btnPdfNavigator = h('button', { class: 'deck-action-btn' },
       h('span', { class: 'btn-icon' }, '📑'),
       h('span', {}, t('Toggle Document Navigator & TOC'))
@@ -725,8 +781,32 @@ export class SidebarRibbon {
       }
     });
 
+    pdfSection.appendChild(btnMakeExcerpt);
     pdfSection.appendChild(btnPdfNavigator);
     pdfSection.appendChild(btnTethers);
+
+    // Excerpt drawer list
+    const excerpts = (this.app.store?.objects || []).filter((o) => o.type === 'image' && o.excerptSource?.boardId);
+    if (excerpts.length) {
+      const excerptListTitle = h('h6', { style: 'margin:12px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;opacity:0.75;' }, `${t('Document Excerpts')} (${excerpts.length})`);
+      pdfSection.appendChild(excerptListTitle);
+      excerpts.forEach((ex) => {
+        const item = h('div', { class: 'deck-excerpt-item' });
+        const thumb = h('img', { class: 'deck-excerpt-thumb', src: ex.src });
+        const meta = h('div', { class: 'deck-excerpt-meta' });
+        const title = h('span', { class: 'deck-excerpt-title' }, ex.excerptSource.boardName || t('Document Excerpt'));
+        const sub = h('span', { class: 'deck-excerpt-sub' }, `Page ${ex.excerptSource.page || 1}`);
+        meta.appendChild(title);
+        meta.appendChild(sub);
+        item.appendChild(thumb);
+        item.appendChild(meta);
+        item.addEventListener('click', () => {
+          this.app.openExcerptSource?.(ex);
+        });
+        pdfSection.appendChild(item);
+      });
+    }
+
     container.appendChild(pdfSection);
   }
 
