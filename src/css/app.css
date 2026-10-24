@@ -4267,3 +4267,330 @@ body.theme-light .dict-word { color: #0f6cbd; }
 
 .colloc-title { font-weight: 700; color: #f59e0b; }
 .colloc-list { opacity: 0.85; }
+
+/* ==========================================================================
+   Section 57: Industrial Circuit Simulator & 2.5D Workbench (Phase 4 / v6.4.0)
+   ========================================================================== */
+
+.circuit-workbench-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.circuit-workbench-backdrop.visible {
+  display: flex;
+  opacity: 1;
+}
+
+.circuit-workbench-modal {
+  width: 92vw;
+  max-width: 1140px;
+  height: 86vh;
+  max-height: 740px;
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #f8fafc;
+}
+
+.workbench-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  background: rgba(15, 23, 42, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-wrap: wrap;
+}
+
+.workbench-title-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #38bdf8;
+}
+
+.workbench-title-area h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.workbench-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.workbench-select {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.workbench-color-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(15, 23, 42, 0.5);
+  padding: 3px 8px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.wire-color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.wire-color-dot.active {
+  transform: scale(1.25);
+  border-color: #ffffff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+}
+
+.workbench-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.workbench-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.workbench-btn.btn-primary {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.workbench-btn.btn-primary:hover {
+  background: #0369a1;
+}
+
+.workbench-close-btn {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 6px;
+}
+
+.workbench-close-btn:hover {
+  color: #ffffff;
+}
+
+.workbench-body {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #0f172a;
+}
+
+.workbench-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+/* Floating Digital Multimeter HUD */
+.workbench-dmm-hud {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  width: 220px;
+  background: #f59e0b;
+  border: 3px solid #b45309;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+  user-select: none;
+}
+
+.dmm-bezel {
+  background: #1e293b;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.dmm-brand {
+  font-size: 9px;
+  font-weight: 800;
+  color: #f59e0b;
+  text-align: center;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.dmm-lcd {
+  background: #a3e635;
+  color: #0f172a;
+  font-family: monospace;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 2px solid #4d7c0f;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.dmm-digits {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.dmm-unit {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dmm-dial-row {
+  display: flex;
+  gap: 3px;
+  margin-top: 8px;
+}
+
+.dmm-dial-btn {
+  flex: 1;
+  background: #334155;
+  border: 1px solid #475569;
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.dmm-dial-btn.active {
+  background: #f59e0b;
+  color: #0f172a;
+  border-color: #d97706;
+}
+
+.dmm-probes-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 10px;
+}
+
+.dmm-probe {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 3px 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dmm-probe.armed {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  animation: pulse-ring 1.5s infinite;
+}
+
+.red-probe .probe-pin {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+.black-probe .probe-pin {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 1px solid #ffffff;
+}
+
+/* Collapsible Oscilloscope Tray */
+.workbench-scope-bar {
+  background: rgba(15, 23, 42, 0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.scope-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 14px;
+  font-size: 11px;
+}
+
+.scope-toggle-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: inherit;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.scope-content {
+  display: none;
+  padding: 6px 14px 10px;
+}
+
+.workbench-scope-bar.expanded .scope-content {
+  display: block;
+}
+
+.scope-canvas {
+  width: 100%;
+  height: 90px;
+  display: block;
+  border-radius: 6px;
+  border: 1px solid #1f2937;
+}
+

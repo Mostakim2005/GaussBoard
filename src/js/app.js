@@ -55,6 +55,7 @@ import { syncBoardToAnki, exportBoardToApkg } from './core/anki.js';
 import { PeriodicTableModal } from './ui/periodic-table.js';
 import { PhetRunnerModal } from './ui/phet-runner.js';
 import { DictionaryPopover } from './ui/dictionary-popover.js';
+import { CircuitWorkbenchModal } from './ui/circuit-workbench.js';
 
 /** An id GazBoard itself would make: safe as a file name on every system, the phone included. */
 const plainBoardId = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id);
@@ -2730,6 +2731,13 @@ class App {
     this.periodicTableModal.show();
   }
 
+  openCircuitWorkbench(preset = 'dol') {
+    if (!this.circuitWorkbenchModal) this.circuitWorkbenchModal = new CircuitWorkbenchModal(this);
+    if (preset === 'dol') this.circuitWorkbenchModal.sim.loadPresetDOL();
+    else if (preset === 'rev') this.circuitWorkbenchModal.sim.loadPresetForwardReverse();
+    this.circuitWorkbenchModal.show();
+  }
+
   openPhetRunner() {
     if (!this.phetRunnerModal) this.phetRunnerModal = new PhetRunnerModal(this);
     this.phetRunnerModal.show();
@@ -5276,6 +5284,11 @@ class App {
     if (mod && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
       e.preventDefault();
       this.startStudySession();
+      return;
+    }
+    if (mod && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+      e.preventDefault();
+      this.openCircuitWorkbench();
       return;
     }
     if (mod && (e.key === 'f' || e.key === 'k')) {

@@ -10,6 +10,7 @@ import { collectStudyCards, previewNextIntervals, Rating } from '../core/fsrs.js
 import { balanceChemicalEquation, insertReactionCard } from '../core/chemistry.js';
 import { FORMULA_CATALOG, insertFormulaCard } from '../core/formula-graph.js';
 import { DICTIONARY_DATABASE } from './dictionary-popover.js';
+import { LADDER_PRESETS } from '../core/diagram-builder.js';
 
 export class SidebarRibbon {
   constructor(app) {
@@ -317,6 +318,35 @@ export class SidebarRibbon {
     );
     container.appendChild(desc);
 
+    // 2.5D Industrial Simulation Workbench Section
+    const simSection = h('div', { class: 'deck-section' });
+    simSection.appendChild(h('h5', { class: 'deck-section-title' }, t('2.5D Simulation Workbench')));
+
+    const btnLaunchSim = h('button', { class: 'deck-action-btn primary' },
+      h('span', { class: 'btn-icon' }, '⚡'),
+      h('span', {}, t('Launch Industrial Workbench (Ctrl+Shift+E)'))
+    );
+    btnLaunchSim.addEventListener('click', () => {
+      this.app.openCircuitWorkbench?.('dol');
+    });
+
+    const presetRow = h('div', { style: 'display:flex;gap:6px;margin-top:6px;' });
+    const btnPresetDOL = h('button', { class: 'deck-action-btn', style: 'flex:1;font-size:11px;' }, t('DOL Starter'));
+    btnPresetDOL.addEventListener('click', () => {
+      this.app.openCircuitWorkbench?.('dol');
+    });
+
+    const btnPresetRev = h('button', { class: 'deck-action-btn', style: 'flex:1;font-size:11px;' }, t('Fwd/Rev Interlock'));
+    btnPresetRev.addEventListener('click', () => {
+      this.app.openCircuitWorkbench?.('rev');
+    });
+
+    presetRow.appendChild(btnPresetDOL);
+    presetRow.appendChild(btnPresetRev);
+    simSection.appendChild(btnLaunchSim);
+    simSection.appendChild(presetRow);
+    container.appendChild(simSection);
+
     // Stencil Component Library
     const sectionStencils = h('div', { class: 'deck-section' });
     sectionStencils.appendChild(h('h5', { class: 'deck-section-title' }, t('Component Stencils')));
@@ -356,7 +386,7 @@ export class SidebarRibbon {
       h('span', {}, t('Digital Multimeter Probe (V / I / Ω)'))
     );
     btnMeter.addEventListener('click', () => {
-      this.app.toast?.(t('Multimeter probes active: Click terminal lugs on canvas to measure nodal voltage.'));
+      this.app.openCircuitWorkbench?.('dol');
     });
 
     const btnOscilloscope = h('button', { class: 'deck-action-btn' },
@@ -364,12 +394,49 @@ export class SidebarRibbon {
       h('span', {}, t('Dual-Trace Virtual Oscilloscope'))
     );
     btnOscilloscope.addEventListener('click', () => {
-      this.app.toast?.(t('Virtual Oscilloscope docked to bottom waveform tray.'));
+      this.app.openCircuitWorkbench?.('dol');
     });
 
     sectionInst.appendChild(btnMeter);
     sectionInst.appendChild(btnOscilloscope);
     container.appendChild(sectionInst);
+
+    // Relay Ladder Logic (RLL) Presets
+    const ladderSection = h('div', { class: 'deck-section' });
+    ladderSection.appendChild(h('h5', { class: 'deck-section-title' }, t('Relay Ladder Logic (RLL)')));
+
+    const ladderSelect = h('select', { class: 'deck-select' });
+    LADDER_PRESETS.forEach((p) => {
+      const opt = h('option', { value: p.id }, p.title);
+      ladderSelect.appendChild(opt);
+    });
+
+    const btnStampLadder = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '📋'),
+      h('span', {}, t('Insert Ladder Logic to Board'))
+    );
+    btnStampLadder.addEventListener('click', () => {
+      const chosen = LADDER_PRESETS.find((p) => p.id === ladderSelect.value);
+      if (chosen) {
+        const cam = this.app.surface?.cam || { viewport: { x: 200, y: 200 } };
+        const textObj = {
+          id: `ladder_${Date.now()}`,
+          type: 'text',
+          x: (cam.viewport?.x || 200) + 60,
+          y: (cam.viewport?.y || 200) + 60,
+          text: `### 🪜 ${chosen.title}\n*${chosen.description}*\n\`\`\`text\n${chosen.diagram}\n\`\`\``,
+          t: Date.now()
+        };
+        this.app.store?.add(textObj);
+        this.app.saveSoon?.();
+        this.app.surface?.render?.();
+        this.app.toast?.(t('Inserted ladder logic diagram to board.'));
+      }
+    });
+
+    ladderSection.appendChild(ladderSelect);
+    ladderSection.appendChild(btnStampLadder);
+    container.appendChild(ladderSection);
   }
 
   insertCircuitComponentNote(comp) {
