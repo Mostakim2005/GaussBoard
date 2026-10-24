@@ -56,6 +56,8 @@ import { PeriodicTableModal } from './ui/periodic-table.js';
 import { PhetRunnerModal } from './ui/phet-runner.js';
 import { DictionaryPopover } from './ui/dictionary-popover.js';
 import { CircuitWorkbenchModal } from './ui/circuit-workbench.js';
+import { MoleculeViewerModal } from './ui/molecule-viewer.js';
+import { FunctionGrapherModal } from './ui/function-grapher.js';
 
 /** An id GazBoard itself would make: safe as a file name on every system, the phone included. */
 const plainBoardId = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id);
@@ -311,6 +313,8 @@ class App {
     this.periodicTableModal = new PeriodicTableModal(this);
     this.phetRunnerModal = new PhetRunnerModal(this);
     this.dictionaryPopover = new DictionaryPopover(this);
+    this.moleculeViewerModal = new MoleculeViewerModal(this);
+    this.functionGrapherModal = new FunctionGrapherModal(this);
     this.initMultiWindowLease();
     this.wireGlobalEvents();
     this.initDismissal();
@@ -2736,6 +2740,18 @@ class App {
     if (preset === 'dol') this.circuitWorkbenchModal.sim.loadPresetDOL();
     else if (preset === 'rev') this.circuitWorkbenchModal.sim.loadPresetForwardReverse();
     this.circuitWorkbenchModal.show();
+  }
+
+  openMoleculeViewer(moleculeId = 'water') {
+    if (!this.moleculeViewerModal) this.moleculeViewerModal = new MoleculeViewerModal(this);
+    if (moleculeId) this.moleculeViewerModal.loadMolecule(moleculeId);
+    this.moleculeViewerModal.show();
+  }
+
+  openFunctionGrapher(preset = 'quadratic') {
+    if (!this.functionGrapherModal) this.functionGrapherModal = new FunctionGrapherModal(this);
+    if (preset) this.functionGrapherModal.loadPreset(preset);
+    this.functionGrapherModal.show();
   }
 
   openPhetRunner() {
@@ -5289,6 +5305,16 @@ class App {
     if (mod && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
       e.preventDefault();
       this.openCircuitWorkbench();
+      return;
+    }
+    if (mod && e.shiftKey && (e.key === 'm' || e.key === 'M')) {
+      e.preventDefault();
+      this.openMoleculeViewer();
+      return;
+    }
+    if (mod && e.shiftKey && (e.key === 'g' || e.key === 'G')) {
+      e.preventDefault();
+      this.openFunctionGrapher();
       return;
     }
     if (mod && (e.key === 'f' || e.key === 'k')) {

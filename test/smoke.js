@@ -17251,6 +17251,35 @@ module.exports.run = async (win, app) => {
       results.videoExporter = typeof VideoExporter === 'function';
     } catch (e) { results.videoExporter = e.message; }
 
+    try {
+      const { MOLECULE_DATABASE, MoleculeViewerModal } = await import('app://board/js/ui/molecule-viewer.js');
+      results.moleculeViewer = MOLECULE_DATABASE.length >= 6 && typeof MoleculeViewerModal === 'function';
+    } catch (e) { results.moleculeViewer = e.message; }
+
+    try {
+      const { GRAPH_PRESETS, FunctionGrapherModal } = await import('app://board/js/ui/function-grapher.js');
+      const fg = new FunctionGrapherModal(window.app);
+      const fn = fg.compileExpression('x^2 - 4');
+      const val = fn(3);
+      results.functionGrapher = GRAPH_PRESETS.length >= 6 && val === 5;
+    } catch (e) { results.functionGrapher = e.message; }
+
+    try {
+      const { TechnicalLinter } = await import('app://board/js/core/technical-linter.js');
+      const issues = TechnicalLinter.lint('In order to test the the system, data was observed by team.');
+      results.technicalLinter = issues.length >= 3;
+    } catch (e) { results.technicalLinter = e.message; }
+
+    try {
+      const { SymbolicCAS, notebookVars } = await import('app://board/js/core/scientific-math.js');
+      const sol = SymbolicCAS.solveLinear('3x + 12 = 0');
+      const diff = SymbolicCAS.differentiate('x^3');
+      notebookVars.set('V', 24);
+      notebookVars.set('R', 8);
+      const evalRes = notebookVars.evaluate('V / R');
+      results.symbolicCAS = sol?.root === -4 && diff === '3x^{2}' && evalRes?.numeric === 3;
+    } catch (e) { results.symbolicCAS = e.message; }
+
     return results;
   `);
 
@@ -17261,6 +17290,10 @@ module.exports.run = async (win, app) => {
   check('Store serializes and restores audioTracks in doc schema', replaySuite.audioTracksRoundTrip === true, JSON.stringify(replaySuite.audioTracksRoundTrip));
   check('SplitWorkspace dual layout manager exists', replaySuite.splitWorkspace === true, JSON.stringify(replaySuite.splitWorkspace));
   check('VideoExporter pipeline engine exists', replaySuite.videoExporter === true, JSON.stringify(replaySuite.videoExporter));
+  check('MoleculeViewerModal and STEM molecule catalog load', replaySuite.moleculeViewer === true, JSON.stringify(replaySuite.moleculeViewer));
+  check('FunctionGrapherModal compiles expression and evaluates domain', replaySuite.functionGrapher === true, JSON.stringify(replaySuite.functionGrapher));
+  check('TechnicalLinter detects wordiness, duplicate words, and passive voice', replaySuite.technicalLinter === true, JSON.stringify(replaySuite.technicalLinter));
+  check('SymbolicCAS solves equations and evaluates reactive notebook variables', replaySuite.symbolicCAS === true, JSON.stringify(replaySuite.symbolicCAS));
 
   /* ---- errors ---- */
   const errs = await js(`return window.__errors || [];`);

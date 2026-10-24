@@ -133,6 +133,58 @@
       "bundledPath": "src/vendor/chart.umd.min.js",
       "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\chartjs\\chart.umd.min.js",
       "status": "ready"
+    },
+    {
+      "id": "3dmol",
+      "name": "3Dmol.js",
+      "version": "2.0.4",
+      "category": "Chemistry & 3D Molecular Viewer",
+      "description": "High-performance WebGL 3D molecular viewer rendering ball-and-stick, CPK space-filling, and secondary structures from PDB and SDF files.",
+      "license": "BSD-2-Clause",
+      "homepage": "https://3dmol.org/",
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/3Dmol-min.js",
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\3dmol\\3Dmol-min.js",
+      "status": "ready"
+    },
+    {
+      "id": "nerdamer",
+      "name": "Nerdamer CAS",
+      "version": "1.1.13",
+      "category": "Symbolic Computer Algebra System (CAS)",
+      "description": "Pure JavaScript symbolic math engine supporting symbolic differentiation, polynomial factoring, equation solving, and matrix calculations.",
+      "license": "MIT",
+      "homepage": "https://nerdamer.com/",
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/nerdamer/nerdamer.core.js",
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\nerdamer\\nerdamer.core.js",
+      "status": "ready"
+    },
+    {
+      "id": "function-plot",
+      "name": "Function Plot",
+      "version": "1.24.0",
+      "category": "Mathematics & 2D Graphing",
+      "description": "Dynamic 2D mathematical function grapher supporting derivatives, tangent slopes, and definite integral shading.",
+      "license": "MIT",
+      "homepage": "https://mauriciopoppe.github.io/function-plot/",
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/function-plot.js",
+      "sharedPath": "C:\\Users\\kazir\\Documents\Antigravity\\CommonLibraries\\function-plot\\function-plot.js",
+      "status": "ready"
+    },
+    {
+      "id": "mathjs",
+      "name": "Math.js",
+      "version": "12.4.1",
+      "category": "Advanced Math & Units",
+      "description": "Extensive math library for JavaScript and Node.js featuring arbitrary precision arithmetic, complex numbers, matrices, and engineering units.",
+      "license": "Apache-2.0",
+      "homepage": "https://mathjs.org/",
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/math.min.js",
+      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\mathjs\\math.min.js",
+      "status": "ready"
     }
   ]
 }

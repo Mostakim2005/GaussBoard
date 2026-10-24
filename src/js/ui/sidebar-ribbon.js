@@ -5,7 +5,8 @@
 import { h } from './popover.js';
 import { icon } from './icons.js';
 import { t } from '../i18n.js';
-import { evalMathExpression } from '../core/scientific-math.js';
+import { evalMathExpression, SymbolicCAS, notebookVars } from '../core/scientific-math.js';
+import { TechnicalLinter } from '../core/technical-linter.js';
 import { collectStudyCards, previewNextIntervals, Rating } from '../core/fsrs.js';
 import { balanceChemicalEquation, insertReactionCard } from '../core/chemistry.js';
 import { FORMULA_CATALOG, insertFormulaCard } from '../core/formula-graph.js';
@@ -508,6 +509,23 @@ export class SidebarRibbon {
           mathResult.textContent = `Req = ${req >= 1000 ? (req / 1000).toFixed(2) + ' kΩ' : req.toFixed(2) + ' Ω'}`;
           return;
         }
+        // Symbolic CAS linear equation check e.g. "3x + 12 = 0"
+        if (q.includes('=') && /x/i.test(q)) {
+          const casSol = SymbolicCAS.solveLinear(q);
+          if (casSol) {
+            mathResult.textContent = `${t('Linear Root')}: x = ${casSol.root}`;
+            return;
+          }
+        }
+        // Symbolic CAS derivative check e.g. "diff x^3"
+        if (/^(?:diff|d\/dx)\s+/i.test(q)) {
+          const targetExpr = q.replace(/^(?:diff|d\/dx)\s+/i, '');
+          const dRes = SymbolicCAS.differentiate(targetExpr);
+          if (dRes) {
+            mathResult.textContent = `d/dx(${targetExpr}) = ${dRes}`;
+            return;
+          }
+        }
         const res = evalMathExpression(q);
         mathResult.textContent = `${t('Result')}: ${res}`;
       } catch (err) {
@@ -520,9 +538,17 @@ export class SidebarRibbon {
     calcSection.appendChild(mathResult);
     container.appendChild(calcSection);
 
-    // Formula Editor & Windows Ink
+    // Dynamic 2D Calculus Grapher & Formula Editor
     const actionSection = h('div', { class: 'deck-section' });
-    actionSection.appendChild(h('h5', { class: 'deck-section-title' }, t('Formula Tools')));
+    actionSection.appendChild(h('h5', { class: 'deck-section-title' }, t('Formula & Calculus Tools')));
+
+    const btnGrapher = h('button', { class: 'deck-action-btn primary' },
+      h('span', { class: 'btn-icon' }, '📈'),
+      h('span', {}, t('2D Function Grapher & Calculus Visualizer (Ctrl+Shift+G)'))
+    );
+    btnGrapher.addEventListener('click', () => {
+      this.app.openFunctionGrapher?.();
+    });
 
     const btnInsertFormula = h('button', { class: 'deck-action-btn' },
       h('span', { class: 'btn-icon' }, '∫'),
@@ -540,6 +566,7 @@ export class SidebarRibbon {
       this.app.toast?.(t('Windows Ink math handwriting recognition active.'));
     });
 
+    actionSection.appendChild(btnGrapher);
     actionSection.appendChild(btnInsertFormula);
     actionSection.appendChild(btnHandwriting);
     container.appendChild(actionSection);
@@ -610,6 +637,14 @@ export class SidebarRibbon {
       this.app.openPeriodicTable?.();
     });
 
+    const btnMolecule = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '🔬'),
+      h('span', {}, t('3D Molecular Structure Viewer (Ctrl+Shift+M)'))
+    );
+    btnMolecule.addEventListener('click', () => {
+      this.app.openMoleculeViewer?.();
+    });
+
     const btnPhet = h('button', { class: 'deck-action-btn' },
       h('span', { class: 'btn-icon' }, '⚛️'),
       h('span', {}, t('PhET Physics HTML5 Simulation Runner'))
@@ -619,6 +654,7 @@ export class SidebarRibbon {
     });
 
     modulesSection.appendChild(btnPeriodic);
+    modulesSection.appendChild(btnMolecule);
     modulesSection.appendChild(btnPhet);
     container.appendChild(modulesSection);
 
@@ -842,6 +878,44 @@ export class SidebarRibbon {
     dictSection.appendChild(btnStampWord);
     dictSection.appendChild(dictResult);
     container.appendChild(dictSection);
+
+    // Technical Writing & ESL Linter
+    const linterSection = h('div', { class: 'deck-section' });
+    linterSection.appendChild(h('h5', { class: 'deck-section-title' }, t('Technical Writing & Style Linter')));
+
+    const linterInput = h('textarea', {
+      class: 'deck-input',
+      rows: '3',
+      style: 'resize:vertical;font-family:inherit;font-size:12px;',
+      placeholder: t('Paste engineering text to lint for passive voice, wordiness, and redundancies...')
+    });
+
+    const linterOutput = h('div', { class: 'deck-result-box', style: 'max-height:120px;overflow-y:auto;' }, t('Linter: ready'));
+
+    const btnRunLint = h('button', { class: 'deck-action-btn primary' }, t('Check Technical Phrasing'));
+    btnRunLint.addEventListener('click', () => {
+      const txt = linterInput.value.trim();
+      if (!txt) {
+        linterOutput.textContent = t('Please enter text to analyze.');
+        return;
+      }
+      const issues = TechnicalLinter.lint(txt);
+      if (issues.length === 0) {
+        linterOutput.innerHTML = `<span style="color:#22c55e;">✔</span> ${t('No style or redundancy issues detected. Clear technical prose!')}`;
+      } else {
+        linterOutput.innerHTML = issues.map((iss) => `
+          <div style="margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:4px;">
+            <span class="deck-stats-pill" style="font-size:10px;padding:1px 4px;margin-right:4px;">${iss.rule}</span>
+            <span style="font-size:11px;">${iss.message}</span>
+          </div>
+        `).join('');
+      }
+    });
+
+    linterSection.appendChild(linterInput);
+    linterSection.appendChild(btnRunLint);
+    linterSection.appendChild(linterOutput);
+    container.appendChild(linterSection);
   }
 
   // --- 6. Diagrams & PDF Shelf ---

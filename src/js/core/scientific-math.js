@@ -258,6 +258,87 @@ export function generateCasesTex(count = 2) {
 }
 
 /**
+ * Safe Pure Recursive Descent Expression Evaluator (Zero CSP eval / Function dependency)
+ */
+export function parseMathExpressionSafely(exprStr, vars = {}) {
+  if (!exprStr || typeof exprStr !== 'string') return NaN;
+  const tokens = [];
+  const regex = /\s*([0-9]+\.?[0-9]*|[a-zA-Z_][a-zA-Z0-9_]*|\*\*|\+|-|\*|\/|\^|\(|\))\s*/g;
+  let match;
+  while ((match = regex.exec(exprStr)) !== null) {
+    if (match[1]) tokens.push(match[1]);
+  }
+  let pos = 0;
+  function peek() { return tokens[pos]; }
+  function consume() { return tokens[pos++]; }
+  function parseExpr() {
+    let val = parseTerm();
+    while (peek() === '+' || peek() === '-') {
+      const op = consume();
+      const next = parseTerm();
+      val = op === '+' ? val + next : val - next;
+    }
+    return val;
+  }
+  function parseTerm() {
+    let val = parsePower();
+    while (peek() === '*' || peek() === '/') {
+      const op = consume();
+      const next = parsePower();
+      val = op === '*' ? val * next : val / next;
+    }
+    return val;
+  }
+  function parsePower() {
+    let val = parseUnary();
+    if (peek() === '^' || peek() === '**') {
+      consume();
+      const next = parsePower();
+      val = Math.pow(val, next);
+    }
+    return val;
+  }
+  function parseUnary() {
+    if (peek() === '+') { consume(); return parseUnary(); }
+    if (peek() === '-') { consume(); return -parseUnary(); }
+    return parsePrimary();
+  }
+  function parsePrimary() {
+    const tok = consume();
+    if (!tok) return NaN;
+    if (tok === '(') {
+      const val = parseExpr();
+      if (peek() === ')') consume();
+      return val;
+    }
+    if (/^[0-9]/.test(tok)) return parseFloat(tok);
+    const low = tok.toLowerCase();
+    if (low === 'x') return typeof vars.x === 'number' ? vars.x : (typeof vars.x !== 'undefined' ? Number(vars.x) : 0);
+    if (low === 'pi') return Math.PI;
+    if (low === 'e') return Math.E;
+    if (Object.prototype.hasOwnProperty.call(vars, tok)) return Number(vars[tok]);
+    if (peek() === '(') {
+      consume();
+      const arg = parseExpr();
+      if (peek() === ')') consume();
+      if (low === 'sin') return Math.sin(arg);
+      if (low === 'cos') return Math.cos(arg);
+      if (low === 'tan') return Math.tan(arg);
+      if (low === 'asin') return Math.asin(arg);
+      if (low === 'acos') return Math.acos(arg);
+      if (low === 'atan') return Math.atan(arg);
+      if (low === 'sqrt') return Math.sqrt(arg);
+      if (low === 'exp') return Math.exp(arg);
+      if (low === 'log' || low === 'ln') return Math.log(arg);
+      if (low === 'log10') return Math.log10(arg);
+      if (low === 'abs') return Math.abs(arg);
+    }
+    return NaN;
+  }
+  return parseExpr();
+}
+
+/**
  * Safe offline arithmetic & elementary expression quick evaluator.
  * Evaluates basic numeric expressions (e.g. "2 + 3 * 4", "\sqrt{64}", "sin(\pi/2)", "2^8").
  * @param {string} tex LaTeX or expression string
@@ -317,8 +398,8 @@ export function evalMathExpression(tex) {
   }
 
   try {
-    // Run evaluation in isolated function
-    const val = Function(`"use strict"; return (${s})`)();
+    // Run evaluation via safe recursive descent parser (Zero CSP / Function dependency)
+    const val = parseMathExpressionSafely(s);
     if (typeof val !== 'number' || !Number.isFinite(val)) {
       return { ok: false };
     }
@@ -329,3 +410,147 @@ export function evalMathExpression(tex) {
     return { ok: false };
   }
 }
+
+/**
+ * Reactive Notebook Variable State Manager
+ * Binds variables (e.g. V_supply = 48, R_1 = 12) across whiteboard notes
+ */
+export class NotebookVariables {
+  constructor() {
+    this.vars = new Map();
+  }
+
+  set(name, val) {
+    if (!name || typeof name !== 'string') return;
+    this.vars.set(name.trim(), Number(val));
+  }
+
+  get(name) {
+    return this.vars.get(name?.trim());
+  }
+
+  has(name) {
+    return this.vars.has(name?.trim());
+  }
+
+  clear() {
+    this.vars.clear();
+  }
+
+  /**
+   * Evaluates an algebraic expression substituting reactive variables
+   * @param {string} expr e.g. "V_supply / R_1"
+   * @returns {{ ok: boolean, result?: string, numeric?: number }}
+   */
+  evaluate(expr) {
+    if (!expr || typeof expr !== 'string') return { ok: false };
+    const varsObj = {};
+    for (const [k, v] of this.vars.entries()) {
+      varsObj[k] = v;
+    }
+    try {
+      const val = parseMathExpressionSafely(expr, varsObj);
+      if (typeof val !== 'number' || !Number.isFinite(val)) {
+        return { ok: false };
+      }
+      const formatted = Math.abs(val) < 1e-10 ? '0' : (Number.isInteger(val) ? String(val) : String(Math.round(val * 1000000) / 1000000));
+      return { ok: true, result: formatted, numeric: val };
+    } catch {
+      return { ok: false };
+    }
+  }
+}
+
+export const notebookVars = new NotebookVariables();
+
+/**
+ * Lightweight Symbolic CAS Solver (Document 6 Section 4.1)
+ * Evaluates symbolic derivatives, polynomial factoring, and linear equations.
+ */
+export class SymbolicCAS {
+  /**
+   * Solves linear equation e.g. "3x + 12 = 0" or "4x - 8 = 16"
+   * @param {string} eqStr
+   */
+  static solveLinear(eqStr) {
+    if (!eqStr || !eqStr.includes('=')) return null;
+    const parts = eqStr.split('=').map((p) => p.trim());
+    // Pattern: [a]x [+/-] [b] = [c]
+    const left = parts[0].replace(/\s+/g, '');
+    const right = parseFloat(parts[1]) || 0;
+
+    const m = left.match(/^([+-]?\d*\.?\d*)x([+-]\d*\.?\d*)?$/i);
+    if (!m) return null;
+
+    let a = m[1] === '' || m[1] === '+' ? 1 : (m[1] === '-' ? -1 : parseFloat(m[1]));
+    let b = m[2] ? parseFloat(m[2]) : 0;
+
+    if (Math.abs(a) < 1e-12) return null;
+    const xVal = (right - b) / a;
+    const cleanX = Number.isInteger(xVal) ? String(xVal) : xVal.toFixed(3);
+
+    return {
+      equation: eqStr,
+      root: xVal,
+      latex: `${eqStr} \\implies x = ${cleanX}`
+    };
+  }
+
+  /**
+   * Symbolic polynomial derivative d/dx (powers, sin, cos, exp, ln)
+   * @param {string} expr
+   */
+  static differentiate(expr) {
+    if (!expr || typeof expr !== 'string') return null;
+    const s = expr.trim();
+
+    // Standard elementary patterns
+    if (/^x\^(\d+)$/i.test(s)) {
+      const p = parseInt(s.match(/\d+/)[0], 10);
+      return p === 1 ? '1' : (p === 2 ? '2x' : `${p}x^{${p - 1}}`);
+    }
+    if (/^(\d+)x\^(\d+)$/i.test(s)) {
+      const m = s.match(/^(\d+)x\^(\d+)$/i);
+      const coeff = parseInt(m[1], 10);
+      const p = parseInt(m[2], 10);
+      return `${coeff * p}x^{${p - 1}}`;
+    }
+    if (/^sin\(x\)$/i.test(s)) return '\\cos(x)';
+    if (/^cos\(x\)$/i.test(s)) return '-\\sin(x)';
+    if (/^exp\(x\)$/i.test(s) || /^e\^x$/i.test(s)) return 'e^x';
+    if (/^ln\(x\)$/i.test(s)) return '\\frac{1}{x}';
+
+    return null;
+  }
+
+  /**
+   * Quadratic root finding and factoring: ax^2 + bx + c = 0
+   * @param {number} a
+   * @param {number} b
+   * @param {number} c
+   */
+  static factorQuadratic(a, b, c) {
+    const disc = b * b - 4 * a * c;
+    if (disc < 0) {
+      // Complex roots
+      const real = (-b / (2 * a)).toFixed(2);
+      const imag = (Math.sqrt(-disc) / (2 * a)).toFixed(2);
+      return {
+        roots: [`${real} + ${imag}j`, `${real} - ${imag}j`],
+        factored: 'Irreducible over ℝ (Complex Conjugate Pair)',
+        discriminant: disc
+      };
+    }
+    const r1 = (-b + Math.sqrt(disc)) / (2 * a);
+    const r2 = (-b - Math.sqrt(disc)) / (2 * a);
+    const s1 = r1 >= 0 ? `- ${r1.toFixed(2)}` : `+ ${Math.abs(r1).toFixed(2)}`;
+    const s2 = r2 >= 0 ? `- ${r2.toFixed(2)}` : `+ ${Math.abs(r2).toFixed(2)}`;
+
+    return {
+      roots: [r1, r2],
+      factored: `(x ${s1})(x ${s2})`,
+      discriminant: disc
+    };
+  }
+}
+
