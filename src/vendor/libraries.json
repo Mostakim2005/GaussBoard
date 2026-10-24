@@ -77,8 +77,8 @@
       "description": "Pure WebAssembly offline OCR engine with English trained language data for recognizing text in scanned books and image excerpts.",
       "license": "Apache-2.0",
       "homepage": "https://tesseract.projectnaptha.com/",
-      "bundledInApp": false,
-      "bundledPath": null,
+      "bundledInApp": true,
+      "bundledPath": "src/vendor/tesseract/tesseract.min.js",
       "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\tesseract\\tesseract.min.js",
       "status": "ready"
     },

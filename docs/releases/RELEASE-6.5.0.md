@@ -3,7 +3,7 @@
 > **Release Version**: `v6.5.0`  
 > **Date**: October 24, 2026  
 > **Git Commit Target**: `feat(stem): Phase 5 3D Molecular Viewer, Function Grapher & Symbolic CAS Suite (v6.5.0)`  
-> **Binary Deliverable**: [`releases/GazBoard-v6.5.0-Portable.exe`](../../releases/GazBoard-v6.5.0-Portable.exe) (`108,768,427 bytes` / `103.73 MiB`)  
+> **Binary Deliverable**: [`releases/GazBoard-v6.5.0-Portable.exe`](../../releases/GazBoard-v6.5.0-Portable.exe) (`113,051,207 bytes` / `107.81 MiB`)  
 > **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Invariant Compliance**: Strict adherence across all 6 Golden Invariants (100% i18n parity, 1,244 smoke checks passed, 0 native C++ dependencies, preserved `p.t` stroke timestamps, Study Tape persistence).
 
