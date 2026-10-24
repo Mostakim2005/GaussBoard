@@ -280,3 +280,48 @@ This document serves as the master registry of all features, enhancements, bug f
   - `node scripts/i18n-check.js`: 2,061 / 2,061 translated (100% parity across all 7 locales).
   - Standalone binary: [`releases/GazBoard-v6.6.0-Portable.exe`](releases/GazBoard-v6.6.0-Portable.exe) (`113,060,623 bytes` / `107.82 MiB`).
   - See [`docs/releases/RELEASE-6.6.0.md`](docs/releases/RELEASE-6.6.0.md) for full release details.
+
+### V 6.7.0 Phase 7 STEM Powerhouse (Circuits, 2D Chemistry, 3D Calculus, Physics Labs)
+
+- Delivers full offline STEM workstations:
+  1. **Falstad-Style Analog, Digital & Discrete Semiconductor Circuit Simulator** (`src/js/core/circuit-sim.js`, `src/js/ui/circuit-workbench.js`):
+     - BJT NPN/PNP, MOSFET N/P, silicon and Zener diodes, optical LEDs, LM741 operational amplifiers, NE555 timer ICs, logic gates (AND, OR, NOT, NAND, NOR, XOR, XNOR), 7-segment display, and 5 industrial presets.
+  2. **ChemDraw-Style 2D Chemical Structure Drawing & SMILES 2D/3D VSEPR Parser** (`src/js/ui/chemical-sketcher.js`):
+     - Interactive chemical canvas, single/double/triple/wedged bonds, heteroatom palette, ring stamps (Benzene, Cyclopentane, Cyclohexane), and 1-click bridge to 3D molecular viewer and canvas stamp.
+  3. **3D Surface & Polar Function Calculus Grapher** (`src/js/ui/function-grapher.js`):
+     - 3D Cartesian surface plotting ($z = f(x, y)$) with azimuth/elevation orbit and depth-sorting; polar curve plotting ($r = f(\theta)$).
+  4. **Pre-built Physics Simulation Lab & Rigid Sandbox** (`src/js/ui/phet-runner.js`):
+     - Geometrical optics ray tracing (convex lens, focal rays, image formation), Coulomb electric field vectors, 2D momentum collision lab, and 2D Newtonian rigid sandbox.
+- **Verification**:
+  - `node scripts/smoke.js`: 1,248 passed, 0 failed (100% pass rate).
+  - `node scripts/i18n-check.js`: 2,093 / 2,093 translated (100% parity across all 7 locales).
+  - Standalone binary: [`releases/GazBoard-v6.7.0-Portable.exe`](releases/GazBoard-v6.7.0-Portable.exe) (`113,075,190 bytes` / `107.84 MiB`).
+  - See [`docs/releases/RELEASE-6.7.0.md`](docs/releases/RELEASE-6.7.0.md) for full release details.
+
+### V 6.8.0 Phase 8 Language, Math & Knowledge Core (WordNet, Academic Linter, Natural Math, Image Occlusion)
+
+- **F-138**: Delivers comprehensive language, linguistic writing, natural mathematics, and active-recall flashcard capabilities:
+  1. **WordNet Academic Dictionary & Scholarly Thesaurus** (`src/js/ui/academic-dictionary.js`):
+     - Academic Word List (AWL Sublists 1-10) and STEM vocabulary database.
+     - Definitions, parts of speech, IPA phonetics, synonyms, antonyms, collocations, and example corpus sentences.
+     - Interactive thesaurus chip search, native Web Speech TTS pronunciation, and 1-click whiteboard definition card stamping.
+     - Hotkey <kbd>Ctrl+Shift+D</kbd> and ESL ribbon shelf integration.
+  2. **University-Level Grammar, Citation & Academic Writing Linter** (`src/js/core/technical-linter.js`):
+     - Academic tone and colloquialism replacement rules.
+     - Subject-verb agreement grammar rules.
+     - Citation integrity checking for parenthetical citations.
+     - Quantitative Academic Style Score (0–100%) and automatic scholarly tone elevation (`TechnicalLinter.applyAcademicTone()`).
+  3. **Natural Language Math-to-LaTeX Converter & Symbolic CAS** (`src/js/core/scientific-math.js`, `src/js/ui/mathedit.js`):
+     - `naturalMathToLaTeX(text)` parses natural conversational math expressions (integrals, derivatives, limits, sums, matrices) into formatted LaTeX.
+     - `SymbolicCAS.solveQuadratic(eqStr)` solves quadratic and linear equations with exact discriminant and step-by-step LaTeX roots.
+     - `SymbolicCAS.matrixDeterminant(matrix)` computes exact determinants for $n \times n$ matrices.
+     - Math Editor dialog (`mathedit.js`) includes `🗣️ Natural Math…` and `⚡ Solve…` action buttons.
+  4. **Image Occlusion Dual Review Modes & Anki Cloze Deck Export** (`src/js/ui/study-runner.js`, `src/js/ui/sidebar-ribbon.js`):
+     - "Hide All, Guess One" vs "Hide One, Guess One" occlusion review modes.
+     - Floating review HUD mode switcher with instant live state refresh.
+     - `exportClozeDeck()` generating Anki-compatible TSV flashcard decks for immediate clipboard export.
+- **Verification**:
+  - `node scripts/smoke.js --new-features`: 21 passed, 0 failed (100% pass rate).
+  - `node scripts/i18n-check.js`: 2,143 / 2,143 translated (100% parity across all 7 locales).
+  - Standalone binary: [`releases/GazBoard-v6.8.0-Portable.exe`](releases/GazBoard-v6.8.0-Portable.exe) (`113,095,961 bytes` / `107.86 MiB`).
+  - See [`docs/releases/RELEASE-6.8.0.md`](docs/releases/RELEASE-6.8.0.md) for full release details.

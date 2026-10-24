@@ -552,6 +552,174 @@ export class SymbolicCAS {
       discriminant: disc
     };
   }
+
+  /**
+   * Solves quadratic equation string e.g. "x^2 - 5x + 6 = 0" or "2x^2 + 4x - 6 = 0"
+   * @param {string} eqStr
+   * @returns {{ ok: boolean, a: number, b: number, c: number, discriminant: number, roots: Array<number|string>, steps: string[], latex: string, error?: string }}
+   */
+  static solveQuadratic(eqStr) {
+    if (!eqStr || typeof eqStr !== 'string') return { ok: false, error: 'Empty equation' };
+    try {
+      const parts = eqStr.split('=').map((p) => p.trim());
+      const leftStr = parts[0] || '0';
+      const rightStr = parts[1] || '0';
+
+      const parsePoly = (str) => {
+        let a = 0, b = 0, c = 0;
+        const clean = str.replace(/\s+/g, '').replace(/-/g, '+-');
+        const terms = clean.split('+').filter(Boolean);
+        for (const t of terms) {
+          if (/x\^2/i.test(t)) {
+            const coeffStr = t.replace(/x\^2/i, '');
+            const coeff = coeffStr === '' ? 1 : (coeffStr === '-' ? -1 : parseFloat(coeffStr));
+            a += isNaN(coeff) ? 0 : coeff;
+          } else if (/x/i.test(t)) {
+            const coeffStr = t.replace(/x/i, '');
+            const coeff = coeffStr === '' ? 1 : (coeffStr === '-' ? -1 : parseFloat(coeffStr));
+            b += isNaN(coeff) ? 0 : coeff;
+          } else {
+            const val = parseFloat(t);
+            c += isNaN(val) ? 0 : val;
+          }
+        }
+        return { a, b, c };
+      };
+
+      const left = parsePoly(leftStr);
+      const right = parsePoly(rightStr);
+      const a = left.a - right.a;
+      const b = left.b - right.b;
+      const c = left.c - right.c;
+
+      if (Math.abs(a) < 1e-12) {
+        // Linear equation fallback: bx + c = 0
+        if (Math.abs(b) < 1e-12) return { ok: false, error: 'Degenerate equation with no x terms' };
+        const root = -c / b;
+        return {
+          ok: true,
+          a: 0,
+          b,
+          c,
+          discriminant: 0,
+          roots: [root],
+          steps: [`Linear equation: ${b}x + ${c} = 0`, `x = -(${c}) / ${b} = ${root}`],
+          latex: `x = ${Number.isInteger(root) ? root : root.toFixed(3)}`
+        };
+      }
+
+      const disc = b * b - 4 * a * c;
+      const steps = [
+        `Standard form: ${a}x^2 + ${b}x + ${c} = 0`,
+        `Discriminant: \\Delta = b^2 - 4ac = (${b})^2 - 4(${a})(${c}) = ${disc}`
+      ];
+
+      if (disc > 0) {
+        const r1 = (-b + Math.sqrt(disc)) / (2 * a);
+        const r2 = (-b - Math.sqrt(disc)) / (2 * a);
+        const r1Clean = Number.isInteger(r1) ? r1 : parseFloat(r1.toFixed(4));
+        const r2Clean = Number.isInteger(r2) ? r2 : parseFloat(r2.toFixed(4));
+        steps.push(`Two distinct real roots: x = \\frac{-(${b}) \\pm \\sqrt{${disc}}}{2(${a})}`);
+        return {
+          ok: true,
+          a,
+          b,
+          c,
+          discriminant: disc,
+          roots: [r1Clean, r2Clean],
+          steps,
+          latex: `x_1 = ${r1Clean}, \\; x_2 = ${r2Clean}`
+        };
+      } else if (Math.abs(disc) < 1e-12) {
+        const r = -b / (2 * a);
+        const rClean = Number.isInteger(r) ? r : parseFloat(r.toFixed(4));
+        steps.push(`Repeated real root: x = \\frac{-(${b})}{2(${a})} = ${rClean}`);
+        return {
+          ok: true,
+          a,
+          b,
+          c,
+          discriminant: 0,
+          roots: [rClean],
+          steps,
+          latex: `x = ${rClean}`
+        };
+      } else {
+        const real = -b / (2 * a);
+        const imag = Math.sqrt(-disc) / (2 * a);
+        const realStr = Number.isInteger(real) ? String(real) : real.toFixed(3);
+        const imagStr = Number.isInteger(imag) ? String(imag) : imag.toFixed(3);
+        steps.push(`Complex conjugate pair: x = ${realStr} \\pm ${imagStr}i`);
+        return {
+          ok: true,
+          a,
+          b,
+          c,
+          discriminant: disc,
+          roots: [`${realStr} + ${imagStr}i`, `${realStr} - ${imagStr}i`],
+          steps,
+          latex: `x = ${realStr} \\pm ${imagStr}i`
+        };
+      }
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  /**
+   * Compute exact determinant of an n x n numeric matrix
+   * @param {number[][] | string} matrix
+   * @returns {{ ok: boolean, determinant: number, dimension: number, latex: string, error?: string }}
+   */
+  static matrixDeterminant(matrix) {
+    try {
+      let m = matrix;
+      if (typeof m === 'string') {
+        m = JSON.parse(m);
+      }
+      if (!Array.isArray(m) || !m.length || !Array.isArray(m[0])) {
+        return { ok: false, error: 'Invalid matrix array format' };
+      }
+      const n = m.length;
+      if (!m.every((row) => Array.isArray(row) && row.length === n)) {
+        return { ok: false, error: 'Matrix must be square (n x n)' };
+      }
+
+      function det(mat) {
+        const dim = mat.length;
+        if (dim === 1) return mat[0][0];
+        if (dim === 2) return mat[0][0] * mat[1][1] - mat[0][1] * mat[1][0];
+        if (dim === 3) {
+          return (
+            mat[0][0] * (mat[1][1] * mat[2][2] - mat[1][2] * mat[2][1]) -
+            mat[0][1] * (mat[1][0] * mat[2][2] - mat[1][2] * mat[2][0]) +
+            mat[0][2] * (mat[1][0] * mat[2][1] - mat[1][1] * mat[2][0])
+          );
+        }
+        let total = 0;
+        for (let col = 0; col < dim; col++) {
+          const sub = [];
+          for (let row = 1; row < dim; row++) {
+            sub.push(mat[row].filter((_, cIndex) => cIndex !== col));
+          }
+          const sign = col % 2 === 0 ? 1 : -1;
+          total += sign * mat[0][col] * det(sub);
+        }
+        return total;
+      }
+
+      const dVal = det(m);
+      const cleanVal = Number.isInteger(dVal) ? dVal : parseFloat(dVal.toFixed(4));
+      return {
+        ok: true,
+        determinant: cleanVal,
+        dimension: n,
+        latex: `\\det(A) = ${cleanVal}`
+      };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
 }
 
 /**
@@ -668,6 +836,99 @@ export function calculateMolarMass(formula) {
   } catch (err) {
     return { ok: false, error: err.message };
   }
+}
+
+/**
+ * Converts natural conversational math phrasing into standardized LaTeX
+ * Supports integrals, derivatives, limits, summations, roots, fractions, and matrices.
+ * @param {string} text
+ * @returns {string} LaTeX expression
+ */
+export function naturalMathToLaTeX(text) {
+  if (!text || typeof text !== 'string') return '';
+  let s = text.trim();
+
+  // Strip math dollar delimiters if present
+  s = s.replace(/^\$+|\$+$/g, '').trim();
+
+  // 1. Integrals: definite and indefinite
+  s = s.replace(/\bintegral\s+of\s+(.+?)\s+from\s+([^\s]+)\s+to\s+([^\s]+)(?:\s+(?:with\s+respect\s+to|d([a-zA-Z])))?/gi, (_, expr, a, b, v) => {
+    const varName = v || 'x';
+    return `\\int_{${a}}^{${b}} ${expr.trim()} \\, d${varName}`;
+  });
+  s = s.replace(/\bintegral\s+of\s+(.+?)(?:\s+with\s+respect\s+to\s+([a-zA-Z])|\s+d([a-zA-Z]))?$/gi, (_, expr, v1, v2) => {
+    const varName = v1 || v2 || 'x';
+    let cleanExpr = expr.trim();
+    if (cleanExpr.endsWith(`d${varName}`)) cleanExpr = cleanExpr.slice(0, -(`d${varName}`.length)).trim();
+    return `\\int ${cleanExpr} \\, d${varName}`;
+  });
+
+  // 2. Derivatives & partials
+  s = s.replace(/\bpartial\s+derivative\s+of\s+(.+?)\s+with\s+respect\s+to\s+([a-zA-Z])/gi, (_, expr, v) => {
+    return `\\frac{\\partial}{\\partial ${v}}\\left[ ${expr.trim()} \\right]`;
+  });
+  s = s.replace(/\bderivative\s+of\s+(.+?)(?:\s+with\s+respect\s+to\s+([a-zA-Z]))?$/gi, (_, expr, v) => {
+    const varName = v || 'x';
+    return `\\frac{d}{d${varName}}\\left[ ${expr.trim()} \\right]`;
+  });
+
+  // 3. Limits
+  s = s.replace(/\blimit\s+of\s+(.+?)\s+as\s+([a-zA-Z])\s*(?:approaches|->|to)\s*([^\s]+)/gi, (_, expr, v, target) => {
+    const cleanTarget = target.toLowerCase() === 'infinity' || target === 'oo' ? '\\infty' : target;
+    return `\\lim_{${v} \\to ${cleanTarget}} ${expr.trim()}`;
+  });
+
+  // 4. Summations and Products
+  s = s.replace(/\bsum\s+of\s+(.+?)\s+from\s+(?:([a-zA-Z])\s*=\s*)?([^\s]+)\s+to\s+([^\s]+)/gi, (_, expr, v, fromVal, toVal) => {
+    const varName = v || 'n';
+    const cleanTo = toVal.toLowerCase() === 'infinity' || toVal === 'oo' ? '\\infty' : toVal;
+    return `\\sum_{${varName}=${fromVal}}^{${cleanTo}} ${expr.trim()}`;
+  });
+  s = s.replace(/\bproduct\s+of\s+(.+?)\s+from\s+(?:([a-zA-Z])\s*=\s*)?([^\s]+)\s+to\s+([^\s]+)/gi, (_, expr, v, fromVal, toVal) => {
+    const varName = v || 'n';
+    const cleanTo = toVal.toLowerCase() === 'infinity' || toVal === 'oo' ? '\\infty' : toVal;
+    return `\\prod_{${varName}=${fromVal}}^{${cleanTo}} ${expr.trim()}`;
+  });
+
+  // 5. Roots
+  s = s.replace(/\b(?:square\s+root\s+of|sqrt\s+of)\s+([a-zA-Z0-9^_+*/.-]+|\([^)]+\))/gi, '\\sqrt{$1}');
+  s = s.replace(/\bsqrt\(([^()]+)\)/gi, '\\sqrt{$1}');
+  s = s.replace(/\bcube\s+root\s+of\s+([a-zA-Z0-9^_+*/.-]+|\([^)]+\))/gi, '\\sqrt[3]{$1}');
+  s = s.replace(/\broot\s+(\d+|[a-zA-Z])\s+of\s+([a-zA-Z0-9^_+*/.-]+|\([^)]+\))/gi, '\\sqrt[$1]{$2}');
+
+  // 6. Fractions
+  s = s.replace(/\b([a-zA-Z0-9()]+)\s+over\s+([a-zA-Z0-9()]+)\b/gi, '\\frac{$1}{$2}');
+
+  // 7. Matrices: matrix [[1, 2], [3, 4]]
+  if (/\[\[[\s\S]*?\]\]/.test(s)) {
+    s = s.replace(/matrix\s*\[\[([\s\S]*?)\]\]/gi, (_, inner) => {
+      const rows = inner.split(/\],\s*\[/).map((r) => {
+        const cleanRow = r.replace(/[\[\]]/g, '').trim();
+        return cleanRow.split(/[\s,]+/).filter(Boolean).join(' & ');
+      });
+      return `\\begin{pmatrix} ${rows.join(' \\\\ ')} \\end{pmatrix}`;
+    });
+  }
+
+  // 8. Elementary symbols & operators
+  s = s.replace(/\bplus\s+or\s+minus\b|\+\/-/gi, '\\pm');
+  s = s.replace(/\btimes\b|\s\*\s/g, ' \\cdot ');
+  s = s.replace(/\bdivided\s+by\b/gi, ' / ');
+  s = s.replace(/\binfinity\b|\boo\b/gi, '\\infty');
+  s = s.replace(/\bpi\b/gi, '\\pi');
+  s = s.replace(/\btheta\b/gi, '\\theta');
+  s = s.replace(/\balpha\b/gi, '\\alpha');
+  s = s.replace(/\bbeta\b/gi, '\\beta');
+  s = s.replace(/\bgamma\b/gi, '\\gamma');
+  s = s.replace(/\bdelta\b/gi, '\\delta');
+  s = s.replace(/\blambda\b/gi, '\\lambda');
+  s = s.replace(/\bsigma\b/gi, '\\sigma');
+  s = s.replace(/<=/g, '\\le');
+  s = s.replace(/>=/g, '\\ge');
+  s = s.replace(/!=/g, '\\ne');
+  s = s.replace(/\^([a-zA-Z0-9]+)/g, '^{$1}');
+
+  return s;
 }
 
 

@@ -5206,4 +5206,86 @@ body.theme-light .dict-word { color: #0f6cbd; }
   cursor: crosshair;
 }
 
+/* Academic Dictionary & Thesaurus Modal (v6.8.0) */
+.academic-dictionary-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 10006;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.academic-dictionary-backdrop.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.academic-dictionary-modal {
+  width: 88vw;
+  max-width: 920px;
+  height: 80vh;
+  max-height: 640px;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #f8fafc;
+}
+
+.dict-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: rgba(30, 41, 59, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pos-filter-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pos-filter-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.pos-filter-btn.active {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+
+.dict-list-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dict-list-item.active {
+  background: rgba(2, 132, 199, 0.25) !important;
+  border-left: 3px solid #38bdf8;
+  color: #ffffff !important;
+}
+
+.thesaurus-chip:hover {
+  filter: brightness(1.2);
+}
+
+
 

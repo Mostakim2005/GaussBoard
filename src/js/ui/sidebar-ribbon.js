@@ -5,7 +5,7 @@
 import { h } from './popover.js';
 import { icon } from './icons.js';
 import { t } from '../i18n.js';
-import { evalMathExpression, SymbolicCAS, notebookVars } from '../core/scientific-math.js';
+import { evalMathExpression, SymbolicCAS, notebookVars, naturalMathToLaTeX } from '../core/scientific-math.js';
 import { TechnicalLinter } from '../core/technical-linter.js';
 import { collectStudyCards, previewNextIntervals, Rating } from '../core/fsrs.js';
 import { balanceChemicalEquation, insertReactionCard } from '../core/chemistry.js';
@@ -569,6 +569,41 @@ export class SidebarRibbon {
     actionSection.appendChild(btnGrapher);
     actionSection.appendChild(btnInsertFormula);
     actionSection.appendChild(btnHandwriting);
+
+    const btnNaturalMath = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '🗣️'),
+      h('span', {}, t('Natural Math to LaTeX Converter'))
+    );
+    btnNaturalMath.addEventListener('click', () => {
+      const ask = prompt(
+        t('Enter natural conversational math (e.g. "integral of x^2 from 0 to 1", "derivative of sin(x)*e^x", "limit of sin(x)/x as x approaches 0"):'),
+        'integral of x^2 from 0 to 1'
+      );
+      if (!ask) return;
+      const converted = naturalMathToLaTeX(ask);
+      if (converted) {
+        navigator.clipboard?.writeText?.(converted);
+        this.app.toast?.(t('Converted to LaTeX and copied: {tex}', { tex: converted }));
+      }
+    });
+
+    const btnQuadratic = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '⚡'),
+      h('span', {}, t('Symbolic CAS Quadratic & Linear Solver'))
+    );
+    btnQuadratic.addEventListener('click', () => {
+      const ask = prompt(t('Enter equation to solve (e.g. x^2 - 5x + 6 = 0):'), 'x^2 - 5x + 6 = 0');
+      if (!ask) return;
+      const sol = SymbolicCAS.solveQuadratic(ask);
+      if (sol.ok) {
+        this.app.toast?.(t('Roots: {roots}', { roots: sol.latex }));
+      } else {
+        this.app.toast?.(t('Could not solve: {err}', { err: sol.error || 'Syntax error' }));
+      }
+    });
+
+    actionSection.appendChild(btnNaturalMath);
+    actionSection.appendChild(btnQuadratic);
     container.appendChild(actionSection);
   }
 
@@ -738,9 +773,22 @@ export class SidebarRibbon {
       this.app.toast?.(t('Study Tape active: Drag strips over labels to occlude them for revision.'));
     });
 
+    const btnOcclusionMode = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '🙈'),
+      h('span', {}, t('Image Occlusion: Hide All vs Hide One'))
+    );
+    btnOcclusionMode.addEventListener('click', () => {
+      if (this.app.studyRunner) {
+        this.app.studyRunner.toggleOcclusionMode?.();
+      } else {
+        this.app.toast?.(t('Start review session first to toggle occlusion modes.'));
+      }
+    });
+
     srsSection.appendChild(btnStartReview);
     srsSection.appendChild(btnReviewDue);
     srsSection.appendChild(btnStudyTape);
+    srsSection.appendChild(btnOcclusionMode);
     container.appendChild(srsSection);
 
     // FSRS Quick Review Rating
@@ -807,8 +855,21 @@ export class SidebarRibbon {
       }
     });
 
+    const btnExportCloze = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '📑'),
+      h('span', {}, t('Export Cloze Flashcards (.tsv)'))
+    );
+    btnExportCloze.addEventListener('click', () => {
+      const deck = this.app.studyRunner?.exportClozeDeck?.();
+      if (deck?.tsv) {
+        navigator.clipboard?.writeText?.(deck.tsv);
+        this.app.toast?.(t('Copied {count} occlusion flashcards to clipboard in Anki TSV format!', { count: deck.count }));
+      }
+    });
+
     exportSection.appendChild(btnAnkiSync);
     exportSection.appendChild(btnApkgExport);
+    exportSection.appendChild(btnExportCloze);
     container.appendChild(exportSection);
   }
 
@@ -881,6 +942,15 @@ export class SidebarRibbon {
       }
     });
 
+    const btnAcademicDict = h('button', { class: 'deck-action-btn primary', style: 'margin-bottom:8px;' },
+      h('span', { class: 'btn-icon' }, '📖'),
+      h('span', {}, t('Academic Dictionary & Thesaurus (Ctrl+Shift+D)'))
+    );
+    btnAcademicDict.addEventListener('click', () => {
+      this.app.openAcademicDictionary?.();
+    });
+
+    dictSection.appendChild(btnAcademicDict);
     dictSection.appendChild(wordInput);
     dictSection.appendChild(btnLookup);
     dictSection.appendChild(btnSpeak);
@@ -921,8 +991,40 @@ export class SidebarRibbon {
       }
     });
 
+    const btnAcademicScore = h('button', { class: 'deck-action-btn', style: 'margin-top:4px;' },
+      h('span', { class: 'btn-icon' }, '🎓'),
+      h('span', {}, t('Evaluate Academic Style Score (0–100%)'))
+    );
+    btnAcademicScore.addEventListener('click', () => {
+      const txt = linterInput.value.trim();
+      if (!txt) {
+        linterOutput.textContent = t('Please enter text to analyze.');
+        return;
+      }
+      const res = TechnicalLinter.evaluateAcademicStyle(txt);
+      linterOutput.innerHTML = `
+        <div style="font-weight:700;color:#3b82f6;font-size:13px;">${t('Academic Style Score')}: ${res.score}% (${res.rating})</div>
+        ${res.deductions.map((d) => `<div style="font-size:11px;margin-top:2px;">• -${d.penalty} pts: ${d.message}</div>`).join('')}
+        ${!res.deductions.length ? `<div style="color:#22c55e;font-size:11px;margin-top:2px;">✔ ${t('Exemplary scholarly clarity and academic tone!')}</div>` : ''}
+      `;
+    });
+
+    const btnFixTone = h('button', { class: 'deck-action-btn', style: 'margin-top:4px;' },
+      h('span', { class: 'btn-icon' }, '✨'),
+      h('span', {}, t('Elevate to Formal Academic Tone'))
+    );
+    btnFixTone.addEventListener('click', () => {
+      const txt = linterInput.value.trim();
+      if (!txt) return;
+      const elevated = TechnicalLinter.applyAcademicTone(txt);
+      linterInput.value = elevated;
+      this.app.toast?.(t('Elevated informal expressions to academic tone.'));
+    });
+
     linterSection.appendChild(linterInput);
     linterSection.appendChild(btnRunLint);
+    linterSection.appendChild(btnAcademicScore);
+    linterSection.appendChild(btnFixTone);
     linterSection.appendChild(linterOutput);
     container.appendChild(linterSection);
   }

@@ -25,6 +25,30 @@ export const REDUNDANT_PHRASES = [
   { match: /\bsubsequent to\b/gi, suggestion: 'after', rule: 'wordiness' }
 ];
 
+export const ACADEMIC_TONE_RULES = [
+  { match: /\ba lot of\b/gi, suggestion: 'numerous', rule: 'colloquialism' },
+  { match: /\bget\b/gi, suggestion: 'obtain', rule: 'colloquialism' },
+  { match: /\bgot\b/gi, suggestion: 'acquired', rule: 'colloquialism' },
+  { match: /\blook into\b/gi, suggestion: 'investigate', rule: 'colloquialism' },
+  { match: /\bfind out\b/gi, suggestion: 'determine', rule: 'colloquialism' },
+  { match: /\bset up\b/gi, suggestion: 'configure', rule: 'colloquialism' },
+  { match: /\bbad\b/gi, suggestion: 'detrimental', rule: 'colloquialism' },
+  { match: /\bbig\b/gi, suggestion: 'substantial', rule: 'colloquialism' },
+  { match: /\bthing\b/gi, suggestion: 'factor', rule: 'colloquialism' },
+  { match: /\bthings\b/gi, suggestion: 'aspects', rule: 'colloquialism' }
+];
+
+export const GRAMMAR_AGREEMENT_RULES = [
+  { match: /\bthe number of\s+([a-zA-Z]+)\s+are\b/gi, suggestion: 'the number of $1 is', rule: 'subject-verb-agreement' },
+  { match: /\ba variety of\s+([a-zA-Z]+)\s+is\b/gi, suggestion: 'a variety of $1 are', rule: 'subject-verb-agreement' },
+  { match: /\beach of the\s+([a-zA-Z]+)\s+are\b/gi, suggestion: 'each of the $1 is', rule: 'subject-verb-agreement' }
+];
+
+export const CITATION_RULES = [
+  { match: /\([A-Z][a-z]+,\s*\)/g, rule: 'incomplete-citation', message: 'Incomplete parenthetical citation: missing publication year.' },
+  { match: /\([A-Z][a-z]+\s+\d{1,3}\)/g, rule: 'malformed-citation', message: 'Malformed citation: standard academic style requires comma and 4-digit year, e.g. (Author, 2024).' }
+];
+
 export const PASSIVE_CONSTRUCTIONS = [
   { match: /\b(?:is|are|was|were|been|being)\s+(?:calculated|measured|observed|determined|analyzed|computed|implemented)\s+by\b/gi, rule: 'passive-voice' }
 ];
@@ -117,6 +141,60 @@ export class TechnicalLinter {
       }
     }
 
+    // 5. Academic Tone & Colloquialisms
+    for (const item of ACADEMIC_TONE_RULES) {
+      let m;
+      const re = new RegExp(item.match.source, item.match.flags);
+      while ((m = re.exec(text)) !== null) {
+        issues.push({
+          index: m.index,
+          length: m[0].length,
+          match: m[0],
+          rule: item.rule,
+          suggestion: item.suggestion,
+          message: t('Colloquial term "{word}". Consider formal academic alternative: "{suggestion}".', {
+            word: m[0],
+            suggestion: item.suggestion
+          })
+        });
+      }
+    }
+
+    // 6. Subject-Verb Agreement
+    for (const item of GRAMMAR_AGREEMENT_RULES) {
+      let m;
+      const re = new RegExp(item.match.source, item.match.flags);
+      while ((m = re.exec(text)) !== null) {
+        const replacement = m[0].replace(re, item.suggestion);
+        issues.push({
+          index: m.index,
+          length: m[0].length,
+          match: m[0],
+          rule: item.rule,
+          suggestion: replacement,
+          message: t('Subject-verb agreement error: "{phrase}". Standard academic usage: "{suggestion}".', {
+            phrase: m[0],
+            suggestion: replacement
+          })
+        });
+      }
+    }
+
+    // 7. Citation Integrity
+    for (const item of CITATION_RULES) {
+      let m;
+      const re = new RegExp(item.match.source, item.match.flags);
+      while ((m = re.exec(text)) !== null) {
+        issues.push({
+          index: m.index,
+          length: m[0].length,
+          match: m[0],
+          rule: item.rule,
+          message: t(item.message)
+        });
+      }
+    }
+
     return issues.sort((a, b) => a.index - b.index);
   }
 
@@ -162,6 +240,104 @@ export class TechnicalLinter {
     }
     return { text: result, count };
   }
+
+  /**
+   * Evaluate Academic Style Score (0-100%) and style diagnostics
+   * @param {string} text
+   * @returns {{ score: number, rating: string, deductions: Array<{rule: string, penalty: number, count: number, message: string}>, issueCount: number }}
+   */
+  static evaluateAcademicStyle(text) {
+    return calculateAcademicStyleScore(text);
+  }
+
+  /**
+   * Replace colloquialisms and informal language with formal academic equivalents
+   * @param {string} text
+   * @returns {string}
+   */
+  static applyAcademicTone(text) {
+    return applyAcademicTone(text);
+  }
+}
+
+/**
+ * Compute an Academic Style Score (0-100%) reflecting tone, conciseness, and precision
+ * @param {string} text
+ * @returns {{ score: number, rating: string, deductions: Array<{rule: string, penalty: number, count: number, message: string}>, issueCount: number }}
+ */
+export function calculateAcademicStyleScore(text) {
+  if (!text || typeof text !== 'string') return { score: 100, rating: 'Exemplary', deductions: [], issueCount: 0 };
+  const issues = TechnicalLinter.lint(text);
+  const words = text.trim().match(/\b[a-zA-Z0-9'-]+\b/g) || [];
+  if (words.length === 0) return { score: 100, rating: 'Exemplary', deductions: [], issueCount: 0 };
+
+  let score = 100;
+  const deductions = [];
+
+  const colloquialCount = issues.filter((i) => i.rule === 'colloquialism').length;
+  if (colloquialCount > 0) {
+    const penalty = Math.min(30, colloquialCount * 6);
+    score -= penalty;
+    deductions.push({ rule: 'colloquialism', penalty, count: colloquialCount, message: `${colloquialCount} informal/colloquial terms` });
+  }
+
+  const grammarCount = issues.filter((i) => i.rule === 'subject-verb-agreement').length;
+  if (grammarCount > 0) {
+    const penalty = Math.min(25, grammarCount * 10);
+    score -= penalty;
+    deductions.push({ rule: 'subject-verb-agreement', penalty, count: grammarCount, message: `${grammarCount} grammatical agreement errors` });
+  }
+
+  const passiveCount = issues.filter((i) => i.rule === 'passive-voice').length;
+  if (passiveCount > 0) {
+    const penalty = Math.min(15, passiveCount * 3);
+    score -= penalty;
+    deductions.push({ rule: 'passive-voice', penalty, count: passiveCount, message: `${passiveCount} passive constructions` });
+  }
+
+  const typoCount = issues.filter((i) => i.rule === 'spelling').length;
+  if (typoCount > 0) {
+    const penalty = Math.min(20, typoCount * 5);
+    score -= penalty;
+    deductions.push({ rule: 'spelling', penalty, count: typoCount, message: `${typoCount} spelling errors` });
+  }
+
+  const wordinessCount = issues.filter((i) => i.rule === 'wordiness' || i.rule === 'redundancy').length;
+  if (wordinessCount > 0) {
+    const penalty = Math.min(15, wordinessCount * 3);
+    score -= penalty;
+    deductions.push({ rule: 'wordiness', penalty, count: wordinessCount, message: `${wordinessCount} wordy or redundant phrases` });
+  }
+
+  const citationCount = issues.filter((i) => i.rule === 'incomplete-citation' || i.rule === 'malformed-citation').length;
+  if (citationCount > 0) {
+    const penalty = Math.min(20, citationCount * 8);
+    score -= penalty;
+    deductions.push({ rule: 'citation', penalty, count: citationCount, message: `${citationCount} citation integrity issues` });
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  let rating = 'Exemplary';
+  if (score >= 90) rating = 'Exemplary';
+  else if (score >= 75) rating = 'Proficient';
+  else if (score >= 60) rating = 'Developing';
+  else rating = 'Needs Revision';
+
+  return { score, rating, deductions, issueCount: issues.length };
+}
+
+/**
+ * Replace colloquial and informal expressions with academic equivalents
+ * @param {string} text
+ * @returns {string}
+ */
+export function applyAcademicTone(text) {
+  if (!text || typeof text !== 'string') return text;
+  let res = text;
+  for (const item of ACADEMIC_TONE_RULES) {
+    res = res.replace(item.match, item.suggestion);
+  }
+  return res;
 }
 
 /**

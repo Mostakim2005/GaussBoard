@@ -59,6 +59,7 @@ import { CircuitWorkbenchModal } from './ui/circuit-workbench.js';
 import { MoleculeViewerModal } from './ui/molecule-viewer.js';
 import { ChemicalSketcherModal } from './ui/chemical-sketcher.js';
 import { FunctionGrapherModal } from './ui/function-grapher.js';
+import { AcademicDictionaryModal } from './ui/academic-dictionary.js';
 
 /** An id GazBoard itself would make: safe as a file name on every system, the phone included. */
 const plainBoardId = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id);
@@ -317,6 +318,7 @@ class App {
     this.moleculeViewerModal = new MoleculeViewerModal(this);
     this.chemicalSketcherModal = new ChemicalSketcherModal(this);
     this.functionGrapherModal = new FunctionGrapherModal(this);
+    this.academicDictionaryModal = new AcademicDictionaryModal(this);
     this.initMultiWindowLease();
     this.wireGlobalEvents();
     this.initDismissal();
@@ -2769,6 +2771,11 @@ class App {
   lookupDictionary(word, at = null) {
     if (!this.dictionaryPopover) this.dictionaryPopover = new DictionaryPopover(this);
     this.dictionaryPopover.show(word, at);
+  }
+
+  openAcademicDictionary(word = null) {
+    if (!this.academicDictionaryModal) this.academicDictionaryModal = new AcademicDictionaryModal(this);
+    this.academicDictionaryModal.show(word);
   }
 
   toggleSearchDialog(q = '') {
@@ -5322,6 +5329,16 @@ class App {
     if (mod && e.shiftKey && (e.key === 'g' || e.key === 'G')) {
       e.preventDefault();
       this.openFunctionGrapher();
+      return;
+    }
+    if (mod && e.shiftKey && (e.key === 'd' || e.key === 'D')) {
+      e.preventDefault();
+      this.openAcademicDictionary();
+      return;
+    }
+    if (mod && e.shiftKey && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      this.openChemicalSketcher();
       return;
     }
     if (mod && (e.key === 'f' || e.key === 'k')) {

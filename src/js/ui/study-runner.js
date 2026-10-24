@@ -17,6 +17,7 @@ export class StudyRunner {
     this.revealed = false;
     this.container = null;
     this.stats = { reviewed: 0, again: 0, hard: 0, good: 0, easy: 0 };
+    this.occlusionMode = 'hideAll'; // 'hideAll' (Hide All, Guess One) | 'hideOne' (Hide One, Guess One)
     this._onKeyDown = this.handleKeyDown.bind(this);
   }
 
@@ -81,6 +82,9 @@ export class StudyRunner {
             <span class="hud-counter">Card 1 / ${this.cards.length}</span>
           </div>
           <div class="study-hud-title">${t('Study Tape Active Recall')}</div>
+          <button class="study-hud-mode-toggle btn" style="font-size:10px;padding:2px 6px;margin-left:auto;margin-right:6px;" title="${t('Toggle between Hide All vs Hide One occlusion modes')}">
+            ${this.occlusionMode === 'hideAll' ? '🙈 ' + t('Hide All') : '👁️ ' + t('Hide One')}
+          </button>
           <button class="study-hud-close" title="${t('Exit Review (Esc)')}">✕</button>
         </div>
         <div class="study-hud-progress"><div class="study-hud-bar" style="width: 0%"></div></div>
@@ -93,9 +97,49 @@ export class StudyRunner {
       </div>
     `;
 
+    hud.querySelector('.study-hud-mode-toggle').addEventListener('click', () => this.toggleOcclusionMode());
     hud.querySelector('.study-hud-close').addEventListener('click', () => this.stop());
     document.body.appendChild(hud);
     this.container = hud;
+  }
+
+  /** Toggle Image Occlusion mode between 'hideAll' (Hide All, Guess One) and 'hideOne' (Hide One, Guess One) */
+  toggleOcclusionMode() {
+    this.occlusionMode = this.occlusionMode === 'hideAll' ? 'hideOne' : 'hideAll';
+    const btn = this.container?.querySelector('.study-hud-mode-toggle');
+    if (btn) {
+      btn.textContent = this.occlusionMode === 'hideAll' ? '🙈 ' + t('Hide All') : '👁️ ' + t('Hide One');
+    }
+    const modeLabel = this.occlusionMode === 'hideAll' ? t('Hide All, Guess One') : t('Hide One, Guess One');
+    this.app.toast?.(t('Occlusion Mode: {mode}', { mode: modeLabel }));
+    this.applyOcclusionVisibility();
+    this.app.surface?.invalidate?.();
+  }
+
+  /** Apply occlusion visibility according to active mode */
+  applyOcclusionVisibility() {
+    const currentItem = this.cards[this.currentIndex];
+    if (!currentItem) return;
+
+    if (this.occlusionMode === 'hideAll') {
+      // In Hide All: all cards remain concealed; only current card becomes revealed when answer is shown
+      this.cards.forEach((c) => {
+        if (c === currentItem) {
+          c.object.revealed = this.revealed;
+        } else {
+          c.object.revealed = false;
+        }
+      });
+    } else {
+      // In Hide One: all other cards are revealed to show surrounding context, ONLY current card is concealed
+      this.cards.forEach((c) => {
+        if (c === currentItem) {
+          c.object.revealed = this.revealed;
+        } else {
+          c.object.revealed = true;
+        }
+      });
+    }
   }
 
   /** Load and focus the specified card */
@@ -109,11 +153,9 @@ export class StudyRunner {
     const item = this.cards[index];
     this.revealed = false;
 
-    // Conceal the card initially so user can test memory
-    if (item.object.revealed) {
-      item.object.revealed = false;
-      this.app.surface?.invalidate?.();
-    }
+    // Apply concealment according to occlusion mode
+    this.applyOcclusionVisibility();
+    this.app.surface?.invalidate?.();
 
     // Update progress
     const pct = Math.round(((index) / this.cards.length) * 100);
@@ -181,8 +223,30 @@ export class StudyRunner {
     this.revealed = true;
     const currentItem = this.cards[this.currentIndex];
     currentItem.object.revealed = true;
+    this.applyOcclusionVisibility();
     this.app.surface?.invalidate?.();
     this.renderActions();
+  }
+
+  /**
+   * Export all board occlusions as an Anki-compatible TSV cloze file
+   * @returns {{ count: number, tsv: string }}
+   */
+  exportClozeDeck() {
+    const allCards = collectStudyCards(this.app.store);
+    if (!allCards.length) {
+      this.app.toast?.(t('No occlusions found to export.'));
+      return { count: 0, tsv: '' };
+    }
+    const lines = ['#separator:tab', '#html:true', '#tags column:3'];
+    allCards.forEach((c, idx) => {
+      const q = `GazBoard Occlusion #${idx + 1} (${c.object.subtype || 'tape'})`;
+      const a = c.object.text || c.object.note || `Occlusion #${idx + 1} [Revealed]`;
+      const tags = 'gazboard image_occlusion fsrs';
+      lines.push(`${q}\t${a}\t${tags}`);
+    });
+    const tsv = lines.join('\n');
+    return { count: allCards.length, tsv };
   }
 
   /** Rate card retention and advance */

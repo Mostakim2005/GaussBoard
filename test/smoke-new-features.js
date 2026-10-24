@@ -138,7 +138,46 @@ const browserChecks = String.raw`(async () => {
     out.periodicTable = Array.isArray(ELEMENTS_DATA) && ELEMENTS_DATA.length >= 40;
   } catch (e) { out.periodicTable = e.message; }
 
-  // 17. No Uncaught Renderer Errors
+  // 17. Academic WordNet Dictionary & Thesaurus
+  try {
+    const { ACADEMIC_LEXICON, AcademicDictionaryModal } = await import('app://board/js/ui/academic-dictionary.js');
+    const hasVocab = Object.keys(ACADEMIC_LEXICON).length >= 50;
+    const sample = ACADEMIC_LEXICON['hypothesis'];
+    const hasPhonetics = !!sample?.ipa && Array.isArray(sample?.synonyms) && Array.isArray(sample?.collocations);
+    out.academicDictionary = hasVocab && hasPhonetics && typeof AcademicDictionaryModal === 'function';
+  } catch (e) { out.academicDictionary = e.message; }
+
+  // 18. Academic Style Scoring & Formal Tone Engine
+  try {
+    const { TechnicalLinter, calculateAcademicStyleScore, applyAcademicTone } = await import('app://board/js/core/technical-linter.js');
+    const informal = 'A lot of things got better in this test.';
+    const scoreRes = calculateAcademicStyleScore(informal);
+    const elevated = applyAcademicTone(informal);
+    out.academicStyleAndTone = scoreRes.score < 100 && scoreRes.deductions.length >= 1 && elevated.includes('numerous') && elevated.includes('acquired');
+  } catch (e) { out.academicStyleAndTone = e.message; }
+
+  // 19. Natural Math to LaTeX & Symbolic Quadratic CAS
+  try {
+    const { naturalMathToLaTeX, SymbolicCAS } = await import('app://board/js/core/scientific-math.js');
+    const texInt = naturalMathToLaTeX('integral of x^2 from 0 to 1');
+    const texLim = naturalMathToLaTeX('limit of sin(x)/x as x approaches 0');
+    const quad = SymbolicCAS.solveQuadratic('x^2 - 5x + 6 = 0');
+    const det = SymbolicCAS.matrixDeterminant([[1, 2], [3, 4]]);
+    out.naturalMathAndCAS = texInt.includes('\\int_{0}^{1}') && texLim.includes('\\lim_{x \\to 0}') && quad.ok && quad.roots.includes(3) && quad.roots.includes(2) && det.determinant === -2;
+  } catch (e) { out.naturalMathAndCAS = e.message; }
+
+  // 20. Image Occlusion Dual Modes & Cloze Deck Export
+  try {
+    const sr = app.studyRunner;
+    const initialMode = sr?.occlusionMode || 'hideAll';
+    sr?.toggleOcclusionMode?.();
+    const toggledMode = sr?.occlusionMode;
+    sr?.toggleOcclusionMode?.(); // Toggle back
+    const cloze = sr?.exportClozeDeck?.();
+    out.imageOcclusion = initialMode === 'hideAll' && toggledMode === 'hideOne' && typeof cloze?.tsv === 'string';
+  } catch (e) { out.imageOcclusion = e.message; }
+
+  // 21. No Uncaught Renderer Errors
   const errs = window.__errors || [];
   out.rendererErrors = errs.length === 0;
 
@@ -164,6 +203,10 @@ async function run(win, app) {
     physicsSim: 'SIMULATION_PRESETS includes optics, electric field, collisions, and rigid sandbox',
     fsrs: 'FSRS v5 spaced repetition engine schedules cards with stability and difficulty',
     periodicTable: 'Periodic Table database contains all 118 elements',
+    academicDictionary: 'Academic WordNet dictionary and thesaurus modal with IPA and collocations',
+    academicStyleAndTone: 'Academic style scoring (0-100%) and formal scholarly tone elevation',
+    naturalMathAndCAS: 'Natural language math-to-LaTeX converter and symbolic quadratic CAS solver',
+    imageOcclusion: 'Image occlusion dual review modes (Hide All vs Hide One) and cloze deck export',
     rendererErrors: 'No uncaught renderer errors'
   };
 

@@ -16,7 +16,9 @@ import {
   latexToWolfram,
   evalMathExpression,
   generateMatrixTex,
-  generateCasesTex
+  generateCasesTex,
+  naturalMathToLaTeX,
+  SymbolicCAS
 } from '../core/scientific-math.js';
 
 /*
@@ -179,6 +181,46 @@ export class MathEditor {
       app.toast(t('Wolfram query copied: {code}', { code: wolfram }));
     });
 
+    const btnNatural = h('button', {
+      type: 'button',
+      class: 'btn',
+      style: 'font-size:11px;padding:3px 8px;',
+      title: t('Convert conversational English math into LaTeX (e.g. "integral of x^2 from 0 to 1")')
+    }, '🗣️ ' + t('Natural Math…'));
+    btnNatural.addEventListener('click', () => {
+      const ask = prompt(
+        t('Enter natural conversational math (e.g. "integral of x^2 from 0 to 1", "derivative of sin(x)*e^x", "limit of sin(x)/x as x approaches 0"):'),
+        'integral of x^2 from 0 to 1'
+      );
+      if (!ask) return;
+      const converted = naturalMathToLaTeX(ask);
+      if (converted) {
+        area.focus();
+        insertTemplate(area, converted);
+        app.toast?.(t('Converted natural math to LaTeX'));
+      }
+    });
+
+    const btnSolveQuad = h('button', {
+      type: 'button',
+      class: 'btn',
+      style: 'font-size:11px;padding:3px 8px;',
+      title: t('Symbolic CAS: Solve quadratic or linear equation')
+    }, '⚡ ' + t('Solve…'));
+    btnSolveQuad.addEventListener('click', () => {
+      const defaultEq = area.value.includes('=') ? area.value : 'x^2 - 5x + 6 = 0';
+      const ask = prompt(t('Enter quadratic equation to solve (e.g. x^2 - 5x + 6 = 0):'), defaultEq);
+      if (!ask) return;
+      const sol = SymbolicCAS.solveQuadratic(ask);
+      if (sol.ok) {
+        area.focus();
+        insertTemplate(area, `\\implies ${sol.latex}`);
+        app.toast?.(t('Solution: {sol}', { sol: sol.latex }));
+      } else {
+        app.toast?.(t('Could not solve: {err}', { err: sol.error || 'Syntax error' }));
+      }
+    });
+
     const evalBadge = h('button', {
       type: 'button',
       class: 'btn',
@@ -192,7 +234,7 @@ export class MathEditor {
       }
     });
 
-    studioRow.appendChild(h('div', { style: 'display:flex;gap:4px;align-items:center;flex-wrap:wrap;' }, btnMatrix, btnSympy, btnMatlab, btnWolfram));
+    studioRow.appendChild(h('div', { style: 'display:flex;gap:4px;align-items:center;flex-wrap:wrap;' }, btnMatrix, btnSympy, btnMatlab, btnWolfram, btnNatural, btnSolveQuad));
     studioRow.appendChild(evalBadge);
 
     let seq = 0;
