@@ -1433,9 +1433,9 @@ export function createPanels(app) {
           : t('Runtime: <b>Web / Progressive Web App</b> · {mode}', { mode: i.pwa ? t('Standalone App') : t('Browser') }) + '<br>' +
             t('Boards storage: <code style="font-size:11px">{path}</code>', { path: i.boardsDir || i.userData });
 
-        info.innerHTML = t('{app} · by {maker}', { app: `<b style="color:var(--text)">GazBoard ${i.version}</b>`, maker: '<b style="color:var(--accent)">theBoringCodes</b>' }) + '<br>' +
+        info.innerHTML = t('{app} · by {maker}', { app: `<b style="color:var(--text)">GaussBoard ${i.version}</b>`, maker: '<b style="color:var(--accent)">theBoringCodes</b>' }) + '<br>' +
           `MD. Fakhruddin Gazzali · <a href="mailto:fahim9778@gmail.com" target="_blank" style="color:var(--accent)">fahim9778@gmail.com</a><br>` +
-          t('Co-created with {heart} by {makers}', { heart: '<span style="color:#e81123">&hearts;</span>', makers: 'Claude Cowork &amp; GPT Sol, Astra' }) + '<br>' +
+          t('Co-created with {heart} by {makers}', { heart: '<span style="color:#e81123">&hearts;</span>', makers: 'Claude Cowork, GPT Sol &amp; Astra' }) + '<br>' +
           platformLines;
       });
 
@@ -1860,7 +1860,34 @@ export function createPanels(app) {
             }
           }, h('span', {}, '📚'), h('span', {}, t('Inspect Runtime Libraries…')))
         ),
-        h('div', { class: 'section' }, h('h5', {}, t('About')), info,
+        h('div', { class: 'section' },
+          h('h5', {}, t('About')),
+          info,
+          h('div', {
+            style: 'margin:12px 0 10px;padding:12px 14px;background:var(--surface-2,rgba(128,128,128,0.08));border-radius:8px;border-left:3px solid var(--accent);font-size:12px;line-height:1.6;color:var(--text)'
+          },
+            h('div', { style: 'margin-bottom:8px' },
+              h('b', {}, 'Homage & Dedication: '),
+              'Named in honor of ', h('b', {}, 'Carl Friedrich Gauss'),
+              ' (1777–1855), the "Prince of Mathematicians," whose foundational laws shape electromagnetic field theory, circuit analysis, and computational mathematics.'
+            ),
+            h('div', { style: 'margin-bottom:8px' },
+              h('b', {}, 'Tailored for Electrical Engineering: '),
+              'Specially engineered for electrical engineering and STEM students, integrating real-time electro-mechanical MNA circuit simulation, 2D/3D calculus graphing, symbolic CAS, and active-recall audio replay.'
+            ),
+            h('div', {},
+              h('b', {}, 'Inspirations: '),
+              'Inspired by a combination of ', h('b', {}, 'StarNote'), ', ', h('b', {}, 'Flexcil'), ', ', h('b', {}, 'LiquidText'), ', and ', h('b', {}, 'Microsoft OneNote'), '.'
+            )
+          ),
+          h('div', {
+            style: 'margin-bottom:12px;padding:10px 12px;border:1px solid var(--stroke,rgba(0,0,0,0.1));border-radius:8px;font-size:11.5px;line-height:1.7;color:var(--text-2)'
+          },
+            h('div', {}, h('b', { style: 'color:var(--text)' }, 'Fork Maintainer & Lead: '), 'Kazi S. Mostakim'),
+            h('div', {}, h('b', { style: 'color:var(--text)' }, 'Original Creator & Upstream Author: '), 'MD. Fakhruddin Gazzali (', h('span', { style: 'color:var(--accent)' }, 'theBoringCodes'), ')'),
+            h('div', {}, h('b', { style: 'color:var(--text)' }, 'Repository Heritage: '), 'Forked and evolved from the original open-source ', h('b', { style: 'color:var(--text)' }, 'GazBoard'), ' whiteboard architecture.'),
+            h('div', {}, h('b', { style: 'color:var(--text)' }, 'AI & Agent Harness Collaborative Engineering: '), 'Developed across agent harnesses and modern models: Google Antigravity (powered by Gemini 3.8 Flash & Gemini 4 Argon), Claude Opus 5 & 5.5, Claude Sonnet 5.5, OpenCode, DeepSeek v4.1 Flash, and Codex GPT-6 Luna.')
+          ),
           h('p', { style: 'font-size:12px;color:var(--text-2);margin-top:10px;line-height:1.6' },
             t('Boards save automatically on this device. Use My boards to reopen them, or Save a copy to keep a board file in a folder you choose. There is no sign-in, no account and no cloud. The one thing that ever leaves this device is a board you hand to another GazBoard yourself, over your own network, and even then it goes straight from here to there, never through anybody\'s server.')))
       );

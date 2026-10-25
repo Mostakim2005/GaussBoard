@@ -4900,11 +4900,32 @@ class App {
     const overlay = document.getElementById('overlay');
     const card = document.getElementById('overlayCard');
     card.innerHTML = '';
-    card.appendChild(h('h3', { style: 'margin-bottom:2px' }, 'GazBoard ' + i.version));
+    card.appendChild(h('h3', { style: 'margin-bottom:2px' }, 'GaussBoard ' + i.version));
     card.appendChild(h('p', {
-      style: 'margin:0 0 14px;font-size:13px;color:var(--text-2);letter-spacing:.02em',
+      style: 'margin:0 0 4px;font-size:13px;color:var(--text-2);letter-spacing:.02em',
       html: t('by <b style="color:var(--accent)">theBoringCodes</b>')
     }));
+    card.appendChild(h('p', {
+      style: 'margin:0 0 10px;font-size:12px;color:var(--accent);font-weight:600',
+      html: 'The Offline Engineering &amp; STEM Digital Whiteboard'
+    }));
+    card.appendChild(h('div', {
+      style: 'margin:10px 0 14px;padding:12px 14px;background:var(--surface-2,rgba(128,128,128,0.08));border-radius:8px;border-left:3px solid var(--accent);font-size:12px;line-height:1.6;color:var(--text)'
+    },
+      h('div', { style: 'margin-bottom:8px' },
+        h('b', {}, 'Homage & Dedication: '),
+        'Named in honor of ', h('b', {}, 'Carl Friedrich Gauss'),
+        ' (1777–1855), the "Prince of Mathematicians," whose foundational laws shape electromagnetic field theory, circuit analysis, and computational mathematics.'
+      ),
+      h('div', { style: 'margin-bottom:8px' },
+        h('b', {}, 'Tailored for Electrical Engineering: '),
+        'Specially engineered for electrical engineering and STEM students, integrating real-time electro-mechanical MNA circuit simulation, 2D/3D calculus graphing, symbolic CAS, and active-recall audio replay.'
+      ),
+      h('div', {},
+        h('b', {}, 'Inspirations: '),
+        'Inspired by a combination of ', h('b', {}, 'StarNote'), ', ', h('b', {}, 'Flexcil'), ', ', h('b', {}, 'LiquidText'), ', and ', h('b', {}, 'Microsoft OneNote'), '.'
+      )
+    ));
     /*
      * This paragraph is a promise, so it has to keep being true.
      *
@@ -4916,9 +4937,15 @@ class App {
     card.appendChild(h('p', { html:
       t('A free-form digital whiteboard for pen, sticky notes, shapes, text, images and documents.<br><br>Runs on this device — no account, no sign-in, no cloud. Boards save automatically here. Use My boards to reopen them, or Save a copy to keep a board file in a folder you choose.<br><br>The one exception is <b>sharing on your own network</b>, which is off until you switch it on in Settings. With it on, you can hand a board straight to another GazBoard on the same network — encrypted, device to device, never through anybody\'s server. Nothing is saved without you being asked first.') }));
     card.appendChild(h('div', {
-      style: 'margin-top:14px;padding-top:12px;border-top:1px solid var(--stroke);font-size:12.5px;line-height:1.8;color:var(--text-2)',
-      html:
-        t('Developer &nbsp;<b style="color:var(--text)">MD. Fakhruddin Gazzali</b><br>Contact &nbsp;<a href="mailto:fahim9778@gmail.com" target="_blank" style="color:var(--accent)">fahim9778@gmail.com</a><br>Co-created with <span style="color:#e81123">&hearts;</span> by Claude Cowork &amp; GPT Sol, Astra') }));
+      style: 'margin-top:14px;padding-top:12px;border-top:1px solid var(--stroke);font-size:12px;line-height:1.8;color:var(--text-2)'
+    },
+      h('div', {}, h('b', { style: 'color:var(--text)' }, 'Fork Maintainer & Lead: '), 'Kazi S. Mostakim'),
+      h('div', {
+        html: t('Developer &nbsp;<b style="color:var(--text)">MD. Fakhruddin Gazzali</b><br>Contact &nbsp;<a href="mailto:fahim9778@gmail.com" target="_blank" style="color:var(--accent)">fahim9778@gmail.com</a><br>Co-created with <span style="color:#e81123">&hearts;</span> by Claude Cowork &amp; GPT Sol, Astra')
+      }),
+      h('div', {}, h('b', { style: 'color:var(--text)' }, 'Repository Heritage: '), 'Forked and evolved from the original open-source ', h('b', { style: 'color:var(--text)' }, 'GazBoard'), ' whiteboard architecture.'),
+      h('div', {}, h('b', { style: 'color:var(--text)' }, 'AI & Agent Harness Collaborative Engineering: '), 'Developed across agent harnesses and modern models: Google Antigravity (powered by Gemini 3.8 Flash & Gemini 4 Argon), Claude Opus 5 & 5.5, Claude Sonnet 5.5, OpenCode, DeepSeek v4.1 Flash, and Codex GPT-6 Luna.')
+    ));
     const platformDetails = i.electron
       ? (i.libreoffice
         ? t('Office import: <b>LibreOffice detected (high fidelity)</b>')

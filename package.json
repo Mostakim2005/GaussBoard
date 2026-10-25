@@ -1,8 +1,8 @@
 {
   "name": "gazboard",
-  "productName": "GazBoard",
+  "productName": "GaussBoard",
   "version": "6.9.2",
-  "description": "A free-form digital whiteboard - offline replica of the classic Microsoft Whiteboard 21.x experience, with Word / PowerPoint / PDF import.",
+  "description": "GaussBoard — An offline digital whiteboard & STEM engineering workstation for electrical engineering students, inspired by a combination of StarNote, Flexcil, LiquidText, and Microsoft OneNote.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -52,6 +52,10 @@
     {
       "name": "MD. Fakhruddin Gazzali",
       "email": "fahim9778@gmail.com"
+    },
+    {
+      "name": "Kazi S. Mostakim",
+      "email": "kazi.s.mostakim@gmail.com"
     }
   ],
   "license": "MIT",
@@ -64,7 +68,7 @@
   },
   "build": {
     "appId": "com.theboringcode.gazboard",
-    "productName": "GazBoard",
+    "productName": "GaussBoard",
     "files": [
       "main.js",
       "storage-location.js",
@@ -147,12 +151,12 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "GazBoard",
-      "uninstallDisplayName": "GazBoard ${version}",
-      "artifactName": "GazBoard-Setup-${version}.exe"
+      "shortcutName": "GaussBoard",
+      "uninstallDisplayName": "GaussBoard ${version}",
+      "artifactName": "GaussBoard-Setup-${version}.exe"
     },
     "portable": {
-      "artifactName": "GazBoard-v${version}-Portable.exe"
+      "artifactName": "GaussBoard-v${version}-Portable.exe"
     },
     "fileAssociations": [
       {
