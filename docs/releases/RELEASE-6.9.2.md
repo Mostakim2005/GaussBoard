@@ -3,7 +3,7 @@
 > **Release Version**: `v6.9.2`  
 > **Date**: October 25, 2026  
 > **Git Commit Target**: `fix(hardening): complete P0 and P1 senior hardening audit (v6.9.2)`  
-> **Binary Deliverable**: none rebuilt in this pass — this is a source-only hardening release  
+> **Binary Deliverable**: [`releases/GazBoard-v6.9.2-Portable.exe`](../../releases/GazBoard-v6.9.2-Portable.exe) (`113,146,990 bytes` / `107.90 MiB`)  
 > **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Audit Record**: [`../hardening/AUDIT_LOG.md`](../hardening/AUDIT_LOG.md) (one line per finding, appended as it was fixed)  
 > **Invariant Compliance**: 6 Golden Invariants preserved; 100% i18n parity across 7 locales with **2,245** keys; 0 native C++ dependencies.
@@ -132,7 +132,7 @@ Audited subsystems: MNA circuit simulator & semiconductors, video export/MP4, Ma
 | **Source release** | repository `feat/cumulative-fixes` at tag `v6.9.2` | Source | Hardened application source |
 | **Hardening audit record** | `docs/hardening/AUDIT_LOG.md` | Documentation | 74 findings, fix status, verification, manual tests |
 | **Release dossier** | `docs/releases/RELEASE-6.9.2.md` | Documentation | This record |
-| **Portable executable** | — | Binary | **Not rebuilt in this pass**; build with `npm run dist:win` if a binary is required |
+| **Portable executable** | [`releases/GazBoard-v6.9.2-Portable.exe`](../../releases/GazBoard-v6.9.2-Portable.exe) | Binary | Standalone zero-install portable Windows executable (`113,146,990 bytes`) for week-long validation |
 
 ---
 
