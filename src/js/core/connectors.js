@@ -121,6 +121,43 @@ function sidePoint(box, side) {
   return { x: c.x, y: box.y - GAP };
 }
 
+/**
+ * Hardening Helper: Prunes duplicate consecutive points and collapses collinear segments
+ * in orthogonal Manhattan paths, preventing zero-length stubs and inverted arrowheads.
+ * @param {Array<{x: number, y: number}>} points
+ * @returns {Array<{x: number, y: number}>}
+ */
+export function cleanOrthogonalPath(points) {
+  if (!points || points.length < 2) return points ? [...points] : [];
+  const cleaned = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const prev = cleaned[cleaned.length - 1];
+    const curr = points[i];
+    // Remove duplicate consecutive coordinates
+    if (Math.abs(prev.x - curr.x) < 0.001 && Math.abs(prev.y - curr.y) < 0.001) {
+      continue;
+    }
+    cleaned.push(curr);
+  }
+  // Collinear simplification pass
+  if (cleaned.length > 2) {
+    const simplified = [cleaned[0]];
+    for (let i = 1; i < cleaned.length - 1; i++) {
+      const prev = simplified[simplified.length - 1];
+      const curr = cleaned[i];
+      const next = cleaned[i + 1];
+      const isCollinearX = Math.abs(prev.x - curr.x) < 0.001 && Math.abs(curr.x - next.x) < 0.001;
+      const isCollinearY = Math.abs(prev.y - curr.y) < 0.001 && Math.abs(curr.y - next.y) < 0.001;
+      if (!isCollinearX && !isCollinearY) {
+        simplified.push(curr);
+      }
+    }
+    simplified.push(cleaned[cleaned.length - 1]);
+    return simplified;
+  }
+  return cleaned;
+}
+
 /** The right-angled path from pA (leaving along dA) to pB (arriving against dB). */
 function elbowPath(pA, dA, pB, dB) {
   const sA = { x: pA.x + dA.x * STUB, y: pA.y + dA.y * STUB };
@@ -173,7 +210,7 @@ function elbowPath(pA, dA, pB, dB) {
     }
     out.push(p);
   }
-  return out;
+  return cleanOrthogonalPath(out);
 }
 
 /** The free direction an unattached end arrives from: along the main axis towards it. */
@@ -224,7 +261,7 @@ export function routeOrthogonal(pA, dA, pB, dB, boxA = null, boxB = null) {
     }
     out.push(p);
   }
-  return out;
+  return cleanOrthogonalPath(out);
 }
 
 const quad = (p0, c, p1, t) => ({

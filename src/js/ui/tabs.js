@@ -33,7 +33,14 @@ export class WorkspaceSessionManager {
         localStorage.setItem(this.STORAGE_KEY, JSON.stringify(sessions.slice(0, 30)));
       }
     } catch (e) {
-      console.warn('Failed to persist workspace session:', e);
+      if (e?.name === 'QuotaExceededError' && typeof localStorage !== 'undefined') {
+        console.warn('localStorage quota exceeded. Pruning older sessions...');
+        try {
+          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(sessions.slice(0, 5)));
+        } catch {}
+      } else {
+        console.warn('Failed to persist workspace session:', e);
+      }
     }
     return sessionData;
   }

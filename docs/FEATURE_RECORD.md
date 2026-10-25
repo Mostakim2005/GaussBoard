@@ -375,3 +375,30 @@ This document serves as the master registry of all features, enhancements, bug f
   - `node --test test/p3-hardening.test.mjs`: 6 passed, 0 failed (100% pass rate).
   - `node scripts/smoke.js --new-features`: 24 passed, 0 failed (100% pass rate).
   - `node scripts/i18n-check.js`: 2,238 / 2,238 translated (100% parity across all 7 locales).
+
+
+### P1 Subsystems Hardening: Computational Engines & Media Pipelines
+
+- **Hardening Scope**: Full audit, numerical stability guards, and dedicated unit test suite for all 8 subsystems in `docs/hardening/01-P1-COMPUTATIONAL-ENGINES-AND-MEDIA.md`:
+  1. **Headless MNA Circuit Simulator & Semiconductors** (`src/js/core/circuit-sim.js`):
+     - Added `buildProtectedMatrix()` with $10^{-12}$ S minimum diagonal shunt conductance, preventing singular matrix division-by-zero on ungrounded nodes.
+     - Implemented `clampDiodeVoltage()` limiting algorithm, preventing floating-point exponential overflow in Shockley diode Newton-Raphson iterations.
+     - Throttled procedural audio continuity buzzer (150ms) and button clicks (40ms) to prevent Web Audio buffer starvation.
+  2. **Video Exporter & MP4 Muxer** (`src/js/export-video.js`):
+     - Clamped track duration to finite numbers $\ge 1$, eliminating division-by-zero and NaN progress calculation.
+     - Added safe runtime error catching on WebCodecs `VideoEncoder` with graceful fallback to `MediaRecorder` WebM.
+  3. **Obsidian Markdown & KaTeX Engine** (`src/js/core/markdown.js`):
+     - Hardened `renderMathToXhtml()` with `throwOnError: false`, `errorColor: '#f43f5e'`, and `strict: false`, rendering clean fallback spans on malformed LaTeX formulas.
+     - Preserved currency prices (`$500`, `$250`) as plain prose while compiling valid math formulas.
+  4. **Dynamic Calculus Function Grapher** (`src/js/ui/function-grapher.js`):
+     - Implemented vertical asymptote discontinuity detection, breaking canvas line strokes across opposite infinities in $\tan(x)$ and $1/x$.
+     - Guarded Riemann integral area formatting against non-finite values (`Number.isFinite(integralArea) ? ... : 'O.L'`).
+  5. **Multi-Tab Workspace Session Manager** (`src/js/ui/tabs.js`):
+     - Added `QuotaExceededError` recovery automatically pruning older saved sessions to prevent fatal `localStorage` exceptions.
+  6. **Manhattan 90° Orthogonal Routing** (`src/js/core/connectors.js`):
+     - Implemented and exported `cleanOrthogonalPath()` pruning duplicate consecutive points ($<0.001$) and collapsing intermediate collinear bends.
+- **Verification**:
+  - `node --test test/p1-hardening.test.mjs`: 5 passed, 0 failed (100% pass rate).
+  - `node --test test/p1-hardening.test.mjs test/p2-hardening.test.mjs test/p3-hardening.test.mjs`: 18 passed, 0 failed.
+  - `node scripts/smoke.js --new-features`: 24 passed, 0 failed.
+  - `node scripts/i18n-check.js`: 2,238 / 2,238 translated (100% parity across all 7 locales).

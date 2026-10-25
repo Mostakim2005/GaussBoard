@@ -257,10 +257,13 @@ export function renderMathToXhtml(tex, displayMode = false) {
       const html = katexObj.renderToString(raw, {
         displayMode,
         throwOnError: false,
+        errorColor: '#f43f5e',
+        strict: false,
         output: 'htmlAndMathml'
       });
       return html.replace(/<(img|br|hr|input|col|area|base|link|meta|param|source|track|wbr)([^>]*?)(?<!\/)>/gi, '<$1$2 />');
-    } catch (_) {
+    } catch (err) {
+      console.warn('KaTeX parsing error caught:', err);
       // Fall through to safe fallback
     }
   }

@@ -103,10 +103,14 @@ export class CircuitAudioSynth {
   }
 
   /**
-   * Pushbutton plastic tactile click
+   * Pushbutton plastic tactile click (throttled)
    */
   playButtonClick() {
     if (!this.enabled) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (this._lastBtnClick && now - this._lastBtnClick < 40) return;
+    this._lastBtnClick = now;
+
     const ctx = this.ensureContext();
     if (!ctx) return;
 
@@ -129,10 +133,14 @@ export class CircuitAudioSynth {
   }
 
   /**
-   * Digital multimeter continuity buzzer tone (2000 Hz)
+   * Digital multimeter continuity buzzer tone (2000 Hz, throttled to prevent audio buffer exhaustion)
    */
   playContinuityBeep() {
     if (!this.enabled) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (this._lastBeep && now - this._lastBeep < 150) return;
+    this._lastBeep = now;
+
     const ctx = this.ensureContext();
     if (!ctx) return;
 
@@ -156,6 +164,39 @@ export class CircuitAudioSynth {
 
 /** Global Procedural Audio Synthesizer singleton */
 export const circuitAudio = new CircuitAudioSynth();
+
+/**
+ * Hardening Helper: Builds an MNA node conductance matrix with minimum shunt conductance
+ * to ground (1 pS) across all diagonal entries, preventing singular matrix divide-by-zero.
+ * @param {number} numNodes
+ * @returns {Float64Array[]}
+ */
+export function buildProtectedMatrix(numNodes) {
+  const n = Math.max(1, numNodes || 1);
+  const G = Array.from({ length: n }, () => new Float64Array(n));
+  const G_MIN = 1e-12; // 1 pS minimum shunt prevents singular matrix
+  for (let i = 0; i < n; i++) {
+    G[i][i] += G_MIN;
+  }
+  return G;
+}
+
+/**
+ * Hardening Helper: Shockley diode voltage limiter preventing exponential floating-point
+ * overflow in Newton-Raphson semiconductor iterations.
+ * @param {number} vNew
+ * @param {number} vOld
+ * @param {number} [vt=0.026] Thermal voltage (approx 26mV at 300K)
+ * @returns {number}
+ */
+export function clampDiodeVoltage(vNew, vOld, vt = 0.026) {
+  if (!Number.isFinite(vNew)) return 0;
+  const vcrit = vt * Math.log(vt / (Math.SQRT2 * 1e-14));
+  if (vNew > vcrit && Math.abs(vNew - (vOld || 0)) > 2 * vt) {
+    return (vOld || 0) > 0 ? (vOld || 0) + 2 * vt : vcrit;
+  }
+  return vNew;
+}
 
 /**
  * Industrial Circuit Simulation Model
@@ -494,8 +535,10 @@ export class IndustrialCircuitSim {
           const potA = potentials.get(`${comp.id}:A`);
           const potK = potentials.get(`${comp.id}:K`);
           if (potA && !potK) {
-            if (potA.rms >= 0.7) {
-              potentials.set(`${comp.id}:K`, { instant: potA.instant - 0.7, rms: Math.max(0, potA.rms - 0.7), isDC: potA.isDC });
+            const vA = clampDiodeVoltage(potA.rms, comp._lastVA || 0);
+            comp._lastVA = vA;
+            if (vA >= 0.7) {
+              potentials.set(`${comp.id}:K`, { instant: potA.instant - 0.7, rms: Math.max(0, vA - 0.7), isDC: potA.isDC });
               changed = true;
             }
           } else if (comp.type === 'zener_diode' && potK && !potA) {

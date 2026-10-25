@@ -46,6 +46,7 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 | **BUG-051** | Localization Parity Drift on STEM Workbench & UI Discovery Keys | Medium | i18n Parity | Resolved in v6.9.1 |
 | **BUG-052** | P3 Hardening: Academic Dictionary TTS, Linter Math Guard, Periodic Table Edge Cases & Laser Lifespan | High | Utilities / Linter | Resolved |
 | **BUG-053** | P2 Hardening: SMILES % Rings, NotebookVariables DAG Cycles, Dataview Prototype Pollution, Anki Timeout & PDF Sidebar Focus | Critical | Domain Workbenches | Resolved |
+| **BUG-054** | P1 Hardening: MNA Matrix Shunts, Shockley Voltage Limiter, Asymptote Guard, Video Duration & Orthogonal Pruning | High | Computational Engines | Resolved |
 
 ---
 
@@ -529,3 +530,16 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
   7. Restored `c.object.revealed = false` on all cards in `StudyRunner.stop()`, protecting Invariant #6.
 * **Verification**: `node --test test/p2-hardening.test.mjs` (7/7 passed), `node scripts/smoke.js --new-features` (24/24 passed), `node scripts/i18n-check.js` (2,238 keys verified).
 * **Files Touched**: `src/js/ui/chemical-sketcher.js`, `src/js/core/scientific-math.js`, `src/js/core/dataview.js`, `src/js/core/anki.js`, `src/js/core/fsrs.js`, `src/js/ui/pdf-sidebar.js`, `src/js/ui/function-grapher.js`, `src/js/ui/circuit-workbench.js`, `src/js/ui/study-runner.js`, `src/js/ui/molecule-viewer.js`.
+
+
+### BUG-054: P1 Hardening: MNA Matrix Shunts, Shockley Voltage Limiter, Asymptote Guard, Video Duration & Orthogonal Pruning
+* **Symptom**: Ungrounded circuit nodes caused division-by-zero singular matrix failures in MNA; forward-biased diodes caused exponential floating-point overflow; continuous buzzer modes caused audio oscillator starvation; zero-duration audio tracks caused division-by-zero NaN in video export; function grapher plotted vertical line artifacts across asymptotes in $\tan(x)$; localStorage quota errors crashed multi-tab session saves; orthogonal routing generated duplicate collinear bends.
+* **Fix**:
+  1. Added `buildProtectedMatrix()` with $10^{-12}$ S minimum diagonal shunt conductance in `circuit-sim.js`.
+  2. Implemented `clampDiodeVoltage()` limiting algorithm and throttled continuity buzzer (150ms) and button clicks (40ms).
+  3. Clamped video export duration to finite values $\ge 1$ and added graceful WebM fallback on WebCodecs encoder errors in `export-video.js`.
+  4. Added asymptote jump discontinuity detection in `function-grapher.js` breaking line strokes across opposite infinities, and guarded Riemann integral area formatting.
+  5. Added automatic session history pruning on `QuotaExceededError` in `tabs.js`.
+  6. Implemented and exported `cleanOrthogonalPath()` in `connectors.js` pruning consecutive duplicate coordinates and intermediate collinear bends.
+* **Verification**: `node --test test/p1-hardening.test.mjs` (5/5 passed), `node scripts/smoke.js --new-features` (24/24 passed), `node scripts/i18n-check.js` (2,238 keys verified).
+* **Files Touched**: `src/js/core/circuit-sim.js`, `src/js/export-video.js`, `src/js/core/markdown.js`, `src/js/ui/function-grapher.js`, `src/js/ui/tabs.js`, `src/js/core/connectors.js`.

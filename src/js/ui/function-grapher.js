@@ -551,11 +551,20 @@ export class FunctionGrapherModal {
     ctx.beginPath();
 
     let started = false;
+    let lastY = null;
+    const ySpan = Math.abs(this.yMax - this.yMin) || 10;
+    const maxJump = ySpan * 0.7;
+
     for (let px = 0; px <= w; px += 2) {
       const x = this.xMin + (px / w) * (this.xMax - this.xMin);
       const y = this.fn(x);
 
       if (Number.isFinite(y) && y >= this.yMin - 10 && y <= this.yMax + 10) {
+        // Asymptote discontinuity guard: break path across opposing infinities
+        if (started && lastY !== null && Math.abs(y - lastY) > maxJump && Math.sign(y) !== Math.sign(lastY)) {
+          started = false;
+        }
+
         const py = toScreenY(y);
         if (!started) {
           ctx.moveTo(px, py);
@@ -563,8 +572,10 @@ export class FunctionGrapherModal {
         } else {
           ctx.lineTo(px, py);
         }
+        lastY = y;
       } else {
         started = false;
+        lastY = null;
       }
     }
     ctx.stroke();
@@ -575,10 +586,14 @@ export class FunctionGrapherModal {
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       let started2 = false;
+      let lastY2 = null;
       for (let px = 0; px <= w; px += 2) {
         const x = this.xMin + (px / w) * (this.xMax - this.xMin);
         const y = this.fn2(x);
         if (Number.isFinite(y) && y >= this.yMin - 10 && y <= this.yMax + 10) {
+          if (started2 && lastY2 !== null && Math.abs(y - lastY2) > maxJump && Math.sign(y) !== Math.sign(lastY2)) {
+            started2 = false;
+          }
           const py = toScreenY(y);
           if (!started2) {
             ctx.moveTo(px, py);
@@ -586,8 +601,10 @@ export class FunctionGrapherModal {
           } else {
             ctx.lineTo(px, py);
           }
+          lastY2 = y;
         } else {
           started2 = false;
+          lastY2 = null;
         }
       }
       ctx.stroke();
@@ -726,7 +743,7 @@ export class FunctionGrapherModal {
       const readArea = this.sidebar.querySelector('#read-area');
       if (readFx) readFx.textContent = Number.isFinite(y0) ? y0.toFixed(2) : 'NaN';
       if (readDfx) readDfx.textContent = Number.isFinite(slope) ? slope.toFixed(2) : 'NaN';
-      if (readArea) readArea.textContent = integralArea.toFixed(2);
+      if (readArea) readArea.textContent = Number.isFinite(integralArea) ? integralArea.toFixed(2) : 'O.L';
     }
   }
 

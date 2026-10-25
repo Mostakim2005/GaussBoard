@@ -201,8 +201,9 @@ export class VideoExporter {
     let rec = null;
     try {
     await waitForAudioReady(audio);
-    const durationMs = durationForTrack(track, audio);
-    if (!durationMs) throw new Error('Could not determine audio duration');
+    const rawDur = durationForTrack(track, audio);
+    const durationMs = Number.isFinite(rawDur) && rawDur > 0 ? rawDur : 1;
+    if (!rawDur) throw new Error('Could not determine audio duration');
 
     // Setup Web Audio routing to capture audio stream without microphone bleed
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -295,7 +296,7 @@ export class VideoExporter {
       }
 
       if (onProgress) {
-        onProgress(Math.min(1.0, curMs / durationMs));
+        onProgress(durationMs > 0 ? Math.min(1.0, Math.max(0, curMs / durationMs)) : 0);
       }
 
       setTimeout(renderLoop, frameInterval);
@@ -362,9 +363,12 @@ export class VideoExporter {
 
         videoEncoder = new VideoEncoder({
           output: (chunk, meta) => {
-            mp4Muxer.addVideoChunk(chunk, meta);
+            if (mp4Muxer) mp4Muxer.addVideoChunk(chunk, meta);
           },
-          error: (err) => console.warn('VideoEncoder error:', err)
+          error: (err) => {
+            console.warn('VideoEncoder runtime error, fallback to WebM:', err);
+            videoEncoder = null;
+          }
         });
 
         videoEncoder.configure({
@@ -423,7 +427,8 @@ export class VideoExporter {
 
     rec.start(250);
 
-    const totalDurationMs = tracks.reduce((sum, tr) => sum + (Number.isFinite(tr.durationMs) && tr.durationMs > 0 ? tr.durationMs : 0), 0);
+    const rawTotalDuration = tracks.reduce((sum, tr) => sum + (Number.isFinite(tr.durationMs) && tr.durationMs > 0 ? tr.durationMs : 0), 0);
+    const totalDurationMs = Number.isFinite(rawTotalDuration) && rawTotalDuration > 0 ? rawTotalDuration : 1;
     let cumulativeElapsedMs = 0;
     const frameInterval = 1000 / fps;
     const ctx = canvas.getContext('2d');
