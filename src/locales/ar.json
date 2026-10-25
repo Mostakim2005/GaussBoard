@@ -1,4 +1,11 @@
 {
+  "Restore": "استعادة",
+  "Restore workspace session": "استعادة جلسة مساحة العمل",
+  "Name for the open tabs:": "اسم للتبويبات المفتوحة:",
+  "Save workspace session": "حفظ جلسة مساحة العمل",
+  "MP4 is exported without sound. Choose WebM to keep the recording audio.": "يتم تصدير MP4 بدون صوت. اختر WebM للحفاظ على صوت التسجيل.",
+  "The recording could not be saved": "تعذّر حفظ التسجيل",
+  "That board is already open": "هذه اللوحة مفتوحة بالفعل",
   "Untitled board": "لوحة بلا عنوان",
   "Saving…": "جارٍ الحفظ…",
   "Saved": "تم الحفظ",

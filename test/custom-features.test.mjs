@@ -106,9 +106,9 @@ test('pressure-aware inking preserves legacy constant widths and responds to pre
   assert.ok(strokeWeight(varying, 8) > strokeWeight(flat, 8));
 });
 
-test('connector customization exposes three finite route geometries', () => {
+test('connector customization exposes finite route geometries', () => {
   useConnectorStore({ doc: { objects: {}, order: [] } });
-  assert.deepEqual(ROUTES, ['straight', 'elbow', 'curved']);
+  assert.deepEqual(ROUTES, ['straight', 'elbow', 'curved', 'orthogonal']);
   const outputs = ROUTES.map((kind) => route({
     type: 'connector', route: kind, a: { x: 0, y: 0 }, b: { x: 180, y: 90 },
     lineWidth: 4, heads: 'end'

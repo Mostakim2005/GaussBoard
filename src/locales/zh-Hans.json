@@ -1,4 +1,11 @@
 {
+  "Restore": "恢复",
+  "Restore workspace session": "恢复工作区会话",
+  "Name for the open tabs:": "为打开的标签页命名：",
+  "Save workspace session": "保存工作区会话",
+  "MP4 is exported without sound. Choose WebM to keep the recording audio.": "MP4 导出不含声音。请选择 WebM 以保留录音音频。",
+  "The recording could not be saved": "无法保存录音",
+  "That board is already open": "该白板已打开",
   "Untitled board": "未命名白板",
   "Saving…": "正在保存…",
   "Saved": "已保存",

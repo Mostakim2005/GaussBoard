@@ -54,3 +54,9 @@ Focused tests validate preset configuration and the dialog's returned selection.
 For the post-v4.8.1 feature audit, replay modes and cross-feature behavior, see [`../releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](../releases/AUDIT-POST-4.8.1-TO-5.0.0.md). The v5.0.0 portable release and feature-only test totals are recorded in [`../releases/RELEASE-5.0.0.md`](../releases/RELEASE-5.0.0.md).
 
 Run `npm run smoke:video` for focused frame-bounds and camera-follow checks. `npm run smoke:features:4.8.8` exercises the export-dialog choices.
+
+## 7. v6.9.2 Hardening Corrections
+
+- **Format default:** the picker now defaults to **WebM**, the pipeline that muxes the recording's audio. The WebCodecs **MP4** path writes video only, so choosing MP4 shows a translated notice that it is exported without sound; MP4 audio muxing remains an open item.
+- **Robustness:** a selected track without `assetId` fails immediately with the recording name (instead of a 15 s media timeout); a throwing `onProgress` callback cannot stop the frame pump; suggested filenames cap the descriptive part while preserving the timestamp suffix.
+- **Known limitation:** both export paths still hold the entire encoded video in memory (MediaRecorder chunks or the muxer's in-memory fast-start buffer, plus the final Blob/ArrayBuffer). Streaming to disk needs append/seek-capable IPC across desktop, Android and web adapters, plus a save dialog before encoding. See `hardening/AUDIT_LOG.md`.

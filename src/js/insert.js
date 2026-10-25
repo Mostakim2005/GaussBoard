@@ -496,13 +496,24 @@ export async function insertAudioFromPath(app, p) {
     t1: durationMs ? Date.now() + durationMs : 0
   };
 
-  if (!Array.isArray(app.store.doc.audioTracks)) app.store.doc.audioTracks = [];
-  app.store.doc.audioTracks.push(track);
+  // Track metadata is document state: commit it as a transaction so it can be
+  // undone and so autosave sees a normal revision (the old direct push made
+  // the track impossible to undo and invisible to the revision cache).
+  const store = app.store;
+  if (!Array.isArray(store.doc.audioTracks)) store.doc.audioTracks = [];
+  const snapshotTracks = () => store.doc.audioTracks.map((item) => ({
+    ...item,
+    bookmarks: Array.isArray(item.bookmarks) ? item.bookmarks.map((bm) => ({ ...bm })) : []
+  }));
+  const before = snapshotTracks();
+  store.doc.audioTracks.push(track);
+  const after = snapshotTracks();
+  store.commit?.('import audio', [{ t: 'doc', before: { audioTracks: before }, after: { audioTracks: after } }]);
   if (typeof app.persist === 'function') await app.persist();
   if (app.replayBar?.updateAudioUI) app.replayBar.updateAudioUI();
-  if (app.audioBar?.open) app.audioBar.open(track);
+  if (app.audioBar?.open) app.audioBar.open(store.doc.audioTracks[store.doc.audioTracks.length - 1] || track);
   app.toast?.(t('Audio imported: {name}', { name }));
-  return track;
+  return store.doc.audioTracks[store.doc.audioTracks.length - 1] || track;
 }
 
 export async function pickAndInsertAudio(app) {

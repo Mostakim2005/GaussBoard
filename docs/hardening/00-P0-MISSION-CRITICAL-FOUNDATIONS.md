@@ -4,6 +4,7 @@
 > **Status**: Ready for Sequential Execution  
 > **Hardening Tier**: **`P0 — Zero Tolerance / Mission Critical`**  
 > **Objective**: Bulletproof the 5 foundational subsystems whose failure causes data loss, canvas drawing lockups, handwriting destruction, or violation of the 6 Golden Invariants.
+> **Audit status (v6.9.2, 2026-10-25)**: **Executed and audited against live source** — 35 findings logged, 33 fixed, 2 open (one mitigated in-scope item and one out-of-scope verification note). Finding-level record, verification and manual test list: [`AUDIT_LOG.md`](AUDIT_LOG.md). The methods below were treated as input suggestions; several real defects (including a replay pass painting over concealed covers and eraser fragments losing their timestamps) were found beyond the dossier's predicted failure modes.
 
 ---
 

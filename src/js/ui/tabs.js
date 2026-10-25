@@ -7,7 +7,24 @@ export class WorkspaceSessionManager {
   static listSessions() {
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(this.STORAGE_KEY) : null;
-      return raw ? JSON.parse(raw) : [];
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      // Anything corrupt in localStorage used to reach callers as-is: a
+      // non-array made saveSession throw, and a tab entry that was not an
+      // object broke tab rendering. Normalise to the expected shape.
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter((s) => s && typeof s === 'object' && typeof s.name === 'string' && s.name)
+        .slice(0, 50)
+        .map((s) => ({
+          name: String(s.name).slice(0, 200),
+          savedAt: Number.isFinite(Number(s.savedAt)) ? Number(s.savedAt) : 0,
+          tabs: (Array.isArray(s.tabs) ? s.tabs : [])
+            .filter((tab) => tab && typeof tab === 'object' && typeof tab.id === 'string')
+            .slice(0, 50)
+            .map((tab) => ({ id: tab.id, title: typeof tab.title === 'string' ? tab.title : '' })),
+          activeId: typeof s.activeId === 'string' ? s.activeId : null
+        }));
     } catch {
       return [];
     }
@@ -58,9 +75,39 @@ export class WorkspaceSessionManager {
   static getSession(name) {
     return this.listSessions().find(s => s.name === name) || null;
   }
+
 }
 
 export class TabBar {
+  /**
+   * Board content in the shape `Store.load()` expects.
+   *
+   * Accepts either a live store document (`objects` dictionary + `order`) or a
+   * board-file payload (`objects` array). The tab cache keeps the former.
+   */
+  static docToPayload(doc) {
+    if (!doc || typeof doc !== 'object') return null;
+    if (Array.isArray(doc.objects)) return { ...doc };
+    const objects = doc.objects && typeof doc.objects === 'object' ? doc.objects : {};
+    const order = Array.isArray(doc.order) ? doc.order : Object.keys(objects);
+    return {
+      id: doc.id,
+      name: doc.name,
+      schema: doc.schema ?? 2,
+      created: doc.created,
+      modified: doc.modified,
+      origin: doc.origin,
+      pageDates: doc.pageDates,
+      background: doc.background,
+      pages: doc.pages,
+      page: Array.isArray(doc.pages) ? (doc.pages[0] || null) : null,
+      audioTracks: doc.audioTracks,
+      camera: doc.camera,
+      properties: doc.properties,
+      objects: order.map((id) => objects[id]).filter(Boolean)
+    };
+  }
+
   constructor(app) {
     this.app = app;
     this.el = null;
@@ -131,8 +178,11 @@ export class TabBar {
     if (!this.activeId || !this.app.store?.doc) return;
     try {
       const docSnapshot = JSON.parse(JSON.stringify(this.app.store.doc));
-      const undoStack = this.app.store._undoStack ? [...this.app.store._undoStack] : [];
-      const redoStack = this.app.store._redoStack ? [...this.app.store._redoStack] : [];
+      // Store keeps `undoStack`/`redoStack` (no underscore). Reading the wrong
+      // names cached two empty arrays, so switching tabs silently discarded
+      // the board's undo history.
+      const undoStack = Array.isArray(this.app.store.undoStack) ? [...this.app.store.undoStack] : [];
+      const redoStack = Array.isArray(this.app.store.redoStack) ? [...this.app.store.redoStack] : [];
       const camera = this.app.surface?.cam ? {
         x: this.app.surface.cam.x,
         y: this.app.surface.cam.y,
@@ -184,7 +234,22 @@ export class TabBar {
     this.scrollActiveIntoView();
   }
 
-  async switchTab(targetId) {
+  switchTab(targetId) {
+    if (!targetId) return Promise.resolve();
+    /*
+     * Serialise tab switches. Each one has awaits (save, asset resolution,
+     * board load); clicking two tabs quickly used to run them concurrently,
+     * so a later switch could cache the previous board's document under the
+     * new tab's id - corrupting that tab's cached content for the session.
+     */
+    const run = (this._switchQueue || Promise.resolve())
+      .catch(() => {})
+      .then(() => this._switchTabNow(targetId));
+    this._switchQueue = run;
+    return run;
+  }
+
+  async _switchTabNow(targetId) {
     if (!targetId || targetId === this.activeId) return;
 
     try {
@@ -197,23 +262,24 @@ export class TabBar {
     this.activeId = targetId;
 
     const cached = this.cache.get(targetId);
-    if (cached) {
+    if (cached?.docSnapshot) {
       cached.timestamp = Date.now();
       try {
-        this.app.store.reset();
-        this.app.store.doc = JSON.parse(JSON.stringify(cached.docSnapshot));
-        if (cached.undoStack) this.app.store._undoStack = [...cached.undoStack];
-        if (cached.redoStack) this.app.store._redoStack = [...cached.redoStack];
-        if (cached.camera && this.app.surface?.cam) {
-          this.app.surface.cam.x = cached.camera.x;
-          this.app.surface.cam.y = cached.camera.y;
-          this.app.surface.cam.z = cached.camera.z;
-        }
-        const titleInput = typeof document !== 'undefined' ? document.getElementById('boardTitle') : null;
-        if (titleInput) titleInput.value = this.app.store.doc.name || t('Untitled board');
-
-        this.app.surface.selection.clear();
-        this.app.surface.damageAll();
+        /*
+         * Load through the normal board path. Assigning `store.doc` directly
+         * skipped the Store's own load (no revision bump, so rev-keyed caches
+         * could still describe the previous board, and no normalisation of
+         * pages/tags/audio) and left the app-level state - title, last-board
+         * pointer, Recent, back pill - pointing at the tab we just left.
+         */
+        const payload = TabBar.docToPayload(cached.docSnapshot);
+        if (!payload) throw new Error('empty tab snapshot');
+        payload.camera = cached.camera || payload.camera;
+        await this.app.loadBoard(payload, { silent: true, claimed: true });
+        // loadBoard resets history; put this tab's own history back.
+        if (Array.isArray(cached.undoStack)) this.app.store.undoStack = [...cached.undoStack];
+        if (Array.isArray(cached.redoStack)) this.app.store.redoStack = [...cached.redoStack];
+        this.app.surface?.damageAll?.();
         this.app.syncUI();
         this.render();
         this.scrollActiveIntoView();
@@ -489,16 +555,28 @@ export class TabBar {
         if (loaded) docToCopy = loaded;
       }
       if (docToCopy) {
+        /*
+         * Copy the whole board, not just its object dictionary. The old code
+         * assigned `doc.objects` but never `doc.order` (and an on-disk payload
+         * has `objects` as an ARRAY), so "Duplicate tab" produced a tab that
+         * rendered as an empty board.
+         */
+        const payload = TabBar.docToPayload(docToCopy);
+        if (!payload) return;
         this.app.newBoard(true);
-        this.app.store.doc.objects = JSON.parse(JSON.stringify(docToCopy.objects || {}));
-        this.app.store.doc.name = (docToCopy.name || t('Untitled board')) + ' (Copy)';
+        const newId = this.app.store.doc.id;
+        const baseName = docToCopy.name || docToCopy.title || t('Untitled board');
+        payload.id = newId;
+        payload.name = `${baseName} (Copy)`;
+        this.app.store.load(payload);
+        const titleInput = typeof document !== 'undefined' ? document.getElementById('boardTitle') : null;
+        if (titleInput) titleInput.value = this.app.store.doc.name;
         this.app.surface?.damageAll();
         this.app.syncUI();
-        const newId = this.app.store.doc.id;
-        const newName = this.app.store.doc.name;
-        this.tabs.push({ id: newId, title: newName });
+        this.tabs.push({ id: newId, title: this.app.store.doc.name });
         this.activeId = newId;
         this.render();
+        this.scrollActiveIntoView();
       }
     } catch (e) {
       console.warn('[tabs] duplicate tab failed:', e);
@@ -526,36 +604,54 @@ export class TabBar {
   async restoreSession(name) {
     const session = WorkspaceSessionManager.getSession(name);
     if (!session || !session.tabs.length) return false;
-    this.tabs = [...session.tabs];
+    this.tabs = session.tabs.map((tab) => ({ ...tab }));
     this.render();
-    if (session.activeId) {
-      await this.switchTab(session.activeId);
-    } else if (this.tabs.length) {
-      await this.switchTab(this.tabs[0].id);
-    }
+    const activeExists = this.tabs.some((tab) => tab.id === session.activeId);
+    const targetId = activeExists ? session.activeId : this.tabs[0].id;
+    if (targetId) await this.switchTab(targetId);
     return true;
   }
 
-  promptSaveSession() {
-    const name = window.prompt(t('Enter session name to save open tabs:'), `Session ${new Date().toLocaleDateString()}`);
+  async promptSaveSession() {
+    const fallback = `Session ${new Date().toLocaleDateString()}`;
+    let name = null;
+    try {
+      if (typeof this.app?.askText === 'function') {
+        name = await this.app.askText(t('Save workspace session'),
+          t('Name for the open tabs:'), { value: fallback, ok: t('Save') });
+      } else if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+        name = window.prompt(t('Enter session name to save open tabs:'), fallback);
+      }
+    } catch { name = null; }
+    name = String(name || '').trim();
     if (!name) return;
     this.saveCurrentSession(name);
     this.app.toast?.(t('Workspace session saved: {name}', { name }));
   }
 
-  promptRestoreSession() {
+  async promptRestoreSession() {
     const sessions = WorkspaceSessionManager.listSessions();
     if (!sessions.length) {
       this.app.toast?.(t('No saved sessions found'));
       return;
     }
-    const sessionNames = sessions.map(s => s.name).join('\n');
-    const chosen = window.prompt(t('Enter name of session to restore:\n\n{list}', { list: sessionNames }), sessions[0].name);
+    const list = sessions.map((s) => s.name).join('\n');
+    let chosen = null;
+    try {
+      if (typeof this.app?.askText === 'function') {
+        // window.prompt is not available in Electron, which made session
+        // restore unreachable from the tab menu; use the app's own dialog.
+        chosen = await this.app.askText(t('Restore workspace session'), list,
+          { value: sessions[0].name, ok: t('Restore') });
+      } else if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+        chosen = window.prompt(t('Enter name of session to restore:\n\n{list}', { list }), sessions[0].name);
+      }
+    } catch { chosen = null; }
+    chosen = String(chosen || '').trim();
     if (!chosen) return;
-    this.restoreSession(chosen).then(ok => {
-      if (ok) this.app.toast?.(t('Restored session: {name}', { name: chosen }));
-      else this.app.toast?.(t('Could not restore session'));
-    });
+    const ok = await this.restoreSession(chosen);
+    if (ok) this.app.toast?.(t('Restored session: {name}', { name: chosen }));
+    else this.app.toast?.(t('Could not restore session'));
   }
 
   toggleVisibility(visible) {

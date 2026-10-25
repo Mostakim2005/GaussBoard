@@ -54,6 +54,12 @@ export class CircuitAudioSynth {
    */
   playContactorClick(energized = true) {
     if (!this.enabled) return;
+    // A coil sitting on its pickup/dropout threshold can change state on every
+    // simulation step. Unthrottled that schedules dozens of oscillators a
+    // second and starves the audio buffers, so gate the click like the button.
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (this._lastContactorAt && now - this._lastContactorAt < 25) return;
+    this._lastContactorAt = now;
     const ctx = this.ensureContext();
     if (!ctx) return;
 
@@ -81,6 +87,9 @@ export class CircuitAudioSynth {
    */
   playBreakerSnap() {
     if (!this.enabled) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (this._lastSnapAt && now - this._lastSnapAt < 25) return;
+    this._lastSnapAt = now;
     const ctx = this.ensureContext();
     if (!ctx) return;
 
@@ -245,6 +254,17 @@ export class IndustrialCircuitSim {
     this.components.clear();
     this.wires = [];
     this.time = 0;
+    // A new circuit has different ports: probes and scope channels pointing at
+    // the old components would silently keep reading 0 V / O.L forever.
+    this.dmm.red = null;
+    this.dmm.black = null;
+    this.dmm.reading = 0;
+    this.dmm.powerWatts = 0;
+    this.dmm.overheatWarning = false;
+    this.scope.chA = null;
+    this.scope.chB = null;
+    this.scope.historyA = [];
+    this.scope.historyB = [];
   }
 
   /**
@@ -295,6 +315,11 @@ export class IndustrialCircuitSim {
    * @param {number} dt
    */
   step(dt = 0.0166) {
+    // Guard the public entry point: a NaN/negative step used to poison
+    // `this.time` and therefore every voltage in the circuit for the rest of
+    // the session. Clamp to something a frame could plausibly be.
+    if (!Number.isFinite(dt) || dt <= 0) dt = 0.0166;
+    else if (dt > 0.25) dt = 0.25;
     this.time += dt;
     const omega = 2 * Math.PI * this.frequency;
     const t = this.time;
@@ -309,8 +334,21 @@ export class IndustrialCircuitSim {
     // Port potentials map: 'comp:port' -> { instant: number, rms: number, isDC: boolean }
     const potentials = new Map();
 
+    /*
+     * Armature positions decided at the end of the previous step. Applying
+     * them before propagation (rather than deciding inside it) is what lets a
+     * contactor hold itself: its aux NO contact is part of its own coil feed.
+     */
+    for (const comp of this.components.values()) {
+      if (comp.type !== 'contactor' || comp._nextEnergized == null) continue;
+      if (comp._nextEnergized !== !!comp.energized) {
+        comp.energized = comp._nextEnergized;
+        this.audio.playContactorClick(comp.energized);
+      }
+    }
+
     const setPort = (port, instant, rms = Math.abs(instant), isDC = false) => {
-      potentials.set(port, { instant, rms, isDC });
+      potentials.set(port, { instant, rms, isDC, src: port });
     };
 
     // Initialize Power Sources
@@ -332,9 +370,18 @@ export class IndustrialCircuitSim {
     }
 
     // 2. Multi-pass iterative potential propagation across closed switches & wires
+    /*
+     * One pass can only push a potential one hop along a chain that happens to
+     * be walked backwards, so a fixed limit of 12 silently left long ladder
+     * rungs half-powered (some nodes never received a potential at all, which
+     * then reads as 0 V and stalls motors or contactor coils). Potentials are
+     * only ever ADDED, never overwritten, so the process is monotone and is
+     * bounded by the number of ports: use that as the limit instead.
+     */
     let changed = true;
     let iterations = 0;
-    while (changed && iterations < 12) {
+    const maxPasses = Math.min(5000, this.components.size * 12 + this.wires.length + 8);
+    while (changed && iterations < maxPasses) {
       changed = false;
       iterations++;
 
@@ -365,24 +412,18 @@ export class IndustrialCircuitSim {
 
         // AC Contactor (KM)
         if (comp.type === 'contactor') {
-          // Check coil excitation across A1 and A2
-          const potA1 = potentials.get(`${comp.id}:A1`);
-          const potA2 = potentials.get(`${comp.id}:A2`);
-          let coilVoltsRMS = 0;
-          if (potA1 && potA2) {
-            coilVoltsRMS = Math.abs(potA1.rms - potA2.rms);
-            if (potA1.isDC !== potA2.isDC) coilVoltsRMS = potA1.rms; // Approximate reference
-          } else if (potA1) {
-            coilVoltsRMS = potA1.rms;
-          }
-
-          const threshold = comp.coilRatedVoltage ? comp.coilRatedVoltage * 0.75 : 180;
-          const wasEnergized = comp.energized;
-          comp.energized = coilVoltsRMS >= threshold;
-
-          if (comp.energized !== wasEnergized) {
-            this.audio.playContactorClick(comp.energized);
-          }
+          /*
+           * Contacts follow the state decided at the END of the previous step.
+           *
+           * A holding contactor's own aux NO contact is part of its coil
+           * circuit, so deciding the state from potentials that are still only
+           * half-propagated made the latch impossible: the coil read "no A1
+           * yet" early in the pass, dropped out, and opened the very contact
+           * that was carrying its own supply. Deciding after propagation (one
+           * step of contactor delay, like a real armature) makes self-hold and
+           * the forward/reverse interlock work.
+           * See the state decision after the propagation loop.
+           */
 
           // Main poles 1-2, 3-4, 5-6 (NO contacts: closed when energized)
           if (comp.energized) {
@@ -535,8 +576,18 @@ export class IndustrialCircuitSim {
           const potA = potentials.get(`${comp.id}:A`);
           const potK = potentials.get(`${comp.id}:K`);
           if (potA && !potK) {
-            const vA = clampDiodeVoltage(potA.rms, comp._lastVA || 0);
-            comp._lastVA = vA;
+            /*
+             * Forward drop straight from the source potential.
+             *
+             * This model propagates node potentials instead of iterating a
+             * Newton-Raphson solve, so there is no exponential to overflow and
+             * nothing to limit: applying the solver's jump limiter here capped
+             * the anode at ~0.73 V and then let it climb by 52 mV PER STEP, so
+             * every circuit with a series diode (bridge rectifier, protection
+             * diode) showed a few tens of millivolts where 23 V belonged and
+             * crept towards the real value over several seconds.
+             */
+            const vA = Number.isFinite(potA.rms) ? potA.rms : 0;
             if (vA >= 0.7) {
               potentials.set(`${comp.id}:K`, { instant: potA.instant - 0.7, rms: Math.max(0, vA - 0.7), isDC: potA.isDC });
               changed = true;
@@ -636,8 +687,17 @@ export class IndustrialCircuitSim {
             vOut = Math.min(vPos - 1.2, Math.max(vNeg, vp * comp.configuredGain));
           }
           const curOut = potentials.get(`${comp.id}:OUT`);
-          if (!curOut || Math.abs(curOut.rms - vOut) > 0.05) {
+          if (!curOut) {
             potentials.set(`${comp.id}:OUT`, { instant: vOut, rms: vOut, isDC: true });
+            changed = true;
+          } else if (Math.abs(curOut.rms - vOut) > 0.05) {
+            // Mutate the node IN PLACE: wires and closed contacts downstream
+            // hold the same object, so a value recomputed after they were
+            // reached is seen everywhere instead of the old copy sticking
+            // (that is why the output LED used to stay dark).
+            curOut.instant = vOut;
+            curOut.rms = vOut;
+            curOut.isDC = true;
             changed = true;
           }
         }
@@ -654,12 +714,18 @@ export class IndustrialCircuitSim {
           }
           const outV = comp.high ? Math.max(0, vcc - 1.2) : 0;
           const curOut = potentials.get(`${comp.id}:3`);
-          if (!curOut || curOut.rms !== outV) {
+          if (!curOut) {
             potentials.set(`${comp.id}:3`, { instant: outV, rms: outV, isDC: true });
+            changed = true;
+          } else if (curOut.rms !== outV) {
+            // In-place, so downstream loads see the toggle (see the op-amp).
+            curOut.instant = outV; curOut.rms = outV; curOut.isDC = true;
             changed = true;
           }
           if (!comp.high) {
-            potentials.set(`${comp.id}:7`, { instant: 0, rms: 0, isDC: true });
+            const pin7 = potentials.get(`${comp.id}:7`);
+            if (!pin7) potentials.set(`${comp.id}:7`, { instant: 0, rms: 0, isDC: true });
+            else if (pin7.rms !== 0) { pin7.instant = 0; pin7.rms = 0; pin7.isDC = true; }
           }
         }
 
@@ -681,8 +747,13 @@ export class IndustrialCircuitSim {
           }
           const outV = out ? 5.0 : 0.0;
           const curOut = potentials.get(`${comp.id}:Y`);
-          if (!curOut || curOut.rms !== outV) {
+          if (!curOut) {
             potentials.set(`${comp.id}:Y`, { instant: outV, rms: outV, isDC: true });
+            changed = true;
+          } else if (curOut.rms !== outV) {
+            // In-place, so a gate whose inputs arrived after the wire to its
+            // LED was already filled still updates that LED.
+            curOut.instant = outV; curOut.rms = outV; curOut.isDC = true;
             changed = true;
           }
         }
@@ -740,6 +811,28 @@ export class IndustrialCircuitSim {
           changed = true;
         }
       }
+    }
+
+    /*
+     * Decide each contactor's armature position from the COMPLETED potentials.
+     * It takes effect at the start of the next step (see above), giving the
+     * coil circuit one armature delay - the same order a real contactor has.
+     */
+    for (const comp of this.components.values()) {
+      if (comp.type !== 'contactor') continue;
+      const potA1 = potentials.get(`${comp.id}:A1`);
+      const potA2 = potentials.get(`${comp.id}:A2`);
+      let coilVoltsRMS = 0;
+      if (potA1 && potA2) {
+        coilVoltsRMS = Math.abs(potA1.rms - potA2.rms);
+        if (potA1.isDC !== potA2.isDC) coilVoltsRMS = potA1.rms; // Approximate reference
+      } else if (potA1) {
+        coilVoltsRMS = potA1.rms;
+      } else if (potA2) {
+        coilVoltsRMS = potA2.rms;
+      }
+      const threshold = comp.coilRatedVoltage ? comp.coilRatedVoltage * 0.75 : 180;
+      comp._nextEnergized = coilVoltsRMS >= threshold;
     }
 
     // 3. Evaluate Loads: Motors, Pilot Lights, and Branch Currents
@@ -830,6 +923,11 @@ export class IndustrialCircuitSim {
     let vRed = potRed ? potRed.rms : 0;
     let vBlack = potBlack ? potBlack.rms : 0;
     let vDiff = Math.abs(vRed - vBlack);
+    // A probe on a dead/unconnected port has NO potential, which is not the
+    // same thing as a 0 V node. Treating the two alike made every pair of
+    // isolated terminals read as a dead short in RES/CONT mode.
+    const bothProbed = !!(this.dmm.red && this.dmm.black);
+    const bothLive = !!(potRed && potBlack);
 
     // Calculate approximate branch current and power dissipation P = V * I
     const branchResistance = 35; // typical industrial load impedance (Ohms)
@@ -859,11 +957,13 @@ export class IndustrialCircuitSim {
         this.dmm.unit = 'W (Power)';
         break;
       case 'RES':
-        if (this.dmm.red && this.dmm.black) {
+        if (bothProbed) {
           if (this.dmm.red === this.dmm.black) {
             this.dmm.reading = '0.02';
+          } else if (bothLive && vDiff === 0) {
+            this.dmm.reading = '0.15';
           } else {
-            this.dmm.reading = vDiff > 0 ? 'O.L' : '0.15';
+            this.dmm.reading = 'O.L';
           }
         } else {
           this.dmm.reading = 'O.L';
@@ -871,7 +971,7 @@ export class IndustrialCircuitSim {
         this.dmm.unit = 'Ω';
         break;
       case 'CONT':
-        if (this.dmm.red && this.dmm.black && (this.dmm.red === this.dmm.black || vDiff === 0)) {
+        if (bothProbed && (this.dmm.red === this.dmm.black || (bothLive && vDiff === 0))) {
           this.dmm.reading = '0.0';
           this.audio.playContinuityBeep();
         } else {
@@ -1064,6 +1164,38 @@ export class IndustrialCircuitSim {
       x: 520,
       y: 330
     });
+
+    /*
+     * Wire the reverse half. Until now this preset added the contactor and the
+     * button and then stopped: choosing "Forward-Reverse Interlock" gave a DOL
+     * starter with two unconnected parts, and nothing reversed or interlocked.
+     */
+    // Interlock: the forward coil now returns through KM2's NC aux contact
+    // instead of straight to A1, so the two coils can never both pull in.
+    this.wires = this.wires.filter((w) => !(
+      (w.from === 'KM1:14' && w.to === 'KM1:A1') || (w.from === 'KM1:A1' && w.to === 'KM1:14')
+    ));
+    this.addWire('KM1:14', 'KM2:21', '#e81123');
+    this.addWire('KM2:22', 'KM1:A1', '#e81123');
+
+    // Reverse control circuit: same node after the Stop button, own start
+    // button, own self-hold aux contact, and the forward contactor's NC in the
+    // return path.
+    this.addWire('SB2:3', 'SB3:3', '#e81123');
+    this.addWire('SB3:3', 'KM2:13', '#e81123');
+    this.addWire('SB3:4', 'KM2:14', '#e81123');
+    this.addWire('KM2:14', 'KM1:21', '#e81123');
+    this.addWire('KM1:22', 'KM2:A1', '#e81123');
+    this.addWire('KM2:A2', 'L_GRID:N', '#0078d4');
+
+    // Reverse main circuit: fed from the same breaker, L1/L2 swapped at the
+    // motor so the field rotates the other way.
+    this.addWire('QF1:2', 'KM2:1', '#8b4513');
+    this.addWire('QF1:4', 'KM2:3', '#201f1e');
+    this.addWire('QF1:6', 'KM2:5', '#605e5c');
+    this.addWire('KM2:2', 'FR1:3', '#8b4513');
+    this.addWire('KM2:4', 'FR1:1', '#201f1e');
+    this.addWire('KM2:6', 'FR1:5', '#605e5c');
   }
 
   /**
@@ -1092,12 +1224,17 @@ export class IndustrialCircuitSim {
     this.clear();
     this.addComponent({ id: 'VDC1', type: 'dc_supply', name: '±12V Dual Supply', x: 60, y: 80 });
     this.addComponent({ id: 'OA1', type: 'opamp', name: 'LM741 Op-Amp', configuredGain: 10, x: 280, y: 80 });
-    this.addComponent({ id: 'POT1', type: 'pushbutton', name: 'Input AC/DC Signal (1V)', pressed: true, x: 60, y: 260 });
+    // The button is the signal gate: pressing it feeds the supply into IN+
+    // through its NO contact. Previously pressed:true used the NC contact and
+    // port 1 was fed by nothing at all, so the amplifier input was floating at
+    // 0 V and the preset could never show a gain or light its output LED.
+    this.addComponent({ id: 'POT1', type: 'pushbutton', name: 'Input AC/DC Signal (1V)', pressed: false, x: 60, y: 260 });
     this.addComponent({ id: 'LED1', type: 'led', name: 'Output Saturation LED', forwardVoltage: 2.0, color: '#22c55e', x: 500, y: 90 });
 
     this.addWire('VDC1:+', 'OA1:V+', '#e81123');
     this.addWire('VDC1:-', 'OA1:V-', '#0078d4');
-    this.addWire('POT1:1', 'OA1:IN+', '#ffd94a');
+    this.addWire('VDC1:+', 'POT1:3', '#ffd94a');
+    this.addWire('POT1:4', 'OA1:IN+', '#ffd94a');
     this.addWire('OA1:OUT', 'LED1:A', '#ffd94a');
     this.addWire('LED1:K', 'VDC1:-', '#0078d4');
     this.dmm.red = 'OA1:OUT';
@@ -1136,12 +1273,15 @@ export class IndustrialCircuitSim {
     this.addComponent({ id: 'LED_S', type: 'led', name: 'Sum Output LED', color: '#22c55e', x: 500, y: 120 });
     this.addComponent({ id: 'LED_C', type: 'led', name: 'Carry Output LED', color: '#ef4444', x: 500, y: 280 });
 
-    this.addWire('VDC1:+', 'IN_A:1', '#e81123');
-    this.addWire('VDC1:+', 'IN_B:1', '#e81123');
-    this.addWire('IN_A:2', 'G_XOR:A', '#ffd94a');
-    this.addWire('IN_A:2', 'G_AND:A', '#ffd94a');
-    this.addWire('IN_B:2', 'G_XOR:B', '#00e5ff');
-    this.addWire('IN_B:2', 'G_AND:B', '#00e5ff');
+    // The input buttons are logic levels: pressed = 1. Their NO contact (3-4)
+    // is the one that closes when pressed - wiring 1-2 used the NC contact, so
+    // pressing a bit DISCONNECTED it and neither LED could ever light.
+    this.addWire('VDC1:+', 'IN_A:3', '#e81123');
+    this.addWire('VDC1:+', 'IN_B:3', '#e81123');
+    this.addWire('IN_A:4', 'G_XOR:A', '#ffd94a');
+    this.addWire('IN_A:4', 'G_AND:A', '#ffd94a');
+    this.addWire('IN_B:4', 'G_XOR:B', '#00e5ff');
+    this.addWire('IN_B:4', 'G_AND:B', '#00e5ff');
     this.addWire('G_XOR:Y', 'LED_S:A', '#22c55e');
     this.addWire('G_AND:Y', 'LED_C:A', '#ef4444');
     this.addWire('LED_S:K', 'VDC1:-', '#0078d4');

@@ -24,6 +24,7 @@ export class ReplayEngine {
     this.playGeneration = 0;
     this.lastError = null;
     this._centerFollowAt = null;
+    this._skipSilenceAt = -Infinity;
     if (this.audio) {
       this.audio.addEventListener('timeupdate', () => this.syncClock());
       this.audio.addEventListener('ended', () => this.onEnded());
@@ -68,22 +69,27 @@ export class ReplayEngine {
         fetch(`app://board/asset/${track.assetId}`)
           .then((r) => r.arrayBuffer())
           .then((buf) => {
-            if (generation !== this.loadGeneration) return;
+            if (generation !== this.loadGeneration) return null;
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            // The context is closed on BOTH paths: a decode that rejects used
+            // to leak it, and Chromium only allows a handful per window.
             return ctx.decodeAudioData(buf).then((decoded) => {
-              if (generation !== this.loadGeneration) { try { ctx.close(); } catch {} return; }
-              this.audioBuffer = decoded;
-              if (this.track && (!this.track.durationMs || this.track.durationMs <= 0)) {
-                this.track.durationMs = Math.round(decoded.duration * 1000);
+              if (generation === this.loadGeneration) {
+                if (this.track && (!this.track.durationMs || this.track.durationMs <= 0)) {
+                  this.track.durationMs = Math.round(decoded.duration * 1000);
+                }
+                if (this.app?.audioBar?.setWaveformBuffer) {
+                  this.app.audioBar.setWaveformBuffer(decoded);
+                }
+                if (this.app?.audioBar?.syncUI) {
+                  this.app.audioBar.syncUI();
+                }
               }
-              if (this.app?.audioBar?.setWaveformBuffer) {
-                this.app.audioBar.setWaveformBuffer(decoded);
-              }
-              if (this.app?.audioBar?.syncUI) {
-                this.app.audioBar.syncUI();
-              }
-              try { ctx.close(); } catch {}
-            });
+              // Only the peaks are wanted. A decoded lecture is hundreds of
+              // megabytes of PCM; keeping it pinned for the session's life is
+              // how a long recording took the whole renderer down.
+              this.audioBuffer = null;
+            }).finally(() => { try { ctx.close(); } catch {} });
           })
           .catch(() => {});
       } catch {}
@@ -310,6 +316,14 @@ export class ReplayEngine {
 
   checkSkipSilence() {
     if (!this.app?.settings?.replaySkipSilence || !this.active || this.pendingSeekMs != null) return false;
+    // Once every 60 Hz frame is far more often than silence can start: the
+    // test walks every stroke on the board (and every bookmark), so it is
+    // limited to four times a second. -Infinity so the first check after the
+    // setting is switched on always runs (performance.now() can itself be
+    // near zero in a fresh process).
+    const perfNow = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (perfNow - this._skipSilenceAt < 250) return false;
+    this._skipSilenceAt = perfNow;
     const strokes = this.getTrackStrokes();
     if (!strokes.length) return false;
     const nowMs = this.currentTimeMs;

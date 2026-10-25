@@ -599,7 +599,12 @@ function wireTopBar(app) {
         app.audioRecorder = new AudioRecorder(app);
       }
       if (app.audioRecorder.state === 'recording') {
-        const res = await app.audioRecorder.stop();
+        let res = null;
+        try {
+          res = await app.audioRecorder.stop();
+        } catch {
+          res = null;
+        }
         if (res && res.assetId) {
           const track = {
             id: res.id,
@@ -618,14 +623,24 @@ function wireTopBar(app) {
           if (typeof app.persist === 'function') await app.persist();
           if (app.replayBar?.syncAudioState) app.replayBar.syncAudioState();
           if (app.audioBar?.syncUI) app.audioBar.syncUI();
+          app.toast?.(t('Recording stopped and saved to board'));
+        } else {
+          // The recorder failed to finalize: saying "saved" here would be a lie.
+          app.toast?.(t('The recording could not be saved'));
         }
         updateRecState(false);
-        app.toast?.(t('Recording stopped and saved to board'));
       } else {
-        await app.audioRecorder.start();
-        if (app.audioRecorder.state === 'recording') {
-          updateRecState(true);
-          app.toast?.(t('Recording started... Speak while you write!'));
+        try {
+          await app.audioRecorder.start();
+          if (app.audioRecorder.state === 'recording') {
+            updateRecState(true);
+            app.toast?.(t('Recording started... Speak while you write!'));
+          }
+        } catch (err) {
+          // A blocked microphone used to reject silently (no toast, button
+          // still looking idle).
+          app.toast?.(t('Microphone access denied: ') + (err?.message || ''));
+          updateRecState(false);
         }
       }
     });

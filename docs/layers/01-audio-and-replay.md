@@ -89,3 +89,12 @@ npm run smoke:custom
 - **v4.8.10 replay camera follow:** Replay follows the currently animated stroke when `settings.replayCameraFollow` is enabled; AudioBar provides a persistent toggle. See [`../releases/RELEASE-4.8.10.md`](../releases/RELEASE-4.8.10.md).
 - **v5.3.0 replay lateral features & undo hardening:** Added **Skip Silence During Audio Replay** (`settings.replaySkipSilence`, default `false`, exposed in AudioBar 3-dot menu and Settings) which fast-forwards silent gaps $>2.0\text{ s}$ between stroke clusters while stopping at bookmarks, and **Tap Stroke to Seek Audio** (`settings.tapStrokeToSeek`, default `true`, exposed in Settings) which seeks playback to `stroke.t0` when tapping a recorded stroke in Reading Mode or with the Select tool while AudioBar is open. Audio track and bookmark mutations now commit valid `{ t: 'doc', before: { audioTracks }, after: { audioTracks } }` operations (`BUG-043`).
 - **Change history:** See `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md` for version boundaries and correction notes, and [`../releases/RELEASE-5.3.0.md`](../releases/RELEASE-5.3.0.md) for v5.3.0 details.
+
+## 8. v6.9.2 Hardening Corrections
+
+- **Timestamp preservation:** partial erasing (`erase.js`) now interpolates `p.t` for cut probes and keeps `t`/tilt on surviving points; each eraser fragment receives its own `t0`/`t1` from its first/last timestamped point instead of inheriting the whole original span.
+- **Precision:** coalesced pointer samples are back-dated by their own event gap instead of all sharing one per-frame clock reading, and timestamps are clamped monotonic for the replay binary search.
+- **Recorder lifecycle:** `AudioRecorder.start()` is re-entry guarded and releases the microphone stream, meter, AudioContext and temp session file on any failure; `stop()` settles on `MediaRecorder` error/synchronous throw and probes codec support before construction.
+- **Memory:** only 60 waveform peaks and the decoded duration are retained — the full PCM AudioBuffer is released — and the peak scan is stride-limited. The per-load AudioContext is closed on both decode paths.
+- **Replay overlay:** concealed answer covers are drawn above animated session ink, so replay no longer reveals blinded content; skip-silence is checked at most four times per second.
+- **UI:** the top-bar Record button reports microphone denial and finalization failure instead of rejecting silently or always claiming "saved".

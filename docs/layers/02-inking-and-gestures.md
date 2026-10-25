@@ -66,3 +66,10 @@ Potential interactions to check when changing an engine include perceived input 
 - **Multi-Variant `WeakMap` Path & Run Cache (`src/js/core/ink.js`)**: `pathCache` and `runCache` store up to 6 `${engine}:${w}` entries per `o.points` reference so live replay neon outline passes (`o.width + 5`, `o.width + 6`) and base stroke passes (`o.width`) never evict each other (99.6% cache hit rate, 6.4x faster replay frame generation).
 - **Hold-to-Shape Recognition (`settings.holdToShape`, default `true`)**: Pausing the pen still ($\le 6\text{ px}$) for 420 ms at the end of a freehand stroke snaps the stroke into a recognized geometric shape or line even when global `inkToShape` is disabled. When `holdToShape === false`, no timer is armed.
 - **Auto-Dim Floating Toolbars While Inking (`settings.autoDimBarsWhileInking`, default `true`)**: Toggles `body.inking-active` during active strokes to fade floating HUDs (`#toolbar`, `#replayBar`, `#audioBar`, `#zoombar`, `#pagebar`) to 20% opacity with `pointer-events: none` and restores them on pointer-up or blur.
+
+## 8. v6.9.2 Hardening Corrections
+
+- **Scratch-out and concealed content:** a scratch gesture no longer deletes objects that sit entirely beneath a concealed answer cover (they are invisible, so their loss would be silent). Visible ink written on the cover — above it in z-order — remains erasable.
+- **Selection hygiene:** deleted objects are pruned from the surface selection after a scratch-out, so stale ids cannot stay selected.
+- **Timestamp integrity:** the coalesced-event timestamp handling described in layer 01 lives in `tools.js`'s draw path; smoothing and rendering still never rewrite stored samples. Point generators and `finishStroke()` keep `p.t` (Invariant #2).
+- **Interaction reliability:** the circuit workbench and split reference pane now resolve terminal/pointer hit targets from the current press/release event rather than a stale hover position.

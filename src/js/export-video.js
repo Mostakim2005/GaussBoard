@@ -29,7 +29,13 @@ export function videoExportFilename(boardName, suffix = uniqueExportSuffix(), tr
   const board = safe(boardName, 'Board');
   const track = trackName ? `-${safe(trackName, 'Recording')}` : '';
   const ext = format === 'mp4' ? 'mp4' : 'webm';
-  return `${board}${track}-replay-${suffix}.${ext}`;
+  const tail = `-replay-${suffix}.${ext}`;
+  // Two long names together can exceed the 255-character filename limit on
+  // NTFS (and the save dialog then refuses the suggested path). Keep the
+  // unique timestamp suffix and shorten only the descriptive part.
+  const room = Math.max(24, 200 - tail.length);
+  const base = `${board}${track}`.slice(0, room).replace(/[. ]+$/g, '') || 'Board';
+  return `${base}${tail}`;
 }
 
 export function boundsForObjects(objects, pages = []) {
@@ -323,6 +329,10 @@ export class VideoExporter {
    */
   async exportStitchedReplayVideo({ tracks, width = 1920, height = 1080, fps = 30, onProgress = null, cameraMode = VIDEO_CAMERA_MODES.FIXED, fixedFrame = VIDEO_FIXED_FRAMES.RECORDING, format = 'mp4' } = {}) {
     if (!tracks || !tracks.length) throw new Error('No audio tracks specified for video export');
+    // A track without an asset cannot be played or captured; fail with a clear
+    // message instead of waiting 15 s for a media error on app://.../undefined.
+    const noAsset = tracks.find((tr) => !tr || !tr.assetId);
+    if (noAsset) throw new Error(`Recording "${noAsset.name || noAsset.id || '?'}" has no audio file to export`);
 
     this.cancelled = false;
     const canvas = document.createElement('canvas');
@@ -499,7 +509,12 @@ export class VideoExporter {
           }
 
           if (onProgress) {
-            onProgress(totalDurationMs > 0 ? Math.min(1.0, (cumulativeElapsedMs + curMs) / totalDurationMs) : 0);
+            // A progress callback that throws must not stop the frame pump:
+            // the recorder would then never be stopped and the export would
+            // hang with no way out but Cancel.
+            try {
+              onProgress(totalDurationMs > 0 ? Math.min(1.0, (cumulativeElapsedMs + curMs) / totalDurationMs) : 0);
+            } catch { /* progress is advisory */ }
           }
 
           setTimeout(checkDone, frameInterval);
@@ -584,7 +599,17 @@ export async function pickRecordingsForVideoExport(app, trackOverride = null) {
     const formatSelect = h('select', { 'aria-label': t('Video format'), style: 'padding:7px 9px;border-radius:7px;background:var(--surface-2);color:var(--text);border:1px solid var(--stroke)' },
       h('option', { value: 'mp4' }, 'MP4 Video (.mp4)'),
       h('option', { value: 'webm' }, 'WebM Video (.webm)'));
-    formatSelect.value = 'mp4';
+    // WebM is the path that muxes the recording's audio. The WebCodecs MP4
+    // backend currently writes video only, so a silent MP4 must not be what a
+    // plain "Export video" gives by default.
+    formatSelect.value = 'webm';
+
+    const formatHint = h('p', {
+      style: 'margin:0;font-size:11.5px;color:var(--text-2);display:none;'
+    }, t('MP4 is exported without sound. Choose WebM to keep the recording audio.'));
+    const syncFormatHint = () => { formatHint.style.display = formatSelect.value === 'mp4' ? 'block' : 'none'; };
+    formatSelect.addEventListener('change', syncFormatHint);
+    syncFormatHint();
 
     const cameraMode = h('select', { 'aria-label': t('Video framing'), style: 'padding:7px 9px;border-radius:7px;background:var(--surface-2);color:var(--text);border:1px solid var(--stroke)' },
       h('option', { value: VIDEO_CAMERA_MODES.FIXED }, t('Fixed view')),
@@ -689,6 +714,7 @@ export async function pickRecordingsForVideoExport(app, trackOverride = null) {
     card.appendChild(desc);
     card.appendChild(h('label', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px' },
       t('Video format'), formatSelect));
+    card.appendChild(formatHint);
     card.appendChild(h('label', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px' },
       t('Video quality'), preset));
     card.appendChild(h('label', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px' },
@@ -717,7 +743,7 @@ export async function exportVideoFile(app, track = null) {
   selectedTracks = picked.tracks;
   shouldStitch = track ? false : picked.stitch;
   video = picked.video || video;
-  const format = picked.format || 'mp4';
+  const format = picked.format || 'webm';
   const filterName = format === 'mp4' ? 'MP4 Video' : 'WebM Video';
   const filterExt = format === 'mp4' ? 'mp4' : 'webm';
 

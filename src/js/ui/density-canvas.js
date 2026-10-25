@@ -29,27 +29,43 @@ export class DensityCanvas {
       this.ctx = this.canvas.getContext('2d');
       this.wireEvents();
     }
-    this.audioBuffer = null;
+    this.audioBuffer = null;      // never retained: only peaks and duration are kept
+    this.audioDurationMs = 0;
+    this._lastBuffer = null;
     this.waveformPeaks = null;
+  }
+
+  /** Board duration for the scrubber: the track's own, else the decoded audio's. */
+  get durationMs() {
+    return this.track?.durationMs || this.audioDurationMs || 0;
   }
 
   setAudioBuffer(buf) {
     if (!buf) return;
-    this.audioBuffer = buf;
+    this._lastBuffer = buf;
+    this.audioDurationMs = Number.isFinite(buf.duration) ? Math.round(buf.duration * 1000) : 0;
     const channel = buf.getChannelData(0);
     const numBars = 60;
     const step = Math.floor(channel.length / numBars);
     const peaks = new Float32Array(numBars);
+    // Sampling stride is bounded: a 60-minute lecture is 170M samples, and
+    // reading every tenth one blocked the UI thread for a noticeable moment.
+    // Sixty 2px bars cannot show more detail than a few hundred samples each.
+    const stride = Math.max(1, Math.floor(step / 512));
     for (let i = 0; i < numBars; i++) {
       let max = 0;
       const start = i * step;
-      for (let j = 0; j < step; j += 10) {
+      for (let j = 0; j < step; j += stride) {
         const val = Math.abs(channel[start + j] || 0);
         if (val > max) max = val;
       }
       peaks[i] = max;
     }
     this.waveformPeaks = peaks;
+    // Drop the PCM. The buffer was never used for playback, only for these
+    // peaks and the duration, and holding it doubled the memory of a long
+    // recording for the rest of the session.
+    this.audioBuffer = null;
     this.render();
   }
 
@@ -80,7 +96,7 @@ export class DensityCanvas {
     }
 
     const rect = this.canvas.getBoundingClientRect();
-    const duration = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 0);
+    const duration = this.durationMs;
     const bx = duration > 0 ? (bm.t / duration) * rect.width : (clientX - rect.left);
     this.tooltipEl.style.left = `${Math.round(bx)}px`;
 
@@ -187,7 +203,7 @@ export class DensityCanvas {
     if (!this.canvas || !Array.isArray(this.track?.bookmarks)) return null;
     const rect = this.canvas.getBoundingClientRect();
     if (!rect.width) return null;
-    const duration = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 0);
+    const duration = this.durationMs;
     if (duration <= 0) return null;
     const x = clientX - rect.left;
     for (const bm of this.track.bookmarks) {
@@ -207,9 +223,7 @@ export class DensityCanvas {
       const rect = this.canvas.getBoundingClientRect();
       if (!rect.width) return;
       const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-      const duration = (this.track?.durationMs > 0 ? this.track.durationMs : null)
-        || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : null)
-        || 0;
+      const duration = this.durationMs;
       if (duration <= 0) return;
       const t = (x / rect.width) * duration;
       if (this.onSeek) this.onSeek(Math.round(t));
@@ -267,7 +281,7 @@ export class DensityCanvas {
     if (track !== null) this.track = track;
     if (objects !== null) this.objects = objects;
     if (currentTimeMs !== null) this.currentTimeMs = currentTimeMs;
-    if (audioBuffer !== null && audioBuffer !== this.audioBuffer) this.setAudioBuffer(audioBuffer);
+    if (audioBuffer && audioBuffer !== this._lastBuffer) this.setAudioBuffer(audioBuffer);
     this.render();
   }
 
@@ -279,7 +293,7 @@ export class DensityCanvas {
 
     ctx.clearRect(0, 0, w, h);
 
-    const duration = this.track?.durationMs || (this.audioBuffer?.duration ? this.audioBuffer.duration * 1000 : 0);
+    const duration = this.durationMs;
     if (duration <= 0) {
       // Empty placeholder track
       ctx.fillStyle = 'rgba(128, 128, 128, 0.15)';

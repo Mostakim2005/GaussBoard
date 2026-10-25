@@ -4,10 +4,23 @@
  * Canvas2D caching and interactive Live Preview DOM overlays.
  */
 
-export const EMBED_WIKILINK_RE = /!\[\[([^\]|#\n]*)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
-export const WIKILINK_RE = /(?<!!)\[\[([^\]|#\n]*)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
-export const EMBED_BOARDREF_RE = /@!\[([^\]\n]+)\]\(b:([a-zA-Z0-9_-]+)(?:#([^\)\n]{1,200}))?\)/g;
-export const BOARDREF_RE = /@\[([^\]\n]+)\]\(b:([a-zA-Z0-9_-]+)(?:#([^\)\n]{1,200}))?\)/g;
+import { ensureKatexLoaded } from './maths.js';
+
+/*
+ * Link/wikilink tokenizers use BOUNDED quantifiers.
+ *
+ * The previous unbounded `[^\]]+` style runs are quadratic on text with many
+ * unmatched openers: a 100 KB note made only of "[" took 23 seconds of
+ * main-thread work because every "[" rescanned to the end of the string
+ * looking for a "]" that never comes. Real labels and URLs are short, so the
+ * caps cost nothing, and excluding "[" from the URL keeps a run of brackets
+ * from being rescanned. The closing delimiters are also checked once before
+ * each pass (see renderInlineMarkdown).
+ */
+export const EMBED_WIKILINK_RE = /!\[\[([^\]\[|#\n]{0,512})(?:#([^\]|\n]{1,512}))?(?:\|([^\]\n]{1,512}))?\]\]/g;
+export const WIKILINK_RE = /(?<!!)\[\[([^\]\[|#\n]{0,512})(?:#([^\]|\n]{1,512}))?(?:\|([^\]\n]{1,512}))?\]\]/g;
+export const EMBED_BOARDREF_RE = /@!\[([^\]\n]{1,512})\]\(b:([a-zA-Z0-9_-]{1,128})(?:#([^\)\n]{1,200}))?\)/g;
+export const BOARDREF_RE = /@\[([^\]\n]{1,512})\]\(b:([a-zA-Z0-9_-]{1,128})(?:#([^\)\n]{1,200}))?\)/g;
 export const CALLOUT_HEADER_RE = /^\[!([A-Za-z]+)\]([+-])?\s*(.*)$/;
 export const TASK_LINE_RE = /^([ \t]*)[-*+]\s+\[([ xX])\]\s+(.*)$/;
 export const DISPLAY_MATH_RE = /\$\$([\s\S]+?)\$\$/g;
@@ -269,6 +282,11 @@ export function renderMathToXhtml(tex, displayMode = false) {
   }
   const tag = displayMode ? 'div' : 'span';
   const cls = displayMode ? 'gb-math-block' : 'gb-math-inline';
+  // KaTeX is loaded on first use. Markdown cards are often what first needs it
+  // (there may be no maths box on the board), so ask for it here; when it
+  // arrives the board repaints and the renderer's cache key changes, replacing
+  // these fallback spans with typeset maths.
+  ensureKatexLoaded();
   return `<${tag} class="${cls}" data-tex="${escapeXhtml(raw)}">${escapeXhtml(raw)}</${tag}>`;
 }
 
@@ -340,14 +358,16 @@ export function renderInlineMarkdown(text, options = {}) {
   );
 
   // 3a. Native GazBoard Embed tokens: @![Label](b:boardId#page)
-  src = src.replace(EMBED_BOARDREF_RE, (_, label, boardId, rawAnchor) => {
+  const hasBoardRef = src.includes('](b:');
+  if (hasBoardRef) src = src.replace(EMBED_BOARDREF_RE, (_, label, boardId, rawAnchor) => {
     const page = rawAnchor && /^\d+$/.test(rawAnchor) ? rawAnchor : '';
     const heading = rawAnchor && !page ? rawAnchor.replace(/^h:/, '') : '';
     return stash(renderEmbedCardXhtml({ boardId, target: label, page, heading, label }));
   });
 
   // 3b. Obsidian Embed Wikilinks: ![[Board Name#Page|Alias]]
-  src = src.replace(EMBED_WIKILINK_RE, (_, rawTarget, rawAnchor, rawAlias) => {
+  const hasWikilink = src.includes(']]');
+  if (hasWikilink) src = src.replace(EMBED_WIKILINK_RE, (_, rawTarget, rawAnchor, rawAlias) => {
     const target = rawTarget.trim();
     const anchor = rawAnchor ? rawAnchor.trim() : '';
     const alias = rawAlias ? rawAlias.trim() : '';
@@ -371,7 +391,7 @@ export function renderInlineMarkdown(text, options = {}) {
   });
 
   // 3c. Native GazBoard link tokens: @[Label](b:boardId#page)
-  src = src.replace(BOARDREF_RE, (_, label, boardId, page) => {
+  if (hasBoardRef) src = src.replace(BOARDREF_RE, (_, label, boardId, page) => {
     const isPage = page && /^\d+$/.test(page);
     const pageSuffix = page ? `#${escapeXhtml(page)}` : '';
     const dataPage = isPage ? ` data-page="${escapeXhtml(page)}"` : '';
@@ -382,7 +402,7 @@ export function renderInlineMarkdown(text, options = {}) {
   });
 
   // 3d. Obsidian Wikilinks: [[Board Name#Page|Alias]]
-  src = src.replace(WIKILINK_RE, (_, rawTarget, rawAnchor, rawAlias) => {
+  if (hasWikilink) src = src.replace(WIKILINK_RE, (_, rawTarget, rawAnchor, rawAlias) => {
     const target = rawTarget.trim();
     const anchor = rawAnchor ? rawAnchor.trim() : '';
     const alias = rawAlias ? rawAlias.trim() : '';
@@ -407,7 +427,10 @@ export function renderInlineMarkdown(text, options = {}) {
   });
 
   // 4. Standard links [label](url) including obsidian:// URIs
-  src = src.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (_, label, url) => {
+  //    Bounded label/URL and "[" excluded from the URL: see the tokenizer note
+  //    at the top of this file. The pass is skipped outright when the text
+  //    cannot contain a link at all.
+  if (src.includes('](') && src.includes(')')) src = src.replace(/\[([^\]\n]{1,512})\]\(([^)\s\[]{1,2048})\)/g, (_, label, url) => {
     const trimmedUrl = url.trim();
     const isSafeProtocol = /^(https?:\/\/|obsidian:\/\/|mailto:|b:|#|\/)/i.test(trimmedUrl);
     const safeHref = isSafeProtocol ? escapeXhtml(trimmedUrl) : '#';
@@ -730,10 +753,19 @@ export function parseMarkdownAST(markdownText) {
  * Renders parsed Markdown AST into strict XHTML.
  */
 export function renderMarkdownToHtml(markdownText, options = {}) {
+  /*
+   * Blockquotes and callouts render their body by recursion, one level per
+   * quote marker. A hostile or imported note with thousands of ">" levels
+   * overflowed the call stack and aborted the whole card render. Past a
+   * sensible depth the remaining text is shown escaped instead.
+   */
+  const depth = Number.isInteger(options._depth) ? options._depth : 0;
+  if (depth > 24) return `<p class="gb-md-p">${escapeXhtml(String(markdownText ?? ''))}</p>`;
   const { attributes, body: cleanBody } = parseFrontmatter(stripObsidianComments(markdownText));
   const footnoteData = extractFootnotes(cleanBody);
   const renderOptions = {
     ...options,
+    _depth: depth + 1,
     footnoteNumbers: footnoteData.numbers.size ? footnoteData.numbers : (options.footnoteNumbers || new Map())
   };
   const ast = parseMarkdownAST(footnoteData.body);
@@ -926,16 +958,27 @@ export function getMarkdownInlineCss({
   fontFamily = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
   align = 'left'
 } = {}) {
+  /*
+   * These values come from board data (an object's colour, alignment, font),
+   * and the CSS is embedded in the SVG that renders a Markdown card. A value
+   * carrying `}` could inject arbitrary rules into that stylesheet, so each is
+   * restricted to the shape the renderer actually produces.
+   */
+  const safeColor = /^[#a-zA-Z0-9(),.%\s-]{1,64}$/.test(String(color ?? '')) ? color : '#1e293b';
+  const safeFamily = /^[a-zA-Z0-9\s,"'_-]{1,120}$/.test(String(fontFamily ?? '')) ? fontFamily
+    : 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  const safeSize = Number.isFinite(Number(fontSize)) ? Math.max(6, Math.min(200, Number(fontSize))) : 20;
+  const safeAlign = ['left', 'center', 'right', 'justify'].includes(align) ? align : 'left';
   return `
     .gb-markdown-body {
       box-sizing: border-box;
       margin: 0;
       padding: 8px 10px;
-      color: ${color};
-      font-family: ${fontFamily};
-      font-size: ${fontSize}px;
+      color: ${safeColor};
+      font-family: ${safeFamily};
+      font-size: ${safeSize}px;
       line-height: 1.45;
-      text-align: ${align};
+      text-align: ${safeAlign};
       word-wrap: break-word;
       overflow-wrap: break-word;
     }

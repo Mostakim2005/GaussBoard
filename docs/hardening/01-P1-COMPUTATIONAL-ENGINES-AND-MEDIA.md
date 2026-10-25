@@ -1,9 +1,10 @@
 # GazBoard Hardening Dossier — Priority 1 (P1): Computational Engines & Media Pipelines
 
 > **Target Audience**: AI Coding Agent / Core Systems Engineer  
-> **Status**: **Fully Hardened & Audited (P1 Tier Complete)**  
+> **Status**: **Executed & audited for v6.9.2 (2026-10-25)** — 39 findings, 35 fixed, 4 open. See [`AUDIT_LOG.md`](AUDIT_LOG.md); §8 records an earlier pass and is superseded where it conflicts.
 > **Hardening Tier**: **`P1 — High Hardening Priority`**  
 > **Objective**: Hardening high-complexity computational engines, differential numerical solvers, asynchronous media export pipelines, and AST parsing engines.
+> **Audit status (v6.9.2, 2026-10-25)**: The live source was audited independently of this dossier. Notably, the DOL starter could not latch, the Forward-Reverse preset was unwired, the diode limiter from the earlier pass broke every series diode, MP4 was a silent default, and the Markdown link tokenizer was quadratic on hostile input. Finding-level record, open limitations and manual tests: [`AUDIT_LOG.md`](AUDIT_LOG.md).
 
 ---
 

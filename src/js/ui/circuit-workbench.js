@@ -339,24 +339,39 @@ export class CircuitWorkbenchModal {
       this.app.toast?.(t('Click any terminal lug on the board to attach BLACK probe lead.'));
     });
 
+    // Cache the LCD elements once. Looking five of them up on every rendered
+    // frame (60x/s) was pure DOM-query overhead in an already busy modal.
+    this.dmmEls = {
+      digits: dmm.querySelector('.dmm-digits'),
+      unit: dmm.querySelector('.dmm-unit'),
+      redTarget: dmm.querySelector('.red-target'),
+      blackTarget: dmm.querySelector('.black-target'),
+      heatBadge: dmm.querySelector('.dmm-heat-badge')
+    };
+    this.dmmShown = {};
+
     return dmm;
   }
 
   updateHudReadouts() {
-    if (!this.dmmWidget) return;
-    const digits = this.dmmWidget.querySelector('.dmm-digits');
-    const unit = this.dmmWidget.querySelector('.dmm-unit');
-    const redTarget = this.dmmWidget.querySelector('.red-target');
-    const blackTarget = this.dmmWidget.querySelector('.black-target');
+    const els = this.dmmEls;
+    if (!els) return;
+    const shown = this.dmmShown;
 
-    if (digits) digits.textContent = this.sim.dmm.reading;
-    if (unit) unit.textContent = this.sim.dmm.unit;
-    if (redTarget) redTarget.textContent = this.sim.dmm.red || t('None');
-    if (blackTarget) blackTarget.textContent = this.sim.dmm.black || t('None');
+    // Only touch the DOM when the displayed value actually changes: replacing
+    // a text node with the same string still dirties layout.
+    const setText = (el, key, value) => {
+      if (el && shown[key] !== value) { el.textContent = value; shown[key] = value; }
+    };
+    setText(els.digits, 'digits', String(this.sim.dmm.reading));
+    setText(els.unit, 'unit', this.sim.dmm.unit);
+    setText(els.redTarget, 'red', this.sim.dmm.red || t('None'));
+    setText(els.blackTarget, 'black', this.sim.dmm.black || t('None'));
 
-    const heatBadge = this.dmmWidget.querySelector('.dmm-heat-badge');
-    if (heatBadge) {
-      heatBadge.style.display = this.sim.dmm.overheatWarning ? 'inline-block' : 'none';
+    const heat = this.sim.dmm.overheatWarning ? 'inline-block' : 'none';
+    if (els.heatBadge && shown.heat !== heat) {
+      els.heatBadge.style.display = heat;
+      shown.heat = heat;
     }
 
     // Update Oscilloscope Canvas if visible
@@ -534,27 +549,37 @@ export class CircuitWorkbenchModal {
     this.portHitboxes.set(id, { x, y, id, label });
   }
 
+  /** Nearest magnetic terminal within grab radius of a canvas-local point. */
+  portAt(pos) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const port of this.portHitboxes.values()) {
+      const d = Math.hypot(port.x - pos.x, port.y - pos.y);
+      if (d <= 18 && d < bestDist) { best = port; bestDist = d; }
+    }
+    return best;
+  }
+
+  /** Canvas-local pointer position for a mouse/pen event. */
+  canvasPoint(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
   // --- Interaction Event Handlers ---
   onMouseMove(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    this.mousePos = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-
-    // Magnetic port snapping detection (radius: 18px)
-    this.hoveredPort = null;
-    for (const port of this.portHitboxes.values()) {
-      const dist = Math.hypot(port.x - this.mousePos.x, port.y - this.mousePos.y);
-      if (dist <= 18) {
-        this.hoveredPort = port;
-        break;
-      }
-    }
+    this.mousePos = this.canvasPoint(e);
+    this.hoveredPort = this.portAt(this.mousePos);
   }
 
   onMouseDown(e) {
     if (e.button !== 0) return; // Left click only
+
+    // A pen or touch press may not have produced a mousemove first, and a
+    // programmatic click never does: resolve the terminal from THIS event's
+    // position rather than trusting the last hover.
+    this.mousePos = this.canvasPoint(e);
+    this.hoveredPort = this.portAt(this.mousePos);
 
     // 1. If a multimeter probe is armed, attach probe to clicked port
     if (this.selectedProbe && this.hoveredPort) {
@@ -621,6 +646,12 @@ export class CircuitWorkbenchModal {
   }
 
   onMouseUp(e) {
+    // Resolve the drop terminal from the release position, not from the last
+    // hover: a quick press-drag-release can finish before a mousemove lands.
+    if (this.canvas && e) {
+      this.mousePos = this.canvasPoint(e);
+      this.hoveredPort = this.portAt(this.mousePos);
+    }
     // 1. Release active wire dragging onto destination terminal
     if (this.activeWireSource) {
       if (this.hoveredPort && this.hoveredPort.id !== this.activeWireSource) {
@@ -686,6 +717,24 @@ export class CircuitWorkbenchModal {
   }
 
   drawIndustrialBackplate(ctx, w, h) {
+    // The perforated backplate is static: ~800 dots plus rails, repainted on
+    // every animation frame. Paint it once into an offscreen canvas per size
+    // and blit that instead.
+    const dpr = window.devicePixelRatio || 1;
+    const key = `${Math.round(w)}x${Math.round(h)}|${dpr}`;
+    if (!this._backplate || this._backplate.key !== key) {
+      const off = document.createElement('canvas');
+      off.width = Math.max(1, Math.round(w * dpr));
+      off.height = Math.max(1, Math.round(h * dpr));
+      const g = off.getContext('2d');
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.paintIndustrialBackplate(g, w, h);
+      this._backplate = { key, canvas: off };
+    }
+    ctx.drawImage(this._backplate.canvas, 0, 0, w, h);
+  }
+
+  paintIndustrialBackplate(ctx, w, h) {
     // Subtle perforated workbench pattern
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(0, 0, w, h);
@@ -1299,17 +1348,32 @@ export class CircuitWorkbenchModal {
       }).catch(() => {});
     }
 
-    // Also add as note to canvas
+    // Also add as note to canvas. The object needs real geometry: a text
+    // object with no w/h has NaN bounds, so the scene culler skips it and the
+    // "Export BOM" note never appeared on the board at all.
     const cam = this.app.surface?.cam;
     const sw = this.app.surface?.canvas?.width || 1200;
     const sh = this.app.surface?.canvas?.height || 800;
     const vp = (cam && typeof cam.viewport === 'function') ? cam.viewport(sw, sh) : (cam?.viewport || { x: 100, y: 100, w: 1000, h: 700 });
+    const fontSize = 16;
+    const width = Math.max(260, Math.min(520, (vp.w || 1000) * 0.5));
+    const lineCount = noteText.split('\n').length;
     const noteObj = {
-      id: `c_bom_${Date.now()}`,
+      id: `c_bom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       type: 'text',
       x: (vp.x || 0) + 50,
       y: (vp.y || 0) + 50,
+      w: width,
+      wrapW: width,
+      h: Math.max(120, Math.min(560, Math.ceil(lineCount * fontSize * 1.45))),
       text: noteText,
+      rotation: 0,
+      color: '#201f1e',
+      fontSize,
+      align: 'left',
+      valign: 'top',
+      font: 'ui',
+      background: 'none',
       t: Date.now()
     };
     this.app.store?.add(noteObj);

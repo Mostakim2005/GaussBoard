@@ -1,4 +1,11 @@
 {
+  "Restore": "Wiederherstellen",
+  "Restore workspace session": "Arbeitsbereichssitzung wiederherstellen",
+  "Name for the open tabs:": "Name für die geöffneten Tabs:",
+  "Save workspace session": "Arbeitsbereichssitzung speichern",
+  "MP4 is exported without sound. Choose WebM to keep the recording audio.": "MP4 wird ohne Ton exportiert. Wähle WebM, um die Aufnahme mit Ton zu behalten.",
+  "The recording could not be saved": "Die Aufnahme konnte nicht gespeichert werden",
+  "That board is already open": "Dieses Whiteboard ist bereits geöffnet",
   "Untitled board": "Unbenanntes Whiteboard",
   "Saving…": "Wird gespeichert…",
   "Saved": "Gespeichert",

@@ -2512,7 +2512,8 @@ class App {
     const s = this.store, sf = this.surface;
     switch (id) {
       case 'undo': case 'edit.undo':
-        if ((this.splitWorkspace?.active || this.splitWorkspace?.isOpen) && this.splitWorkspace?.isPointerOverLeft) {
+        if (this.splitWorkspace?.isLeftFocused?.()) {
+          this.splitWorkspace.leftTextEditor?.commit?.();
           this.splitWorkspace.leftStore?.undo();
           this.splitWorkspace.leftSurface?.repaintAll();
           this.splitWorkspace.saveLeftBoardDebounced();
@@ -2520,7 +2521,8 @@ class App {
         }
         this.textEditor.commit(); s.undo(); this.pruneSelection(); break;
       case 'redo': case 'edit.redo':
-        if ((this.splitWorkspace?.active || this.splitWorkspace?.isOpen) && this.splitWorkspace?.isPointerOverLeft) {
+        if (this.splitWorkspace?.isLeftFocused?.()) {
+          this.splitWorkspace.leftTextEditor?.commit?.();
           this.splitWorkspace.leftStore?.redo();
           this.splitWorkspace.leftSurface?.repaintAll();
           this.splitWorkspace.saveLeftBoardDebounced();

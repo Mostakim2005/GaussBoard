@@ -22,48 +22,86 @@ export class AudioRecorder {
   }
 
   async start() {
-    if (this.state !== 'idle') return;
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-    });
+    // A second Start while the microphone prompt is still open used to open a
+    // second capture stream and overwrite the first one, leaving a live
+    // microphone with no recorder attached to it.
+    if (this.state !== 'idle' || this._starting) return;
+    this._starting = true;
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
 
-    this.sessionId = 'rec_' + Date.now();
-    this.activeTrackId = 'aud_' + Date.now();
-    if (window.board?.recording?.start) {
-      await window.board.recording.start(this.sessionId);
+      this.sessionId = 'rec_' + Date.now();
+      this.activeTrackId = 'aud_' + Date.now();
+      if (window.board?.recording?.start) {
+        await window.board.recording.start(this.sessionId);
+      }
+
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        this.audioCtx = new AudioContextClass();
+        const source = this.audioCtx.createMediaStreamSource(this.stream);
+        this.analyser = this.audioCtx.createAnalyser();
+        this.analyser.fftSize = 64;
+        source.connect(this.analyser);
+        this.startMeter();
+      }
+
+      // Not every build accepts the explicit WebM/Opus type; asking for the
+      // default recorder beats throwing away a recording that would have worked.
+      const options = { audioBitsPerSecond: 64000 };
+      const preferred = 'audio/webm;codecs=opus';
+      if (typeof MediaRecorder.isTypeSupported !== 'function'
+          || MediaRecorder.isTypeSupported(preferred)) options.mimeType = preferred;
+      this.recorder = new MediaRecorder(this.stream, options);
+
+      this.chunkQueue = Promise.resolve();
+      this.chunkError = null;
+      this.recorder.ondataavailable = (e) => {
+        if (!e.data || e.data.size <= 0 || !window.board?.recording?.appendChunk) return;
+        const sessionId = this.sessionId;
+        this.chunkQueue = this.chunkQueue.then(async () => {
+          const buf = await e.data.arrayBuffer();
+          await window.board.recording.appendChunk(sessionId, new Uint8Array(buf));
+        }).catch((error) => { this.chunkError ||= error; });
+      };
+
+      this.elapsedOffsetMs = 0;
+      this.segmentStartMs = performance.now();
+      this.recorder.start(3000); // 3-second slices
+      this.state = 'recording';
+      if (this.onStateChange) this.onStateChange(this.state);
+    } catch (error) {
+      // Never leave the microphone open, the meter running or a half-written
+      // session file behind when capture cannot start.
+      await this.releaseCapture();
+      this.state = 'idle';
+      throw error;
+    } finally {
+      this._starting = false;
     }
+  }
 
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (AudioContextClass) {
-      this.audioCtx = new AudioContextClass();
-      const source = this.audioCtx.createMediaStreamSource(this.stream);
-      this.analyser = this.audioCtx.createAnalyser();
-      this.analyser.fftSize = 64;
-      source.connect(this.analyser);
-      this.startMeter();
+  /** Stop the capture stream, meter and session file; safe to call twice. */
+  async releaseCapture() {
+    this.stopMeter();
+    if (this.analyser) { try { this.analyser.disconnect?.(); } catch {} this.analyser = null; }
+    if (this.stream) {
+      try { this.stream.getTracks().forEach((t) => t.stop()); } catch {}
+      this.stream = null;
     }
-
-    this.recorder = new MediaRecorder(this.stream, {
-      mimeType: 'audio/webm;codecs=opus',
-      audioBitsPerSecond: 64000
-    });
-
-    this.chunkQueue = Promise.resolve();
-    this.chunkError = null;
-    this.recorder.ondataavailable = (e) => {
-      if (!e.data || e.data.size <= 0 || !window.board?.recording?.appendChunk) return;
-      const sessionId = this.sessionId;
-      this.chunkQueue = this.chunkQueue.then(async () => {
-        const buf = await e.data.arrayBuffer();
-        await window.board.recording.appendChunk(sessionId, new Uint8Array(buf));
-      }).catch((error) => { this.chunkError ||= error; });
-    };
-
-    this.elapsedOffsetMs = 0;
-    this.segmentStartMs = performance.now();
-    this.state = 'recording';
-    this.recorder.start(3000); // 3-second slices
-    if (this.onStateChange) this.onStateChange(this.state);
+    if (this.audioCtx) {
+      const ctx = this.audioCtx;
+      this.audioCtx = null;
+      try { await ctx.close(); } catch {}
+    }
+    // Close the temp file the main process opened, or it stays open for the
+    // life of the app.
+    if (this.sessionId && window.board?.recording?.finish) {
+      try { await window.board.recording.finish(this.sessionId, 0); } catch {}
+    }
+    this.sessionId = null;
   }
 
   pause() {
@@ -91,31 +129,54 @@ export class AudioRecorder {
     this.stopMeter();
 
     const finalDurationMs = Math.round(this.elapsedOffsetMs);
+    const recorder = this.recorder;
 
     return new Promise((resolve) => {
-      this.recorder.onstop = async () => {
+      let settled = false;
+      const settle = (result) => {
+        if (settled) return;
+        settled = true;
+        this.sessionId = null;
+        resolve(result);
+      };
+      const fail = async (error) => {
+        this.stopMeter();
+        if (this.stream) { try { this.stream.getTracks().forEach((t) => t.stop()); } catch {} this.stream = null; }
+        if (this.audioCtx) { const ctx = this.audioCtx; this.audioCtx = null; try { await ctx.close(); } catch {} }
+        // Close the temp session file too, or it stays open until the app quits.
+        if (this.sessionId && window.board?.recording?.finish) {
+          try { await window.board.recording.finish(this.sessionId, finalDurationMs); } catch {}
+        }
+        if (this.onStateChange) this.onStateChange(this.state);
+        settle({ id: this.activeTrackId, durationMs: finalDurationMs, error });
+      };
+      recorder.onstop = async () => {
         try {
           // MediaRecorder dispatches its final dataavailable before onstop, but
           // arrayBuffer() and the IPC write are asynchronous. Serialize every
           // chunk and await the queue before closing/finalizing the asset.
           await this.chunkQueue;
           if (this.chunkError) throw this.chunkError;
-          if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
-          if (this.audioCtx) await this.audioCtx.close();
+          if (this.stream) { this.stream.getTracks().forEach((t) => t.stop()); this.stream = null; }
+          if (this.audioCtx) { const ctx = this.audioCtx; this.audioCtx = null; await ctx.close(); }
           let result = {};
           if (window.board?.recording?.finish) {
             result = await window.board.recording.finish(this.sessionId, finalDurationMs);
           }
           if (this.onStateChange) this.onStateChange(this.state);
-          resolve({ ...result, id: this.activeTrackId, durationMs: finalDurationMs });
+          settle({ ...result, id: this.activeTrackId, durationMs: finalDurationMs });
         } catch (error) {
-          if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
-          if (this.audioCtx) { try { await this.audioCtx.close(); } catch {} }
-          if (this.onStateChange) this.onStateChange(this.state);
-          resolve({ id: this.activeTrackId, durationMs: finalDurationMs, error });
+          await fail(error);
         }
       };
-      this.recorder.stop();
+      // A recorder that errors out never fires `onstop`; without this the UI
+      // waited on a promise that could not settle.
+      recorder.onerror = (event) => { fail(recorder.error || event?.error || new Error('Recording failed')); };
+      try {
+        recorder.stop();
+      } catch (error) {
+        fail(error);
+      }
     });
   }
 

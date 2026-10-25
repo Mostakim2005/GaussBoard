@@ -45,6 +45,10 @@ export class Surface {
     this._greetingDrawn = null;   // what the last frame drew, for the suite
     // Answer covers on their way out: id -> { obj, t0 }. See fadeOut().
     this._fades = new Map();
+    // Reusable "future ink" copies for the replay overlay. Allocating one per
+    // future stroke per animation frame was tens of thousands of objects a
+    // second on a long recording. Keyed by the stroke object itself.
+    this._ghostStrokes = new WeakMap();
     this._lockedRev = -1;      // revision the locked-object list was built for
     this._locked = [];
     this._groupRev = -1;       // and the same for the group outlines
@@ -912,6 +916,25 @@ export class Surface {
     this.drawLaser(ctx);
   }
 
+  /**
+   * Index of the first point drawn AFTER `t` in an ascending timeline.
+   * Returns -1 when the whole stroke has been reached (or when the stroke has
+   * no timeline at all), which is the same answer the linear scan gave.
+   */
+  static firstPointAfter(points, t) {
+    if (!Array.isArray(points) || !points.length || points[0].t == null) return -1;
+    let lo = 0, hi = points.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      const pt = points[mid];
+      // A missing timestamp counts as "already drawn": the stroke is drawn up
+      // to the last sample that can be placed on the timeline.
+      if (pt.t == null || pt.t <= t) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo < points.length ? lo : -1;
+  }
+
   drawReplaySession(ctx, replay = this.app?.replayEngine) {
     if (!replay || !replay.track || !replayInkEnabled(this.app?.settings)) return;
     const displayMode = replayDisplayMode(this.app?.settings, replay?.displayMode);
@@ -961,7 +984,10 @@ export class Surface {
         drawObject(ctx, o, () => this.invalidate(), this.editing);
       } else if (o.t0 != null && o.t0 <= t && (o.t1 == null || t < o.t1)) {
         if (Array.isArray(o.points)) {
-          const sliceIndex = displayMode === 'spotlight' ? -1 : o.points.findIndex((p) => p.t != null && p.t > t);
+          // Timestamps ascend (writing and erasing both guarantee it), so the
+          // reveal edge is found by binary search rather than by scanning a
+          // multi-thousand-point stroke on every frame.
+          const sliceIndex = displayMode === 'spotlight' ? -1 : Surface.firstPointAfter(o.points, t);
           let pts = sliceIndex >= 0 ? o.points.slice(0, sliceIndex) : o.points;
           if (pts.length === 1) {
             // Keep a just-started stroke visible before its second sampled
@@ -994,12 +1020,37 @@ export class Surface {
           ctx.save();
           // Render unrendered future strokes in crisp light grey ink without per-stroke offscreen filter allocation
           ctx.globalAlpha = 0.38;
-          drawObject(ctx, { ...o, color: '#8a919e', effect: 'none' }, () => this.invalidate(), this.editing);
+          let ghost = this._ghostStrokes.get(o);
+          if (!ghost) { ghost = { ...o }; this._ghostStrokes.set(o, ghost); }
+          else Object.assign(ghost, o);
+          ghost.color = '#8a919e';
+          ghost.effect = 'none';
+          drawObject(ctx, ghost, () => this.invalidate(), this.editing);
           ctx.restore();
         }
       }
     }
+    // Concealed answer covers stay ON TOP of the animated session ink. The
+    // base picture is painted first, so without this the replayed strokes are
+    // drawn over tape that exists to hide exactly that ink.
+    for (const cover of this.concealedCovers()) {
+      drawObject(ctx, cover, () => this.invalidate(), this.editing);
+    }
     ctx.restore();
+  }
+
+  /** Concealed answer covers, cached by store revision (replay draws them last). */
+  concealedCovers() {
+    if (this._coverRev === this.store.rev && this._coverList) return this._coverList;
+    const objs = this.store.doc.objects;
+    const list = [];
+    for (const id of this.store.doc.order) {
+      const o = objs[id];
+      if (o && o.type === 'curtain' && o.revealed !== true) list.push(o);
+    }
+    this._coverRev = this.store.rev;
+    this._coverList = list;
+    return list;
   }
 
   /** A selected arrow: a ring at each end (filled when it holds on to something) and a diamond in the middle. */

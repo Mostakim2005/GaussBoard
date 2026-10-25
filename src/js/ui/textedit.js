@@ -202,9 +202,14 @@ function textareaFace(el) {
 }
 
 export class TextEditor {
-  constructor(app) {
+  /**
+   * @param {object} app  the owning application (or a pane proxy: see split-workspace.js)
+   * @param {HTMLElement} [layer]  positioned overlay to attach editors to;
+   *   defaults to #editLayer. A second pane passes its own editor instance.
+   */
+  constructor(app, layer = null) {
     this.app = app;
-    this.layer = document.getElementById('editLayer');
+    this.layer = layer || document.getElementById('editLayer');
     this.el = null;
     this.previewEl = null;
     this.previewMode = false;
@@ -474,9 +479,16 @@ export class TextEditor {
 
     const applyBoxStyle = (domEl) => {
       if (!domEl) return;
+      // Editor coordinates are canvas coordinates. In a split workspace the
+      // canvas is not at the overlay's origin, so carry the difference or the
+      // box (and the text) appear on the other pane.
+      const lr = this.layer?.getBoundingClientRect?.();
+      const cr = app.surface.canvas?.getBoundingClientRect?.();
+      const ox = lr && cr ? cr.left - lr.left : 0;
+      const oy = lr && cr ? cr.top - lr.top : 0;
       const s = domEl.style;
-      s.left = p.x + 'px';
-      s.top = p.y + 'px';
+      s.left = (p.x + ox) + 'px';
+      s.top = (p.y + oy) + 'px';
       s.width = Math.max(24, ww * cam.z) + 'px';
       s.height = Math.max(20, wh * cam.z) + 'px';
       s.fontSize = size * cam.z + 'px';

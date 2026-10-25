@@ -49,3 +49,10 @@ node scripts/smoke.js
 `src/js/core/pages.js` exports `pageMarginRects(pages)` to calculate guide rectangles, and `src/js/core/surface.js` draws those as a screen overlay. They are visual writing guides; they are deliberately excluded from `renderTo()` output and are not clipping boundaries. Do not document them as print-safe margins or use them as export bounds unless an export path is explicitly changed and tested.
 
 The 4.8.8 custom tests cover asymmetric margin geometry and page scope. Crop undo/cancel, source-bound clamping and video surface cleanup have focused checks in `npm run smoke:features:4.8.4.1`.
+
+## 7. v6.9.2 Hardening Corrections
+
+- **Study runner state machine:** `StudyRunner` no longer assigns `object.revealed` directly. `setReviewState()` updates the cover and any content written on it (`hidden`), and `refreshCanvas()` calls `surface.touch()` so the frozen-scene key moves and the reveal actually repaints. FSRS ratings are applied through `store.update()` (undoable) rather than pre-mutating the object.
+- **Freehand tape attachment:** `coverFor()` derives the cover footprint from `boundsOf()`, so ink written on a freehand tape (which has points/bbox but no x/y/w/h) is attached, moves and hides with the tape.
+- **Tape is a mask, not ink:** a tape drawn while recording is no longer stamped with `audioId`/`t0`, so the replay engine does not animate or ghost it.
+- **Replay vs concealment:** concealed covers are redrawn after the replay pass, keeping blinded ink hidden during animated replay (deliberate trade-off documented in the release dossier).

@@ -21,6 +21,30 @@ export class StudyRunner {
     this._onKeyDown = this.handleKeyDown.bind(this);
   }
 
+  /**
+   * Set a cover's review-time visibility.
+   *
+   * A review is a view state, not an edit, so it is not a store transaction -
+   * but it still has to keep the object graph coherent: content written ON the
+   * card follows the card (see App.setCovers), and the canvas must be told the
+   * picture changed (see refreshCanvas), or the frozen scene is blitted back
+   * unchanged and the answer never appears.
+   */
+  setReviewState(card, revealed) {
+    const o = card?.object;
+    if (!o) return;
+    o.revealed = revealed;
+    for (const w of this.app.onCovers?.([o.id]) || []) w.hidden = revealed;
+  }
+
+  /** In-place state changed: move the frozen-scene key, then repaint. */
+  refreshCanvas() {
+    const sf = this.app.surface;
+    if (!sf) return;
+    sf.touch?.();
+    sf.invalidate?.();
+  }
+
   /** Start a review session */
   start({ onlyDue = false } = {}) {
     if (this.active) this.stop();
@@ -69,11 +93,11 @@ export class StudyRunner {
     if (Array.isArray(this.cards)) {
       this.cards.forEach((c) => {
         if (c?.object) {
-          c.object.revealed = false;
+          this.setReviewState(c, false);
         }
       });
     }
-    this.app.surface?.invalidate?.();
+    this.refreshCanvas();
   }
 
   /** Mount floating review HUD */
@@ -121,7 +145,7 @@ export class StudyRunner {
     const modeLabel = this.occlusionMode === 'hideAll' ? t('Hide All, Guess One') : t('Hide One, Guess One');
     this.app.toast?.(t('Occlusion Mode: {mode}', { mode: modeLabel }));
     this.applyOcclusionVisibility();
-    this.app.surface?.invalidate?.();
+    this.refreshCanvas();
   }
 
   /** Apply occlusion visibility according to active mode */
@@ -133,18 +157,18 @@ export class StudyRunner {
       // In Hide All: all cards remain concealed; only current card becomes revealed when answer is shown
       this.cards.forEach((c) => {
         if (c === currentItem) {
-          c.object.revealed = this.revealed;
+          this.setReviewState(c, this.revealed);
         } else {
-          c.object.revealed = false;
+          this.setReviewState(c, false);
         }
       });
     } else {
       // In Hide One: all other cards are revealed to show surrounding context, ONLY current card is concealed
       this.cards.forEach((c) => {
         if (c === currentItem) {
-          c.object.revealed = this.revealed;
+          this.setReviewState(c, this.revealed);
         } else {
-          c.object.revealed = true;
+          this.setReviewState(c, true);
         }
       });
     }
@@ -163,7 +187,7 @@ export class StudyRunner {
 
     // Apply concealment according to occlusion mode
     this.applyOcclusionVisibility();
-    this.app.surface?.invalidate?.();
+    this.refreshCanvas();
 
     // Update progress
     const pct = Math.round(((index) / this.cards.length) * 100);
@@ -230,9 +254,9 @@ export class StudyRunner {
     if (this.revealed || !this.active) return;
     this.revealed = true;
     const currentItem = this.cards[this.currentIndex];
-    currentItem.object.revealed = true;
+    this.setReviewState(currentItem, true);
     this.applyOcclusionVisibility();
-    this.app.surface?.invalidate?.();
+    this.refreshCanvas();
     this.renderActions();
   }
 
@@ -265,7 +289,6 @@ export class StudyRunner {
     // Compute next FSRS state
     const newCard = repeat(item.card, rating);
     item.card = newCard;
-    item.object.fsrs = newCard;
 
     // Track stats
     this.stats.reviewed += 1;
@@ -274,7 +297,9 @@ export class StudyRunner {
     else if (rating === Rating.Good) this.stats.good += 1;
     else if (rating === Rating.Easy) this.stats.easy += 1;
 
-    // Persist to document store
+    // Persist to document store. The patch is applied BY the store; writing
+    // `item.object.fsrs` first would make the store record the new value as
+    // its own "before" state, so undo could never put the old schedule back.
     this.app.store?.update?.(item.object.id, { fsrs: newCard }, 'rate card fsrs');
 
     // Advance to next card

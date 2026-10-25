@@ -30,6 +30,8 @@
 | `docs/releases/RELEASES_INDEX.md` | Compact release ledger and artifact registry | You need to identify a release or artifact. |
 | `docs/releases/RELEASE-x.y.z.md` | Scope, implementation, causes/fixes, verification, and limitations for one release | You need details for that specific version. Open only the selected dossier. |
 | `docs/releases/RELEASE-5.1.0.md` | Split workspace transfer, Markdown improvements, board/heading links and visual excerpts | You need the current 5.1.0 behavior, verification or release record. |
+| `docs/hardening/AUDIT_LOG.md` | Authoritative P0 + P1 hardening record: one line per finding (severity, FIXED/NOT FIXED), verification runs, open limitations, and manual test list | You need the hardening outcome or want to know whether a P0/P1 claim is actually fixed. |
+| `docs/releases/RELEASE-6.9.2.md` | Current source-only hardening release dossier (P0 + P1 counts, behaviour changes, verification, deliverables) | You need current release scope, compatibility notes, or known limitations. |
 | `docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md` | Ranked source-checked review of custom additions, cross-feature behavior, security/performance findings and follow-up work | You need the v5.0.0 feature-audit decision record. |
 | `docs/releases/RELEASE-5.1.0.md` | v5.1.0 split-pane, Markdown/link, excerpt implementation and verification | You need current release specifics. |
 | `docs/FEATURE_RECORD.md` | Stable feature IDs and concise feature descriptions | You need the feature registry or to add a feature record. |
@@ -45,7 +47,7 @@
 
 ## Which document is authoritative?
 
-For **current behavior**, use source and focused tests. For **current release state and owner constraints**, use the handover. For **feature routing and architecture guardrails**, use the bootstrap, this map, and the selected layer dossier. For **release history**, use the release index and selected release dossier. For the v5.0.0 ranking and audit decisions, use the post-v4.8.1 audit dossier. Feature records and bug logs are indexes into that evidence. Plans and historical catalogs preserve intent and must not override current source or tests.
+For **current behavior**, use source and focused tests. For **current release state and owner constraints**, use the handover. For **feature routing and architecture guardrails**, use the bootstrap, this map, and the selected layer dossier. For **release history**, use the release index and selected release dossier. For **hardening outcomes**, use [`hardening/AUDIT_LOG.md`](hardening/AUDIT_LOG.md) plus the current release dossier. For the v5.0.0 ranking and audit decisions, use the post-v4.8.1 audit dossier. Feature records and bug logs are indexes into that evidence. Plans and historical catalogs preserve intent and must not override current source or tests.
 
 ## Token-light discovery
 

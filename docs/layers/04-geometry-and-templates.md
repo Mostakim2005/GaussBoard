@@ -48,3 +48,9 @@ node scripts/smoke.js
 - `src/js/templates.js` derives filterable tags for built-in templates and reads editable tags from custom templates. Selected tags are combined as an AND filter. This extends, but does not replace, My boards tag filtering.
 - `npm run smoke:custom` checks all four arrowhead styles and the template tag predicate; `npm run smoke:features:4.8.8` checks the live template filter UI.
 - Version correction: v4.8.5's release dossier advertised head shapes and engine labels that were not all present as described in the tagged code. The verified additions are detailed in `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md`.
+
+## 6. v6.9.2 Hardening Corrections
+
+- **Degenerate orthogonal paths:** when both ends resolve to the same point (an arrow drawn from a box back onto itself), the cleaned path collapses to one point; canvas and SVG arrowheads now require a usable final segment, so no arbitrary rightward head is drawn.
+- **Known limitation (recorded, not fixed):** `routeOrthogonal()` accepts `boxA`/`boxB` but does not use them — routing is a deterministic Z/C bend, not obstacle avoidance. Real avoidance needs grid/A* routing (new functionality).
+- **Known limitation:** connector end resolution uses one module-global store, so connectors in the split reference pane fall back to free ends rather than attaching to the secondary board. Ends keep their last coordinates; no data corruption was observed.

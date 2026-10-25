@@ -7,7 +7,9 @@ import { Store, boundsOf } from '../core/store.js';
 import { EXCERPT_MIME } from '../core/excerpts.js';
 import { Interaction } from '../core/tools.js';
 import { PropertiesDialog } from './properties-dialog.js';
+import { TextEditor } from './textedit.js';
 import { icon } from './icons.js';
+import { uid } from '../core/util.js';
 import { t } from '../i18n.js';
 
 export class SplitWorkspace {
@@ -52,6 +54,36 @@ export class SplitWorkspace {
     return this.enabled;
   }
 
+  /** Remember which pane the user last pressed in ("left" or "main"). */
+  setActivePane(pane) {
+    if (pane !== 'left' && pane !== 'main') return;
+    this.activePane = pane;
+    // Only one pane can own the keyboard. Clearing the other pane's selection
+    // means a keyboard command that is still primary-board bound (Delete,
+    // Copy, z-order) cannot act on objects in the pane the user is not in.
+    if (pane === 'left') {
+      if (this.app?.surface?.selection?.size) {
+        this.app.surface.selection.clear();
+        this.app.syncUI?.();
+        this.app.surface.invalidate?.();
+      }
+    } else if (this.leftSurface?.selection?.size) {
+      this.leftSurface.selection.clear();
+      this.leftSurface.invalidate?.();
+    }
+  }
+
+  /**
+   * Does the reference pane own keyboard edits right now? The last pressed
+   * pane wins, so a stray pointer resting over the other pane cannot redirect
+   * Ctrl+Z to a board the user is not working on.
+   */
+  isLeftFocused() {
+    if (!this.enabled) return false;
+    if (this.activePane) return this.activePane === 'left';
+    return !!this.isPointerOverLeft;
+  }
+
   /**
    * Mount dual-viewport workspace layout.
    */
@@ -71,19 +103,22 @@ export class SplitWorkspace {
     this.ratio = Math.max(0.2, Math.min(0.8, ratio));
     this.leftBoardId = leftBoardId || null;
 
-    // Stash original elements to reparent and restore on disable
+    // Stash original elements to reparent and restore on disable.
+    // #editLayer and #ctxbar stay in #stage: they are shared overlays whose
+    // positions are measured from the stage, and a pane has overflow:hidden.
     const toReparent = [
       this.primaryCanvas,
-      document.getElementById('inkNib'),
-      document.getElementById('editLayer'),
-      document.getElementById('ctxbar')
+      document.getElementById('inkNib')
     ].filter(Boolean);
 
-    this.reparentedNodes = toReparent.map(node => ({
-      node,
-      parent: node.parentNode,
-      nextSibling: node.nextSibling
-    }));
+    const moving = new Set(toReparent);
+    this.reparentedNodes = toReparent.map(node => {
+      // Anchor on the nearest following sibling that is NOT moved, so the
+      // original order can be rebuilt on disable.
+      let anchor = node.nextSibling;
+      while (anchor && moving.has(anchor)) anchor = anchor.nextSibling;
+      return { node, parent: node.parentNode, anchor };
+    });
     this.originalCanvasParent = this.primaryCanvas.parentNode;
     this.originalCanvasNextSibling = this.primaryCanvas.nextSibling;
 
@@ -294,14 +329,40 @@ export class SplitWorkspace {
       if (this.pickerInput && boardName) {
         this.pickerInput.value = boardName;
       }
-      Promise.resolve(this.app?.resolveAssets?.(this.leftStore.doc)).then(() => {
-        this.leftSurface?.invalidate();
+      // resolveAssets() takes a board payload (`objects` array) and returns a
+      // NEW document; the store's live doc is a dictionary. Only the resolved
+      // picture sources are copied back in place - reloading the store here
+      // would throw away anything drawn or pasted before the promise settles.
+      Promise.resolve(this.app?.resolveAssets?.(this.leftStore.toJSON())).then((resolved) => {
+        if (!resolved || !Array.isArray(resolved.objects) || !this.leftStore || !this.enabled) return;
+        let touched = false;
+        for (const o of resolved.objects) {
+          const live = o && this.leftStore.doc.objects[o.id];
+          if (!live || live.src === o.src) continue;
+          live.src = o.src;
+          if (o.assetId) live.assetId = o.assetId;
+          if (o.missing) live.missing = true;
+          touched = true;
+        }
+        if (touched) {
+          this.leftStore.rev++;
+          this.leftSurface?.invalidate();
+        }
       }).catch(() => {});
     }
     this.leftSurface = new Surface(cLeft, this.leftStore, { lowLatency: false });
     this.leftSurface.resize();
     this._leftStoreUnsub = this.leftStore.subscribe(() => {
       this.leftSurface?.invalidate();
+      // A reference board that was never picked from disk has no file of its
+      // own. Give it one as soon as something is drawn, or closing the split
+      // would drop the work with no copy anywhere.
+      if (!this.leftBoardId && this.leftStore?.count) {
+        this.leftBoardId = this.leftStore.doc.id || null;
+        if (this.pickerInput && !this.pickerInput.value) {
+          this.pickerInput.value = this.leftStore.doc.name || t('Untitled');
+        }
+      }
       this.saveLeftBoardDebounced();
     });
 
@@ -314,6 +375,7 @@ export class SplitWorkspace {
         if (prop === 'store') return this.leftStore;
         if (prop === 'surface') return this.leftSurface;
         if (prop === 'inkNibEl') return this.leftNib;
+        if (prop === 'textEditor') return this.leftTextEditor || target.textEditor;
         if (prop === 'syncUI') return () => this.leftSurface?.invalidate();
         if (prop === 'syncZoom') return () => {
           this.syncCameraFromLeft();
@@ -332,6 +394,16 @@ export class SplitWorkspace {
         return target[prop];
       }
     });
+
+    // Typing on the reference board goes through its own editor bound to the
+    // left store and camera; the primary editor would save the words onto the
+    // other board (or nowhere).
+    this.leftTextEditor = new TextEditor(leftAppProxy);
+
+    // The pane the user last pressed in owns keyboard edits (Ctrl+Z / Ctrl+Y).
+    this.activePane = null;
+    this.leftPane.addEventListener('pointerdown', () => this.setActivePane('left'), true);
+    this.rightPane.addEventListener('pointerdown', () => this.setActivePane('main'), true);
 
     this.leftInteraction = new Interaction(leftAppProxy, {
       surface: this.leftSurface,
@@ -364,6 +436,14 @@ export class SplitWorkspace {
     if (!this.enabled) return;
 
     clearTimeout(this._saveTimer);
+    this._saveTimer = null;
+    // Typed words on the reference board are committed to its store before the
+    // store goes away; saveLeftBoard() then snapshots the board synchronously,
+    // so the write still happens once this teardown has finished.
+    if (this.leftTextEditor) {
+      try { this.leftTextEditor.commit(); } catch { /* nothing being typed */ }
+      this.leftTextEditor = null;
+    }
     if (this.leftBoardId) {
       this.saveLeftBoard();
     }
@@ -397,6 +477,8 @@ export class SplitWorkspace {
     this.leftNib = null;
     this.leftBoardId = null;
     this.isPointerOverLeft = false;
+    this.activePane = null;
+    this.excerptDockEl = null;
 
     if (this.leftPropertiesDialog) {
       this.leftPropertiesDialog.close();
@@ -404,14 +486,21 @@ export class SplitWorkspace {
     }
 
     if (this.reparentedNodes?.length) {
+      // Put each node back where it came from, in order, using the nearest
+      // following sibling that stayed behind as the anchor. Appending blindly
+      // changed the stacking order the app expects.
+      let prevRestored = null;
       for (const rec of this.reparentedNodes) {
-        if (rec.node && rec.parent) {
-          if (rec.nextSibling && rec.parent.contains(rec.nextSibling)) {
-            rec.parent.insertBefore(rec.node, rec.nextSibling);
-          } else if (typeof rec.parent.appendChild === 'function') {
-            rec.parent.appendChild(rec.node);
-          }
+        const parent = rec.parent;
+        if (!rec.node || !parent || typeof parent.insertBefore !== 'function') continue;
+        if (prevRestored && prevRestored.parentNode === parent) {
+          parent.insertBefore(rec.node, prevRestored.nextSibling);
+        } else if (rec.anchor && parent.contains(rec.anchor)) {
+          parent.insertBefore(rec.node, rec.anchor);
+        } else {
+          parent.appendChild(rec.node);
         }
+        prevRestored = rec.node;
       }
       this.reparentedNodes = [];
     } else if (this.primaryCanvas && this.originalCanvasParent) {
@@ -555,7 +644,9 @@ export class SplitWorkspace {
             const view = this.app.surface.cam.viewport(this.app.surface.width, this.app.surface.height);
             const center = { x: view.x + view.w / 2, y: view.y + view.h / 2 };
             const newObj = JSON.parse(JSON.stringify(ex));
-            newObj.id = 'img_' + Date.now();
+            // Unique id: Date.now() repeats when an excerpt is stamped twice in
+            // the same millisecond and the second copy replaces the first.
+            newObj.id = uid('img');
             newObj.x = center.x - (newObj.w || 200) / 2;
             newObj.y = center.y - (newObj.h || 150) / 2;
             this.app.store?.add(newObj, 'paste_excerpt');
@@ -766,11 +857,15 @@ export class SplitWorkspace {
     // 1. If query is non-empty and does NOT exactly match any board title, offer "+ Create board"
     const exactMatch = this.boardList.some(b => (b.name || b.title || '').toLowerCase() === q);
     if (q && !exactMatch) {
+      // The label carries the user's typed query, so it is built as DOM text:
+      // `html:` would inject whatever was typed into the popover as markup.
       const createItem = h('div', {
         class: 'split-create-board-action',
-        style: 'display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;background:rgba(0,120,212,0.08);color:#0078d4;font-size:12px;font-weight:600;margin-bottom:6px;',
-        html: `${icon('plus', 14)} <span>${t('Create board "{name}"', { name: query.trim() })}</span>`
-      });
+        style: 'display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;background:rgba(0,120,212,0.08);color:#0078d4;font-size:12px;font-weight:600;margin-bottom:6px;'
+      },
+        h('span', { style: 'display:flex', html: icon('plus', 14) }),
+        h('span', {}, t('Create board "{name}"', { name: query.trim() }))
+      );
       createItem.addEventListener('pointerdown', async (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -860,6 +955,9 @@ export class SplitWorkspace {
   async loadLeftBoard(id) {
     if (!id || !this.leftStore) return;
     try {
+      // Switching boards must not swallow the last few hundred ms of ink on
+      // the board being replaced: its save is debounced, so flush it first.
+      await this.flushLeftBoard();
       let data = null;
       if (typeof window.board?.boards?.load === 'function') {
         data = await window.board.boards.load(id);
@@ -874,7 +972,9 @@ export class SplitWorkspace {
       if (data) {
         if (!data.name && data.title) data.name = data.title;
         if (!Array.isArray(data.objects) && Array.isArray(data.elements)) data.objects = data.elements;
-        await this.app?.resolveAssets?.(data);
+        // resolveAssets returns a new object; discarding the result left
+        // `asset:` picture references unresolved and drew empty pictures.
+        data = (await this.app?.resolveAssets?.(data)) || data;
         this.leftBoardId = id;
         this.leftStore.load(data);
         if (this.leftSurface) {
@@ -894,6 +994,31 @@ export class SplitWorkspace {
     } catch (err) {
       this.app?.toast?.(t('Failed to load board: {msg}', { msg: err.message }));
     }
+  }
+
+  /**
+   * Open a board reference (wikilink / board link "Open in Split View") in the
+   * reference pane, opening the split workspace first when it is closed.
+   * `ref` is `{ id, page, heading, box }` or a bare board id.
+   */
+  async openBoardInSplit(ref) {
+    const id = typeof ref === 'string' ? ref : (ref?.id || ref?.boardId || '');
+    if (!id) return false;
+    // The same board on both sides would be two stores autosaving the same
+    // file, each overwriting the other's strokes. Never split a board with
+    // itself.
+    if (id === this.app?.store?.doc?.id) {
+      this.app?.toast?.(t('That board is already open'));
+      return false;
+    }
+    if (!this.enabled) this.enable();
+    if (!this.enabled || !this.leftStore) return false;
+    if (id === this.leftBoardId) {
+      this.leftSurface?.repaintAll();
+      return true;
+    }
+    await this.loadLeftBoard(id);
+    return this.leftBoardId === id;
   }
 
   async createNewStudyBoard(title) {
@@ -945,19 +1070,44 @@ export class SplitWorkspace {
     this._saveTimer = setTimeout(() => this.saveLeftBoard(), 600);
   }
 
-  async saveLeftBoard() {
-    if (!this.leftBoardId || !this.leftStore) return;
+  /**
+   * Write the reference board out. The document is snapshotted here, before
+   * anything async, because the left pane can load another board (or be torn
+   * down) while the write is still in flight. Writes are chained, never
+   * overlapped, so an old save cannot land after a newer one.
+   */
+  saveLeftBoard() {
+    const boardId = this.leftBoardId;
+    const store = this.leftStore;
+    if (!boardId || !store) return Promise.resolve();
+    let doc;
+    try { doc = store.toJSON(); } catch { return Promise.resolve(); }
+    doc.id = boardId;
+    if (!doc.name && this.pickerInput?.value?.trim()) {
+      doc.name = this.pickerInput.value.trim();
+    }
+    if (doc.name) doc.title = doc.name;
+    const prev = this._leftSave || Promise.resolve();
+    const run = prev.catch(() => {}).then(() => this._writeLeftBoard(doc, boardId));
+    this._leftSave = run;
+    run.finally(() => { if (this._leftSave === run) this._leftSave = null; }).catch(() => {});
+    return run.catch(() => {});
+  }
+
+  /** Write any pending change now (board switch, closing the split). */
+  async flushLeftBoard() {
+    clearTimeout(this._saveTimer);
+    this._saveTimer = null;
+    if (this._leftSave) await this._leftSave.catch(() => {});
+    await this.saveLeftBoard();
+  }
+
+  async _writeLeftBoard(doc, boardId) {
     try {
-      const doc = this.leftStore.toJSON();
-      doc.id = this.leftBoardId;
-      if (!doc.name && this.pickerInput?.value?.trim()) {
-        doc.name = this.pickerInput.value.trim();
-      }
-      doc.title = doc.name;
       await this.app?.externaliseAssets?.(doc);
       const json = JSON.stringify(doc);
       if (window.board?.boards?.save) {
-        await window.board.boards.save({ id: this.leftBoardId, json, setLast: false });
+        await window.board.boards.save({ id: boardId, json, setLast: false });
       }
     } catch (err) {
       console.warn('Failed to auto-save left study board:', err);

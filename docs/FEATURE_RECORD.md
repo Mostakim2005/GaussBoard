@@ -6,6 +6,8 @@ This document serves as the master registry of all features, enhancements, bug f
 
 ---
 
+> **v6.9.2 authority note:** the P0 + P1 hardening audit corrected several behavioural claims in this historical record (split-pane saving/focus/text editing, erased-stroke timestamps, replay-over-covers, study-runner cover state, DOL/reverse presets, video export defaults, Markdown/KaTeX, tab caches and grapher guards). Where a row below conflicts with current behaviour, [`releases/RELEASE-6.9.2.md`](releases/RELEASE-6.9.2.md), [`hardening/AUDIT_LOG.md`](hardening/AUDIT_LOG.md) and the current source/tests are authoritative. See section 4.
+
 ## 1. Feature & Invariant Index
 
 | Feature ID | Name | Primary Files | Status | Regression Invariant |
@@ -402,3 +404,40 @@ This document serves as the master registry of all features, enhancements, bug f
   - `node --test test/p1-hardening.test.mjs test/p2-hardening.test.mjs test/p3-hardening.test.mjs`: 18 passed, 0 failed.
   - `node scripts/smoke.js --new-features`: 24 passed, 0 failed.
   - `node scripts/i18n-check.js`: 2,238 / 2,238 translated (100% parity across all 7 locales).
+
+
+## 4. v6.9.2 P0 + P1 Hardening Audit (2026-10-25)
+
+A two-tier hardening pass was executed against the live source: the P0 mission-critical foundations first, then the P1 computational engines and media pipelines. Every finding was fixed and logged one line at a time (fix + log before moving on), so the record is interruption-safe. The P0/P1 dossiers were treated as input suggestions, not as evidence that the features worked.
+
+### 4.1 Totals
+- **P0 (F-108, F-103, F-104, F-101, F-102):** 35 findings logged, 33 fixed, 2 open (1 mitigated in-scope item, 1 out-of-scope verification note).
+- **P1 (F-133/F-137, F-110, F-107/F-129, F-135, F-127, F-139):** 39 findings logged, 35 fixed, 4 open.
+- **Combined:** 74 logged, 68 fixed, 6 open. Full detail: [`hardening/AUDIT_LOG.md`](hardening/AUDIT_LOG.md).
+
+### 4.2 Behaviour corrected (not just defensive hardening)
+1. **Split Study Workspace:** reference-board saves are snapshotted/flushed and never land on another board; typed left-pane notes stay on the left board and render in the right place; Ctrl+Z/Ctrl+Y follow the pane last pressed; "Open in Split View" works; asset-backed pictures open; a fresh reference board persists.
+2. **Audio-ink timing:** partially erased recorded strokes keep their timestamps and fragment time spans, so replay remains in sync; coalesced samples carry distinct, monotonic times; recorder failure/stop paths release the microphone and settle.
+3. **Replay & covers:** ghost copies and reveal-edge searches are bounded; concealed covers stay above animated session ink; skip-silence no longer scans the whole board every frame.
+4. **Scratch-out & Study Tape:** a scratch across a concealed cover no longer deletes invisible answer ink; review sessions keep the cover/attached-content state machine and repaint the frozen scene; freehand tape claims the ink written on it; tape drawn during recording is not replayed as ink.
+5. **Circuit simulator:** the DOL starter latches and drops correctly; the Forward-Reverse preset is fully wired and interlocked; diodes pass real forward voltage; op-amp/555/logic-gate outputs update loads; DMM continuity no longer reports dead terminals as shorts.
+6. **Video export:** WebM (with audio) is the default; MP4 warns that it is exported without sound; missing assets and throwing progress callbacks no longer hang the pipeline; long filenames are capped.
+7. **Markdown/KaTeX:** link parsing is linear-time on hostile input, block nesting is depth-limited, card stylesheet values are validated, and math in plain notes loads KaTeX on demand and refreshes the render cache.
+8. **Function grapher:** undefined domains and asymptotes are represented honestly; zoom is bounded and the grid scales with the pixels; integrals across poles report O.L; polar gaps no longer draw spokes.
+9. **Multi-tab sessions:** undo/redo survives tab switches, cached restore uses the normal board-load path, Duplicate tab copies the whole board, switches are serialised, and session Save/Restore use the app dialog instead of `window.prompt`.
+10. **Orthogonal connectors:** degenerate self-connectors no longer draw an arbitrary arrowhead.
+
+### 4.3 Known limitations recorded at release
+- Video export still buffers the complete encoded file in memory (streaming IPC not implemented).
+- MP4 exports remain video-only; choose WebM for audio.
+- Orthogonal routing does not perform obstacle avoidance (it accepts boxes but ignores them).
+- Connectors in the split reference pane resolve ends against the primary store (fall back to free ends; no corruption).
+- P0: keyboard edit commands other than undo/redo remain primary-board bound; the inactive pane's selection is cleared on press as a safety mitigation.
+
+### 4.4 Verification at release
+- `node --test test/p1-hardening.test.mjs` → 5/5
+- `node scripts/smoke.js --new-features` → 24/24
+- `node scripts/smoke.js --features-4.8.8` → 8/8
+- `node scripts/smoke.js` → 1,247 passed; one pre-existing dynamic `t(item.message)` scan failure in `technical-linter.js`
+- `node scripts/i18n-check.js` → 2,245/2,245 in all 7 locales
+- Markdown 15/15, custom features 30/30; combined focused suite 64/65 (pre-existing DOM-dependent video-framing test)

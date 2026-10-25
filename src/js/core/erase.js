@@ -21,8 +21,13 @@ function densify(pts, maxGap) {
       const n = Math.min(64, Math.ceil(d / maxGap));
       for (let k = 1; k < n; k++) {
         const t = k / n;
+        // Invariant #2: probe points carry an interpolated timestamp as well,
+        // because a probe can become the new cut edge of a recorded stroke.
+        const pt = {};
+        if (a.t != null && b.t != null) pt.t = Math.round(a.t + (b.t - a.t) * t);
+        else if (a.t != null) pt.t = a.t;
         out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t,
-          p: (a.p ?? 0.5) + ((b.p ?? 0.5) - (a.p ?? 0.5)) * t, probe: true });
+          p: (a.p ?? 0.5) + ((b.p ?? 0.5) - (a.p ?? 0.5)) * t, ...pt, probe: true });
       }
     }
     out.push(b);
@@ -82,7 +87,10 @@ export function bakedPoints(stroke) {
   const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
   return stroke.points.map((p) => {
     const q = rotatePoint(p.x, p.y, cx, cy, stroke.rotation);
-    return { x: q.x, y: q.y, p: p.p };
+    // Invariant #2: keep the timestamp (and tilt) on rotated points too.
+    return { x: q.x, y: q.y, p: p.p,
+      ...(p.t != null ? { t: p.t } : {}),
+      ...(typeof p.tiltX === 'number' && (p.tiltX !== 0 || p.tiltY !== 0) ? { tiltX: p.tiltX, tiltY: p.tiltY || 0 } : {}) };
   });
 }
 
@@ -101,13 +109,20 @@ export function splitStroke(stroke, a, b, r) {
   // else, and thinning them would move the very points the shape is made of.
   return runs
     .filter((run) => run.length > 1 && pathLength(run) >= minLength)
-    .map((run) => ({
-      ...structuredClone(stroke),
-      id: uid('s'),
-      rotation: 0,
-      points: run.map((p) => ({ x: +p.x.toFixed(2), y: +p.y.toFixed(2), p: +(p.p ?? 0.5).toFixed(2) })),
-      bbox: bboxOfPoints(run)
-    }));
+    .map((run) => {
+      const points = run.map((p) => ({ x: +p.x.toFixed(2), y: +p.y.toFixed(2), p: +(p.p ?? 0.5).toFixed(2),
+        // Invariant #2: an erased recorded stroke must keep its timeline, or
+        // the surviving fragments stop replaying in time with the audio.
+        ...(p.t != null ? { t: Math.round(p.t) } : {}),
+        ...(typeof p.tiltX === 'number' && (p.tiltX !== 0 || p.tiltY !== 0) ? { tiltX: p.tiltX, tiltY: p.tiltY || 0 } : {}) }));
+      const out = { ...structuredClone(stroke), id: uid('s'), rotation: 0, points, bbox: bboxOfPoints(run) };
+      // A fragment covers only part of the original stroke's time span; using
+      // the original t0/t1 would reveal the whole fragment before its ink was
+      // actually drawn.
+      if (points[0].t != null) out.t0 = points[0].t;
+      if (points[points.length - 1].t != null) out.t1 = points[points.length - 1].t;
+      return out;
+    });
 }
 
 function pathLength(pts) {

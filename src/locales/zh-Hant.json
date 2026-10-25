@@ -1,4 +1,11 @@
 {
+  "Restore": "還原",
+  "Restore workspace session": "還原工作區工作階段",
+  "Name for the open tabs:": "為開啟的分頁命名：",
+  "Save workspace session": "儲存工作區工作階段",
+  "MP4 is exported without sound. Choose WebM to keep the recording audio.": "MP4 匯出不含聲音。請選擇 WebM 以保留錄音音訊。",
+  "The recording could not be saved": "無法儲存錄音",
+  "That board is already open": "該白板已開啟",
   "Untitled board": "未命名白板",
   "Saving…": "正在儲存…",
   "Saved": "已儲存",

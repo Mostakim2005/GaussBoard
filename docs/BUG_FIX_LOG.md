@@ -47,6 +47,8 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
 | **BUG-052** | P3 Hardening: Academic Dictionary TTS, Linter Math Guard, Periodic Table Edge Cases & Laser Lifespan | High | Utilities / Linter | Resolved |
 | **BUG-053** | P2 Hardening: SMILES % Rings, NotebookVariables DAG Cycles, Dataview Prototype Pollution, Anki Timeout & PDF Sidebar Focus | Critical | Domain Workbenches | Resolved |
 | **BUG-054** | P1 Hardening: MNA Matrix Shunts, Shockley Voltage Limiter, Asymptote Guard, Video Duration & Orthogonal Pruning | High | Computational Engines | Resolved |
+| **BUG-055** | P0 Hardening Audit: Split-Pane Save/Focus/Text Editors, Eraser Timestamp Loss, Replay-Over-Covers & Study-Runner State | Critical | P0 Foundations | Resolved (1 in-scope item open) |
+| **BUG-056** | P1 Hardening Audit: DOL Latch & Unwired Reverse Preset, Silent MP4 Default, Markdown Regex DoS, Tab Cache, Grapher Zoom | Critical | Computational Engines & Media | Resolved (4 items open) |
 
 ---
 
@@ -543,3 +545,27 @@ This document records all bugs, regressions, edge-case failures, and UI conflict
   6. Implemented and exported `cleanOrthogonalPath()` in `connectors.js` pruning consecutive duplicate coordinates and intermediate collinear bends.
 * **Verification**: `node --test test/p1-hardening.test.mjs` (5/5 passed), `node scripts/smoke.js --new-features` (24/24 passed), `node scripts/i18n-check.js` (2,238 keys verified).
 * **Files Touched**: `src/js/core/circuit-sim.js`, `src/js/export-video.js`, `src/js/core/markdown.js`, `src/js/ui/function-grapher.js`, `src/js/ui/tabs.js`, `src/js/core/connectors.js`.
+
+
+### BUG-055: P0 Hardening Audit: Split-Pane Save/Focus/Text Editors, Eraser Timestamp Loss, Replay-Over-Covers & Study-Runner State
+* **Symptom**: In split view, switching boards mid-save could write the old reference board over the newly selected file; the last 600 ms of reference-pane edits were dropped on a switch; typed reference-pane text was positioned with the main camera and committed to the main store (lost); Ctrl+Z followed the resting pointer instead of the last-pressed pane; "Open in Split View" did nothing; pictures opened blank in the reference pane. Partially erasing a recorded stroke stripped `p.t` from the surviving fragments and gave them the original stroke's whole time span, breaking audio synchronisation. Animated replay drew session ink over concealed answer covers. A scratch-out over a concealed cover deleted the invisible answer beneath it. The study runner wrote `object.revealed` directly (frozen-scene key never moved; on-card `hidden` content desynchronised), and freehand tape could never claim ink written on it.
+* **Fix**:
+  1. `split-workspace.js`: snapshot + chain left-board saves, flush before board switch/close, per-pane `TextEditor` with canvas-overlay offset, `activePane` focus lease for undo/redo, implemented `openBoardInSplit()`, resolved `asset:` sources, anchored DOM restore, unique excerpt ids, inactive-pane selection clearing.
+  2. `erase.js`/`tools.js`: fragment `t`/tilt preservation, interpolated cut-probe timestamps, per-fragment `t0`/`t1`, per-coalesced-sample timestamps with monotonic clamp.
+  3. `surface.js`: concealed covers redrawn above the replay pass; ghost-copy cache; binary-search reveal edge.
+  4. `study-runner.js`: review visibility through cover + attached-content state and `surface.touch()`; FSRS rating undo fixed.
+  5. `tools.js`: `coverFor()` uses `boundsOf()` (tape + card); tape excluded from the audio-ink clock; scratch-out spares objects under concealed covers.
+* **Verification**: `node scripts/smoke.js --new-features` 24/24; `node scripts/smoke.js --features-5.1.0` 5/5; `node scripts/i18n-check.js` 2,245/2,245; full finding record in `docs/hardening/AUDIT_LOG.md`.
+* **Files Touched**: `src/js/ui/split-workspace.js`, `src/js/ui/textedit.js`, `src/js/ui/study-runner.js`, `src/js/ui/contextmenu.js`, `src/js/ui/density-canvas.js`, `src/js/ui/toolbar.js`, `src/js/app.js`, `src/js/core/tools.js`, `src/js/core/erase.js`, `src/js/core/replay.js`, `src/js/core/surface.js`, `src/js/core/audio-recorder.js`, `src/js/insert.js`.
+
+### BUG-056: P1 Hardening Audit: DOL Latch & Unwired Reverse Preset, Silent MP4 Default, Markdown Regex DoS, Tab Cache, Grapher Zoom
+* **Symptom**: The DOL starter's Start button did nothing because contactor state was decided from half-propagated potentials, so the coil opened its own hold contact; the Forward-Reverse preset added KM2/SB3 with no wiring; the previous diode "limiter" capped every series diode at ~0.73 V and crept up 52 mV per step; op-amp/adder outputs never updated downstream LEDs. MP4 was the default video format but the WebCodecs path muxes video only, so default exports were silent. A note containing 100 KB of `[` blocked the main thread ~24 s; ~20k nested blockquotes overflowed the stack; card colour/font values could inject CSS. Markdown math did not request KaTeX and its SVG cache ignored KaTeX readiness. The grapher flattened non-finite values to 0 (drawing across undefined domains) and unbounded zoom could make the integer grid loop forever. Tab caches read `_undoStack` (non-existent), cache restore bypassed `loadBoard`, Duplicate tab produced an empty board, rapid switches cross-contaminated caches, and session dialogs used `window.prompt` (unavailable in Electron).
+* **Fix**:
+  1. `circuit-sim.js`: armature state decided from completed potentials and applied next step; fully wired reverse coil/self-hold/interlock/mains; direct diode drop; in-place driver-node updates (op-amp/555/gates); larger propagation ceiling; DMM continuity requires live nodes; audio throttles; `clear()`/`step()` sanitising; workbench HUD/backplate caching, hit-testing on the press event, BOM stamp geometry.
+  2. `export-video.js`: WebM (audio) default + translated MP4 no-sound notice, missing-asset error, progress-callback guard, filename cap.
+  3. `markdown.js`: bounded link quantifiers + closing-delimiter pre-checks (DoS fixed), block recursion cap, stylesheet value whitelisting, on-demand KaTeX with cache key; `render.js` KaTeX-ready key.
+  4. `function-grapher.js`: NaN/Infinity preserved; clamped zoom + pixel-sized grid steps; pole integrals report O.L and poles no longer fake roots; polar gaps.
+  5. `tabs.js`: correct undo/redo cache fields, restore via `app.loadBoard`, whole-board duplicate, serialised switches, `askText` session dialogs, validated localStorage.
+  6. `connectors.js`: no arrowhead on a fully degenerate path; stale route/dialog tests aligned with shipped features.
+* **Verification**: `node --test test/p1-hardening.test.mjs` 5/5; `node scripts/smoke.js --new-features` 24/24; `node scripts/smoke.js --features-4.8.8` 8/8; `node scripts/i18n-check.js` 2,245/2,245; `node --test test/markdown.test.mjs` 15/15; `node --test test/custom-features.test.mjs` 30/30. Open items and manual tests: `docs/hardening/AUDIT_LOG.md`.
+* **Files Touched**: `src/js/core/circuit-sim.js`, `src/js/ui/circuit-workbench.js`, `src/js/export-video.js`, `src/js/core/markdown.js`, `src/js/core/render.js`, `src/js/ui/function-grapher.js`, `src/js/ui/tabs.js`, `src/js/core/connectors.js`, `src/locales/*.json`, `test/custom-features.test.mjs`, `test/smoke-features-4.8.8.js`.

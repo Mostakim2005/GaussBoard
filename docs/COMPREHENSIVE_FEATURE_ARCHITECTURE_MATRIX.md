@@ -1,6 +1,6 @@
 # GazBoard Replay — Comprehensive Feature, Risk & Architecture Matrix
 
-> **Scope**: Authoritative architectural ledger, failure-mode vulnerability analysis, and cross-subsystem interaction matrix covering all custom and baseline features implemented in GazBoard Replay from v4.8.1 through v6.9.1.  
+> **Scope**: Authoritative architectural ledger, failure-mode vulnerability analysis, and cross-subsystem interaction matrix covering all custom and baseline features implemented in GazBoard Replay from v4.8.1 through v6.9.2.  
 > **Core Architectural Paradigm**: Pure Vanilla JavaScript (ES6 Modules), Canvas2D hardware acceleration, zero frontend frameworks (React/Vue/Svelte-free), zero C++ native addons (`node-gyp`-free), 100% offline autonomy (0 external CDNs), strict 6 Golden Invariants compliance.
 
 ---
@@ -29,6 +29,8 @@ To maximize stability and prevent regressions as GazBoard scales, every implemen
 ## 2. Master Feature Prioritization & Vulnerability Ledger
 
 This master ledger ranks all 39 primary features from **Highest Hardening Priority (`P0`) down to `P3`**, enabling developers to harden the most vulnerable and architecturally complex systems first.
+
+> **v6.9.2 audit status:** the five P0 rows and the P1 computational/media rows have been audited against the live source, not just the dossiers. 74 findings were logged (68 fixed) across the split workspace, audio-ink timing, replay partitioning, scratch eraser, study tape/covers, circuit simulation, video export, Markdown/KaTeX, the calculus grapher, multi-tab sessions and orthogonal routing. Several rows below describe intended architecture rather than pre-audit behaviour; where they differ, [`releases/RELEASE-6.9.2.md`](releases/RELEASE-6.9.2.md) and [`hardening/AUDIT_LOG.md`](hardening/AUDIT_LOG.md) are authoritative.
 
 | ID | Feature Name | Domain | Complexity | Risk Likelihood | Hardening Priority | User Impact | Primary Failure Modes & Cross-Code Collisions |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :--- |

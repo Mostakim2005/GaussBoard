@@ -819,6 +819,9 @@ export class Interaction {
           if (!a.ruled && this.underThePlastic(raw)) { a.blocked = true; return; }
           const cand = this.snapToRuler(raw, a);
           const prev = a.obj.points[a.obj.points.length - 1];
+          // Replay slicing binary-searches these timestamps, so they may never
+          // run backwards - not even when the audio clock is scrubbed mid-stroke.
+          if (prev && cand.t != null && prev.t != null && cand.t < prev.t) cand.t = prev.t;
           if (prev && dist(prev, cand) * this.surface.cam.z <= 1.2) return;
           if (!keep(cand)) return;
           if (a.blocked) { this.breakStroke(a); a.blocked = false; }
@@ -831,11 +834,20 @@ export class Interaction {
         const clock = audioInkClock(this.app);
         const curT = clock && clock.trackId === a.obj.audioId ? clock.timeMs : null;
         if (evs && evs.length) {
+          const eventStamp = typeof e.timeStamp === 'number' ? e.timeStamp : null;
           for (const ce of evs) {
             const csp = this.surface.screenPoint(ce);
             const cwp = this.surface.cam.toWorld(csp.x, csp.y);
             const tilt = (ce && typeof ce.tiltX === 'number' && (ce.tiltX !== 0 || ce.tiltY !== 0)) ? { tiltX: ce.tiltX, tiltY: ce.tiltY } : {};
-            offer({ ...cwp, p: this.pressure(ce), ...(curT != null ? { t: curT } : {}), ...tilt });
+            // The audio clock is read once, now. Coalesced samples all happened
+            // BEFORE this event, so back-date each one by its own gap; stacking
+            // a whole frame of ink on one instant made fast strokes replay in
+            // visible steps instead of along their real timeline.
+            let pointT = curT;
+            if (curT != null && eventStamp != null && typeof ce.timeStamp === 'number') {
+              pointT = Math.max(0, curT - Math.max(0, eventStamp - ce.timeStamp));
+            }
+            offer({ ...cwp, p: this.pressure(ce), ...(pointT != null ? { t: pointT } : {}), ...tilt });
           }
         } else {
           const tilt = (e && typeof e.tiltX === 'number' && (e.tiltX !== 0 || e.tiltY !== 0)) ? { tiltX: e.tiltX, tiltY: e.tiltY } : {};
@@ -1846,7 +1858,9 @@ export class Interaction {
       ruled: startEdge !== null, ruledEdge: startEdge || 0 };
     const clock = audioInkClock(this.app);
     const t0 = clock?.timeMs ?? null;
-    if (clock) {
+    // Study tape is a mask, not ink: giving it an audioId would make the replay
+    // engine treat the cover as a recorded stroke and animate it as one.
+    if (clock && !isTape) {
       obj.audioId = clock.trackId;
       obj.t0 = clock.timeMs;
     }
@@ -2057,6 +2071,22 @@ export class Interaction {
     const hitBox = { x: box.x - expand, y: box.y - expand, w: box.w + expand * 2, h: box.h + expand * 2 };
 
     const targets = this.app?.settings?.scratchTargets || { stroke: true, text: false, note: false, shape: false };
+    // Ink that sits UNDER a concealed cover cannot be seen, so a scribble over
+    // the cover must not silently erase it. (Ink written ON a cover is above
+    // it in z-order and stays fair game.)
+    const covers = this.store.objects.filter((c) => c && c.type === 'curtain' && !c.revealed);
+    const underCover = (o) => {
+      if (!covers.length) return false;
+      const at = this.store.indexOf(o.id);
+      const b = worldBounds(o);
+      for (const c of covers) {
+        if (this.store.indexOf(c.id) < at) continue;   // cover is beneath it: hides nothing
+        const cb = worldBounds(c);
+        if (b.x >= cb.x - 4 && b.y >= cb.y - 4
+            && b.x + b.w <= cb.x + cb.w + 4 && b.y + b.h <= cb.y + cb.h + 4) return true;
+      }
+      return false;
+    };
     const hits = inBox(this.store, hitBox, false).filter((o) => {
       if (o.locked || o.id === a.obj.id) return false;
       const type = o.type;
@@ -2065,11 +2095,14 @@ export class Interaction {
       if (type === 'note') return !!targets.note;
       if (type === 'shape') return !!targets.shape;
       return false;
-    });
+    }).filter((o) => !underCover(o));
     if (!hits.length) return false;
 
     this.discardTapMark(); // Throw away the scribble mark without saving to store
     this.store.remove(hits.map((o) => o.id), 'scratch-out');
+    // Deleted things cannot stay selected: that left a live selection holding
+    // ids the board no longer has.
+    this.app?.pruneSelection?.();
     this.surface.pulseHighlight(hitBox, 400);
     this.surface.invalidate();
     return true;
@@ -2266,7 +2299,11 @@ export class Interaction {
     for (let i = order.length - 1; i >= 0; i--) {
       const c = this.store.doc.objects[order[i]];
       if (!c || c.type !== 'curtain' || c.revealed || c.id === obj.id) continue;
-      const box = { x: Math.min(c.x, c.x + c.w), y: Math.min(c.y, c.y + c.h), w: Math.abs(c.w), h: Math.abs(c.h) };
+      // boundsOf() is the cover's real footprint for BOTH kinds: a rectangular
+      // card has x/y/w/h, while freehand study tape only has points and a bbox.
+      // Reading c.x/c.w directly made tape covers unable to claim anything.
+      const cb = boundsOf(c);
+      const box = { x: cb.x, y: cb.y, w: cb.w, h: cb.h };
       const inside = (p) => {
         const q = toLocal(c, p);
         return q.x >= box.x && q.x <= box.x + box.w && q.y >= box.y && q.y <= box.y + box.h;

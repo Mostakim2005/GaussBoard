@@ -49,7 +49,7 @@ const browserChecks = String.raw`(async () => {
     await app.panels.close();
     const { pickRecordingsForVideoExport } = await import('app://board/js/export-video.js');
     const selected = pickRecordingsForVideoExport(app, [{ id: 'preset-smoke', name: 'Preset test', durationMs: 1000 }]);
-    const preset = await wait(() => document.querySelector('#videoExportModal select'));
+    const preset = await wait(() => document.querySelector('#videoExportModal select[aria-label="Video quality"]'));
     preset.value = '1080p60';
     preset.dispatchEvent(new Event('change', { bubbles: true }));
     const cameraMode = document.querySelector('#videoExportModal select[aria-label="Video framing"]');

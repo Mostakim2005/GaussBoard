@@ -485,8 +485,16 @@ export function drawConnector(ctx, o, paint = (c) => c) {
   ctx.stroke();
   ctx.setLineDash([]);
   const style = HEAD_STYLES.includes(o.headStyle) ? o.headStyle : 'filled';
-  if (heads === 'end' || heads === 'both') drawArrowhead(ctx, r.headFrom, r.b, size, style);
-  if (heads === 'both') drawArrowhead(ctx, r.tailFrom, r.a, size, style);
+  // A fully degenerate path (both ends on the same spot, e.g. an arrow drawn
+  // from a box back onto itself) has no direction; drawing a head from a point
+  // to itself made it point arbitrarily right. No usable segment, no head.
+  const hasHead = (from, to) => Math.hypot(to.x - from.x, to.y - from.y) > 0.5;
+  if ((heads === 'end' || heads === 'both') && pts.length > 1 && hasHead(r.headFrom, r.b)) {
+    drawArrowhead(ctx, r.headFrom, r.b, size, style);
+  }
+  if (heads === 'both' && pts.length > 1 && hasHead(r.tailFrom, r.a)) {
+    drawArrowhead(ctx, r.tailFrom, r.a, size, style);
+  }
   ctx.restore();
 }
 
@@ -515,9 +523,10 @@ export function connectorSvg(o) {
     return `<polygon points="${point(to)} ${point(p1)} ${point(notch)} ${point(p2)}" fill="${colour}"/>`;
   };
   const heads = o.heads || 'end';
+  const headOk = (from, to) => Math.hypot(to.x - from.x, to.y - from.y) > 0.5;
   return `<path d="${d}" fill="none" stroke="${colour}" stroke-width="${lw}" stroke-linecap="round" stroke-linejoin="round"${dash}/>` +
-    (heads === 'end' || heads === 'both' ? head(r.headFrom, r.b) : '') +
-    (heads === 'both' ? head(r.tailFrom, r.a) : '');
+    (heads === 'end' || heads === 'both' ? headOk(r.headFrom, r.b) ? head(r.headFrom, r.b) : '' : '') +
+    (heads === 'both' && headOk(r.tailFrom, r.a) ? head(r.tailFrom, r.a) : '');
 }
 
 /* ---------- what an end can grab ---------- */

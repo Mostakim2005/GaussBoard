@@ -226,7 +226,7 @@ export function updateSelectionBar(app, targetObj = null) {
     bar.appendChild(unlock);
     if (covers.length) bar.appendChild(revealBtn());
     appendMoreActions(app, bar);
-    placeBar(bar, box);
+    placeBar(bar, box, false, app);
     return;
   }
 
@@ -419,7 +419,7 @@ export function updateSelectionBar(app, targetObj = null) {
 
   appendMoreActions(app, bar);
 
-  placeBar(bar, box, !!app.interaction?.selectionHasDots?.());
+  placeBar(bar, box, !!app.interaction?.selectionHasDots?.(), app);
 }
 
 function appendMoreActions(app, bar) {
@@ -433,14 +433,19 @@ function appendMoreActions(app, bar) {
   bar.appendChild(button);
 }
 
-function placeBar(bar, box, dots = false) {
+function placeBar(bar, box, dots = false, app = null) {
   bar.classList.add('show');
   const stage = document.getElementById('stage').getBoundingClientRect();
+  // `box` is in the owning canvas's coordinates. In a split workspace the
+  // canvas is not at the stage's origin, so carry the difference.
+  const cr = app?.surface?.canvas?.getBoundingClientRect?.();
+  const ox = cr ? cr.left - stage.left : 0;
+  const oy = cr ? cr.top - stage.top : 0;
   const w = bar.offsetWidth || 200;
-  let left = box.x + box.w / 2 - w / 2;
+  let left = box.x + box.w / 2 - w / 2 + ox;
   left = Math.max(8, Math.min(left, stage.width - w - 8));
-  let top = box.y - bar.offsetHeight - (dots ? 66 : 44);
-  if (top < 8) top = Math.min(box.y + box.h + (dots ? 34 : 12), stage.height - bar.offsetHeight - 80);
+  let top = box.y - bar.offsetHeight - (dots ? 66 : 44) + oy;
+  if (top < 8) top = Math.min(box.y + box.h + (dots ? 34 : 12) + oy, stage.height - bar.offsetHeight - 80);
   top = Math.max(8, Math.min(top, stage.height - bar.offsetHeight - 8));
   bar.style.left = left + 'px';
   bar.style.top = top + 'px';

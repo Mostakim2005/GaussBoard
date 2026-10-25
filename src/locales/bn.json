@@ -1,4 +1,11 @@
 {
+  "Restore": "পুনরুদ্ধার",
+  "Restore workspace session": "ওয়ার্কস্পেস সেশন পুনরুদ্ধার করুন",
+  "Name for the open tabs:": "খোলা ট্যাবগুলোর নাম:",
+  "Save workspace session": "ওয়ার্কস্পেস সেশন সংরক্ষণ করুন",
+  "MP4 is exported without sound. Choose WebM to keep the recording audio.": "MP4 শব্দ ছাড়াই রপ্তানি হয়। রেকর্ডিংয়ের অডিও রাখতে WebM বেছে নিন।",
+  "The recording could not be saved": "রেকর্ডিংটি সংরক্ষণ করা যায়নি",
+  "That board is already open": "এই বোর্ডটি ইতিমধ্যে খোলা আছে",
   "Untitled board": "নামহীন বোর্ড",
   "Saving…": "সেভ হচ্ছে…",
   "Saved": "সেভ হয়েছে",

@@ -176,7 +176,11 @@ export function drawMarkdownBlock(ctx, o, hideText = false, onload = null, boxOv
   const fontFamily = faceOf(o.font);
   const align = o.align || 'left';
 
-  const key = `${o.text}\u0000${Math.round(w)}\u0000${Math.round(h)}\u0000${color}\u0000${fontSize}\u0000${fontFamily}\u0000${align}`;
+  // KaTeX readiness belongs in the key: a card first rendered before the
+  // offline bundle arrives is cached with fallback math, and without this the
+  // fallback TeX would stay on screen for the life of that cache entry.
+  const katexReady = typeof globalThis !== 'undefined' && !!globalThis.katex;
+  const key = `${o.text}\u0000${Math.round(w)}\u0000${Math.round(h)}\u0000${color}\u0000${fontSize}\u0000${fontFamily}\u0000${align}\u0000${katexReady ? 'k' : ''}`;
   let entry = mdSvgCache.get(key);
 
   if (!entry && typeof Image !== 'undefined') {

@@ -1,4 +1,11 @@
 {
+  "Restore": "Restaurar",
+  "Restore workspace session": "Restaurar sessão do espaço de trabalho",
+  "Name for the open tabs:": "Nome para as abas abertas:",
+  "Save workspace session": "Salvar sessão do espaço de trabalho",
+  "MP4 is exported without sound. Choose WebM to keep the recording audio.": "O MP4 é exportado sem som. Escolha WebM para manter o áudio da gravação.",
+  "The recording could not be saved": "Não foi possível salvar a gravação",
+  "That board is already open": "Esse quadro já está aberto",
   "Untitled board": "Quadro sem título",
   "Saving…": "Salvando…",
   "Saved": "Salvo",

@@ -24,6 +24,31 @@ export const GRAPH_PRESETS = [
   { id: 'rational', name: 'Rational: f(x) = 4 / (x² + 1)', expr: '4 / (x^2 + 1)', domain: [-6, 6], a: -2, b: 2 }
 ];
 
+/* Zoom is bounded: an unbounded wheel could drive the span to Infinity, and
+ * the integer grid loop then had no way to finish (the page froze outright). */
+const MIN_VIEW_SPAN = 1e-4;
+const MAX_VIEW_SPAN = 1e6;
+
+/** A 1/2/5×10ⁿ grid step no smaller than `raw`. */
+function niceStep(raw) {
+  const value = Math.abs(Number(raw));
+  if (!Number.isFinite(value) || value <= 0) return 1;
+  const power = Math.pow(10, Math.floor(Math.log10(value)));
+  const norm = value / power;
+  const mult = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  return mult * power;
+}
+
+/** Axis tick text without trailing float noise ("0.30000000000000004"). */
+function formatTick(value, step) {
+  if (!Number.isFinite(value)) return '';
+  const abs = Math.abs(value);
+  if (abs >= 1e5 || (abs > 0 && abs < 1e-4)) return value.toExponential(0);
+  const decimals = step >= 1 ? 0 : Math.min(6, Math.ceil(-Math.log10(step)));
+  const text = value.toFixed(decimals);
+  return text === '-0' ? '0' : text;
+}
+
 export class FunctionGrapherModal {
   constructor(app) {
     this.app = app;
@@ -107,9 +132,13 @@ export class FunctionGrapherModal {
     return (x) => {
       try {
         const val = parseMathExpressionSafely(exprStr, { x });
-        return Number.isFinite(val) ? val : 0;
+        // Keep NaN/Infinity instead of flattening them to 0: the point of the
+        // asymptote/domain guards downstream is to SEE those values. Turning
+        // them into zero drew sqrt(x) as a line along y=0 for x<0 and hid
+        // every pole behind a fake value.
+        return typeof val === 'number' ? val : NaN;
       } catch {
-        return 0;
+        return NaN;
       }
     };
   }
@@ -292,8 +321,12 @@ export class FunctionGrapherModal {
         const zoomFactor = e.deltaY < 0 ? 0.85 : 1.15;
         const xMid = (this.xMin + this.xMax) / 2;
         const yMid = (this.yMin + this.yMax) / 2;
-        const xSpan = (this.xMax - this.xMin) * zoomFactor;
-        const ySpan = (this.yMax - this.yMin) * zoomFactor;
+        const clampSpan = (span) => {
+          if (!Number.isFinite(span) || span <= 0) return 12;
+          return Math.max(MIN_VIEW_SPAN, Math.min(MAX_VIEW_SPAN, span));
+        };
+        const xSpan = clampSpan((this.xMax - this.xMin) * zoomFactor);
+        const ySpan = clampSpan((this.yMax - this.yMin) * zoomFactor);
 
         this.xMin = xMid - xSpan / 2;
         this.xMax = xMid + xSpan / 2;
@@ -477,17 +510,24 @@ export class FunctionGrapherModal {
     const toScreenX = (x) => ((x - this.xMin) / (this.xMax - this.xMin)) * w;
     const toScreenY = (y) => h - ((y - this.yMin) / (this.yMax - this.yMin)) * h;
 
-    // Grid lines
+    // Grid lines. The step follows the pixels available, so zooming out shows
+    // fewer, wider-spaced lines instead of millions of integer rules.
+    const xStep = niceStep((this.xMax - this.xMin) / Math.max(4, w / 60));
+    const yStep = niceStep((this.yMax - this.yMin) / Math.max(4, h / 45));
     ctx.strokeStyle = '#1e293b';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let x = Math.ceil(this.xMin); x <= Math.floor(this.xMax); x++) {
-      const sx = toScreenX(x);
+    const xStart = Math.ceil(this.xMin / xStep);
+    const xEnd = Math.floor(this.xMax / xStep);
+    for (let i = xStart; i <= xEnd && i - xStart <= 400; i++) {
+      const sx = toScreenX(i * xStep);
       ctx.moveTo(sx, 0);
       ctx.lineTo(sx, h);
     }
-    for (let y = Math.ceil(this.yMin); y <= Math.floor(this.yMax); y++) {
-      const sy = toScreenY(y);
+    const yStart = Math.ceil(this.yMin / yStep);
+    const yEnd = Math.floor(this.yMax / yStep);
+    for (let i = yStart; i <= yEnd && i - yStart <= 400; i++) {
+      const sy = toScreenY(i * yStep);
       ctx.moveTo(0, sy);
       ctx.lineTo(w, sy);
     }
@@ -511,22 +551,28 @@ export class FunctionGrapherModal {
     // Axis Numbers
     ctx.fillStyle = '#64748b';
     ctx.font = '10px sans-serif';
-    for (let x = Math.ceil(this.xMin); x <= Math.floor(this.xMax); x++) {
-      if (x === 0) continue;
-      ctx.fillText(String(x), toScreenX(x) - 4, originY + 14);
+    for (let i = xStart; i <= xEnd && i - xStart <= 400; i++) {
+      const value = i * xStep;
+      if (Math.abs(value) < xStep * 0.001) continue;
+      ctx.fillText(formatTick(value, xStep), toScreenX(value) - 4, originY + 14);
     }
-    for (let y = Math.ceil(this.yMin); y <= Math.floor(this.yMax); y++) {
-      if (y === 0) continue;
-      ctx.fillText(String(y), originX + 6, toScreenY(y) + 3);
+    for (let i = yStart; i <= yEnd && i - yStart <= 400; i++) {
+      const value = i * yStep;
+      if (Math.abs(value) < yStep * 0.001) continue;
+      ctx.fillText(formatTick(value, yStep), originX + 6, toScreenY(value) + 3);
     }
 
     // 2. Definite Integral Shading
     let integralArea = 0;
+    let integralUndefined = false;
     if (this.showIntegral) {
       const a = this.integralA;
       const b = this.integralB;
       const steps = 100;
       const dx = (b - a) / steps;
+      const poleLimit = Math.abs(this.yMax - this.yMin) * 100 + 100;
+      const jumpLimit = Math.abs(this.yMax - this.yMin) * 10 + 10;
+      let prevSample = null;
 
       ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
       ctx.beginPath();
@@ -535,15 +581,23 @@ export class FunctionGrapherModal {
       for (let i = 0; i <= steps; i++) {
         const x = a + i * dx;
         const y = this.fn(x);
-        if (Number.isFinite(y)) {
+        // A pole inside [a,b] makes the Riemann sum meaningless: report O.L
+        // rather than a plausible-looking number made of skipped samples.
+        if (!Number.isFinite(y) || Math.abs(y) > poleLimit) integralUndefined = true;
+        else if (prevSample != null && Math.sign(y) !== Math.sign(prevSample) && Math.abs(y - prevSample) > jumpLimit) integralUndefined = true;
+        if (Number.isFinite(y) && Math.abs(y) <= poleLimit) {
           ctx.lineTo(toScreenX(x), toScreenY(y));
           if (i < steps) integralArea += y * dx;
+          prevSample = y;
+        } else {
+          prevSample = null;
         }
       }
       ctx.lineTo(toScreenX(b), toScreenY(0));
       ctx.closePath();
       ctx.fill();
     }
+    if (integralUndefined) integralArea = NaN;
 
     // 3. Plot Function Curve f(x)
     ctx.strokeStyle = '#38bdf8';
@@ -622,8 +676,10 @@ export class FunctionGrapherModal {
         const curY = this.fn(curX);
         const curDy = (this.fn(curX + 0.001) - curY) / 0.001;
 
-        // Root detection (y sign change)
-        if (Number.isFinite(prevY) && Number.isFinite(curY) && prevY * curY < 0) {
+        // Root detection (y sign change). A sign flip across a pole is not a
+        // root: require the values to move gently, not jump by a window.
+        if (Number.isFinite(prevY) && Number.isFinite(curY) && prevY * curY < 0
+            && Math.abs(curY - prevY) < (this.yMax - this.yMin)) {
           const rootX = curX - curY * (step / (curY - prevY));
           const sx = toScreenX(rootX);
           const sy = toScreenY(0);
@@ -883,12 +939,18 @@ export class FunctionGrapherModal {
     let started = false;
     for (let i = 0; i <= steps * 2; i++) {
       const theta = (i * Math.PI) / 180;
-      let r = 0;
+      let r = NaN;
       try {
         const val = parseMathExpressionSafely(this.exprPolar, { t: theta, theta });
-        r = Number.isFinite(val) ? val : 0;
+        r = typeof val === 'number' ? val : NaN;
       } catch {
-        r = 0;
+        r = NaN;
+      }
+      // Undefined radius (a pole, a negative sqrt, ...) is a GAP in the curve,
+      // not a point at the origin: plotting it as 0 drew spokes to the centre.
+      if (!Number.isFinite(r)) {
+        started = false;
+        continue;
       }
       const sx = cx + r * Math.cos(theta) * scale;
       const sy = cy - r * Math.sin(theta) * scale;
