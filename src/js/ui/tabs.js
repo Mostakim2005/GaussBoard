@@ -1,5 +1,7 @@
 // tabs.js — Multi-Tab Browsing Strip & In-Memory Session Cache
 import { t } from '../i18n.js';
+import { openPopover, closePopover } from './popover.js';
+import { allBoards } from '../core/boardrefs.js';
 
 export class WorkspaceSessionManager {
   static STORAGE_KEY = 'gazboard_workspace_sessions';
@@ -319,16 +321,14 @@ export class TabBar {
     const tabIndex = this.tabs.findIndex(t => t.id === targetId);
     if (tabIndex === -1) return;
 
-    if (this.tabs.length === 1) {
-      // Closing only open tab: save and make a fresh new tab
+    if (this.tabs.length <= 1) {
+      // Closing only open tab: save and open My Boards gallery so user can choose
       try { await this.app.saveBeforeLeaving(); } catch {}
       this.cache.delete(targetId);
-      this.app.newBoard(true);
-      const newId = this.app.store.doc.id;
-      const newName = this.app.store.doc.name || t('Untitled board');
-      this.tabs = [{ id: newId, title: newName }];
-      this.activeId = newId;
+      this.tabs = [];
+      this.activeId = null;
       this.render();
+      this.app.panels?.boards?.();
       return;
     }
 
@@ -459,6 +459,161 @@ export class TabBar {
 
       this.tabsListEl.appendChild(item);
     }
+
+    // Dynamic (+) button immediately following the latest tab
+    const inlineAddBtn = document.createElement('button');
+    inlineAddBtn.className = 'gb-tab-inline-add';
+    inlineAddBtn.type = 'button';
+    inlineAddBtn.title = t('New or open board');
+    inlineAddBtn.setAttribute('aria-label', t('New or open board'));
+    inlineAddBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+    `;
+    inlineAddBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openNewTabMenu(inlineAddBtn);
+    });
+    this.tabsListEl.appendChild(inlineAddBtn);
+  }
+
+  async openBoardInTab(targetId, boardTitle) {
+    if (!targetId) return;
+    const existing = this.tabs.find((t) => t.id === targetId);
+    if (existing) {
+      await this.switchTab(targetId);
+      return;
+    }
+    try {
+      await this.app.saveBeforeLeaving();
+    } catch (e) {
+      console.warn('[tabs] save before open board failed:', e);
+    }
+    this.cacheCurrentSession();
+    try {
+      await this.app.openBoard(targetId);
+      const title = boardTitle || this.app.store?.doc?.name || t('Untitled board');
+      this.tabs.push({ id: targetId, title });
+      this.activeId = targetId;
+      this.render();
+      this.scrollActiveIntoView();
+    } catch (e) {
+      this.app.toast?.(t('Could not open that board'));
+    }
+  }
+
+  openNewTabMenu(anchor) {
+    if (typeof document === 'undefined') return;
+    const pop = document.createElement('div');
+    pop.className = 'gb-newtab-popover';
+
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'gb-newtab-actions';
+
+    const btnNew = document.createElement('button');
+    btnNew.type = 'button';
+    btnNew.className = 'gb-newtab-btn';
+    btnNew.innerHTML = `
+      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      <span>${t('New Board')}</span>
+    `;
+    btnNew.onclick = () => {
+      closePopover();
+      this.newTab();
+    };
+
+    const btnOpen = document.createElement('button');
+    btnOpen.type = 'button';
+    btnOpen.className = 'gb-newtab-btn';
+    btnOpen.innerHTML = `
+      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+      </svg>
+      <span>${t('Open Existing')}</span>
+    `;
+    btnOpen.onclick = () => {
+      closePopover();
+      this.app.panels?.boards?.();
+    };
+
+    actionsRow.appendChild(btnNew);
+    actionsRow.appendChild(btnOpen);
+    pop.appendChild(actionsRow);
+
+    const searchRow = document.createElement('div');
+    searchRow.className = 'gb-newtab-search';
+    searchRow.innerHTML = `
+      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" placeholder="${t('Search existing boards…')}" spellcheck="false" />
+    `;
+    const searchInput = searchRow.querySelector('input');
+    pop.appendChild(searchRow);
+
+    const listEl = document.createElement('div');
+    listEl.className = 'gb-newtab-list';
+    pop.appendChild(listEl);
+
+    const renderList = (filter = '') => {
+      listEl.innerHTML = '';
+      const boards = (typeof allBoards === 'function' ? allBoards() : [])
+        .filter((b) => b && b.id !== this.activeId);
+      const query = filter.trim().toLowerCase();
+      const filtered = query
+        ? boards.filter((b) => {
+            const name = (b.name || '').toLowerCase();
+            const tags = Array.isArray(b.tags) ? b.tags.join(' ').toLowerCase() : '';
+            const aliases = Array.isArray(b.aliases) ? b.aliases.join(' ').toLowerCase() : '';
+            return name.includes(query) || tags.includes(query) || aliases.includes(query);
+          })
+        : boards.slice(0, 10);
+
+      if (!filtered.length) {
+        const empty = document.createElement('div');
+        empty.style.padding = '8px';
+        empty.style.fontSize = '12px';
+        empty.style.color = 'var(--text-2)';
+        empty.style.textAlign = 'center';
+        empty.textContent = t('No matching boards');
+        listEl.appendChild(empty);
+        return;
+      }
+
+      for (const b of filtered) {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'gb-newtab-item';
+        item.innerHTML = `
+          <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="3" y1="9" x2="21" y2="9"></line>
+            <line x1="9" y1="21" x2="9" y2="9"></line>
+          </svg>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(b.name || t('Untitled board'))}</span>
+        `;
+        item.onclick = async () => {
+          closePopover();
+          await this.openBoardInTab(b.id, b.name);
+        };
+        listEl.appendChild(item);
+      }
+    };
+
+    renderList();
+
+    searchInput.addEventListener('input', () => {
+      renderList(searchInput.value);
+    });
+
+    openPopover(anchor, pop, { key: 'newTabMenu', placement: 'bottom', align: 'start' });
+    setTimeout(() => searchInput?.focus(), 50);
   }
 
   showTabContextMenu(tabId, x, y) {
@@ -501,6 +656,9 @@ export class TabBar {
       <button class="gb-tab-menu-item" data-action="close-others">
         <span>${t('Close other tabs')}</span>
       </button>
+      <button class="gb-tab-menu-item" data-action="close-all">
+        <span>${t('Close all tabs')}</span>
+      </button>
       <button class="gb-tab-menu-item" data-action="close">
         <span>${t('Close tab')}</span>
         <span class="shortcut">Ctrl+W</span>
@@ -533,6 +691,8 @@ export class TabBar {
         this.promptRestoreSession();
       } else if (action === 'close-others') {
         await this.closeOtherTabs(tabId);
+      } else if (action === 'close-all') {
+        await this.closeAllTabs();
       } else if (action === 'close') {
         await this.closeTab(tabId);
       }
@@ -594,6 +754,15 @@ export class TabBar {
     } else {
       this.render();
     }
+  }
+
+  async closeAllTabs() {
+    try { await this.app.saveBeforeLeaving(); } catch {}
+    this.cache.clear();
+    this.tabs = [];
+    this.activeId = null;
+    this.render();
+    this.app.panels?.boards?.();
   }
 
   saveCurrentSession(name) {

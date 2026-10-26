@@ -747,6 +747,73 @@ export async function exportVideoFile(app, track = null) {
   const filterName = format === 'mp4' ? 'MP4 Video' : 'WebM Video';
   const filterExt = format === 'mp4' ? 'mp4' : 'webm';
 
+function showBackgroundExportProgress(app, initialText, onCancel) {
+  if (typeof document === 'undefined') return null;
+  let banner = document.getElementById('videoExportBanner');
+  if (banner) banner.remove();
+
+  banner = document.createElement('div');
+  banner.id = 'videoExportBanner';
+  banner.className = 'video-export-banner';
+  banner.setAttribute('role', 'status');
+  banner.setAttribute('aria-live', 'polite');
+
+  const pulse = document.createElement('div');
+  pulse.className = 'veb-pulse';
+
+  const label = document.createElement('span');
+  label.className = 'veb-label';
+  label.textContent = initialText || t('Exporting video…');
+
+  const bar = document.createElement('div');
+  bar.className = 'veb-bar';
+  const fill = document.createElement('div');
+  fill.className = 'veb-fill';
+  fill.style.width = '0%';
+  bar.appendChild(fill);
+
+  const pctEl = document.createElement('span');
+  pctEl.className = 'veb-pct';
+  pctEl.textContent = '0%';
+
+  const btnCancel = document.createElement('button');
+  btnCancel.type = 'button';
+  btnCancel.className = 'veb-cancel';
+  btnCancel.title = t('Cancel export');
+  btnCancel.setAttribute('aria-label', t('Cancel export'));
+  btnCancel.innerHTML = '&times;';
+  btnCancel.onclick = (e) => {
+    e.stopPropagation();
+    onCancel?.();
+    banner.remove();
+  };
+
+  banner.appendChild(pulse);
+  banner.appendChild(label);
+  banner.appendChild(bar);
+  banner.appendChild(pctEl);
+  banner.appendChild(btnCancel);
+
+  const topbar = document.getElementById('topbar');
+  if (topbar) {
+    topbar.appendChild(banner);
+  } else {
+    document.body.appendChild(banner);
+  }
+
+  return {
+    update: (frac, text) => {
+      const rounded = Math.round((frac || 0) * 100);
+      fill.style.width = `${rounded}%`;
+      pctEl.textContent = `${rounded}%`;
+      if (text) label.textContent = text;
+    },
+    close: () => {
+      banner.remove();
+    }
+  };
+}
+
   if (!selectedTracks.length) return null;
 
   if (shouldStitch || selectedTracks.length === 1) {
@@ -758,23 +825,12 @@ export async function exportVideoFile(app, track = null) {
     if (!filePath) return null;
 
     const exporter = new VideoExporter(app);
-    let progress = null;
-    if (typeof app.showProgress === 'function') {
-      const exportTitle = t('Export Video ({format})', { format: format.toUpperCase() }) || t('Export Video (WebM)');
-      progress = app.showProgress(exportTitle, t('Exporting replay video ({pct}%)...', { pct: 0 }));
-      const card = document.getElementById('overlayCard');
-      if (card) {
-        const btnCancel = document.createElement('button');
-        btnCancel.className = 'btn';
-        btnCancel.style.marginTop = '12px';
-        btnCancel.textContent = t('Cancel');
-        btnCancel.onclick = () => {
-          exporter.cancel();
-          progress.close();
-        };
-        card.appendChild(btnCancel);
-      }
-    }
+    const wasReading = !!app.readingMode;
+    // Enter reading mode so inking/editing gestures do not interfere with video capture
+    app.setReadingMode(true, { silent: true });
+
+    const exportTitle = t('Video export ({pct}%)', { pct: 0 });
+    const progress = showBackgroundExportProgress(app, exportTitle, () => exporter.cancel());
 
     try {
       const { blob } = await exporter.exportStitchedReplayVideo({
@@ -783,7 +839,7 @@ export async function exportVideoFile(app, track = null) {
         format,
         onProgress: (pct) => {
           const rounded = Math.round(pct * 100);
-          progress?.update(pct, t('Exporting replay video ({pct}%)...', { pct: rounded }));
+          progress?.update(pct, t('Video export ({pct}%)', { pct: rounded }));
         }
       });
 
@@ -800,45 +856,57 @@ export async function exportVideoFile(app, track = null) {
         app.toast(err.message || 'Export failed');
       }
       return null;
+    } finally {
+      progress?.close();
+      // Restore previous mode (reading or writing)
+      app.setReadingMode(wasReading, { silent: true });
     }
   } else {
     // Export each track separately
-    for (let i = 0; i < selectedTracks.length; i++) {
-      const tr = selectedTracks[i];
-      const safeName = (tr.name || `Recording-${i + 1}`).replace(/[^a-zA-Z0-9_\-]/g, '_');
-      const filePath = await window.board.saveDialog({
-        title: t('Save {name}', { name: tr.name || 'Recording' }),
-        defaultPath: videoExportFilename(app.store.doc.name, uniqueExportSuffix(), safeName, format),
-        filters: [{ name: filterName, extensions: [filterExt] }]
-      });
-      if (!filePath) continue;
+    const wasReading = !!app.readingMode;
+    app.setReadingMode(true, { silent: true });
+    let exporter = null;
+    let progress = null;
 
-      const exporter = new VideoExporter(app);
-      let progress = null;
-      if (typeof app.showProgress === 'function') {
-        progress = app.showProgress(t('Export Video ({format})', { format: format.toUpperCase() }), t('Exporting {name} ({pct}%)...', { name: tr.name || '', pct: 0 }));
-      }
-
-      try {
-        const { blob } = await exporter.exportStitchedReplayVideo({
-          tracks: [tr],
-          ...video,
-          format,
-          onProgress: (pct) => {
-            const rounded = Math.round(pct * 100);
-            progress?.update(pct, t('Exporting {name} ({pct}%)...', { name: tr.name || '', pct: rounded }));
-          }
+    try {
+      for (let i = 0; i < selectedTracks.length; i++) {
+        const tr = selectedTracks[i];
+        const safeName = (tr.name || `Recording-${i + 1}`).replace(/[^a-zA-Z0-9_\-]/g, '_');
+        const filePath = await window.board.saveDialog({
+          title: t('Save {name}', { name: tr.name || 'Recording' }),
+          defaultPath: videoExportFilename(app.store.doc.name, uniqueExportSuffix(), safeName, format),
+          filters: [{ name: filterName, extensions: [filterExt] }]
         });
-        if (!exporter.cancelled) {
-          const buf = await blob.arrayBuffer();
-          await window.board.writeFile(filePath, new Uint8Array(buf));
+        if (!filePath) continue;
+
+        exporter = new VideoExporter(app);
+        const titleStr = t('Exporting {name} ({pct}%)', { name: tr.name || '', pct: 0 });
+        progress = showBackgroundExportProgress(app, titleStr, () => exporter.cancel());
+
+        try {
+          const { blob } = await exporter.exportStitchedReplayVideo({
+            tracks: [tr],
+            ...video,
+            format,
+            onProgress: (pct) => {
+              const rounded = Math.round(pct * 100);
+              progress?.update(pct, t('Exporting {name} ({pct}%)', { name: tr.name || '', pct: rounded }));
+            }
+          });
+          if (!exporter.cancelled) {
+            const buf = await blob.arrayBuffer();
+            await window.board.writeFile(filePath, new Uint8Array(buf));
+            progress?.close();
+            app.toast(t('Saved {name}', { name: filePath.split(/[\\/]/).pop() }));
+          }
+        } catch (err) {
           progress?.close();
-          app.toast(t('Saved {name}', { name: filePath.split(/[\\/]/).pop() }));
+          if (!exporter.cancelled) app.toast(err.message || 'Export failed');
         }
-      } catch (err) {
-        progress?.close();
-        if (!exporter.cancelled) app.toast(err.message || 'Export failed');
       }
+    } finally {
+      progress?.close();
+      app.setReadingMode(wasReading, { silent: true });
     }
     return true;
   }

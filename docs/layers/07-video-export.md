@@ -60,3 +60,8 @@ Run `npm run smoke:video` for focused frame-bounds and camera-follow checks. `np
 - **Format default:** the picker now defaults to **WebM**, the pipeline that muxes the recording's audio. The WebCodecs **MP4** path writes video only, so choosing MP4 shows a translated notice that it is exported without sound; MP4 audio muxing remains an open item.
 - **Robustness:** a selected track without `assetId` fails immediately with the recording name (instead of a 15 s media timeout); a throwing `onProgress` callback cannot stop the frame pump; suggested filenames cap the descriptive part while preserving the timestamp suffix.
 - **Known limitation:** both export paths still hold the entire encoded video in memory (MediaRecorder chunks or the muxer's in-memory fast-start buffer, plus the final Blob/ArrayBuffer). Streaming to disk needs append/seek-capable IPC across desktop, Android and web adapters, plus a save dialog before encoding. See `hardening/AUDIT_LOG.md`.
+
+## 8. Non-Blocking Background Video Export & Reading Mode Isolation
+
+- **Non-Blocking Background Export**: Replaced the blocking modal dialog with a sleek topbar notification banner (`#videoExportBanner` inside `#topbar`). Shows animated pulse dot, live percentage progress (`Video export (81%)`), progress fill bar, and a dedicated `[✕ Cancel]` button.
+- **Reading Mode Canvas Isolation**: While background export is executing, the app automatically transitions to Reading Mode (`app.setReadingMode(true, { silent: true })`). This guarantees that pointer interactions and dragging on the canvas only pan/view the board, preventing accidental ink strokes or mutations from corrupting the active export. When export completes or is cancelled, the prior mode (reading or editing) is seamlessly restored.

@@ -15,6 +15,7 @@ import { todayStamp } from '../core/pages.js';
 import * as F from '../core/folders.js';
 import * as Recent from '../core/recent.js';
 import { scoreBoard } from './boardpicker.js';
+import { createLaserDurationSlider } from './toolbar.js';
 
 /**
  * How a paired computer that is NOT currently visible should be shown.
@@ -62,6 +63,10 @@ export function createPanels(app) {
         app.audioBar?.open(app.store.doc.audioTracks[0]);
       }
       app._savedHudState = null;
+    }
+
+    if (app.tabBar && app.tabBar.tabs.length === 0 && app.store?.doc?.id) {
+      app.tabBar.onBoardLoaded(app.store.doc.id, app.store.doc.name);
     }
 
     // The page fades rather than sliding away; it stops being a page once it has gone.
@@ -1620,11 +1625,8 @@ export function createPanels(app) {
             h('span', { style: 'font-size:12px;min-width:36px;text-align:right' },
               `${Math.round(Math.max(0.1, Math.min(1, Number(s.penOpacity ?? 1))) * 100)}%`)),
             t('Allow drawing translucent pen strokes for layering effects.')),
-          row(t('Laser trail duration'), mkChoice(
-            [[0, t('Instant')], [300, '300ms'], [520, t('520ms')], [1200, '1.2s'], [2500, '2.5s'], [5000, '5.0s'], [10000, '10s']],
-            () => Number(s.laserTrailDuration ?? 520),
-            (v) => { s.laserTrailDuration = Number(v); app.saveSettings(); if (app.surface) app.surface.dirty = true; }
-          ), t('How long the laser pointer trail lingers on screen before melting away.')),
+          row(t('Laser trail duration'), createLaserDurationSlider(app, Number(s.laserTrailDuration ?? 500)),
+            t('How long the laser pointer trail lingers on screen before melting away.')),
           row(t('Ruler snapping'), mkToggle(() => app.ruler.snap, (v) => (app.ruler.snap = v)))
         ),
         storage ? h('div', { class: 'section' }, h('h5', {}, t('Storage')), storage) : null,
@@ -2503,12 +2505,17 @@ export function createPanels(app) {
           ? h('img', { src: b.thumb, alt: '', draggable: 'false', loading: 'lazy' })
           : h('span', { class: 'bt-blank', html: icon('board', 30) })),
         h('b', { class: 'bt-name rt-name' }, q ? markText(name, q) : name),
-        ...(Array.isArray(b.tags) && b.tags.length ? [
+        ...(((Array.isArray(b.tags) && b.tags.length) || (Array.isArray(b.aliases) && b.aliases.length)) ? [
           h('div', { class: 'bt-tags', style: 'display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 4px;' },
-            ...b.tags.slice(0, 4).map(t => h('span', {
+            ...(Array.isArray(b.tags) ? b.tags.slice(0, 4).map(t => h('span', {
               class: 'tag-chip',
-              style: 'background:rgba(0,120,212,0.12);color:var(--accent,#0078d4);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;'
-            }, `#${String(t).replace(/^#+/, '')}`))
+              style: 'background:rgba(0,120,212,0.12);color:var(--accent-2,#0078d4);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;'
+            }, q ? markText(`#${String(t).replace(/^#+/, '')}`, q) : `#${String(t).replace(/^#+/, '')}`)) : []),
+            ...(Array.isArray(b.aliases) ? b.aliases.slice(0, 3).map(al => h('span', {
+              class: 'alias-chip',
+              title: t('Alias: {name}', { name: al }),
+              style: 'background:rgba(168,85,247,0.14);color:#9333ea;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;display:inline-flex;align-items:center;gap:3px;'
+            }, h('span', { style: 'font-size:9px;opacity:0.85;' }, '🏷️'), q ? markText(al, q) : al)) : [])
           )
         ] : []),
         ...(lines || [h('small', { class: 'bt-date' }, when)]),
@@ -2954,6 +2961,18 @@ export function createPanels(app) {
         h('span', { html: icon('board', 20), style: 'color:var(--text-2);display:flex' }),
         h('span', { class: 'meta' },
           h('b', { class: 'bt-name rt-name' }, q ? markText(name, q) : name),
+          ...(((Array.isArray(b.tags) && b.tags.length) || (Array.isArray(b.aliases) && b.aliases.length)) ? [
+            h('span', { class: 'bt-tags-inline', style: 'display:inline-flex;flex-wrap:wrap;gap:4px;margin:2px 0;' },
+              ...(Array.isArray(b.tags) ? b.tags.slice(0, 3).map(t => h('span', {
+                class: 'tag-chip',
+                style: 'background:rgba(0,120,212,0.12);color:var(--accent-2,#0078d4);padding:0px 5px;border-radius:8px;font-size:9.5px;font-weight:600;'
+              }, q ? markText(`#${String(t).replace(/^#+/, '')}`, q) : `#${String(t).replace(/^#+/, '')}`)) : []),
+              ...(Array.isArray(b.aliases) ? b.aliases.slice(0, 2).map(al => h('span', {
+                class: 'alias-chip',
+                style: 'background:rgba(168,85,247,0.14);color:#9333ea;padding:0px 5px;border-radius:8px;font-size:9.5px;font-weight:600;'
+              }, `🏷️ ${al}`)) : [])
+            )
+          ] : []),
           ...(lines || [h('small', {}, b.objects === 1
             ? t('{n} item · {date}', { n: b.objects, date: new Date(b.modified).toLocaleString() })
             : t('{n} items · {date}', { n: b.objects, date: new Date(b.modified).toLocaleString() }))])),

@@ -29,17 +29,41 @@ import {
  */
 export const MATH_PALETTE = [
   { name: 'Structures', items: [
-    ['a⁄b', '\\frac{@}{}'], ['√', '\\sqrt{@}'], ['ⁿ√', '\\sqrt[n]{@}'], ['x²', '^{@}', 'x^{2}'], ['xᵢ', '_{@}', 'x_{i}'],
+    ['a⁄b', '\\frac{@}{}'], ['√', '\\sqrt{@}'], ['ⁿ√', '\\sqrt[n]{@}'], ['x²', '^{@}', 'x^{2}'], ['xᵢ', '_{@}', 'x_{i}'], ['xᵢʲ', '_{i}^{j}'],
     ['∑', '\\sum_{i=1}^{n} @', '\\sum'], ['∏', '\\prod_{i=1}^{n} @', '\\prod'], ['∫', '\\int_{a}^{b} @\\,dx', '\\int'], ['lim', '\\lim_{x \\to \\infty} @', '\\lim'],
-    ['log', '\\log_{2} @', '\\log_2'], ['ln', '\\ln @', '\\ln'], ['( )', '\\left( @ \\right)'], ['⌊ ⌋', '\\lfloor @ \\rfloor'], ['⌈ ⌉', '\\lceil @ \\rceil'],
-    ['[ ]', '\\begin{bmatrix} @ & \\\\ & \\end{bmatrix}', ''], ['{ cases', 'f(x) = \\begin{cases} @ & \\text{if } \\\\ & \\text{otherwise} \\end{cases}', ''],
-    ['x̄', '\\bar{@}'], ['x⃗', '\\vec{@}'], ['abc', '\\text{@}']
+    ['log', '\\log_{2} @', '\\log_2'], ['ln', '\\ln @', '\\ln'], ['( )', '\\left( @ \\right)'], ['[ ]', '\\left[ @ \\right]'], ['{ }', '\\left\\{ @ \\right\\}'],
+    ['|x|', '|@|'], ['⌊ ⌋', '\\lfloor @ \\rfloor'], ['⌈ ⌉', '\\lceil @ \\rceil'],
+    ['[matrix]', '\\begin{bmatrix} @ & \\\\ & \\end{bmatrix}', ''], ['{ cases', 'f(x) = \\begin{cases} @ & \\text{if } \\\\ & \\text{otherwise} \\end{cases}', ''],
+    ['x̄', '\\bar{@}'], ['x⃗', '\\vec{@}'], ['x̂', '\\hat{@}'], ['ẋ', '\\dot{@}'], ['ẍ', '\\ddot{@}'], ['abc', '\\text{@}']
   ] },
   { name: 'Calculus', items: [
-    ['∫ dx', '\\int @\\,dx', '\\int'], ['∫ₐᵇ', '\\int_{a}^{b} @\\,dx', '\\int'], ['∬', '\\iint @\\,dx\\,dy', '\\iint'], ['∮', '\\oint @\\,ds', '\\oint'],
-    ['d/dx', '\\frac{d}{dx}\\left( @ \\right)'], ['∂/∂x', '\\frac{\\partial}{\\partial x}\\left( @ \\right)'], ['d²/dx²', '\\frac{d^2}{dx^2}\\left( @ \\right)'],
-    ['∇', '\\nabla @'], ['∇²', '\\nabla^2 @'], ['lim₀', '\\lim_{x \\to 0} @'], ['lim_∞', '\\lim_{x \\to \\infty} @'],
-    ['∑₀^∞', '\\sum_{n=0}^{\\infty} @'], ['∏₁^∞', '\\prod_{n=1}^{\\infty} @'], ['dy/dx', '\\frac{dy}{dx}']
+    ['∫ dx', '\\int @\\,dx', '\\int'], ['∫ₐᵇ', '\\int_{a}^{b} @\\,dx', '\\int'], ['∬', '\\iint @\\,dx\\,dy', '\\iint'], ['∭', '\\iiint @\\,dx\\,dy\\,dz', '\\iiint'], ['∮', '\\oint @\\,ds', '\\oint'],
+    ['dy/dx', '\\frac{dy}{dx}'], ['d/dx', '\\frac{d}{dx}\\left( @ \\right)'], ['∂/∂x', '\\frac{\\partial}{\\partial x}\\left( @ \\right)'],
+    ['d²/dx²', '\\frac{d^2}{dx^2}\\left( @ \\right)'], ['∂²/∂x²', '\\frac{\\partial^2}{\\partial x^2}\\left( @ \\right)'],
+    ['∇', '\\nabla @'], ['∇²', '\\nabla^2 @'], ['∇·v', '\\nabla \\cdot \\vec{@}'], ['∇×v', '\\nabla \\times \\vec{@}'],
+    ['lim₀', '\\lim_{x \\to 0} @'], ['lim_∞', '\\lim_{x \\to \\infty} @'], ['lim_a', '\\lim_{x \\to a} @'],
+    ['∑₀^∞', '\\sum_{n=0}^{\\infty} @'], ['∏₁^∞', '\\prod_{n=1}^{\\infty} @'],
+    ['Taylor', 'f(x) = \\sum_{n=0}^{\\infty} \\frac{f^{(n)}(a)}{n!}(x-a)^n'], ['L\'Hôp', '\\lim_{x \\to c}\\frac{f(x)}{g(x)} = \\lim_{x \\to c}\\frac{f\'(x)}{g\'(x)}']
+  ] },
+  { name: 'Electrical', items: [
+    ['V=IR', 'V = I \\cdot R'], ['P=VI', 'P = V \\cdot I'], ['P=I²R', 'P = I^2 R = \\frac{V^2}{R}'],
+    ['Z_RLC', 'Z = R + j\\left(\\omega L - \\frac{1}{\\omega C}\\right)'], ['Z_L', 'Z_L = j\\omega L'], ['Z_C', 'Z_C = \\frac{1}{j\\omega C}'],
+    ['ω=2πf', '\\omega = 2\\pi f'], ['f₀', 'f_0 = \\frac{1}{2\\pi\\sqrt{LC}}'], ['Q', 'Q = \\frac{\\omega_0 L}{R}'],
+    ['Phasor', '\\mathbf{V} = |V|\\angle\\theta'], ['j', 'j = \\sqrt{-1}'], ['Euler', 'e^{j\\theta} = \\cos\\theta + j\\sin\\theta'],
+    ['Y=G+jB', 'Y = G + jB'], ['τ=RC', '\\tau = RC'], ['τ=L/R', '\\tau = \\frac{L}{R}'],
+    ['H(s)', 'H(s) = \\frac{V_{\\text{out}}(s)}{V_{\\text{in}}(s)}'], ['s=σ+jω', 's = \\sigma + j\\omega'],
+    ['ℒ{f}', '\\mathcal{L}\\{ @ \\}'], ['ℱ{f}', '\\mathcal{F}\\{ @ \\}'],
+    ['∇·D=ρ', '\\nabla \\cdot \\mathbf{D} = \\rho_v'], ['∇·B=0', '\\nabla \\cdot \\mathbf{B} = 0'],
+    ['∇×E', '\\nabla \\times \\mathbf{E} = -\\frac{\\partial \\mathbf{B}}{\\partial t}'], ['∇×H', '\\nabla \\times \\mathbf{H} = \\mathbf{J} + \\frac{\\partial \\mathbf{D}}{\\partial t}'],
+    ['Ω', '\\Omega'], ['kΩ', '\\text{k}\\Omega'], ['MΩ', '\\text{M}\\Omega'], ['μF', '\\mu\\text{F}'], ['mH', '\\text{mH}'], ['dB', '\\text{dB}']
+  ] },
+  { name: 'Chemistry', items: [
+    ['→', '\\rightarrow'], ['⇄', '\\rightleftharpoons'], ['⇌', '\\xrightleftharpoons[@]{}'],
+    ['ΔH°', '\\Delta H^{\\circ}'], ['ΔG°', '\\Delta G^{\\circ} = \\Delta H^{\\circ} - T\\Delta S^{\\circ}'], ['ΔS°', '\\Delta S^{\\circ}'],
+    ['K_eq', 'K_{\\text{eq}} = \\frac{[C]^c [D]^d}{[A]^a [B]^b}'], ['K_a', 'K_a = \\frac{[\\text{H}^+][\\text{A}^-]}{[\\text{HA}]}'], ['K_w', 'K_w = [\\text{H}^+][\\text{OH}^-] = 10^{-14}'],
+    ['pH', '\\text{pH} = -\\log_{10}[\\text{H}^+]'], ['pOH', '\\text{pOH} = -\\log_{10}[\\text{OH}^-]'], ['pH+pOH', '\\text{pH} + \\text{pOH} = 14'],
+    ['PV=nRT', 'PV = nRT'], ['Arrhenius', 'k = A e^{-\\frac{E_a}{RT}}'], ['Nernst', 'E = E^{\\circ} - \\frac{RT}{nF}\\ln Q'],
+    ['H⁺', '\\text{H}^+'], ['OH⁻', '\\text{OH}^-'], ['H₂O', '\\text{H}_2\\text{O}'], ['CO₂', '\\text{CO}_2'], ['e⁻', 'e^-'], ['mol/L', '\\text{mol/L}']
   ] },
   { name: 'LinearAlgebra', items: [
     ['[2×2]', '\\begin{bmatrix} @ & \\\\ & \\end{bmatrix}', ''],
@@ -47,7 +71,16 @@ export const MATH_PALETTE = [
     ['det', '\\det\\left( @ \\right)'], ['|A|', '\\begin{vmatrix} @ & \\\\ & \\end{vmatrix}', ''],
     ['A⁻¹', '@^{-1}'], ['Aᵀ', '@^{T}'], ['||v||', '\\| @ \\|'],
     ['u·v', '\\vec{u} \\cdot \\vec{v}'], ['u×v', '\\vec{u} \\times \\vec{v}'],
-    ['col', '\\begin{bmatrix} @ \\\\  \\end{bmatrix}', ''], ['Iₙ', '\\mathbf{I}_{n}'], ['λ', '\\lambda']
+    ['col', '\\begin{bmatrix} @ \\\\  \\end{bmatrix}', ''], ['Iₙ', '\\mathbf{I}_{n}'], ['λ', '\\lambda'],
+    ['Av=λv', 'A\\mathbf{v} = \\lambda\\mathbf{v}'], ['rank', '\\text{rank}(A)']
+  ] },
+  { name: 'PhysicsStats', items: [
+    ['F=ma', '\\mathbf{F} = m\\mathbf{a}'], ['E=mc²', 'E = mc^2'], ['p=mv', '\\mathbf{p} = m\\mathbf{v}'],
+    ['K=½mv²', 'K = \\frac{1}{2}mv^2'], ['U=mgh', 'U = mgh'],
+    ['v=fλ', 'v = f\\lambda'], ['T=1/f', 'T = \\frac{1}{f}'], ['ω=√(k/m)', '\\omega = \\sqrt{\\frac{k}{m}}'],
+    ['ħ', '\\hbar'], ['c', 'c'], ['G', 'G'], ['k_B', 'k_B'], ['ε₀', '\\varepsilon_0'], ['μ₀', '\\mu_0'],
+    ['P(A|B)', 'P(A \\mid B) = \\frac{P(B \\mid A)P(A)}{P(B)}'], ['μ', '\\mu'], ['σ', '\\sigma'], ['σ²', '\\sigma^2'],
+    ['x̄', '\\bar{x}'], ['N(μ,σ²)', '\\mathcal{N}(\\mu, \\sigma^2)'], ['Δt', '\\Delta t'], ['Δx', '\\Delta x']
   ] },
   { name: 'Greek', items: [
     ['α', '\\alpha'], ['β', '\\beta'], ['γ', '\\gamma'], ['δ', '\\delta'], ['ε', '\\epsilon'], ['θ', '\\theta'], ['λ', '\\lambda'],
@@ -60,21 +93,18 @@ export const MATH_PALETTE = [
     ['⊂', '\\subset'], ['⊆', '\\subseteq'], ['∪', '\\cup'], ['∩', '\\cap'], ['∅', '\\emptyset'], ['∀', '\\forall'], ['∃', '\\exists'],
     ['¬', '\\neg'], ['∧', '\\land'], ['∨', '\\lor'], ['∂', '\\partial'], ['∇', '\\nabla'], ['°', '^{\\circ}'], ['…', '\\ldots'],
     ['O(n)', 'O(@)'], ['Θ(n)', '\\Theta(@)'], ['ℝ', '\\mathbb{R}'], ['ℕ', '\\mathbb{N}'], ['ℤ', '\\mathbb{Z}'], ['ℂ', '\\mathbb{C}']
-  ] },
-  { name: 'PhysicsStats', items: [
-    ['ħ', '\\hbar'], ['c', 'c'], ['G', 'G'], ['k_B', 'k_B'], ['μ', '\\mu'], ['σ', '\\sigma'], ['σ²', '\\sigma^2'],
-    ['x̄', '\\bar{x}'], ['P(A)', 'P(@)'], ['P(A|B)', 'P(@ \\mid B)'], ['N(μ,σ²)', '\\mathcal{N}(\\mu, \\sigma^2)'],
-    ['Δt', '\\Delta t'], ['Δx', '\\Delta x']
   ] }
 ];
 
 const GROUP_LABEL = {
   Structures: () => t('Structures'),
   Calculus: () => t('Calculus'),
+  Electrical: () => t('Electrical'),
+  Chemistry: () => t('Chemistry'),
   LinearAlgebra: () => t('Linear Algebra'),
+  PhysicsStats: () => t('Physics & Stats'),
   Greek: () => t('Greek'),
-  Symbols: () => t('Symbols'),
-  PhysicsStats: () => t('Physics & Stats')
+  Symbols: () => t('Symbols')
 };
 
 /** Put `tex` into a textarea at its selection, the way a palette button does. */
@@ -234,6 +264,21 @@ export class MathEditor {
       }
     });
 
+    const explain = h('div', { class: 'mx-studio-explain' }, t('Hover any studio button above to see its scientific computing purpose'));
+    const bindExplain = (btn, text) => {
+      btn.addEventListener('mouseenter', () => { explain.textContent = text; explain.classList.add('active'); });
+      btn.addEventListener('mouseleave', () => {
+        explain.textContent = t('Hover any studio button above to see its scientific computing purpose');
+        explain.classList.remove('active');
+      });
+    };
+    bindExplain(btnMatrix, t('Matrix: Prompts for rows × columns (e.g. 2x2, 3x3) and inserts formatted LaTeX matrix syntax.'));
+    bindExplain(btnSympy, t('SymPy: Converts current LaTeX to executable Python code for SymPy symbolic math and copies it.'));
+    bindExplain(btnMatlab, t('MATLAB: Converts LaTeX expression into MATLAB / Octave syntax and copies it to clipboard.'));
+    bindExplain(btnWolfram, t('Wolfram: Converts LaTeX into natural syntax ready to query Wolfram|Alpha or Mathematica.'));
+    bindExplain(btnNatural, t('Natural Math: Type English (e.g. "integral of x^2 from 0 to 1") and convert it to valid LaTeX.'));
+    bindExplain(btnSolveQuad, t('Solve CAS: Symbolically solves quadratic and linear equations in the expression using Computer Algebra.'));
+
     studioRow.appendChild(h('div', { style: 'display:flex;gap:4px;align-items:center;flex-wrap:wrap;' }, btnMatrix, btnSympy, btnMatlab, btnWolfram, btnNatural, btnSolveQuad));
     studioRow.appendChild(evalBadge);
 
@@ -278,6 +323,48 @@ export class MathEditor {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.finish(); }
     });
 
+    // Interactive live KaTeX argument slot selection & green highlight
+    preview.addEventListener('mouseover', (e) => {
+      const slot = e.target.closest('.mord, .mfrac, .msupsub, .mop, .mbin, .mrel, .text');
+      if (slot && preview.contains(slot)) {
+        preview.querySelectorAll('.mx-slot-hover').forEach((el) => el.classList.remove('mx-slot-hover'));
+        slot.classList.add('mx-slot-hover');
+      }
+    });
+    preview.addEventListener('mouseout', (e) => {
+      const slot = e.target.closest('.mord, .mfrac, .msupsub, .mop, .mbin, .mrel, .text');
+      if (slot) slot.classList.remove('mx-slot-hover');
+    });
+    preview.addEventListener('click', (e) => {
+      const slot = e.target.closest('.mord, .mfrac, .msupsub, .mop, .mbin, .mrel, .text');
+      if (!slot || !area) return;
+      const token = slot.textContent.trim();
+      if (!token) return;
+
+      const allSimilar = Array.from(preview.querySelectorAll(slot.tagName)).filter((el) => el.textContent.trim() === token);
+      const matchIdx = Math.max(0, allSimilar.indexOf(slot));
+
+      let foundPos = -1;
+      let searchFrom = 0;
+      for (let i = 0; i <= matchIdx; i++) {
+        const pos = area.value.indexOf(token, searchFrom);
+        if (pos === -1) break;
+        foundPos = pos;
+        searchFrom = pos + token.length;
+      }
+      if (foundPos === -1) {
+        foundPos = area.value.indexOf(token);
+      }
+
+      if (foundPos !== -1) {
+        area.focus();
+        area.setSelectionRange(foundPos, foundPos + token.length);
+        preview.querySelectorAll('.mx-slot-active').forEach((el) => el.classList.remove('mx-slot-active'));
+        slot.classList.add('mx-slot-active');
+        setTimeout(() => slot.classList.remove('mx-slot-active'), 1200);
+      }
+    });
+
     const tabs = h('div', { class: 'mx-tabs', role: 'tablist' });
     const grid = h('div', { class: 'mx-palette' });
     const showGroup = (g) => {
@@ -313,9 +400,40 @@ export class MathEditor {
     cancel.addEventListener('click', () => this.cancel());
 
     this.el = h('div', { class: 'math-editor', id: 'mathEditor', role: 'dialog', 'aria-label': t('Maths') },
-      h('div', { class: 'mx-head' }, h('b', {}, t('Maths')), h('small', {}, t('Enter to finish · Shift+Enter for a new line · Esc to cancel'))),
-      area, preview, error, studioRow, tabs, grid,
+      h('div', { class: 'mx-head', title: t('Drag to move maths editor') },
+        h('b', {}, t('Maths')),
+        h('small', {}, t('Enter to finish · Shift+Enter for a new line · Esc to cancel'))
+      ),
+      area, preview, error, studioRow, explain, tabs, grid,
       h('div', { class: 'mx-actions' }, h('small', { class: 'mx-tip' }, t('Tip: in any text, $x^2$ puts maths in a sentence.')), cancel, done));
+
+    // Draggable header
+    const head = this.el.querySelector('.mx-head');
+    let dragData = null;
+    head.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || e.target.closest('button, input, select')) return;
+      e.preventDefault();
+      dragData = {
+        startX: e.clientX,
+        startY: e.clientY,
+        initLeft: this.el.offsetLeft,
+        initTop: this.el.offsetTop
+      };
+      const onMove = (ev) => {
+        if (!dragData) return;
+        const dx = ev.clientX - dragData.startX;
+        const dy = ev.clientY - dragData.startY;
+        this.el.style.left = Math.max(4, dragData.initLeft + dx) + 'px';
+        this.el.style.top = Math.max(4, dragData.initTop + dy) + 'px';
+      };
+      const onUp = () => {
+        dragData = null;
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    });
     this.area = area;
     document.getElementById('stage').appendChild(this.el);
     showGroup(MATH_PALETTE[0]);

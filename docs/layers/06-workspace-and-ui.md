@@ -89,3 +89,100 @@ node scripts/i18n-check.js
 - **Entry points:** the wikilink **Open in Split View** action is implemented (`openBoardInSplit()`), with a guard against opening the same board in both panes.
 - **Multi-tab:** undo/redo survive tab switches (cache used non-existent fields), cached restore goes through `app.loadBoard()` then restores that tab's history, Duplicate tab copies the whole board, switches are serialised, session dialogs use `app.askText` (Electron has no `window.prompt`), and localStorage session data is validated on read.
 - **Icons/ids:** excerpt-shelf stamping uses `uid('img')` instead of a millisecond timestamp.
+
+## 10. v6.9.3 Rapid Bug Fixes & UX Hardening
+
+- **Dark Mode Hover/Selection Contrast Sweep (`app.css`, `search-dialog.js`, `note-overview.js`):**
+  - Resolved missing CSS tokens `--desk` and `--line` in `:root`, `:root[data-theme="dark"]`, and `@media (prefers-color-scheme: dark)`, which caused hovered tools, commands, and settings items to fall back to hardcoded light-gray/white backgrounds while retaining light text (white-on-white text washout).
+  - Enforced adaptive surface background `var(--surface-2, rgba(128,128,128,0.15))` and explicit `color: var(--text)` overrides for `.search-tool-row:hover`, `.search-board-row:hover`, `.search-setting-row:hover`, and `.note-overview-card:hover`.
+- **Board Aliases Rendering & Search Match Highlighting (`panels.js`):**
+  - Updated `addBoard` (both grid tiles and list rows) to render `b.aliases` chips with a distinct purple badge and `🏷️` icon alongside `b.tags`.
+  - Added search query highlighting via `markText(al, q)` so users immediately understand why a board appeared when searching for its alias.
+- **Note Overview Top-Down Mini-Map & Page Thumbnails Navigator (`note-overview.js`):**
+  - Re-architected `NoteOverviewDrawer` into a dual-tab layout: `[ Note overview ]` and `[ My boards ]`.
+  - **Infinite Canvas Mode (`pages.length === 0`):** Renders a real-time 2D Mini-Map of all canvas objects with an interactive camera viewport window (`vx, vy, vw, vh`). Dragging or clicking on the mini-map pans the camera in real time across the infinite canvas. Includes "Fit to board", "Reset zoom", and live zoom percentage badge.
+  - **Multi-Page Mode (`pages.length > 0`):** Renders a vertical top-down thumbnail strip of all board pages (Page 1, Page 2, Page 3...) with live rendered canvas previews, page dimensions, active page highlight, and 1-click navigation via `fitToPage(idx)`.
+  - Maintained 100% translation parity across all 7 locales (2,246 keys).
+- **Top Bar Space Optimization & Long Titles/Properties (`app.css`, `toolbar.js`):**
+  - Expanded `#boardTitle` (`min-width: 120px; max-width: 480px; flex-shrink: 0;`), dynamic horizontal scrolling for `#topPropertiesChips` (`max-width: 520px`), rendering up to 3 individual tags and alias pills (`🏷️ alias`) instead of compressing everything into an aggregate badge.
+- **Eraser Options Popover In-Place Updating (`toolbar.js`):**
+  - Resolved popover dismissal on click: replaced `openToolPopover(app, anchor, 'eraser')` re-triggers (which triggered `popover.js` `isOpen` toggle-off) with in-place DOM updates (`updateModeUI` checkmark management and in-place `toggleBtn` ON/OFF toggling), keeping the eraser options menu persistently open.
+- **Floating ReplayBar Theme & Contrast (`app.css`, `replay-bar.js`):**
+  - Fixed dark fallback styling on light theme causing black text on dark charcoal backgrounds. Introduced adaptive `--surface-glass` and `--stroke-glass` tokens in `app.css`, ensuring high contrast and theme harmony in both light and dark modes.
+- **Split Workspace Dual-Board Guard & Auto-Selection (`split-workspace.js`, `note-overview.js`):**
+  - Guaranteed split view represents two distinct boards: rejects splitting a board against itself, alerts users if only one board exists in the workspace, filters the active main board out of the left board picker dropdown, and automatically pre-loads an alternative board when entering split view.
+- **Partitioned Split Top Bar & Prominent Physical Board Swapping (`split-workspace.js`, `toolbar.js`, `app.css`):**
+  - Dynamically mounts `#splitTopbarLeft` directly above the left pane with `[ Left board ]` badge, editable title input, `# Properties` button, tag/alias chips, prominent `[ ⇄ Swap ]` button, and close button.
+  - Dynamically inserts `[ Right board ]` badge before `#boardTitle` directly above the right pane.
+  - Physical board swapping (`swapPanes()`) exchanges document stores, IDs, repaints surfaces, and synchronizes both topbars simultaneously.
+  - Maintained 100% translation parity across all 7 locales (2,253 keys translated).
+- **Universal Glass Theme & High-Contrast Harmonization (`app.css`):**
+  - Eliminated hardcoded dark fallback `rgba(28, 32, 38, 0.92)` from `.menu-glass` and popup cards which caused severe text contrast collapse (dark text on dark background in light themes). Replaced with responsive CSS custom properties (`--surface-glass`, `--stroke-glass`, `--card-glass-bg`, `--card-glass-border`, `--card-glass-hover`, `--text-3`).
+- **Dynamic Inline Tab Creation & Instant Board Search Popover (`tabs.js`, `app.css`):**
+  - Appended an inline `(+)` button (`.gb-tab-inline-add`) dynamically docked immediately to the right of the latest active tab, preventing excessive mouse travel to the far-right tab bar button.
+  - Clicking opens a smart popover offering `[ + New Board ]`, `[ 📂 Open Existing ]`, a live fuzzy search input (`Search existing boards…`), and a dynamic filterable list of all existing boards for one-click opening.
+- **Obsidian-Style Markdown Formatting Toolbar & Responsive Card Sizing (`contextmenu.js`, `textedit.js`, `transform.js`, `tools.js`, `render.js`, `app.css`):**
+  - **Dedicated Expandable Toolbar**: Replaced minimal formatting bar with a full Obsidian Markdown Toolbar (`.obsidian-toolbar`) featuring Undo, Redo, Clear formatting, Eraser, H2 (`H₂`), H3 (`H₃`), Hn dropdown (H1-H6 + Paragraph), Bold (`B`), Italic (`I`), Strikethrough (`S`), Underline (`U`), Callouts (`📝▾` with 10 note styles), Code/Diagrams (`📦▾` with Code, Mermaid, Math), Live Preview toggle (`👁️`), Wikilink (`📎`), Markdown Tables (`▦`), Task Checklists (`☑`), Quotes (`💬`), Typography (`T...▾` with Line Numbers, Font Size, Line Spacing, YAML Frontmatter), Bullet & Numbered lists, Font Color (`A`), and Highlight & Note Background.
+  - **Fix Glitchy / Uncontrollable Resizing**: In `transform.js` (`scaleObject`) and `tools.js` (`fitResizedText`), stopped scaling `fontSize` when resizing markdown/text cards; stopped forcing uniform square aspect ratios on corner drags without Shift; and stopped `commit()` from wiping out manual card heights.
+  - **Solid vs. Transparent Note Backgrounds**: Default markdown notes render with solid adaptive card surface backgrounds (`#202227` dark / `#ffffff` light) with subtle shadow and border, preventing transparent callout/text washouts. Added a background switcher offering Transparent, Theme Solid, and 7 preset swatches.
+  - **Half-Page Default Dimensions & Presets**: New or small markdown notes automatically adopt comfortable half-page default dimensions (`640x520`) with quick preset cycling (`⛶`: Half-Page `640x520`, Wide `960x680`, Compact `360x240`).
+  - **Live Preview Enhancements**: Added interactive wikilink navigation (`[[Board#Heading]]`) from within Live Preview, task checkbox toggling, and toggleable gutter line numbers (`.gb-show-line-numbers`). Maintained 100% translation parity across all 7 locales (2,329 keys).
+
+## 11. Movable & Resizable Maths Studio, STEM Expansion & KaTeX Slot Clicking
+
+- **Movable & Resizable Maths Modal Window (`mathedit.js`, `app.css`)**:
+  - Modal `#mathEditor` is movable by dragging the header `.mx-head` (`cursor: grab; user-select: none`).
+  - Window supports smooth resizing (`resize: both; overflow: auto; min-width: 440px; min-height: 420px;`).
+- **STEM Expansion (High School 10–12 & University 1st-Year Basics)**:
+  - Added dedicated **Electrical** palette: Ohm's law ($V=IR$), electric power ($P=VI, P=I^2R$), AC complex impedance ($Z_{RLC}, Z_L, Z_C$), angular frequency and resonance ($\omega=2\pi f, f_0$), AC phasors ($\mathbf{V}=|V|\angle\theta$), Euler ($e^{j\theta}$), time constants ($\tau=RC, \tau=L/R$), Laplace transfer functions ($H(s), s=\sigma+j\omega, \mathcal{L}\{f\}$), Maxwell's equations ($\nabla\cdot\mathbf{D}, \nabla\cdot\mathbf{B}, \nabla\times\mathbf{E}, \nabla\times\mathbf{H}$), and EE units ($\Omega, \text{k}\Omega, \text{M}\Omega, \mu\text{F}, \text{mH}, \text{dB}$).
+  - Added dedicated **Chemistry** palette: reaction arrows ($\rightarrow, \rightleftharpoons, \xrightleftharpoons{}$), thermodynamics ($\Delta H^{\circ}, \Delta G^{\circ}, \Delta S^{\circ}$), equilibrium ($K_{\text{eq}}, K_a, K_w$), pH and pOH ($\text{pH}=-\log_{10}[\text{H}^+], \text{pH}+\text{pOH}=14$), ideal gas law ($PV=nRT$), Arrhenius kinetics ($k=Ae^{-\frac{E_a}{RT}}$), Nernst equation ($E=E^{\circ}-\frac{RT}{nF}\ln Q$), and common species ($\text{H}^+, \text{OH}^-, \text{H}_2\text{O}, \text{CO}_2, e^-, \text{mol/L}$).
+  - Expanded **Calculus** (triple integrals $\iiint$, vector operators $\nabla\cdot\vec{v}, \nabla\times\vec{v}$, limits $\lim_{x\to a}$, Taylor series, L'Hôpital) and **Physics & Stats** (Newton's 2nd law $\mathbf{F}=m\mathbf{a}$, mass-energy $E=mc^2$, momentum $\mathbf{p}=m\mathbf{v}$, kinetic/potential energy $K, U$, waves $v=f\lambda, T=1/f, \omega=\sqrt{k/m}$, constants $\varepsilon_0, \mu_0$, Bayes theorem $P(A|B)$).
+- **Studio Button Hover Tooltip Banner (`.mx-studio-explain`)**:
+  - Dynamically updates guidance banner below the studio buttons on hover, explaining what `Matrix…`, `SymPy`, `MATLAB`, `Wolfram`, `Natural Math…`, and `Solve…` do and how to use their output.
+- **Interactive Live KaTeX Preview Slot Clicking & Highlighting**:
+  - Hovering over arguments/tokens in `.mx-preview` displays green hover outline (`.mx-slot-hover`).
+  - Clicking any argument/placeholder in the live rendered math detects the slot, selects and highlights the corresponding text in the LaTeX textarea above, and flashes active green (`.mx-slot-active`), allowing direct and error-free editing of formulas.
+- **100% Strict i18n Parity**: All new tabs, buttons, dialog inputs, and explanations are translated across all 7 locales (`ar`, `bn`, `de`, `es`, `pt-BR`, `zh-Hans`, `zh-Hant`) verified via `node scripts/i18n-check.js`.
+
+## 12. Independent Snipping Tool & Paged Context Menu Deletion
+
+- **Independent Excerpt Snipping Tool (`replay-bar.js`, `app.js`, `contextmenu.js`)**:
+  - Added dedicated `[✂️ Snip]` button to the floating replay/utility bar (`#replayBar`) with toggleable visibility in settings.
+  - Added `[✂️ Capture excerpt snippet]` to the canvas right-click context menu.
+  - Allows clicking anywhere to initiate visual region capture with crosshair cursor, dimmed backdrop, and instant clipboard copy with linked board provenance.
+- **Canvas Context Menu Page Deletion (`contextmenu.js`)**:
+  - Right-clicking on any page background or canvas in paged mode presents `[🗑️ Delete page {n}]` or `[🗑️ Delete this page]`, directly deleting the targeted page with full undo support.
+
+## 13. YouTube Video Overlay & Player Security Audit (`video-dialog.js`, `index.html`, `render.js`)
+
+- **Content Security Policy Frame & Media Directives**:
+  - Added `frame-src 'self' app: data: blob: https://www.youtube.com https://www.youtube-nocookie.com;` to `index.html` CSP meta tag, enabling YouTube embeds in the player modal.
+  - Added `img-src` allowlisting `https://img.youtube.com` and `https://i.ytimg.com` for high-resolution video thumbnail fetching.
+  - Added `media-src 'self' app: data: blob: https: file:;` for direct streaming video URLs.
+- **Comprehensive Video URL Parsing & Parameter Support**:
+  - Expanded `parseVideoUrl()` regex to support YouTube live streams (`/live/`), Shorts (`/shorts/`), embeds, and queries with pre-appended parameters (`?feature=shared&v=...`).
+  - Added timestamp extraction (`?t=45`, `?t=1m25s`, `?start=45`) to initialize the video player directly at the linked moment.
+- **Security Sandboxing & Scheme Injection Prevention**:
+  - Strictly blocked dangerous URI schemes (`javascript:`, `data:text/html`, `vbscript:`).
+  - Added explicit iframe sandboxing: `sandbox="allow-scripts allow-same-origin allow-presentation allow-forms allow-popups"` with `referrerpolicy="no-referrer-when-downgrade"`.
+  - Added validation gate in `openVideoInsertDialog` to reject unknown or empty URLs with user-friendly toast guidance.
+- **Lifecycle & Memory Leakage Teardown**:
+  - Ensured complete media unloading (`videoEl.removeAttribute('src')`, `load()`, `iframe.src = 'about:blank'`) and backdrop-click dismissal on both the insertion and player dialogs.
+  - Implemented smooth `postMessage` seeking with iframe fallback.
+- **Render Engine Robustness & Error Boundary (`render.js`)**:
+  - Fixed `ReferenceError: image is not defined` in `drawVideoCard` by properly referencing `getImage(o.thumb, onload)`.
+  - Wrapped dynamic object rendering in `drawObject` inside an isolated `try { ... } catch (err) { console.warn('Render error in object', o.type, err); } finally { ctx.restore(); }` error boundary. This prevents any corrupted card or media element from crashing the render loop, which previously left canvases shifted, blank, or with invisible/transparent elements during panning and zooming.
+
+## 14. Tab Clearing Routing to 'My Boards' & Multi-Tab Operations (`tabs.js`, `panels.js`, `app.css`)
+
+- **Routing Tab Closure to 'My Boards' Gallery (`tabs.js`, `panels.js`)**:
+  - When closing the final remaining open tab (or clearing all tabs), GazBoard no longer automatically spawns an empty "Untitled Board" by default.
+  - Instead, closing the last tab clears `activeId`, empties `this.tabs = []`, re-renders the clean empty tab strip (retaining the quick `(+)` add button), and immediately opens the full-screen **My Boards** gallery (`app.panels.boards()`).
+  - This allows the user to choose intentionally whether to create a new board, open a folder, or select an existing board from their library.
+  - If the user cancels or closes the "My Boards" panel without selecting an alternative board when `tabs.length === 0`, `panels.js` safely re-syncs the active loaded document tab so the workspace remains in an operational state.
+- **Close All Tabs Context Menu Action**:
+  - Added `Close all tabs` action (`closeAllTabs()`) to the tab right-click context menu alongside `Close tab`, `Close other tabs`, and `Close tabs to the right`.
+  - Fully translated across all 7 locales (`ar`, `bn`, `de`, `es`, `pt-BR`, `zh-Hans`, `zh-Hant`) maintaining 100% i18n coverage.
+
+
+

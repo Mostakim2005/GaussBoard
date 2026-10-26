@@ -134,10 +134,10 @@ export function nearestPageIndex(pages, x, y) {
 export function offsetIntoRect(b, r) {
   if (!b || !r) return { dx: 0, dy: 0 };
   let dx = 0, dy = 0;
-  if (b.w >= r.w) dx = (r.x + r.w / 2) - (b.x + b.w / 2);
+  if (b.w >= r.w) dx = r.x - b.x;
   else if (b.x < r.x) dx = r.x - b.x;
   else if (b.x + b.w > r.x + r.w) dx = (r.x + r.w) - (b.x + b.w);
-  if (b.h >= r.h) dy = (r.y + r.h / 2) - (b.y + b.h / 2);
+  if (b.h >= r.h) dy = r.y - b.y;
   else if (b.y < r.y) dy = r.y - b.y;
   else if (b.y + b.h > r.y + r.h) dy = (r.y + r.h) - (b.y + b.h);
   return { dx, dy };

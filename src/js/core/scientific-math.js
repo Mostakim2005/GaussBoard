@@ -263,7 +263,7 @@ export function generateCasesTex(count = 2) {
 export function parseMathExpressionSafely(exprStr, vars = {}) {
   if (!exprStr || typeof exprStr !== 'string') return NaN;
   const tokens = [];
-  const regex = /\s*([0-9]+\.?[0-9]*|[a-zA-Z_][a-zA-Z0-9_]*|\*\*|\+|-|\*|\/|\^|\(|\))\s*/g;
+  const regex = /\s*([0-9]+\.?[0-9]*|(?:Math\.)?[a-zA-Z_][a-zA-Z0-9_]*|\*\*|\+|-|\*|\/|\^|\(|\))\s*/g;
   let match;
   while ((match = regex.exec(exprStr)) !== null) {
     if (match[1]) tokens.push(match[1]);
@@ -312,7 +312,7 @@ export function parseMathExpressionSafely(exprStr, vars = {}) {
       return val;
     }
     if (/^[0-9]/.test(tok)) return parseFloat(tok);
-    const low = tok.toLowerCase();
+    const low = tok.toLowerCase().replace(/^math\./, '');
     if (low === 'x') return typeof vars.x === 'number' ? vars.x : (typeof vars.x !== 'undefined' ? Number(vars.x) : 0);
     if (low === 'pi') return Math.PI;
     if (low === 'e') return Math.E;

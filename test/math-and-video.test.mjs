@@ -64,6 +64,25 @@ test('video suite: URL parsing, time formatting, and seek parsers', () => {
   const yt2 = parseVideoUrl('https://youtu.be/dQw4w9WgXcQ?t=45');
   assert.equal(yt2.type, 'youtube');
   assert.equal(yt2.id, 'dQw4w9WgXcQ');
+  assert.equal(yt2.startTime, 45);
+
+  const ytLive = parseVideoUrl('https://www.youtube.com/live/dQw4w9WgXcQ?feature=share');
+  assert.equal(ytLive.type, 'youtube');
+  assert.equal(ytLive.id, 'dQw4w9WgXcQ');
+
+  const ytParam = parseVideoUrl('https://www.youtube.com/watch?feature=shared&v=dQw4w9WgXcQ&t=1m25s');
+  assert.equal(ytParam.type, 'youtube');
+  assert.equal(ytParam.id, 'dQw4w9WgXcQ');
+  assert.equal(ytParam.startTime, 85);
+
+  const ytShorts = parseVideoUrl('https://www.youtube.com/shorts/dQw4w9WgXcQ');
+  assert.equal(ytShorts.type, 'youtube');
+  assert.equal(ytShorts.id, 'dQw4w9WgXcQ');
+
+  // Security rejection of invalid/dangerous schemes
+  assert.equal(parseVideoUrl('javascript:alert(1)').type, 'unknown');
+  assert.equal(parseVideoUrl('data:text/html;base64,...').type, 'unknown');
+  assert.equal(parseVideoUrl('fdsfdsf').type, 'unknown');
 
   // Direct video files
   const vid1 = parseVideoUrl('https://example.com/video.mp4');

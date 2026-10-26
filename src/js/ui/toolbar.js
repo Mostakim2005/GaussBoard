@@ -194,8 +194,12 @@ export function initToolbar(app) {
   calBtn.innerHTML = penIcon(app.settings.calligraphyColor || app.settings.penColor || '#1a1a1a', 'none', 'calligraphy') + '<span class="kbd">C</span>';
   calBtn.addEventListener('click', (e) => toggleTool('calligraphy')(e, calBtn));
   bar.appendChild(calBtn);
-  iconTool({ ribbonId: 'tape', tool: 'tape', icon: 'curtain', title: t('Study Tape'),
-    onClick: () => { app.setTool('tape'); app.syncUI(); closePopover(); } });
+  const tapeBtn = h('button', { class: 'pen', title: t('Study Tape — click again for options') });
+  tapeBtn.dataset.tool = 'tape';
+  tapeBtn.dataset.ribbonId = 'tape';
+  tapeBtn.innerHTML = penIcon(app.settings.tapeColor || '#a855f7', 'none', 'tape') + '<span class="kbd">T</span>';
+  tapeBtn.addEventListener('click', (e) => toggleTool('tape')(e, tapeBtn));
+  bar.appendChild(tapeBtn);
 
   const er = h('button', { class: 'pen', title: t('Eraser (E) \u2014 click again for options') });
   er.dataset.tool = 'eraser';
@@ -657,43 +661,55 @@ function wireTopBar(app) {
     const aliases = Array.isArray(doc.properties?.aliases) ? doc.properties.aliases : (Array.isArray(doc.aliases) ? doc.aliases : []);
 
     if (aliases.length > 0) {
-      const al = aliases[0];
-      const chip = h('span', {
-        class: 'prop-chip top-alias-chip',
-        title: t('Board alias (Click to edit)'),
-        style: 'cursor:pointer;font-size:11px;padding:2px 7px;border-radius:10px;background:rgba(168,85,247,0.12);color:#9333ea;font-weight:600;display:inline-flex;align-items:center;gap:3px;'
-      }, h('span', { style: 'opacity:0.75;font-weight:400;' }, 'alias:'), al + (aliases.length > 1 ? ` (+${aliases.length - 1})` : ''));
-      chip.addEventListener('click', () => {
-        if (!app.propertiesDialog) {
-          import('./properties-dialog.js').then((m) => {
-            app.propertiesDialog = new m.PropertiesDialog(app);
+      for (const al of aliases.slice(0, 3)) {
+        const chip = h('span', {
+          class: 'prop-chip top-alias-chip',
+          title: t('Board alias (Click to edit)'),
+          style: 'cursor:pointer;font-size:11.5px;padding:2px 8px;border-radius:10px;background:rgba(168,85,247,0.14);color:#9333ea;font-weight:600;display:inline-flex;align-items:center;gap:3px;flex-shrink:0;'
+        }, h('span', { style: 'font-size:10px;opacity:0.85;' }, '🏷️'), al);
+        chip.addEventListener('click', () => {
+          if (!app.propertiesDialog) {
+            import('./properties-dialog.js').then((m) => {
+              app.propertiesDialog = new m.PropertiesDialog(app);
+              app.propertiesDialog.open();
+            });
+          } else {
             app.propertiesDialog.open();
-          });
-        } else {
-          app.propertiesDialog.open();
-        }
-      });
-      container.appendChild(chip);
+          }
+        });
+        container.appendChild(chip);
+      }
+      if (aliases.length > 3) {
+        container.appendChild(h('span', { style: 'font-size:10.5px;color:var(--text-2);' }, `+${aliases.length - 3}`));
+      }
     }
 
     if (tags.length > 0) {
-      const tg = tags[0];
-      const chip = h('span', {
-        class: 'prop-chip top-tag-chip',
-        title: t('Board tag (Click to edit)'),
-        style: 'cursor:pointer;font-size:11px;padding:2px 7px;border-radius:10px;background:rgba(0,120,212,0.1);color:#0078d4;font-weight:600;display:inline-flex;align-items:center;gap:3px;'
-      }, h('span', { style: 'opacity:0.75;font-weight:400;' }, 'tag:'), tg + (tags.length > 1 ? ` (+${tags.length - 1})` : ''));
-      chip.addEventListener('click', () => {
-        if (!app.propertiesDialog) {
-          import('./properties-dialog.js').then((m) => {
-            app.propertiesDialog = new m.PropertiesDialog(app);
+      for (const tg of tags.slice(0, 3)) {
+        const chip = h('span', {
+          class: 'prop-chip top-tag-chip',
+          title: t('Board tag (Click to edit)'),
+          style: 'cursor:pointer;font-size:11.5px;padding:2px 8px;border-radius:10px;background:rgba(0,120,212,0.12);color:var(--accent-2,#0078d4);font-weight:600;display:inline-flex;align-items:center;gap:3px;flex-shrink:0;'
+        }, `#${String(tg).replace(/^#+/, '')}`);
+        chip.addEventListener('click', () => {
+          if (!app.propertiesDialog) {
+            import('./properties-dialog.js').then((m) => {
+              app.propertiesDialog = new m.PropertiesDialog(app);
+              app.propertiesDialog.open();
+            });
+          } else {
             app.propertiesDialog.open();
-          });
-        } else {
-          app.propertiesDialog.open();
-        }
-      });
-      container.appendChild(chip);
+          }
+        });
+        container.appendChild(chip);
+      }
+      if (tags.length > 3) {
+        container.appendChild(h('span', { style: 'font-size:10.5px;color:var(--text-2);' }, `+${tags.length - 3}`));
+      }
+    }
+
+    if (app.splitWorkspace?.enabled) {
+      app.splitWorkspace.syncSplitTopbars?.();
     }
   };
   setTimeout(() => app.updateTopProperties?.(), 100);
@@ -990,6 +1006,337 @@ export function pickPenInk(app, c) {
   const held = heldPenId(s);
   if (held) rememberPen(s, held, { color: c, effect });
   app.saveSettings(); app.syncUI();
+}
+
+/**
+ * Modern interactive stepped slider for laser trail duration.
+ * Provides a draggable thumb with smooth snap points matching user intervals:
+ * 0 (Instant), 300ms, 500ms, 1.0s, 1.5s, 5.0s, 10s.
+ */
+export function createLaserDurationSlider(app, initialValue = 500, onChange = null) {
+  const steps = [
+    { val: 0, label: t('Instant'), tick: '0' },
+    { val: 300, label: '300ms', tick: '0.3' },
+    { val: 500, label: '500ms', tick: '0.5' },
+    { val: 1000, label: '1.0s', tick: '1' },
+    { val: 1500, label: '1.5s', tick: '1.5' },
+    { val: 5000, label: '5.0s', tick: '5' },
+    { val: 10000, label: '10s', tick: '10' }
+  ];
+
+  let currentVal = Number(initialValue ?? 500);
+  let currentIndex = steps.findIndex(s => s.val === currentVal);
+  if (currentIndex < 0) {
+    let minDiff = Infinity;
+    currentIndex = 2; // 500ms default
+    steps.forEach((s, idx) => {
+      const diff = Math.abs(s.val - currentVal);
+      if (diff < minDiff) { minDiff = diff; currentIndex = idx; }
+    });
+  }
+
+  const container = h('div', {
+    class: 'laser-slider-widget',
+    style: 'display:flex;flex-direction:column;gap:8px;padding:8px 4px;user-select:none;touch-action:none;min-width:260px;'
+  });
+
+  // Top row: Label & Current Value pill
+  const valBadge = h('span', {
+    class: 'laser-slider-val-badge',
+    style: 'font-size:12px;font-weight:700;color:var(--accent,#0078d4);background:rgba(0,120,212,0.12);padding:2px 8px;border-radius:10px;font-variant-numeric:tabular-nums;'
+  }, steps[currentIndex].label);
+
+  const topRow = h('div', {
+    style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;'
+  },
+    h('span', { style: 'font-size:12px;font-weight:600;color:var(--text-2,inherit);' }, t('Trail Duration')),
+    valBadge
+  );
+
+  // Track area
+  const trackWrapper = h('div', {
+    class: 'laser-slider-track-wrap',
+    style: 'position:relative;height:28px;display:flex;align-items:center;cursor:pointer;margin:0 10px;'
+  });
+
+  const trackBg = h('div', {
+    style: 'position:absolute;left:0;right:0;height:6px;border-radius:3px;background:var(--line,rgba(128,128,128,0.25));'
+  });
+
+  const trackFill = h('div', {
+    style: 'position:absolute;left:0;height:6px;border-radius:3px;background:var(--accent,#0078d4);transition:width 0.08s ease;'
+  });
+
+  // Step dots
+  const dotElements = [];
+  const dotsContainer = h('div', {
+    style: 'position:absolute;left:0;right:0;height:100%;display:flex;align-items:center;pointer-events:none;'
+  });
+
+  steps.forEach((s, idx) => {
+    const pct = (idx / (steps.length - 1)) * 100;
+    const dot = h('div', {
+      style: `position:absolute;left:${pct}%;top:50%;width:8px;height:8px;border-radius:50%;background:${idx <= currentIndex ? 'var(--accent,#0078d4)' : 'var(--desk,#b0b0b0)'};transform:translate(-50%,-50%);transition:background 0.1s ease;`
+    });
+    dotElements.push(dot);
+    dotsContainer.appendChild(dot);
+  });
+
+  // Thumb
+  const thumb = h('div', {
+    class: 'laser-slider-thumb',
+    style: 'position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:#ffffff;border:3px solid var(--accent,#0078d4);box-shadow:0 2px 6px rgba(0,0,0,0.3);transform:translate(-50%,-50%);cursor:grab;z-index:2;transition:left 0.08s ease;'
+  });
+
+  trackWrapper.appendChild(trackBg);
+  trackWrapper.appendChild(trackFill);
+  trackWrapper.appendChild(dotsContainer);
+  trackWrapper.appendChild(thumb);
+
+  // Bottom row: Tick labels
+  const ticksRow = h('div', {
+    style: 'position:relative;height:16px;margin:0 10px;font-size:11px;color:var(--text-2,rgba(128,128,128,0.8));font-weight:600;'
+  });
+
+  steps.forEach((s, idx) => {
+    const pct = (idx / (steps.length - 1)) * 100;
+    const tick = h('span', {
+      style: `position:absolute;left:${pct}%;transform:translateX(-50%);cursor:pointer;white-space:nowrap;`
+    }, s.tick);
+    tick.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setIndex(idx);
+    });
+    ticksRow.appendChild(tick);
+  });
+
+  const setIndex = (idx) => {
+    currentIndex = Math.max(0, Math.min(steps.length - 1, idx));
+    const step = steps[currentIndex];
+    currentVal = step.val;
+    const pct = (currentIndex / (steps.length - 1)) * 100;
+    trackFill.style.width = `${pct}%`;
+    thumb.style.left = `${pct}%`;
+    valBadge.textContent = step.label;
+
+    dotElements.forEach((d, i) => {
+      d.style.background = i <= currentIndex ? 'var(--accent,#0078d4)' : 'var(--desk,#b0b0b0)';
+    });
+
+    if (onChange) onChange(currentVal);
+    else if (app) {
+      if (!app.settings) app.settings = {};
+      app.settings.laserTrailDuration = currentVal;
+      app.saveSettings?.();
+      if (app.surface) app.surface.dirty = true;
+    }
+  };
+
+  // Drag interaction
+  let isDragging = false;
+  const updateFromPointer = (e) => {
+    const rect = trackWrapper.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const clientX = e.clientX ?? (e.touches ? e.touches[0].clientX : 0);
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const stepIdx = Math.round(ratio * (steps.length - 1));
+    setIndex(stepIdx);
+  };
+
+  const onPointerMove = (e) => {
+    if (!isDragging) return;
+    updateFromPointer(e);
+  };
+
+  const onPointerUp = (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    thumb.style.cursor = 'grab';
+    try { trackWrapper.releasePointerCapture(e.pointerId); } catch {}
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+  };
+
+  trackWrapper.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    isDragging = true;
+    thumb.style.cursor = 'grabbing';
+    try { trackWrapper.setPointerCapture(e.pointerId); } catch {}
+    updateFromPointer(e);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  });
+
+  // Initialize positions
+  const initPct = (currentIndex / (steps.length - 1)) * 100;
+  trackFill.style.width = `${initPct}%`;
+  thumb.style.left = `${initPct}%`;
+
+  container.appendChild(topRow);
+  container.appendChild(trackWrapper);
+  container.appendChild(ticksRow);
+
+  return container;
+}
+
+/**
+ * Stepped 10% increment slider for Study Tape opacity (0% to 100%).
+ */
+export function createTapeOpacitySlider(app, initialValue = 1.0, onChange = null) {
+  const steps = [
+    { val: 0, label: '0%', tick: '0%' },
+    { val: 0.1, label: '10%', tick: '·' },
+    { val: 0.2, label: '20%', tick: '·' },
+    { val: 0.3, label: '30%', tick: '·' },
+    { val: 0.4, label: '40%', tick: '·' },
+    { val: 0.5, label: '50%', tick: '50%' },
+    { val: 0.6, label: '60%', tick: '·' },
+    { val: 0.7, label: '70%', tick: '·' },
+    { val: 0.8, label: '80%', tick: '·' },
+    { val: 0.9, label: '90%', tick: '·' },
+    { val: 1.0, label: '100%', tick: '100%' }
+  ];
+
+  let currentVal = Number(initialValue ?? 1.0);
+  let currentIndex = steps.findIndex(s => Math.abs(s.val - currentVal) < 0.05);
+  if (currentIndex < 0) currentIndex = 10; // 100% default
+
+  const container = h('div', {
+    class: 'tape-slider-widget',
+    style: 'display:flex;flex-direction:column;gap:8px;padding:8px 4px;user-select:none;touch-action:none;min-width:260px;'
+  });
+
+  const valBadge = h('span', {
+    class: 'laser-slider-val-badge',
+    style: 'font-size:12px;font-weight:700;color:var(--accent,#a855f7);background:rgba(168,85,247,0.12);padding:2px 8px;border-radius:10px;font-variant-numeric:tabular-nums;'
+  }, steps[currentIndex].label);
+
+  const topRow = h('div', {
+    style: 'display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;'
+  },
+    h('span', { style: 'font-size:12px;font-weight:600;color:var(--text-2,inherit);' }, t('Tape Opacity')),
+    valBadge
+  );
+
+  const trackWrapper = h('div', {
+    class: 'laser-slider-track-wrap',
+    style: 'position:relative;height:28px;display:flex;align-items:center;cursor:pointer;margin:0 10px;'
+  });
+
+  const trackBg = h('div', {
+    style: 'position:absolute;left:0;right:0;height:6px;border-radius:3px;background:var(--line,rgba(128,128,128,0.25));'
+  });
+
+  const trackFill = h('div', {
+    style: 'position:absolute;left:0;height:6px;border-radius:3px;background:var(--accent,#a855f7);transition:width 0.08s ease;'
+  });
+
+  const dotElements = [];
+  const dotsContainer = h('div', {
+    style: 'position:absolute;left:0;right:0;height:100%;display:flex;align-items:center;pointer-events:none;'
+  });
+
+  steps.forEach((s, idx) => {
+    const pct = (idx / (steps.length - 1)) * 100;
+    const dot = h('div', {
+      style: `position:absolute;left:${pct}%;top:50%;width:6px;height:6px;border-radius:50%;background:${idx <= currentIndex ? 'var(--accent,#a855f7)' : 'var(--desk,#b0b0b0)'};transform:translate(-50%,-50%);transition:background 0.1s ease;`
+    });
+    dotElements.push(dot);
+    dotsContainer.appendChild(dot);
+  });
+
+  const thumb = h('div', {
+    class: 'laser-slider-thumb',
+    style: 'position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:#ffffff;border:3px solid var(--accent,#a855f7);box-shadow:0 2px 6px rgba(0,0,0,0.3);transform:translate(-50%,-50%);cursor:grab;z-index:2;transition:left 0.08s ease;'
+  });
+
+  trackWrapper.appendChild(trackBg);
+  trackWrapper.appendChild(trackFill);
+  trackWrapper.appendChild(dotsContainer);
+  trackWrapper.appendChild(thumb);
+
+  const ticksRow = h('div', {
+    style: 'display:flex;justify-content:space-between;padding:0 2px;margin-top:-2px;'
+  });
+
+  steps.forEach((s, idx) => {
+    const isMajor = s.tick !== '·';
+    const tickEl = h('span', {
+      style: `font-size:${isMajor ? '10px' : '14px'};font-weight:${isMajor ? '600' : 'bold'};color:${idx === currentIndex ? 'var(--accent,#a855f7)' : 'var(--text-2,rgba(128,128,128,0.7))'};cursor:pointer;line-height:1;user-select:none;`
+    }, s.tick);
+    tickEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setIndex(idx);
+    });
+    ticksRow.appendChild(tickEl);
+  });
+
+  const setIndex = (idx) => {
+    idx = Math.max(0, Math.min(steps.length - 1, idx));
+    currentIndex = idx;
+    const chosen = steps[idx];
+    currentVal = chosen.val;
+
+    const pct = (idx / (steps.length - 1)) * 100;
+    trackFill.style.width = `${pct}%`;
+    thumb.style.left = `${pct}%`;
+    valBadge.textContent = chosen.label;
+
+    dotElements.forEach((dot, i) => {
+      dot.style.background = i <= idx ? 'var(--accent,#a855f7)' : 'var(--desk,#b0b0b0)';
+    });
+
+    Array.from(ticksRow.children).forEach((tEl, i) => {
+      tEl.style.color = i === idx ? 'var(--accent,#a855f7)' : 'var(--text-2,rgba(128,128,128,0.7))';
+    });
+
+    onChange?.(chosen.val);
+  };
+
+  let isDragging = false;
+  const updateFromPointer = (e) => {
+    const rect = trackWrapper.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    const frac = rect.width > 0 ? x / rect.width : 0;
+    const nearestIndex = Math.round(frac * (steps.length - 1));
+    setIndex(nearestIndex);
+  };
+
+  const onPointerMove = (e) => {
+    if (!isDragging) return;
+    updateFromPointer(e);
+  };
+
+  const onPointerUp = (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    thumb.style.cursor = 'grab';
+    try { trackWrapper.releasePointerCapture(e.pointerId); } catch {}
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+  };
+
+  trackWrapper.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    isDragging = true;
+    thumb.style.cursor = 'grabbing';
+    try { trackWrapper.setPointerCapture(e.pointerId); } catch {}
+    updateFromPointer(e);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  });
+
+  const initPct = (currentIndex / (steps.length - 1)) * 100;
+  trackFill.style.width = `${initPct}%`;
+  thumb.style.left = `${initPct}%`;
+
+  container.appendChild(topRow);
+  container.appendChild(trackWrapper);
+  container.appendChild(ticksRow);
+
+  return container;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1319,6 +1666,20 @@ export function openToolPopover(app, anchor, tool) {
       h('div', { style: 'margin-top:12px;' }, popToggle)
     );
   } else if (tool === 'eraser') {
+    const modeButtons = new Map();
+    const updateModeUI = (activeId) => {
+      for (const [mid, btn] of modeButtons.entries()) {
+        const check = btn.querySelector('.k');
+        if (mid === activeId) {
+          btn.classList.add('active-mode');
+          if (!check) btn.appendChild(h('span', { class: 'k', html: '&#10003;' }));
+        } else {
+          btn.classList.remove('active-mode');
+          if (check) check.remove();
+        }
+      }
+    };
+
     const mkMode = (id, label, hint) => {
       const b = h('button', { class: 'menu-item' + (s.eraserMode === id ? ' active-mode' : '') },
         h('span', { style: 'display:flex;flex-direction:column;gap:2px;text-align:left' },
@@ -1328,8 +1689,11 @@ export function openToolPopover(app, anchor, tool) {
       b.style.alignItems = 'flex-start';
       b.addEventListener('click', () => {
         if (id === 'all') { app.command('edit.clear'); closePopover(); return; }
-        s.eraserMode = id; app.saveSettings(); openToolPopover(app, anchor, 'eraser');
+        s.eraserMode = id;
+        app.saveSettings();
+        updateModeUI(id);
       }, { once: false });
+      modeButtons.set(id, b);
       return b;
     };
     body = h('div', { style: 'min-width:270px' },
@@ -1346,23 +1710,27 @@ export function openToolPopover(app, anchor, tool) {
               h('span', {}, t('Erase pencil marks')),
               h('small', { style: 'color:var(--text-2);font-size:11.5px' }, t('Removes every pencil line on this board and keeps the ink'))));
           b.style.alignItems = 'flex-start';
-          b.addEventListener('click', () => { closePopover(); app.command('edit.erasePencil'); });
+          b.addEventListener('click', () => {
+            app.command('edit.erasePencil');
+          });
           return b;
         })()),
       h('h4', { style: 'margin-top:14px' }, t('Gesture scratch-out')),
       h('div', { style: 'display:flex;align-items:center;justify-content:space-between;padding:4px 0;' },
         h('span', { style: 'font-size:12.5px;' }, t('Scribble over ink to erase')),
         (() => {
-          const active = s.scratchOut !== false;
+          let active = s.scratchOut !== false;
           const toggleBtn = h('button', {
             class: 'btn' + (active ? ' primary' : ''),
-            style: 'padding:3px 10px;font-size:11.5px;font-weight:600;'
+            style: 'padding:3px 10px;font-size:11.5px;font-weight:600;min-width:44px;'
           }, active ? t('ON') : t('OFF'));
           toggleBtn.addEventListener('click', () => {
-            s.scratchOut = !(s.scratchOut !== false);
+            active = !active;
+            s.scratchOut = active;
             app.saveSettings();
+            toggleBtn.className = 'btn' + (active ? ' primary' : '');
+            toggleBtn.textContent = active ? t('ON') : t('OFF');
             if (app.replayBar?.updateScratchUI) app.replayBar.updateScratchUI();
-            openToolPopover(app, anchor, 'eraser');
           });
           return toggleBtn;
         })()
@@ -1437,36 +1805,90 @@ export function openToolPopover(app, anchor, tool) {
       sizeRow([1, 2, 3, 5, 8], s.shapeLineWidth, (v) => { s.shapeLineWidth = v; app.saveSettings(); app.applyToSelection({ lineWidth: v }, 'shape'); }, s.shapeStroke)
     );
   } else if (tool === 'laser') {
-    const curDur = Number(s.laserTrailDuration ?? 520);
-    const durOptions = [
-      [0, t('Instant')],
-      [300, '300ms'],
-      [520, '520ms'],
-      [1200, '1.2s'],
-      [2500, '2.5s'],
-      [5000, '5.0s'],
-      [10000, '10s']
-    ];
-    const durRow = h('div', { class: 'row', style: 'display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;' });
-    for (const [durMs, durLabel] of durOptions) {
-      const b = h('button', {
-        class: 'btn' + (Number(durMs) === curDur ? ' primary' : ''),
-        style: 'padding:4px 9px;font-size:12px;border-radius:12px;'
-      }, durLabel);
-      b.addEventListener('click', () => {
-        s.laserTrailDuration = Number(durMs);
-        app.saveSettings();
-        for (const child of durRow.children) child.classList.remove('primary');
-        b.classList.add('primary');
-        if (app.surface) app.surface.dirty = true;
-      });
-      durRow.appendChild(b);
-    }
-    body = h('div', { style: 'max-width:240px;' },
-      h('h4', {}, t('Laser trail duration')),
-      durRow,
-      h('div', { style: 'font-size:11px;color:var(--text-2,rgba(128,128,128,0.8));margin-top:8px;' },
+    const curDur = Number(s.laserTrailDuration ?? 500);
+    const slider = createLaserDurationSlider(app, curDur, (val) => {
+      s.laserTrailDuration = val;
+      app.saveSettings();
+      if (app.surface) app.surface.dirty = true;
+    });
+    body = h('div', { style: 'min-width:270px;padding:2px 4px;' },
+      h('h4', { style: 'margin-bottom:6px;' }, t('Laser trail duration')),
+      slider,
+      h('div', { style: 'font-size:11px;color:var(--text-2,rgba(128,128,128,0.8));margin-top:6px;' },
         t('Fades smoothly after drawing. Nothing is saved to board.')
+      )
+    );
+  } else if (tool === 'tape') {
+    const tapeColors = [
+      '#a855f7', // Purple
+      '#eab308', // Yellow
+      '#10b981', // Mint Green
+      '#f43f5e', // Coral Pink
+      '#d4b886', // Masking Beige
+      '#06b6d4', // Cyan
+      '#334155'  // Slate Dark
+    ];
+    const tapeTextures = [
+      { id: 'stripes', label: t('Stripes') },
+      { id: 'plain', label: t('Plain') },
+      { id: 'dots', label: t('Washi Dots') }
+    ];
+
+    const curWidth = s.tapeWidth || 34;
+    const curColor = s.tapeColor || '#a855f7';
+    const curOpacity = s.tapeOpacity != null ? s.tapeOpacity : 1.0;
+    const curTexture = s.tapeTexture || 'stripes';
+
+    const opacitySlider = createTapeOpacitySlider(app, curOpacity, (val) => {
+      s.tapeOpacity = val;
+      app.saveSettings();
+      if (app.surface) app.surface.dirty = true;
+    });
+
+    const textureRow = h('div', { class: 'row', style: 'gap:6px;' },
+      ...tapeTextures.map((tx) => {
+        const b = h('button', {
+          class: 'btn' + (curTexture === tx.id ? ' primary' : ''),
+          style: 'flex:1;font-size:11.5px;padding:4px 6px;'
+        }, tx.label);
+        b.onclick = () => {
+          markActive(b.parentNode, b, 'primary');
+          s.tapeTexture = tx.id;
+          app.saveSettings();
+          if (app.surface) app.surface.dirty = true;
+        };
+        return b;
+      })
+    );
+
+    const assessToggle = toggle(t('Ask assessment on reveal (Active Recall)'), s.tapeAssessOnReveal !== false, (v) => {
+      s.tapeAssessOnReveal = v;
+      app.saveSettings();
+    });
+
+    const totalTapes = (app.store?.objects || []).filter((o) => o.type === 'curtain' && o.subtype === 'tape').length;
+    const totalReviews = (app.store?.objects || []).filter((o) => o.type === 'curtain' && o.subtype === 'tape')
+      .reduce((sum, o) => sum + (o.reviewCount || 0), 0);
+
+    body = h('div', { style: 'min-width:280px;padding:2px 4px;' },
+      h('h4', {}, t('Tape width')),
+      sizeRow([16, 24, 34, 48, 64], curWidth, (v) => {
+        s.tapeWidth = v; app.saveSettings();
+      }, curColor),
+      h('h4', { style: 'margin-top:12px' }, t('Tape skin & colour')),
+      swatchRow(tapeColors, curColor, (c) => {
+        s.tapeColor = c;
+        app.saveSettings();
+        app.syncUI();
+      }),
+      h('h4', { style: 'margin-top:12px' }, t('Tape texture')),
+      textureRow,
+      h('h4', { style: 'margin-top:12px' }, t('Opacity (10% increments)')),
+      opacitySlider,
+      h('div', { style: 'margin-top:14px' }, assessToggle),
+      h('div', { style: 'font-size:11px;color:var(--text-2);margin-top:8px;padding-top:6px;border-top:1px solid var(--stroke);display:flex;justify-content:space-between;' },
+        h('span', {}, t('Tapes on board: {n}', { n: totalTapes })),
+        h('span', {}, t('Reviews logged: {n}', { n: totalReviews }))
       )
     );
   }
@@ -1792,6 +2214,13 @@ export function syncToolbar(app) {
     const cColor = s.calligraphyColor || s.penColor || '#1a1a1a';
     const want = penIcon(cColor, 'none', 'calligraphy') + '<span class="kbd">C</span>';
     if (calBtn.dataset.paint !== cColor) { calBtn.innerHTML = want; calBtn.dataset.paint = cColor; }
+  }
+  const tapeBtn = bar.querySelector('.pen[data-tool="tape"]');
+  if (tapeBtn) {
+    tapeBtn.classList.toggle('active', app.tool === 'tape');
+    const tColor = s.tapeColor || '#a855f7';
+    const want = penIcon(tColor, 'none', 'tape') + '<span class="kbd">T</span>';
+    if (tapeBtn.dataset.paint !== tColor) { tapeBtn.innerHTML = want; tapeBtn.dataset.paint = tColor; }
   }
   const er = bar.querySelector('.pen[data-tool="eraser"]');
   if (er) er.classList.toggle('active', app.tool === 'eraser');

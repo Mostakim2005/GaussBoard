@@ -38,9 +38,11 @@ export function formatRange(pages) {
 const THUMB_LIMIT = 400;   // beyond this, skip previews and use the range box alone
 
 export const QUALITY = [
-  { id: 2,   label: t('Standard'), dpi: 144, note: t('crisp on screen, small boards') },
-  { id: 3,   label: t('High'),     dpi: 216, note: t('holds up when you zoom in') },
-  { id: 4.2, label: t('Maximum'),  dpi: 300, note: t('print resolution, large boards') }
+  { id: 0.75, label: t('Lowest'),   dpi: 54,  note: t('ultra-compact storage') },
+  { id: 1.0,  label: t('Low'),      dpi: 72,  note: t('compact and fast') },
+  { id: 2,    label: t('Standard'), dpi: 144, note: t('crisp on screen, small boards') },
+  { id: 3,    label: t('High'),     dpi: 216, note: t('holds up when you zoom in') },
+  { id: 4.2,  label: t('Maximum'),  dpi: 300, note: t('print resolution, large boards') }
 ];
 
 /**
@@ -218,9 +220,9 @@ export function choosePages(app, doc) {
         : t('none selected');
       importBtn.toggleAttribute('disabled', pages.length === 0);
       importBtn.textContent = pages.length ? (pages.length === 1 ? t('Import {n} page', { n: pages.length }) : t('Import {n} pages', { n: pages.length })) : t('Import');
-      const q = QUALITY.find((x) => x.id === quality) || QUALITY[0];
-      // rough: an A4 page as PNG at this scale, times the page count
-      const mb = pages.length * (q.dpi / 144) ** 2 * 0.9;
+      const q = QUALITY.find((x) => x.id === quality) || QUALITY[2];
+      // rough: an A4 page as PNG or compact JPEG, times the page count
+      const mb = pages.length * (q.id <= 0.75 ? 0.04 : q.id <= 1.0 ? 0.07 : (q.dpi / 144) ** 2 * 0.9);
       sizeHint.textContent = pages.length ? t('{dpi} dpi · about {mb} MB on the board', { dpi: q.dpi, mb: mb < 1 ? '<1' : Math.round(mb) }) : '';
       for (const [n, { tile }] of tiles) tile.classList.toggle('on', chosen.has(n));
     }

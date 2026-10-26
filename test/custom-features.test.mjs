@@ -1,3 +1,4 @@
+import { MATH_PALETTE } from '../src/js/ui/mathedit.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -16,7 +17,8 @@ import { Store } from '../src/js/core/store.js';
 import { AudioBar, sessionMenuPosition } from '../src/js/ui/audio-bar.js';
 import { parseSubtitles, findActiveCue } from '../src/js/ui/subtitles.js';
 import { VIDEO_EXPORT_PRESETS } from '../src/js/export-video.js';
-import { pageMarginRects } from '../src/js/core/pages.js';
+import { pageMarginRects, offsetIntoRect } from '../src/js/core/pages.js';
+import { QUALITY } from '../src/js/ui/pagepicker.js';
 import { filterTemplatesByTags } from '../src/js/templates.js';
 
 test('slow dense scratch-out is accepted and ordinary writing is rejected', () => {
@@ -727,3 +729,46 @@ test('Lateral Feature #4 (splitSyncScroll): synchronizes camera coordinates acro
   assert.deepEqual({ x: app.surface.cam.x, y: app.surface.cam.y, z: app.surface.cam.z }, { x: -40, y: 60, z: 2.0 });
   assert.equal(rightInvalidated, 1);
 });
+
+test('expanded STEM math palette contains Electrical and Chemistry categories and advanced structures', () => {
+  const groupNames = MATH_PALETTE.map((g) => g.name);
+  assert.ok(groupNames.includes('Electrical'));
+  assert.ok(groupNames.includes('Chemistry'));
+  assert.ok(groupNames.includes('Calculus'));
+  assert.ok(groupNames.includes('Structures'));
+
+  const ee = MATH_PALETTE.find((g) => g.name === 'Electrical');
+  const chem = MATH_PALETTE.find((g) => g.name === 'Chemistry');
+
+  assert.ok(ee.items.some(([lbl, tex]) => lbl === 'V=IR' && tex.includes('V = I')));
+  assert.ok(ee.items.some(([lbl]) => lbl === 'Z_RLC'));
+  assert.ok(chem.items.some(([lbl]) => lbl === 'pH'));
+  assert.ok(chem.items.some(([lbl]) => lbl === 'PV=nRT'));
+});
+
+test('PDF import presets include Lowest and Low for compact storage', () => {
+  assert.ok(QUALITY.length >= 5);
+  const lowest = QUALITY.find(q => q.id === 0.75);
+  const low = QUALITY.find(q => q.id === 1.0);
+  assert.ok(lowest, 'Lowest preset (0.75 scale / 54 dpi) must exist');
+  assert.ok(low, 'Low preset (1.0 scale / 72 dpi) must exist');
+  assert.equal(lowest.label, 'Lowest');
+  assert.equal(low.label, 'Low');
+});
+
+test('offsetIntoRect aligns top and left when bounding box exceeds page bounds', () => {
+  const page = { x: 0, y: 0, w: 600, h: 800 };
+  // Oversized box placed at (100, 200)
+  const oversized = { x: 100, y: 200, w: 900, h: 1200 };
+  const offset = offsetIntoRect(oversized, page);
+  // Must shift back to page top-left (0 - 100, 0 - 200) rather than centering and bleeding into previous page
+  assert.equal(offset.dx, -100);
+  assert.equal(offset.dy, -200);
+
+  // Normal box inside page needs no offset
+  const normal = { x: 50, y: 50, w: 200, h: 300 };
+  const noOffset = offsetIntoRect(normal, page);
+  assert.equal(noOffset.dx, 0);
+  assert.equal(noOffset.dy, 0);
+});
+

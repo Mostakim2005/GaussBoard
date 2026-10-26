@@ -56,3 +56,59 @@ The 4.8.8 custom tests cover asymmetric margin geometry and page scope. Crop und
 - **Freehand tape attachment:** `coverFor()` derives the cover footprint from `boundsOf()`, so ink written on a freehand tape (which has points/bbox but no x/y/w/h) is attached, moves and hides with the tape.
 - **Tape is a mask, not ink:** a tape drawn while recording is no longer stamped with `audioId`/`t0`, so the replay engine does not animate or ghost it.
 - **Replay vs concealment:** concealed covers are redrawn after the replay pass, keeping blinded ink hidden during animated replay (deliberate trade-off documented in the release dossier).
+
+## 8. Dedicated Study Tape Pen & Active Recall Assessment
+
+- **Dedicated Pen Tray Tool**: Study Tape is elevated to a primary pen item in `#penTray` with an authentic tape-dispenser / pulled-strip SVG icon, keyboard shortcut `T`, and synchronized toolbar selection.
+- **Double-Click Popover & Customization**:
+  - Size presets: 5 widths (`16px`, `24px`, `34px`, `48px`, `64px`).
+  - Swatch palette: 7 tape colors (Classic Yellow, Neon Cyan, Hot Pink, Mint Green, Soft Lavender, Warm Orange, Sleek Charcoal).
+  - Textures: 3 tactile finishes (`Stripes`, `Plain`, `Washi Dots`).
+  - Stepped Opacity Slider: Interactive 10% snap increments (`0%` to `100%`) with tick markers and a `50%` midpoint.
+  - Active Recall Setting: Toggle checkbox to prompt assessment on reveal, plus review counters.
+- **Active Recall Assessment Modal & Database**:
+  - Revealing a concealed tape on canvas prompts an Active Recall rating modal with 4 choices:
+    - `Confident & Right` (green)
+    - `Unsure & Right` (blue)
+    - `Confident & Wrong` (amber)
+    - `Unsure & Wrong` (rose)
+  - Records reviews with timestamp, score, confidence, and trial counts inside `tapeObj.assessments` and in the board document database `doc.tapeDb[tapeId]` for future Anki/FSRS export. Provides "Skip" and "Don't ask again" options.
+
+## 9. Interactive Visual Crop, Resize & Clean Lock Display
+
+- **On-Canvas Interactive Cropping HUD (`startImageCrop`)**:
+  - Replaced legacy slider dialog with an on-canvas visual overlay `#imageCropOverlay` attached directly to `#stage`.
+  - High-contrast dotted/dashed cyan outline (`border: 2px dashed #00e5ff`) with drop-shadow for visibility on both dark and light images.
+  - 8 interactive stretch handles (`nw`, `ne`, `sw`, `se`, `n`, `s`, `w`, `e`) allowing fluid resizing in any direction.
+  - 4 semi-transparent shaded mask strips (`rgba(0, 0, 0, 0.52)`) dimming the regions outside the active crop box.
+  - Rule-of-thirds grid lines (dashed 3x3 guides) within the crop window.
+  - Direct dragging inside the box translates the crop window smoothly.
+  - Floating action pill at bottom displaying live crop percentage, `↶ Reset`, `✕ Cancel`, and `✓ Apply` with instant canvas preview.
+- **Image Resize Popover (`openImageResizePopover`)**:
+  - Accessible directly from the image selection context bar (`[Resize image]`).
+  - Offers width and height inputs with a "Keep aspect ratio" toggle, plus quick scale presets (`50%`, `75%`, `100%`, `125%`, `150%`, `200%`).
+- **Clean Lock Display**:
+  - In `surface.js`, locked outlines and lock badges (`drawLockedOutline`, `drawLockBadge`) are rendered exclusively when an object is actively selected or hovered (`isSelected || isHovered`).
+  - Annotated images and locked board elements remain completely clean and uncluttered during normal reading, presentation, and editing.
+
+## 10. Independent Snipping Tool, Excerpt Boundaries & Sheet Clamping
+
+- **Independent Snipping Tool (`startSnippingExcerpt()`)**:
+  - Accessible via ribbon button `[✂️ Snip]`, canvas context menu (`Capture excerpt snippet`), or keyboard shortcut.
+  - Activates interactive semi-transparent backdrop overlay with crosshair cursor and helper tooltip.
+  - User drags a bounding box over any canvas content; on mouse-up, the region is rendered to a high-resolution excerpt image with linked source metadata (`boardId`, `pageIndex`, `bounds`).
+  - Image is automatically copied to the system clipboard and can be pasted onto any board or split workspace.
+- **Distinctive Excerpt Visual Styling**:
+  - Excerpt image objects display a purple dashed boundary (`#7c3aed`, 2px dashed outline) with 4 sharp corner bracket accents in canvas rendering (`render.js`).
+  - Rendered with a top-left branded pill badge: `[ 🔗 Excerpt · SourceBoard ]` for immediate visual differentiation from standard screenshots.
+  - Maintains LiquidText-style elastic tether lines to original source bounds when viewing the origin board.
+- **Page Boundary Clamping / Constrain to Sheet**:
+  - In `pages.js` (`offsetIntoRect`), oversized objects are anchored at the top-left of the target page rather than centering across page gutters and bleeding into preceding pages.
+  - In `tools.js` (`clampGroupToPaper` and resize handling), dragged and inserted objects in paged mode are strictly clamped and proportionally downscaled to fit within the page dimensions.
+
+## 11. Video Card Rendering Robustness & Infinite Mirror Loop Prevention
+
+- **Video Card Image Fetching**: In `render.js` (`drawVideoCard`), thumbnail decoding correctly calls `getImage(o.thumb, onload)` instead of undeclared `image()`, eliminating the `ReferenceError` on video insert.
+- **Canvas Render Error Boundary**: Wrapped object rendering dispatch in `drawObject()` with a `try ... catch ... finally { ctx.restore(); }` safeguard. Any individual object rendering failure is logged without aborting `drawScene()`, preventing unhandled exceptions from breaking `_slideFrozen()` and causing infinite blit recursion / Droste mirror tunnels.
+
+

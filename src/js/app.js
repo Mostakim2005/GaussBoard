@@ -2254,7 +2254,131 @@ class App {
     this.dropHidden();
     this.surface.invalidate();
     this.syncUI();
+
+    if (next && o.subtype === 'tape' && this.settings.tapeAssessOnReveal !== false) {
+      this.promptTapeAssessment(o);
+    }
     return true;
+  }
+
+  /**
+   * Active recall assessment prompt after revealing study tape.
+   * Stores review outcome in the tape object and doc.tapeDb database.
+   */
+  promptTapeAssessment(tapeObj) {
+    if (typeof document === 'undefined' || !tapeObj) return;
+    document.querySelector('.tape-assess-popover')?.remove();
+
+    const pop = document.createElement('div');
+    pop.className = 'tape-assess-dialog tape-assess-popover';
+    pop.style.position = 'fixed';
+    pop.style.zIndex = '9500';
+    pop.style.bottom = '90px';
+    pop.style.left = '50%';
+    pop.style.transform = 'translateX(-50%)';
+
+    pop.innerHTML = `
+      <div class="tape-assess-title">🎯 ${t('Active Recall Assessment')}</div>
+      <div class="tape-assess-sub">${t('How confident were you with this answer?')}</div>
+      <div class="tape-assess-grid">
+        <button type="button" class="tape-assess-btn cr" data-res="confident_right">
+          <span>🎯 ${t('Confident & Right')}</span>
+        </button>
+        <button type="button" class="tape-assess-btn ur" data-res="unsure_right">
+          <span>🤔 ${t('Unsure & Right')}</span>
+        </button>
+        <button type="button" class="tape-assess-btn cw" data-res="confident_wrong">
+          <span>⚠️ ${t('Confident & Wrong')}</span>
+        </button>
+        <button type="button" class="tape-assess-btn uw" data-res="unsure_wrong">
+          <span>❌ ${t('Unsure & Wrong')}</span>
+        </button>
+      </div>
+      <div class="tape-assess-footer">
+        <button type="button" class="tape-assess-skip">${t('Skip')}</button>
+        <label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="chkDontAskTape" />
+          <span>${t("Don't ask again")}</span>
+        </label>
+      </div>
+    `;
+
+    document.body.appendChild(pop);
+
+    const close = () => {
+      pop.remove();
+      document.removeEventListener('pointerdown', onDocPointer);
+    };
+
+    const onDocPointer = (e) => {
+      if (!pop.contains(e.target)) close();
+    };
+
+    setTimeout(() => {
+      document.addEventListener('pointerdown', onDocPointer);
+    }, 100);
+
+    const chkDontAsk = pop.querySelector('#chkDontAskTape');
+    if (chkDontAsk) {
+      chkDontAsk.addEventListener('change', () => {
+        if (chkDontAsk.checked) {
+          this.settings.tapeAssessOnReveal = false;
+          this.saveSettings();
+        }
+      });
+    }
+
+    const skipBtn = pop.querySelector('.tape-assess-skip');
+    if (skipBtn) {
+      skipBtn.addEventListener('click', () => close());
+    }
+
+    pop.querySelectorAll('.tape-assess-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const resKey = btn.dataset.res;
+        const isRight = resKey === 'confident_right' || resKey === 'unsure_right';
+        const isConfident = resKey === 'confident_right' || resKey === 'confident_wrong';
+
+        const record = {
+          time: Date.now(),
+          result: resKey,
+          correct: isRight,
+          confidence: isConfident ? 'high' : 'low'
+        };
+
+        const target = this.store.get(tapeObj.id);
+        if (target) {
+          const assessments = Array.isArray(target.assessments) ? [...target.assessments, record] : [record];
+          const reviewCount = (target.reviewCount || 0) + 1;
+          this.store.update(target.id, {
+            assessments,
+            reviewCount,
+            lastResult: resKey,
+            lastReviewed: Date.now()
+          }, 'assess tape');
+
+          if (this.store.doc) {
+            this.store.doc.tapeDb = this.store.doc.tapeDb || {};
+            this.store.doc.tapeDb[target.id] = {
+              id: target.id,
+              reviewCount,
+              lastResult: resKey,
+              lastReviewed: Date.now(),
+              totalAssessments: assessments.length
+            };
+          }
+        }
+
+        const labels = {
+          confident_right: t('Confident & Right'),
+          unsure_right: t('Unsure & Right'),
+          confident_wrong: t('Confident & Wrong'),
+          unsure_wrong: t('Unsure & Wrong')
+        };
+        this.toast(t('Recorded: {result}', { result: labels[resKey] || resKey }));
+        close();
+      });
+    });
   }
 
   /** Lift every cover in the selection, as one undo. */
@@ -3446,6 +3570,148 @@ class App {
     this.clipStamp = this.clipboardStamp();
     this.toast(t('Excerpt copied — paste it into another board'));
     return true;
+  }
+
+  /** Interactive Snipping Tool: click-and-drag anywhere on the board to capture a linked excerpt. */
+  startSnippingExcerpt() {
+    document.getElementById('snipOverlay')?.remove();
+    const stage = document.getElementById('stage') || document.body;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'snipOverlay';
+    overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:9999;cursor:crosshair;background:rgba(0,0,0,0.28);user-select:none;backdrop-filter:blur(1px);';
+
+    const tip = document.createElement('div');
+    tip.style.cssText = 'position:absolute;top:24px;left:50%;transform:translateX(-50%);background:var(--surface,#ffffff);color:var(--text,#000000);padding:7px 18px;border-radius:24px;box-shadow:var(--shadow-3,0 4px 20px rgba(0,0,0,0.25));font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;pointer-events:none;border:1px solid var(--stroke,rgba(128,128,128,0.2));';
+    tip.textContent = t('✂️ Drag a box to capture linked excerpt · Esc to cancel');
+    overlay.appendChild(tip);
+
+    const boxEl = document.createElement('div');
+    boxEl.style.cssText = 'position:absolute;display:none;border:2px dashed #a855f7;background:rgba(168,85,247,0.14);box-shadow:0 0 0 1px rgba(0,0,0,0.5),0 0 16px rgba(168,85,247,0.45);pointer-events:none;box-sizing:border-box;';
+    const dimBadge = document.createElement('span');
+    dimBadge.style.cssText = 'position:absolute;bottom:-24px;right:0;background:#7e22ce;color:#ffffff;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;';
+    boxEl.appendChild(dimBadge);
+    overlay.appendChild(boxEl);
+
+    let startX = 0, startY = 0;
+    let dragging = false;
+
+    const onPointerDown = (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const r = overlay.getBoundingClientRect();
+      startX = e.clientX - r.left;
+      startY = e.clientY - r.top;
+      dragging = true;
+      boxEl.style.display = 'block';
+      boxEl.style.left = `${startX}px`;
+      boxEl.style.top = `${startY}px`;
+      boxEl.style.width = '0px';
+      boxEl.style.height = '0px';
+    };
+
+    const onPointerMove = (e) => {
+      if (!dragging) return;
+      const r = overlay.getBoundingClientRect();
+      const curX = e.clientX - r.left;
+      const curY = e.clientY - r.top;
+      const left = Math.min(startX, curX);
+      const top = Math.min(startY, curY);
+      const w = Math.abs(curX - startX);
+      const h = Math.abs(curY - startY);
+      boxEl.style.left = `${left}px`;
+      boxEl.style.top = `${top}px`;
+      boxEl.style.width = `${w}px`;
+      boxEl.style.height = `${h}px`;
+      dimBadge.textContent = `${Math.round(w)} × ${Math.round(h)} px`;
+    };
+
+    const cleanup = () => {
+      overlay.remove();
+      window.removeEventListener('keydown', onKeyDown);
+    };
+
+    const onPointerUp = async (e) => {
+      if (!dragging) return;
+      dragging = false;
+      const r = overlay.getBoundingClientRect();
+      const endX = e.clientX - r.left;
+      const endY = e.clientY - r.top;
+      const screenBox = {
+        x: Math.min(startX, endX),
+        y: Math.min(startY, endY),
+        w: Math.abs(endX - startX),
+        h: Math.abs(endY - startY)
+      };
+      cleanup();
+
+      if (screenBox.w < 15 || screenBox.h < 15) return;
+
+      const cam = this.surface.cam;
+      const p1 = cam.toWorld(screenBox.x, screenBox.y);
+      const p2 = cam.toWorld(screenBox.x + screenBox.w, screenBox.y + screenBox.h);
+      const worldBox = {
+        x: Math.min(p1.x, p2.x),
+        y: Math.min(p1.y, p2.y),
+        w: Math.abs(p2.x - p1.x),
+        h: Math.abs(p2.y - p1.y)
+      };
+
+      const maxSide = Math.max(worldBox.w, worldBox.h);
+      const areaScale = Math.sqrt(12_000_000 / Math.max(1, worldBox.w * worldBox.h));
+      const scale = Math.min(2, 4096 / maxSide, areaScale);
+      let dataUrl;
+      try {
+        dataUrl = this.surface.renderTo(worldBox, scale, true, false)?.toDataURL('image/png');
+      } catch {
+        this.toast(t('Failed to capture excerpt'));
+        return;
+      }
+      if (!dataUrl) return;
+
+      const factor = Math.min(1, 640 / Math.max(worldBox.w, worldBox.h));
+      const doc = this.store.doc;
+      const page = this.pageCount ? this.currentPageIndex() + 1 : 0;
+      const payload = {
+        version: 1,
+        dataUrl,
+        width: worldBox.w * factor,
+        height: worldBox.h * factor,
+        source: {
+          boardId: String(doc.id || ''),
+          boardName: String(doc.name || doc.title || t('Untitled board')).slice(0, 200),
+          page,
+          bounds: { ...worldBox }
+        }
+      };
+
+      const center = {
+        x: worldBox.x + worldBox.w / 2,
+        y: worldBox.y + worldBox.h / 2
+      };
+      const image = excerptImageObject(payload, center);
+      if (!image) return;
+      image.isExcerpt = true;
+
+      this.clipboard = [image];
+      try { await window.board?.clipboardWrite?.({ image: payload.dataUrl }); } catch {}
+      this.clipStamp = this.clipboardStamp();
+
+      this.toast(t('Excerpt captured — copied to clipboard! Paste onto any board.'), 'check');
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cleanup();
+      }
+    };
+
+    overlay.addEventListener('pointerdown', onPointerDown);
+    overlay.addEventListener('pointermove', onPointerMove);
+    overlay.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('keydown', onKeyDown);
+    stage.appendChild(overlay);
   }
 
   /** Place an excerpt delivered by a drag operation into a chosen board store. */

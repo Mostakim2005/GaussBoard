@@ -41,7 +41,8 @@ export function scaleObject(o, sx, sy, ox, oy) {
     o.h *= sy;
     if (o.w < 0) { o.x += o.w; o.w = -o.w; }
     if (o.h < 0) { o.y += o.h; o.h = -o.h; }
-    if (o.fontSize) o.fontSize = Math.max(6, o.fontSize * Math.sqrt(Math.abs(sx * sy)));
+    const isMdCard = (o.type === 'text' || o.type === 'note') && (o.markdown !== false || o.cardStyle || o.autoSize === false);
+    if (o.fontSize && !isMdCard) o.fontSize = Math.max(6, o.fontSize * Math.sqrt(Math.abs(sx * sy)));
     if (o.type === 'text') o.autoSize = false;   // a hand-set size is kept
     if (o.lineWidth) o.lineWidth = Math.max(0.5, o.lineWidth * Math.sqrt(Math.abs(sx * sy)));
   }

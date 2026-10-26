@@ -137,7 +137,18 @@ export function showContextMenu(app, e, fromSelectionBar = false) {
     menu.appendChild(item(t('Templates…'), 'template', () => app.panels.templates()));
     menu.appendChild(item(t('Canvas…'), 'palette', () => app.panels.background()));
     menu.appendChild(item(t('Page margins…'), 'palette', () => app.openPageMarginDialog?.()));
+    if (app.pages?.length > 1) {
+      const clickedPageIdx = pageIndexAt(app.pages, wp.x, wp.y);
+      const targetIdx = clickedPageIdx >= 0 ? clickedPageIdx : (typeof app.currentPageIndex === 'function' ? app.currentPageIndex() : 0);
+      menu.appendChild(item(t('Delete page {n}', { n: targetIdx + 1 }), 'trash', () => app.deletePage(targetIdx), { danger: true }));
+    }
+    menu.appendChild(item(t('Capture excerpt snippet'), 'crop', () => app.startSnippingExcerpt?.()));
     menu.appendChild(item(t('Clear canvas'), 'trash', () => app.command('edit.clear'), { danger: true }));
+  }
+
+  if (one?.kind === 'page' && app.pages?.length > 1) {
+    const pIdx = one.docPage ? one.docPage - 1 : (typeof app.currentPageIndex === 'function' ? app.currentPageIndex() : 0);
+    menu.appendChild(item(t('Delete this page'), 'trash', () => app.deletePage(pIdx), { danger: true }));
   }
 
   if (one?.type === 'image' && one.excerptSource?.boardId) {
@@ -379,6 +390,7 @@ export function updateSelectionBar(app, targetObj = null) {
     if (imgObj.excerptSource?.boardId) {
       bar.appendChild(mk(t('Open source excerpt'), 'link', () => app.openExcerptSource(imgObj)));
     }
+    bar.appendChild(mk(t('Resize image'), 'arrowSize', () => openImageResizePopover(app, imgObj, bar)));
     bar.appendChild(mk(t('Crop image'), 'crop', () => startImageCrop(app, imgObj)));
     bar.appendChild(mk(t('Annotate image'), 'pen', () => startImageAnnotate(app, imgObj)));
     bar.appendChild(mk(t('Compress image…'), 'compress', () => app.openImageCompressDialog?.(imgObj)));
@@ -496,7 +508,10 @@ function openColorPopover(app, anchor, type, sel) {
 function formatBar(app, bar) {
   const te = app.textEditor;
   const el = te.el;
-  if (!el) { bar.classList.remove('show'); return; }
+  if (!el) { bar.classList.remove('show', 'obsidian-toolbar'); return; }
+
+  bar.classList.add('obsidian-toolbar');
+
   if (bar.dataset.mode !== 'format' || bar._for !== el) {
     bar.dataset.mode = 'format';
     bar._for = el;
@@ -506,157 +521,701 @@ function formatBar(app, bar) {
       bar._fmtHooked = true;
       bar.addEventListener('pointerdown', (e) => { if (bar.dataset.mode === 'format') e.preventDefault(); });
     }
-    const mk = (kind, title, label, css) => {
-      const b = h('button', { title, class: 'fmt-btn', 'data-fmt': kind });
-      b.appendChild(h('span', { style: css }, label));
-      b.addEventListener('click', () => { te.format(kind); syncFormat(app, bar); });
+
+    const mkBtn = (title, iconContent, fn, opts = {}) => {
+      const b = h('button', {
+        title,
+        class: 'fmt-btn' + (opts.class ? ' ' + opts.class : ''),
+        style: opts.style || ''
+      });
+      if (typeof iconContent === 'string' && iconContent.startsWith('<svg')) {
+        b.innerHTML = iconContent;
+      } else if (typeof iconContent === 'string') {
+        b.appendChild(h('span', { style: opts.labelStyle || '' }, iconContent));
+      } else if (iconContent) {
+        b.appendChild(iconContent);
+      }
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        fn(e, b);
+        syncFormat(app, bar);
+      });
       return b;
     };
-    const mod = /Mac|iPhone|iPad/.test(navigator.platform || '') ? 'Cmd' : 'Ctrl';
-    bar.appendChild(mk('bold', t('Bold ({key})', { key: mod + '+B' }), 'B', 'font-weight:700;font-size:15px'));
-    bar.appendChild(mk('italic', t('Italic ({key})', { key: mod + '+I' }), 'I', 'font-style:italic;font-family:Georgia,serif;font-size:16px'));
-    bar.appendChild(mk('underline', t('Underline ({key})', { key: mod + '+U' }), 'U', 'text-decoration:underline;font-size:15px'));
-    bar.appendChild(h('span', { class: 'bar-sep' }));
-    const colours = h('span', { class: 'fmt-colours' });
-    const auto = h('button', { class: 'sw fmt-sw', title: t('Automatic colour'), 'data-colour': '' });
-    auto.style.background = 'linear-gradient(135deg, var(--text) 50%, var(--surface) 50%)';
-    auto.addEventListener('click', () => { te.colour(null); syncFormat(app, bar); });
-    colours.appendChild(auto);
-    for (const c of TEXT_COLORS.slice(1)) {
-      const b = h('button', { class: 'sw fmt-sw', title: c, 'data-colour': c });
-      b.style.background = c;
-      b.addEventListener('click', () => { te.colour(c); syncFormat(app, bar); });
-      colours.appendChild(b);
-    }
-    bar.appendChild(colours);
-    bar.appendChild(h('span', { class: 'bar-sep' }));
-    const wlBtn = h('button', {
-      title: t('Insert Wikilink'),
-      class: 'fmt-btn',
-      'data-wikilink': '1',
-      style: 'width:auto;padding:0 7px;font-weight:600;font-size:12px;'
-    }, '[[]]');
-    wlBtn.addEventListener('click', () => { te.insertWikilinkSyntax(); });
+
+    const sep = () => h('span', { class: 'bar-sep' });
+
+    // Group 1: Undo, Redo, Clear, Eraser
+    bar.appendChild(mkBtn(t('Undo (Ctrl+Z)'), icon('undo', 15), () => document.execCommand('undo')));
+    bar.appendChild(mkBtn(t('Redo (Ctrl+Y)'), icon('redo', 15), () => document.execCommand('redo')));
+    bar.appendChild(mkBtn(t('Clear formatting'), icon('trash', 15), () => te.clearFormatting()));
+    bar.appendChild(mkBtn(t('Delete line or selection'), icon('eraser', 15), () => te.deleteCurrentLineOrSelection()));
+
+    bar.appendChild(sep());
+
+    // Group 2: Headings H2, H3, Hn dropdown
+    bar.appendChild(mkBtn(t('Heading 2 (##)'), 'H₂', () => te.toggleLinePrefix('## ', /^#{1,6}\s*/), {
+      style: 'font-weight:700;font-size:12.5px;padding:0 5px;width:auto;'
+    }));
+    bar.appendChild(mkBtn(t('Heading 3 (###)'), 'H₃', () => te.toggleLinePrefix('### ', /^#{1,6}\s*/), {
+      style: 'font-weight:700;font-size:12.5px;padding:0 5px;width:auto;'
+    }));
+
+    const hnBtn = mkBtn(t('Headings dropdown'), 'H▾', (e, anchor) => {
+      openHeadingsPopover(app, anchor, te);
+    }, { style: 'font-weight:700;font-size:12px;padding:0 5px;width:auto;' });
+    bar.appendChild(hnBtn);
+
+    bar.appendChild(sep());
+
+    // Group 3: Bold, Italic, Strikethrough, Underline
+    bar.appendChild(mkBtn(t('Bold (Ctrl+B)'), 'B', () => {
+      if (te.target?.markdown !== false) te.wrapMarkdownSelection('**');
+      else te.format('bold');
+    }, { style: 'font-weight:700;font-size:14px;' }));
+
+    bar.appendChild(mkBtn(t('Italic (Ctrl+I)'), 'I', () => {
+      if (te.target?.markdown !== false) te.wrapMarkdownSelection('*');
+      else te.format('italic');
+    }, { style: 'font-style:italic;font-family:Georgia,serif;font-size:14px;' }));
+
+    bar.appendChild(mkBtn(t('Strikethrough'), 'S', () => {
+      te.wrapMarkdownSelection('~~');
+    }, { style: 'text-decoration:line-through;font-size:13.5px;' }));
+
+    bar.appendChild(mkBtn(t('Underline (Ctrl+U)'), 'U', () => {
+      if (te.target?.markdown !== false) te.wrapMarkdownSelection('<u>', '</u>');
+      else te.format('underline');
+    }, { style: 'text-decoration:underline;font-size:13.5px;' }));
+
+    bar.appendChild(sep());
+
+    // Group 4: Callouts, Code / 3D, Live Preview, Link
+    const calloutBtn = mkBtn(t('Insert Callout'), '📝▾', (e, anchor) => {
+      openCalloutsPopover(app, anchor, te);
+    }, { style: 'width:auto;padding:0 5px;font-size:12px;' });
+    bar.appendChild(calloutBtn);
+
+    const codeBtn = mkBtn(t('Insert Code or Diagram'), '📦▾', (e, anchor) => {
+      openCodePopover(app, anchor, te);
+    }, { style: 'width:auto;padding:0 5px;font-size:12px;' });
+    bar.appendChild(codeBtn);
+
+    const prevBtn = mkBtn(t('Toggle Live Preview (F2)'), '👁️', () => {
+      te.toggleLivePreview();
+    }, { class: 'fmt-preview-btn' });
+    prevBtn.dataset.mdPreview = '1';
+    bar.appendChild(prevBtn);
+
+    const wlBtn = mkBtn(t('Insert Wikilink [[...]] (Ctrl+K)'), icon('link', 15), () => {
+      te.insertWikilinkSyntax();
+    });
     bar.appendChild(wlBtn);
 
-    const mdBtn = h('button', {
-      title: t('Markdown'),
-      class: 'fmt-btn',
-      'data-md-preview': '1',
-      style: 'width:auto;padding:0 7px;font-weight:700;font-size:12px;'
-    }, 'M↓');
-    mdBtn.addEventListener('click', () => {
-      te.toggleLivePreview();
-      syncFormat(app, bar);
-    });
-    bar.appendChild(mdBtn);
+    bar.appendChild(sep());
 
-    bar.appendChild(h('span', { class: 'bar-sep' }));
-    const paste = h('button', { title: t('Paste with formatting'), 'data-paste': '1', html: icon('paste', 17) });
-    paste.addEventListener('click', () => te.pasteFromClipboard());
-    bar.appendChild(paste);
+    // Group 5: Table, Task list, Quote, Typography, Lists
+    bar.appendChild(mkBtn(t('Insert Markdown Table'), icon('table', 15), () => {
+      te.insertMarkdownTable(3, 3);
+    }));
+
+    bar.appendChild(mkBtn(t('Task list (- [ ])'), '☑', () => {
+      te.toggleLinePrefix('- [ ] ', /^[-*+]\s+\[[ xX]\]\s+|^[-*+]\s+/);
+    }, { style: 'font-size:14px;' }));
+
+    bar.appendChild(mkBtn(t('Blockquote (> )'), '💬', () => {
+      te.toggleLinePrefix('> ', /^>\s*/);
+    }, { style: 'font-size:13px;' }));
+
+    const typoBtn = mkBtn(t('Paragraph & Typography'), 'T...▾', (e, anchor) => {
+      openTypographyPopover(app, anchor, te);
+    }, { style: 'width:auto;padding:0 5px;font-size:12px;font-weight:600;' });
+    bar.appendChild(typoBtn);
+
+    bar.appendChild(mkBtn(t('Bulleted list (- )'), '≡·', () => {
+      te.toggleLinePrefix('- ', /^[-*+]\s+/);
+    }, { style: 'font-weight:700;font-size:13px;' }));
+
+    bar.appendChild(mkBtn(t('Numbered list (1. )'), '1.≡', () => {
+      te.toggleLinePrefix('1. ', /^\d+\.\s+/);
+    }, { style: 'font-weight:700;font-size:12px;' }));
+
+    bar.appendChild(sep());
+
+    // Group 6: Font Color and Highlighter & Background
+    const fontColorBtn = h('button', {
+      class: 'fmt-btn fmt-color-trigger',
+      title: t('Text colour')
+    });
+    const fontA = h('span', { style: 'font-weight:700;font-size:13px;line-height:1;' }, 'A');
+    const colorBar = h('span', { class: 'fmt-color-bar', style: 'width:12px;height:2.5px;background:var(--text);border-radius:1px;margin-top:1px;' });
+    fontColorBtn.append(fontA, colorBar);
+    fontColorBtn.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;';
+    fontColorBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      openTextColorPopover(app, fontColorBtn, te);
+    });
+    bar.appendChild(fontColorBtn);
+
+    const bgBtn = h('button', {
+      class: 'fmt-btn fmt-bg-trigger',
+      title: t('Highlight & Note background')
+    });
+    const hlIcon = h('span', { style: 'display:flex;' }, icon('highlighter', 15));
+    const bgBar = h('span', { class: 'fmt-bg-bar', style: 'width:12px;height:2.5px;background:var(--accent-2, #0078d4);border-radius:1px;margin-top:1px;' });
+    bgBtn.append(hlIcon, bgBar);
+    bgBtn.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;';
+    bgBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      openNoteBgPopover(app, bgBtn, te);
+    });
+    bar.appendChild(bgBtn);
+
+    bar.appendChild(sep());
+
+    // Group 7: Preset Size & Expand
+    const sizePresetBtn = mkBtn(t('Preset size: Half-page (640x520) / Full / Compact'), '⛶', () => {
+      const o = te.target;
+      if (!o) return;
+      if (o.w >= 900) te.setCardSizePreset('compact');
+      else if (o.w <= 400) te.setCardSizePreset('halfPage');
+      else te.setCardSizePreset('wide');
+    }, { style: 'font-size:14px;' });
+    bar.appendChild(sizePresetBtn);
+
+    const expandBtn = mkBtn(t('Expand / Collapse toolbar'), '⤢', () => {
+      bar.classList.toggle('expanded');
+    }, { style: 'font-size:13px;' });
+    bar.appendChild(expandBtn);
   }
+
   syncFormat(app, bar);
+
   const stage = document.getElementById('stage').getBoundingClientRect();
   const activeDom = (te.previewMode && te.previewEl) ? te.previewEl : el;
   const r = activeDom.getBoundingClientRect();
-  placeBar(bar, { x: r.left - stage.left, y: r.top - stage.top + 36, w: r.width, h: r.height });
+  let left = r.left - stage.left;
+  let top = r.top - stage.top - 46;
+  if (top < 10) top = r.bottom - stage.top + 8;
+  left = Math.max(8, Math.min(left, stage.width - (bar.offsetWidth || 500) - 8));
+  bar.style.left = left + 'px';
+  bar.style.top = top + 'px';
 }
 
 function syncFormat(app, bar) {
-  for (const b of bar.querySelectorAll('[data-fmt]')) b.classList.toggle('on', app.textEditor.state(b.dataset.fmt));
-  const mdBtn = bar.querySelector('[data-md-preview]');
-  if (mdBtn) mdBtn.classList.toggle('on', !!app.textEditor?.previewMode);
+  const te = app.textEditor;
+  if (!te) return;
+  const prevBtn = bar.querySelector('[data-md-preview]');
+  if (prevBtn) prevBtn.classList.toggle('on', !!te.previewMode);
+}
+
+function openHeadingsPopover(app, anchor, te) {
+  const items = [
+    ['# ', t('Heading 1 (#)'), 'font-size:17px;font-weight:700;'],
+    ['## ', t('Heading 2 (##)'), 'font-size:15px;font-weight:700;'],
+    ['### ', t('Heading 3 (###)'), 'font-size:13.5px;font-weight:600;'],
+    ['#### ', t('Heading 4 (####)'), 'font-size:12.5px;font-weight:600;'],
+    ['##### ', t('Heading 5 (#####)'), 'font-size:12px;font-weight:600;'],
+    ['###### ', t('Heading 6 (######)'), 'font-size:11.5px;font-weight:600;'],
+    ['', t('Paragraph (Normal)'), 'font-size:12px;']
+  ];
+  const menu = h('div', { class: 'menu', style: 'min-width:180px;' });
+  for (const [pfx, label, style] of items) {
+    const btn = h('button', { class: 'menu-item', style: 'padding:6px 12px;' },
+      h('span', { style }, label)
+    );
+    btn.addEventListener('click', () => {
+      closePopover();
+      te.toggleLinePrefix(pfx, /^#{1,6}\s*/);
+    });
+    menu.appendChild(btn);
+  }
+  openPopover(anchor, menu, { key: 'mdheadings' });
+}
+
+function openCalloutsPopover(app, anchor, te) {
+  const callouts = [
+    ['note', '📝', t('Note')],
+    ['tip', '💡', t('Tip')],
+    ['warning', '⚠️', t('Warning')],
+    ['danger', '⚡', t('Danger')],
+    ['info', 'ℹ️', t('Info')],
+    ['success', '✅', t('Success')],
+    ['question', '❓', t('Question')],
+    ['bug', '🐛', t('Bug')],
+    ['example', '📋', t('Example')],
+    ['quote', '💬', t('Quote')]
+  ];
+  const menu = h('div', { class: 'menu', style: 'min-width:170px;max-height:280px;overflow-y:auto;' });
+  for (const [kind, iconStr, label] of callouts) {
+    const btn = h('button', { class: 'menu-item', style: 'display:flex;align-items:center;gap:8px;padding:6px 12px;' },
+      h('span', { style: 'font-size:15px;' }, iconStr),
+      h('span', { style: 'font-weight:500;font-size:12.5px;' }, label)
+    );
+    btn.addEventListener('click', () => {
+      closePopover();
+      te.insertCallout(kind, label, t('Recall content details here.'));
+    });
+    menu.appendChild(btn);
+  }
+  openPopover(anchor, menu, { key: 'mdcallouts' });
+}
+
+function openCodePopover(app, anchor, te) {
+  const items = [
+    ['javascript', t('Code Block (JavaScript)'), () => te.insertCodeBlock('javascript')],
+    ['python', t('Code Block (Python)'), () => te.insertCodeBlock('python')],
+    ['mermaid', t('Mermaid Diagram'), () => te.insertMermaidBlock()],
+    ['math', t('LaTeX Math Block ($$)'), () => te.insertMathBlock()]
+  ];
+  const menu = h('div', { class: 'menu', style: 'min-width:210px;' });
+  for (const [k, label, fn] of items) {
+    const btn = h('button', { class: 'menu-item', style: 'padding:7px 12px;font-size:12.5px;' }, label);
+    btn.addEventListener('click', () => {
+      closePopover();
+      fn();
+    });
+    menu.appendChild(btn);
+  }
+  openPopover(anchor, menu, { key: 'mdcode' });
+}
+
+function openTypographyPopover(app, anchor, te) {
+  const menu = h('div', { class: 'menu', style: 'min-width:220px;padding:8px;' });
+
+  // 1. Line numbers toggle
+  const hasLineNum = te.target?.lineNumbers !== false;
+  const lineNumBtn = h('button', { class: 'menu-item' + (hasLineNum ? ' on' : ''), style: 'padding:6px 8px;font-size:12.5px;' },
+    h('span', {}, (hasLineNum ? '✓ ' : '  ') + t('Line numbers'))
+  );
+  lineNumBtn.addEventListener('click', () => {
+    closePopover();
+    te.toggleLineNumbers();
+  });
+  menu.appendChild(lineNumBtn);
+
+  menu.appendChild(h('div', { class: 'menu-sep' }));
+
+  // 2. Font sizes
+  const sizes = [14, 16, 18, 20, 24, 28, 32];
+  const sizeLabel = h('div', { style: 'font-size:11.5px;color:var(--text-2);padding:4px 8px;' }, t('Font size'));
+  menu.appendChild(sizeLabel);
+  const sizeRow = h('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;padding:0 8px 6px;' });
+  for (const s of sizes) {
+    const b = h('button', {
+      class: 'tool tool-sm' + ((te.target?.fontSize || 20) === s ? ' active' : ''),
+      style: 'font-size:11.5px;padding:2px 6px;min-width:32px;cursor:pointer;'
+    }, String(s));
+    b.addEventListener('click', () => {
+      closePopover();
+      te.setCardFontSize(s);
+    });
+    sizeRow.appendChild(b);
+  }
+  menu.appendChild(sizeRow);
+
+  menu.appendChild(h('div', { class: 'menu-sep' }));
+
+  // 3. Frontmatter Template
+  const fmBtn = h('button', { class: 'menu-item', style: 'padding:6px 8px;font-size:12.5px;' },
+    h('span', {}, t('Insert YAML Properties'))
+  );
+  fmBtn.addEventListener('click', () => {
+    closePopover();
+    te.insertBlockText('---\ntitle: "' + (app.currentBoardName?.() || 'Note') + '"\ntags: []\naliases: []\n---');
+  });
+  menu.appendChild(fmBtn);
+
+  openPopover(anchor, menu, { key: 'mdtypography' });
+}
+
+function openTextColorPopover(app, anchor, te) {
+  const grid = h('div', { class: 'swatches', style: 'padding:8px;' });
+  const auto = h('button', { class: 'sw fmt-sw', title: t('Automatic colour') });
+  auto.style.background = 'linear-gradient(135deg, var(--text) 50%, var(--surface) 50%)';
+  auto.addEventListener('click', () => {
+    closePopover();
+    te.colour(null);
+  });
+  grid.appendChild(auto);
+  for (const c of TEXT_COLORS.slice(1)) {
+    const b = h('button', { class: 'sw fmt-sw', title: c });
+    b.style.background = c;
+    b.addEventListener('click', () => {
+      closePopover();
+      te.colour(c);
+    });
+    grid.appendChild(b);
+  }
+  openPopover(anchor, grid, { key: 'mdtextcolour' });
+}
+
+function openNoteBgPopover(app, anchor, te) {
+  const container = h('div', { style: 'padding:10px;min-width:220px;display:flex;flex-direction:column;gap:8px;' });
+
+  // 1. Highlight text action
+  const hlBtn = h('button', { class: 'menu-item', style: 'padding:6px 8px;font-size:12.5px;' },
+    h('span', { style: 'background:rgba(255,225,82,0.6);padding:1px 4px;border-radius:2px;' }, t('Highlight selection (==text==)'))
+  );
+  hlBtn.addEventListener('click', () => {
+    closePopover();
+    te.wrapMarkdownSelection('==');
+  });
+  container.appendChild(hlBtn);
+
+  container.appendChild(h('div', { class: 'menu-sep' }));
+
+  // 2. Card background choices
+  const title = h('div', { style: 'font-size:11.5px;color:var(--text-2);font-weight:600;' }, t('Note Background'));
+  container.appendChild(title);
+
+  const transpBtn = h('button', { class: 'menu-item', style: 'padding:6px 8px;font-size:12px;' },
+    h('span', {}, '⊘ ' + t('Transparent background'))
+  );
+  transpBtn.addEventListener('click', () => {
+    closePopover();
+    te.setCardBackground('transparent');
+  });
+  container.appendChild(transpBtn);
+
+  const solidBtn = h('button', { class: 'menu-item', style: 'padding:6px 8px;font-size:12px;' },
+    h('span', {}, '🌓 ' + t('Solid Theme Surface'))
+  );
+  solidBtn.addEventListener('click', () => {
+    closePopover();
+    te.setCardBackground('none');
+  });
+  container.appendChild(solidBtn);
+
+  const swatches = h('div', { class: 'swatches', style: 'margin-top:4px;' });
+  const bgPalette = ['#202227', '#ffffff', '#fff9db', '#e8f4fd', '#e6fcf5', '#f3f0ff', '#1a1d21'];
+  for (const c of bgPalette) {
+    const b = h('button', { class: 'sw', title: c });
+    b.style.background = c;
+    b.style.boxShadow = 'inset 0 0 0 1px rgba(128,128,128,0.3)';
+    b.addEventListener('click', () => {
+      closePopover();
+      te.setCardBackground(c);
+    });
+    swatches.appendChild(b);
+  }
+  container.appendChild(swatches);
+
+  openPopover(anchor, container, { key: 'mdnotebg' });
+}
+
+function openImageResizePopover(app, imgObj, anchor) {
+  closePopover();
+  const snap = app.store.snapshot([imgObj.id]);
+  const container = h('div', { class: 'menu', style: 'padding:12px;min-width:240px;display:flex;flex-direction:column;gap:10px;' });
+
+  const title = h('div', { style: 'font-weight:700;font-size:13px;color:var(--text);display:flex;justify-content:space-between;align-items:center;' },
+    h('span', {}, t('Resize image')),
+    h('button', { style: 'background:none;border:none;cursor:pointer;color:var(--text-2);font-size:14px;', onclick: closePopover }, '✕')
+  );
+  container.appendChild(title);
+
+  const origW = imgObj.w || 300;
+  const origH = imgObj.h || 200;
+  const aspect = origW / Math.max(1, origH);
+  let lockAspect = true;
+
+  const wInput = h('input', { type: 'number', class: 'inp', value: String(Math.round(origW)), style: 'width:75px;padding:3px 6px;font-size:12px;' });
+  const hInput = h('input', { type: 'number', class: 'inp', value: String(Math.round(origH)), style: 'width:75px;padding:3px 6px;font-size:12px;' });
+
+  const lockCheck = h('input', { type: 'checkbox', checked: true });
+  lockCheck.addEventListener('change', () => { lockAspect = lockCheck.checked; });
+
+  const applyDims = (w, h) => {
+    imgObj.w = Math.max(10, Math.round(w));
+    imgObj.h = Math.max(10, Math.round(h));
+    wInput.value = String(imgObj.w);
+    hInput.value = String(imgObj.h);
+    app.surface.invalidate();
+  };
+
+  wInput.addEventListener('input', () => {
+    const w = parseFloat(wInput.value) || origW;
+    const h = lockAspect ? w / aspect : (parseFloat(hInput.value) || origH);
+    applyDims(w, h);
+  });
+
+  hInput.addEventListener('input', () => {
+    const h = parseFloat(hInput.value) || origH;
+    const w = lockAspect ? h * aspect : (parseFloat(wInput.value) || origW);
+    applyDims(w, h);
+  });
+
+  const rowDims = h('div', { style: 'display:flex;align-items:center;gap:6px;font-size:12px;' },
+    h('span', { style: 'color:var(--text-2);' }, t('W:')), wInput,
+    h('span', { style: 'color:var(--text-2);' }, t('H:')), hInput
+  );
+  container.appendChild(rowDims);
+
+  const rowLock = h('label', { style: 'display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-2);cursor:pointer;' },
+    lockCheck, h('span', {}, t('Keep aspect ratio'))
+  );
+  container.appendChild(rowLock);
+
+  const presetLabel = h('div', { style: 'font-size:11px;color:var(--text-2);margin-top:2px;' }, t('Scale presets'));
+  container.appendChild(presetLabel);
+
+  const presetRow = h('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;' });
+  const presets = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+  for (const factor of presets) {
+    const pct = Math.round(factor * 100) + '%';
+    const b = h('button', { class: 'btn', style: 'padding:2px 6px;font-size:11px;' }, pct);
+    b.addEventListener('click', () => {
+      applyDims(origW * factor, origH * factor);
+    });
+    presetRow.appendChild(b);
+  }
+  container.appendChild(presetRow);
+
+  const actionRow = h('div', { style: 'display:flex;justify-content:flex-end;gap:6px;margin-top:4px;' });
+  const cancelBtn = h('button', { class: 'btn', style: 'padding:4px 10px;font-size:12px;' }, t('Cancel'));
+  cancelBtn.addEventListener('click', () => {
+    app.store.restoreSnapshot(snap);
+    app.surface.invalidate();
+    closePopover();
+  });
+  const commitBtn = h('button', { class: 'btn primary', style: 'padding:4px 12px;font-size:12px;' }, t('Apply'));
+  commitBtn.addEventListener('click', () => {
+    app.store.commitSnapshot('resize image', snap);
+    app.surface.invalidate();
+    closePopover();
+    app.toast(t('Image resized'));
+  });
+  actionRow.appendChild(cancelBtn);
+  actionRow.appendChild(commitBtn);
+  container.appendChild(actionRow);
+
+  openPopover(anchor, container, { key: 'imageresize' });
 }
 
 export function startImageCrop(app, imgObj) {
   closePopover();
-  document.getElementById('cropOverlay')?.remove();
+  document.getElementById('imageCropOverlay')?.remove();
   const snap = app.store.snapshot([imgObj.id]);
   const origCrop = imgObj.crop ? { ...imgObj.crop } : null;
 
-  const dismiss = (revert = false) => {
-    if (revert) {
-      app.store.restoreSnapshot(snap);
-      app.surface.invalidate();
+  let curCrop = origCrop ? { ...origCrop } : { sx: 0, sy: 0, sw: 1, sh: 1 };
+  if (typeof curCrop.sx !== 'number') curCrop.sx = 0;
+  if (typeof curCrop.sy !== 'number') curCrop.sy = 0;
+  if (typeof curCrop.sw !== 'number') curCrop.sw = 1;
+  if (typeof curCrop.sh !== 'number') curCrop.sh = 1;
+
+  const stage = document.getElementById('stage') || document.body;
+
+  const overlay = h('div', { id: 'imageCropOverlay' });
+  const maskTop = h('div', { class: 'crop-mask-strip' });
+  const maskBottom = h('div', { class: 'crop-mask-strip' });
+  const maskLeft = h('div', { class: 'crop-mask-strip' });
+  const maskRight = h('div', { class: 'crop-mask-strip' });
+
+  const cropBox = h('div', { class: 'crop-interactive-box', title: t('Drag to move crop window') });
+
+  cropBox.appendChild(h('div', { class: 'crop-grid-line crop-grid-v1' }));
+  cropBox.appendChild(h('div', { class: 'crop-grid-line crop-grid-v2' }));
+  cropBox.appendChild(h('div', { class: 'crop-grid-line crop-grid-h1' }));
+  cropBox.appendChild(h('div', { class: 'crop-grid-line crop-grid-h2' }));
+
+  const handles = ['nw', 'ne', 'sw', 'se', 'n', 's', 'w', 'e'];
+  for (const pos of handles) {
+    cropBox.appendChild(h('div', { class: `crop-handle crop-handle-${pos}`, 'data-pos': pos }));
+  }
+
+  const actionPill = h('div', { class: 'crop-action-pill' });
+  const dimTag = h('span', { style: 'font-weight:600;font-size:12px;color:var(--text);' });
+  const btnReset = h('button', { class: 'btn', style: 'padding:3px 9px;font-size:12px;' }, '↶ ' + t('Reset'));
+  const btnCancel = h('button', { class: 'btn', style: 'padding:3px 9px;font-size:12px;' }, '✕ ' + t('Cancel'));
+  const btnApply = h('button', { class: 'btn primary', style: 'padding:3px 12px;font-size:12px;' }, '✓ ' + t('Apply'));
+
+  actionPill.appendChild(dimTag);
+  actionPill.appendChild(btnReset);
+  actionPill.appendChild(btnCancel);
+  actionPill.appendChild(btnApply);
+
+  overlay.appendChild(maskTop);
+  overlay.appendChild(maskBottom);
+  overlay.appendChild(maskLeft);
+  overlay.appendChild(maskRight);
+  overlay.appendChild(cropBox);
+  overlay.appendChild(actionPill);
+  stage.appendChild(overlay);
+
+  const getScreenRects = () => {
+    const cam = app.surface.cam;
+    const p1 = cam.toScreen(imgObj.x, imgObj.y);
+    const p2 = cam.toScreen(imgObj.x + imgObj.w, imgObj.y + imgObj.h);
+    const imgLeft = Math.min(p1.x, p2.x);
+    const imgTop = Math.min(p1.y, p2.y);
+    const imgW = Math.max(10, Math.abs(p2.x - p1.x));
+    const imgH = Math.max(10, Math.abs(p2.y - p1.y));
+
+    const boxLeft = imgLeft + curCrop.sx * imgW;
+    const boxTop = imgTop + curCrop.sy * imgH;
+    const boxW = Math.max(12, curCrop.sw * imgW);
+    const boxH = Math.max(12, curCrop.sh * imgH);
+
+    return { imgLeft, imgTop, imgW, imgH, boxLeft, boxTop, boxW, boxH };
+  };
+
+  const syncUI = () => {
+    const { imgLeft, imgTop, imgW, imgH, boxLeft, boxTop, boxW, boxH } = getScreenRects();
+
+    cropBox.style.left = `${boxLeft}px`;
+    cropBox.style.top = `${boxTop}px`;
+    cropBox.style.width = `${boxW}px`;
+    cropBox.style.height = `${boxH}px`;
+
+    maskTop.style.left = `${imgLeft}px`;
+    maskTop.style.top = `${imgTop}px`;
+    maskTop.style.width = `${imgW}px`;
+    maskTop.style.height = `${Math.max(0, boxTop - imgTop)}px`;
+
+    maskBottom.style.left = `${imgLeft}px`;
+    maskBottom.style.top = `${boxTop + boxH}px`;
+    maskBottom.style.width = `${imgW}px`;
+    maskBottom.style.height = `${Math.max(0, (imgTop + imgH) - (boxTop + boxH))}px`;
+
+    maskLeft.style.left = `${imgLeft}px`;
+    maskLeft.style.top = `${boxTop}px`;
+    maskLeft.style.width = `${Math.max(0, boxLeft - imgLeft)}px`;
+    maskLeft.style.height = `${boxH}px`;
+
+    maskRight.style.left = `${boxLeft + boxW}px`;
+    maskRight.style.top = `${boxTop}px`;
+    maskRight.style.width = `${Math.max(0, (imgLeft + imgW) - (boxLeft + boxW))}px`;
+    maskRight.style.height = `${boxH}px`;
+
+    const pctW = Math.round(curCrop.sw * 100);
+    const pctH = Math.round(curCrop.sh * 100);
+    dimTag.textContent = `${pctW}% × ${pctH}%`;
+
+    imgObj.crop = { ...curCrop };
+    app.surface.invalidate();
+  };
+
+  syncUI();
+
+  let activeDrag = null;
+
+  const onPointerDown = (e) => {
+    const handle = e.target.closest('.crop-handle');
+    const isBox = e.target === cropBox || (cropBox.contains(e.target) && !handle);
+    if (!handle && !isBox) return;
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const { imgW, imgH } = getScreenRects();
+    activeDrag = {
+      type: handle ? handle.dataset.pos : 'move',
+      startX: e.clientX,
+      startY: e.clientY,
+      initCrop: { ...curCrop },
+      imgW,
+      imgH
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
+
+  const onPointerMove = (e) => {
+    if (!activeDrag) return;
+    const dx = e.clientX - activeDrag.startX;
+    const dy = e.clientY - activeDrag.startY;
+    const dsx = dx / activeDrag.imgW;
+    const dsy = dy / activeDrag.imgH;
+    const init = activeDrag.initCrop;
+
+    if (activeDrag.type === 'move') {
+      let nsx = Math.max(0, Math.min(1 - init.sw, init.sx + dsx));
+      let nsy = Math.max(0, Math.min(1 - init.sh, init.sy + dsy));
+      curCrop.sx = nsx;
+      curCrop.sy = nsy;
+    } else {
+      const pos = activeDrag.type;
+      let sx = init.sx;
+      let sy = init.sy;
+      let ex = init.sx + init.sw;
+      let ey = init.sy + init.sh;
+
+      if (pos.includes('w')) {
+        sx = Math.max(0, Math.min(ex - 0.05, init.sx + dsx));
+      }
+      if (pos.includes('e')) {
+        ex = Math.max(sx + 0.05, Math.min(1, init.sx + init.sw + dsx));
+      }
+      if (pos.includes('n')) {
+        sy = Math.max(0, Math.min(ey - 0.05, init.sy + dsy));
+      }
+      if (pos.includes('s')) {
+        ey = Math.max(sy + 0.05, Math.min(1, init.sy + init.sh + dsy));
+      }
+
+      curCrop.sx = sx;
+      curCrop.sy = sy;
+      curCrop.sw = ex - sx;
+      curCrop.sh = ey - sy;
     }
-    cropModal.remove();
+
+    syncUI();
   };
 
-  const cropModal = h('div', {
-    id: 'cropOverlay',
-    style: 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--surface);border:1px solid var(--stroke);border-radius:12px;padding:14px 18px;box-shadow:var(--shadow-3);display:flex;flex-direction:column;gap:10px;min-width:320px;'
-  });
-
-  const title = h('div', { style: 'font-weight:700;font-size:14px;color:var(--text);display:flex;align-items:center;justify-content:space-between;' },
-    h('span', {}, t('Crop image')),
-    h('button', {
-      style: 'background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-2);',
-      onclick: () => dismiss(true)
-    }, '✕')
-  );
-
-  const curCrop = origCrop || { sx: 0, sy: 0, sw: 1, sh: 1 };
-  const clampInset = (v) => Math.max(0, Math.min(45, v));
-  let topPct = clampInset(Math.round((curCrop.sy || 0) * 100));
-  let leftPct = clampInset(Math.round((curCrop.sx || 0) * 100));
-  let rightPct = clampInset(Math.round((1 - ((curCrop.sx || 0) + (curCrop.sw || 1))) * 100));
-  let bottomPct = clampInset(Math.round((1 - ((curCrop.sy || 0) + (curCrop.sh || 1))) * 100));
-
-  const makeSlider = (label, val, onChange) => {
-    return h('div', { style: 'display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;' },
-      h('span', { style: 'width:60px;' }, label),
-      h('input', {
-        type: 'range', min: '0', max: '45', value: String(val), style: 'flex:1;cursor:pointer;',
-        oninput: (e) => onChange(Number(e.target.value))
-      })
-    );
+  const onPointerUp = () => {
+    activeDrag = null;
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
   };
 
-  const previewCrop = () => {
-    const sx = leftPct / 100;
-    const sy = topPct / 100;
-    const sw = Math.max(0.1, 1 - (leftPct + rightPct) / 100);
-    const sh = Math.max(0.1, 1 - (topPct + bottomPct) / 100);
-    imgObj.crop = { sx, sy, sw, sh };
-    app.surface.invalidate();
+  cropBox.addEventListener('pointerdown', onPointerDown);
+
+  const cleanup = () => {
+    overlay.remove();
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('keydown', onKeyDown);
   };
 
-  const sliderT = makeSlider(t('Top'), topPct, (v) => { topPct = v; previewCrop(); });
-  const sliderB = makeSlider(t('Bottom'), bottomPct, (v) => { bottomPct = v; previewCrop(); });
-  const sliderL = makeSlider(t('Left'), leftPct, (v) => { leftPct = v; previewCrop(); });
-  const sliderR = makeSlider(t('Right'), rightPct, (v) => { rightPct = v; previewCrop(); });
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      btnCancel.click();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      btnApply.click();
+    }
+  };
+  window.addEventListener('keydown', onKeyDown);
 
-  const btnRow = h('div', { style: 'display:flex;gap:8px;justify-content:flex-end;margin-top:4px;' });
-  const btnReset = h('button', { class: 'btn', style: 'padding:4px 10px;font-size:12px;' }, t('Reset'));
   btnReset.onclick = () => {
-    delete imgObj.crop;
-    app.store.commitSnapshot('reset crop', snap);
-    app.surface.invalidate();
-    cropModal.remove();
+    curCrop = { sx: 0, sy: 0, sw: 1, sh: 1 };
+    syncUI();
     app.toast(t('Crop reset'));
   };
 
-  const btnApply = h('button', { class: 'btn primary', style: 'padding:4px 12px;font-size:12px;' }, t('Apply'));
-  btnApply.onclick = () => {
-    previewCrop();
-    app.store.commitSnapshot('crop image', snap);
+  btnCancel.onclick = () => {
+    if (origCrop) imgObj.crop = origCrop;
+    else delete imgObj.crop;
     app.surface.invalidate();
-    cropModal.remove();
-    app.toast(t('Image cropped'));
+    cleanup();
   };
 
-  btnRow.appendChild(btnReset);
-  btnRow.appendChild(btnApply);
-
-  cropModal.appendChild(title);
-  cropModal.appendChild(sliderT);
-  cropModal.appendChild(sliderB);
-  cropModal.appendChild(sliderL);
-  cropModal.appendChild(sliderR);
-  cropModal.appendChild(btnRow);
-
-  document.body.appendChild(cropModal);
+  btnApply.onclick = () => {
+    if (curCrop.sx === 0 && curCrop.sy === 0 && curCrop.sw === 1 && curCrop.sh === 1) {
+      delete imgObj.crop;
+    } else {
+      imgObj.crop = { ...curCrop };
+    }
+    app.store.commitSnapshot('crop image', snap);
+    app.surface.invalidate();
+    cleanup();
+    app.toast(t('Image cropped'));
+  };
 }
 
 export function startImageAnnotate(app, imgObj) {

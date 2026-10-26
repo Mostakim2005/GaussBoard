@@ -40,7 +40,7 @@ export class SearchDialog {
       type: 'text',
       class: 'omni-search-input',
       placeholder: t('Search boards, settings, pressure, tags, aliases...'),
-      style: 'width:100%;box-sizing:border-box;padding:12px 16px 12px 42px;border:none;background:var(--desk,#f5f5f7);border-radius:12px;font-size:15px;color:var(--text,#111111);outline:none;'
+      style: 'width:100%;box-sizing:border-box;padding:12px 16px 12px 42px;border:none;background:var(--desk,#f5f5f7);border-radius:12px;font-size:15px;color:var(--text,inherit);outline:none;'
     });
 
     const searchIcon = h('span', {
@@ -210,7 +210,7 @@ export class SearchDialog {
         h('div', { style: 'display:flex;flex-direction:column;gap:2px;' },
           h('div', { style: 'display:flex;align-items:center;gap:6px;' },
             h('span', { style: 'font-weight:600;font-size:13.5px;' }, tool.title),
-            tool.shortcut ? h('kbd', { style: 'font-size:10.5px;padding:1px 5px;background:var(--desk,#f0f0f2);color:var(--text-2,#666);border-radius:4px;border:1px solid rgba(0,0,0,0.1);' }, tool.shortcut) : ''
+            tool.shortcut ? h('kbd', { style: 'font-size:10.5px;padding:1px 5px;background:var(--desk,rgba(128,128,128,0.15));color:var(--text-2,inherit);border-radius:4px;border:1px solid var(--line,rgba(128,128,128,0.2));' }, tool.shortcut) : ''
           ),
           h('span', { style: 'font-size:11.5px;color:var(--text-2,rgba(128,128,128,0.85));' }, tool.desc)
         ),
@@ -224,7 +224,7 @@ export class SearchDialog {
         this.close();
         tool.action();
       });
-      row.addEventListener('mouseenter', () => { row.style.background = 'var(--desk,#f5f5f7)'; });
+      row.addEventListener('mouseenter', () => { row.style.background = 'var(--surface-2, rgba(128,128,128,0.15))'; });
       row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
       this.toolsContainer.appendChild(row);
     }
@@ -286,7 +286,7 @@ export class SearchDialog {
         h('span', { style: 'font-size:11.5px;color:var(--text-2,rgba(128,128,128,0.8));' }, dateStr)
       );
 
-      row.addEventListener('mouseenter', () => { row.style.background = 'var(--desk,#f0f0f4)'; });
+      row.addEventListener('mouseenter', () => { row.style.background = 'var(--surface-2, rgba(128,128,128,0.15))'; });
       row.addEventListener('mouseleave', () => { row.style.background = isCurrent ? 'rgba(0,120,212,0.08)' : 'transparent'; });
       row.addEventListener('click', () => {
         this.close();
@@ -530,18 +530,18 @@ export class SearchDialog {
       {
         id: 'laserTrailDuration',
         title: t('Laser trail duration'),
-        desc: t('How long the laser pointer trail lingers on screen (Instant, 300ms, 520ms, 1.2s, 2.5s, 5.0s, 10s)'),
+        desc: t('How long the laser pointer trail lingers on screen (Instant, 300ms, 500ms, 1.0s, 1.5s, 5.0s, 10s)'),
         type: 'choice',
         options: [
           [0, t('Instant')],
           [300, '300ms'],
-          [520, '520ms'],
-          [1200, '1.2s'],
-          [2500, '2.5s'],
+          [500, '500ms'],
+          [1000, '1.0s'],
+          [1500, '1.5s'],
           [5000, '5.0s'],
           [10000, '10s']
         ],
-        get: () => Number(s.laserTrailDuration ?? 520),
+        get: () => Number(s.laserTrailDuration ?? 500),
         set: (v) => { s.laserTrailDuration = Number(v); app.saveSettings(); if (app.surface) app.surface.dirty = true; }
       },
       {
@@ -635,7 +635,7 @@ export class SearchDialog {
       } else if (item.type === 'choice') {
         const curVal = item.get();
         const select = h('select', {
-          style: 'padding:3px 8px;border-radius:10px;border:1px solid var(--line,rgba(0,0,0,0.15));background:var(--desk,#f0f0f4);font-size:11.5px;font-weight:500;color:inherit;outline:none;'
+          style: 'padding:3px 8px;border-radius:10px;border:1px solid var(--line,rgba(128,128,128,0.2));background:var(--desk,#f0f0f4);font-size:11.5px;font-weight:500;color:inherit;outline:none;'
         });
         for (const [val, label] of item.options) {
           const opt = document.createElement('option');
@@ -673,7 +673,7 @@ export class SearchDialog {
         control
       );
 
-      row.addEventListener('mouseenter', () => { row.style.background = 'var(--desk,#f0f0f4)'; });
+      row.addEventListener('mouseenter', () => { row.style.background = 'var(--surface-2, rgba(128,128,128,0.15))'; });
       row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
 
       this.settingsContainer.appendChild(row);

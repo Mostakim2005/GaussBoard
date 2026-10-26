@@ -54,3 +54,14 @@ The focused unit checks verify margin calculation, scope, persistence and undo o
 
 For the comprehensive engineering specification for interactive text markup (highlights, underline, squiggly), LiquidText-style pin-and-tear excerpts, book margin expansion via `pdf-lib`, scanned book offline OCR via `Tesseract.js` WASM, and Table of Contents navigation, see:  
 [`docs/plan/08-pdf-annotation-and-book-reader-architecture.md`](../plan/08-pdf-annotation-and-book-reader-architecture.md).
+
+## 7. Ultra-Compact PDF Import Quality Presets & Page Deletion
+
+- **Ultra-Compact PDF Import Quality Presets & JPEG Compression (`pagepicker.js`, `pdf.js`)**:
+  - Added `Lowest` (0.75 scale / 54 dpi) and `Low` (1.0 scale / 72 dpi) to `QUALITY` presets in `pagepicker.js`.
+  - When importing documents with compact scales ($\le 1.25$), `pdf.js` uses JPEG compression (`image/jpeg`, quality 0.75), reducing file size from ~90 MB to ~5 MB for 100 pages (~95% space savings).
+- **Direct Page Deletion in Paged Mode (`app.js`, `contextmenu.js`, `note-overview.js`)**:
+  - Context menu on canvas and page background provides `Delete page {n}` / `Delete this page`.
+  - Note Overview thumbnail gallery provides direct delete buttons per page.
+  - Full undo/redo integration via `app.deletePage(index)`.
+

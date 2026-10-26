@@ -191,6 +191,17 @@ export function penIcon(color, effect, kind = 'pen') {
       <line x1="13" y1="5.2" x2="13" y2="13" stroke="#605e5c" stroke-width="0.8"/>
       <rect x="7" y="27" width="12" height="3" fill="rgba(255,255,255,.18)"/></svg>`;
   }
+  if (kind === 'tape') {
+    return `<svg viewBox="0 0 26 44" width="26" height="44" aria-hidden="true">
+      <defs>${defs}</defs>
+      <path d="M4 22c0-5.5 4.5-10 10-10s10 4.5 10 10v15a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V22z" fill="#475569"/>
+      <circle cx="14" cy="22" r="7.5" fill="${fill}" stroke="#334155" stroke-width="1"/>
+      <circle cx="14" cy="22" r="3" fill="#cbd5e1"/>
+      <path d="M14 6l8 6v4l-8-6z" fill="${fill}" opacity="0.9"/>
+      <path d="M21 9l2 3h-4z" fill="#94a3b8"/>
+      <line x1="22" y1="12" x2="23" y2="15" stroke="#f8fafc" stroke-width="1.2"/>
+    </svg>`;
+  }
 
   return `<svg viewBox="0 0 26 44" width="26" height="44" aria-hidden="true">
     <defs>${defs}</defs>

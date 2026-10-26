@@ -44,6 +44,10 @@ export class SplitWorkspace {
     this.boardList = [];
     this.pickerDropdown = null;
     this.pickerInput = null;
+    this.splitTopbarLeft = null;
+    this.splitTopbarRightBadge = null;
+    this.splitLeftTitleInput = null;
+    this.splitLeftChips = null;
   }
 
   get active() {
@@ -87,7 +91,7 @@ export class SplitWorkspace {
   /**
    * Mount dual-viewport workspace layout.
    */
-  enable({ leftBoardData = null, ratio = 0.5, leftBoardId = null } = {}) {
+  async enable({ leftBoardData = null, ratio = 0.5, leftBoardId = null } = {}) {
     if (this.enabled) return;
     if (typeof document === 'undefined') {
       this.enabled = true;
@@ -99,6 +103,51 @@ export class SplitWorkspace {
 
     this.primaryCanvas = document.getElementById('c');
     if (!this.primaryCanvas) return;
+
+    const currentMainId = this.app?.store?.doc?.id || this.app?.boardId;
+    await this.refreshBoardList();
+
+    const otherBoards = (this.boardList || []).filter(b => b.id && b.id !== currentMainId);
+
+    // Split view requires at least two boards. Never split a board with itself.
+    if (!leftBoardData && !leftBoardId) {
+      if (otherBoards.length === 0) {
+        this.app?.toast?.(t('Split view requires at least two boards to view side by side. Create another board or open one from My boards.'));
+        return;
+      }
+      leftBoardId = otherBoards[0].id;
+    } else if (leftBoardId && leftBoardId === currentMainId) {
+      this.app?.toast?.(t('A board cannot be split against itself. Please select a different board.'));
+      if (otherBoards.length > 0) {
+        leftBoardId = otherBoards[0].id;
+        leftBoardData = null;
+      } else {
+        return;
+      }
+    }
+
+    if (!leftBoardData && leftBoardId) {
+      try {
+        let loaded = null;
+        if (typeof window.board?.boards?.load === 'function') {
+          loaded = await window.board.boards.load(leftBoardId);
+        } else if (typeof window.board?.boards?.get === 'function') {
+          loaded = await window.board.boards.get(leftBoardId);
+        } else if (this.app?.storage?.load) {
+          loaded = await this.app.storage.load(leftBoardId);
+        }
+        if (typeof loaded === 'string') {
+          try { loaded = JSON.parse(loaded); } catch {}
+        }
+        if (loaded) {
+          if (!loaded.name && loaded.title) loaded.name = loaded.title;
+          if (!Array.isArray(loaded.objects) && Array.isArray(loaded.elements)) loaded.objects = loaded.elements;
+          leftBoardData = (await this.app?.resolveAssets?.(loaded)) || loaded;
+        }
+      } catch (err) {
+        console.warn('Could not auto-load left board for split view:', err);
+      }
+    }
 
     this.ratio = Math.max(0.2, Math.min(0.8, ratio));
     this.leftBoardId = leftBoardId || null;
@@ -190,8 +239,8 @@ export class SplitWorkspace {
     const btnSwap = h('button', {
       class: 'btn-split-swap',
       title: t('Swap left and right boards'),
-      style: 'background:none;border:none;cursor:pointer;padding:4px;color:inherit;display:flex;align-items:center;',
-      html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16"/></svg>'
+      style: 'background:rgba(0,120,212,0.12);border:1px solid var(--line,rgba(0,120,212,0.3));border-radius:6px;cursor:pointer;padding:3px 8px;font-size:11px;font-weight:600;color:var(--accent,#0078d4);display:flex;align-items:center;gap:4px;',
+      html: '<span style="font-size:13px;line-height:1;">⇄</span><span>' + t('Swap') + '</span>'
     });
     btnSwap.addEventListener('click', () => this.swapPanes());
 
@@ -426,6 +475,9 @@ export class SplitWorkspace {
       this.app.surface.resize();
     }
 
+    // Mount the split topbar partition above the left and right boards
+    this.mountSplitTopbar();
+
     this.enabled = true;
   }
 
@@ -434,6 +486,8 @@ export class SplitWorkspace {
    */
   disable() {
     if (!this.enabled) return;
+
+    this.unmountSplitTopbar();
 
     clearTimeout(this._saveTimer);
     this._saveTimer = null;
@@ -533,9 +587,9 @@ export class SplitWorkspace {
     this.enabled = false;
   }
 
-  toggle(opts = {}) {
+  async toggle(opts = {}) {
     if (this.enabled) this.disable();
-    else this.enable(opts);
+    else await this.enable(opts);
   }
 
   setRatio(r) {
@@ -558,6 +612,9 @@ export class SplitWorkspace {
         this.rightPane.style.width = `${((1 - this.ratio) * 100).toFixed(1)}%`;
         this.rightPane.style.height = '100%';
       }
+    }
+    if (this.splitTopbarLeft) {
+      this.splitTopbarLeft.style.width = `${(this.ratio * 100).toFixed(1)}%`;
     }
     if (this.leftSurface) this.leftSurface.resize();
     if (this.app?.surface) this.app.surface.resize();
@@ -736,7 +793,7 @@ export class SplitWorkspace {
   /**
    * Swap left and right board documents.
    */
-  swapPanes() {
+  async swapPanes() {
     if (!this.enabled || !this.leftStore || !this.app?.store) return;
     const leftData = this.leftStore.toJSON();
     const rightData = this.app.store.toJSON();
@@ -753,8 +810,12 @@ export class SplitWorkspace {
       this.pickerInput.value = this.leftStore.doc?.name || this.leftStore.doc?.title || rightData.name || rightData.title || t('Untitled');
     }
 
+    this.syncSplitTopbars();
+
     if (this.leftSurface) this.leftSurface.repaintAll();
     if (this.app.surface) this.app.surface.repaintAll();
+
+    this.app?.toast?.(t('Swapped left and right boards'), 'check');
   }
 
   buildBoardPicker() {
@@ -875,7 +936,9 @@ export class SplitWorkspace {
     }
 
     // 2. Filter existing boards
+    const currentMainId = this.app?.store?.doc?.id || this.app?.boardId;
     const filtered = this.boardList.filter(b => {
+      if (b.id && b.id === currentMainId) return false;
       if (!q) return true;
       const title = (b.name || b.title || '').toLowerCase();
       if (title.includes(q)) return true;
@@ -954,6 +1017,11 @@ export class SplitWorkspace {
 
   async loadLeftBoard(id) {
     if (!id || !this.leftStore) return;
+    const currentMainId = this.app?.store?.doc?.id || this.app?.boardId;
+    if (id === currentMainId) {
+      this.app?.toast?.(t('A board cannot be split against itself. Please select a different board.'));
+      return;
+    }
     try {
       // Switching boards must not swallow the last few hundred ms of ink on
       // the board being replaced: its save is debounced, so flush it first.
@@ -990,6 +1058,7 @@ export class SplitWorkspace {
             this.leftPropertiesDialog.sync();
           }
         }
+        this.syncSplitTopbars();
       }
     } catch (err) {
       this.app?.toast?.(t('Failed to load board: {msg}', { msg: err.message }));
@@ -1008,7 +1077,7 @@ export class SplitWorkspace {
     // file, each overwriting the other's strokes. Never split a board with
     // itself.
     if (id === this.app?.store?.doc?.id) {
-      this.app?.toast?.(t('That board is already open'));
+      this.app?.toast?.(t('A board cannot be split against itself. Please select a different board.'));
       return false;
     }
     if (!this.enabled) this.enable();
@@ -1173,5 +1242,206 @@ export class SplitWorkspace {
       this.syncCameraFromLeft();
       this.leftSurface.repaintAll();
     }, { passive: false });
+  }
+
+  mountSplitTopbar() {
+    if (typeof document === 'undefined') return;
+    const topbar = document.getElementById('topbar');
+    if (!topbar) return;
+
+    this.unmountSplitTopbar();
+
+    // 1. Left top bar section directly above the left pane
+    const splitLeft = h('div', {
+      id: 'splitTopbarLeft',
+      class: 'split-topbar-left',
+      style: `height:100%;display:flex;align-items:center;gap:6px;width:${(this.ratio * 100).toFixed(1)}%;padding:0 8px;border-right:2px solid var(--accent,#0078d4);flex-shrink:0;overflow-x:auto;scrollbar-width:none;box-sizing:border-box;background:var(--surface,#ffffff);`
+    });
+
+    const leftBadge = h('span', {
+      class: 'badge split-left-badge',
+      style: 'font-weight:700;font-size:11px;background:rgba(0,120,212,0.12);color:var(--accent,#0078d4);border-color:rgba(0,120,212,0.3);flex-shrink:0;'
+    }, t('Left board'));
+
+    const titleInput = h('input', {
+      class: 'split-topbar-title',
+      value: this.leftStore?.doc?.name || this.leftStore?.doc?.title || t('Untitled'),
+      spellcheck: 'false',
+      title: t('Left board name (Edit or click to rename)'),
+      style: 'border:1px solid transparent;background:transparent;border-radius:6px;padding:3px 6px;font-size:14px;font-weight:600;color:var(--text);min-width:80px;max-width:200px;text-overflow:ellipsis;flex-shrink:0;'
+    });
+    titleInput.addEventListener('change', () => {
+      const val = titleInput.value.trim() || t('Untitled');
+      if (this.leftStore?.doc) {
+        this.leftStore.doc.name = val;
+        this.leftStore.doc.title = val;
+        this.saveLeftBoardDebounced();
+      }
+      if (this.pickerInput) this.pickerInput.value = val;
+    });
+    titleInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') titleInput.blur();
+    });
+    this.splitLeftTitleInput = titleInput;
+
+    const btnProps = h('button', {
+      class: 'tb-btn tb-props-btn split-left-props',
+      title: t('Board Properties — Left Board'),
+      style: 'display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:10px;font-size:11.5px;cursor:pointer;flex-shrink:0;background:rgba(0,0,0,0.04);border:1px solid var(--line,rgba(0,0,0,0.15));color:inherit;'
+    },
+      h('span', { style: 'font-weight:700;color:var(--accent,#0078d4);' }, '#'),
+      h('span', {}, t('Properties'))
+    );
+    btnProps.addEventListener('click', () => {
+      if (!this.leftStore?.doc) return;
+      if (!this.leftPropertiesDialog) {
+        this.leftPropertiesDialog = new PropertiesDialog(this.app, {
+          doc: this.leftStore.doc,
+          onSave: async () => {
+            await this.saveLeftBoard();
+            this.syncSplitTopbars();
+          }
+        });
+      } else {
+        this.leftPropertiesDialog.targetDoc = this.leftStore.doc;
+      }
+      this.leftPropertiesDialog.open();
+    });
+
+    const chips = h('div', {
+      class: 'split-left-props-chips',
+      style: 'display:inline-flex;align-items:center;gap:4px;max-width:240px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;'
+    });
+    this.splitLeftChips = chips;
+
+    const btnSwap = h('button', {
+      class: 'tb-btn split-left-swap-btn',
+      title: t('Swap left and right boards'),
+      style: 'display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer;flex-shrink:0;background:rgba(0,120,212,0.14);border:1px solid var(--accent,#0078d4);color:var(--accent,#0078d4);'
+    },
+      h('span', { style: 'font-size:13px;' }, '⇄'),
+      h('span', {}, t('Swap'))
+    );
+    btnSwap.addEventListener('click', () => this.swapPanes());
+
+    const btnClose = h('button', {
+      class: 'tb-btn split-left-close-btn',
+      title: t('Close split view'),
+      style: 'display:inline-flex;align-items:center;padding:3px 6px;border-radius:6px;cursor:pointer;flex-shrink:0;background:none;border:none;color:var(--text-2);',
+      html: icon('close', 14)
+    });
+    btnClose.addEventListener('click', () => this.disable());
+
+    splitLeft.appendChild(leftBadge);
+    splitLeft.appendChild(titleInput);
+    splitLeft.appendChild(btnProps);
+    splitLeft.appendChild(chips);
+    splitLeft.appendChild(btnSwap);
+    splitLeft.appendChild(btnClose);
+
+    topbar.insertBefore(splitLeft, topbar.firstChild);
+    this.splitTopbarLeft = splitLeft;
+
+    // 2. Right board badge inserted right before #boardTitle
+    const boardTitle = document.getElementById('boardTitle');
+    if (boardTitle && boardTitle.parentNode) {
+      const rightBadge = h('span', {
+        id: 'splitTopbarRightBadge',
+        class: 'badge split-right-badge',
+        style: 'font-weight:700;font-size:11px;background:rgba(16,185,129,0.12);color:#059669;border-color:rgba(16,185,129,0.3);flex-shrink:0;'
+      }, t('Right board'));
+      boardTitle.parentNode.insertBefore(rightBadge, boardTitle);
+      this.splitTopbarRightBadge = rightBadge;
+    }
+
+    this.syncSplitTopbars();
+  }
+
+  unmountSplitTopbar() {
+    if (this.splitTopbarLeft) {
+      this.splitTopbarLeft.remove();
+      this.splitTopbarLeft = null;
+    }
+    if (this.splitTopbarRightBadge) {
+      this.splitTopbarRightBadge.remove();
+      this.splitTopbarRightBadge = null;
+    }
+    this.splitLeftTitleInput = null;
+    this.splitLeftChips = null;
+  }
+
+  syncSplitTopbars() {
+    if (!this.enabled) return;
+    if (this.splitTopbarLeft) {
+      this.splitTopbarLeft.style.width = `${(this.ratio * 100).toFixed(1)}%`;
+    }
+    const doc = this.leftStore?.doc;
+    if (this.splitLeftTitleInput && doc) {
+      this.splitLeftTitleInput.value = doc.name || doc.title || t('Untitled');
+    }
+    if (this.splitLeftChips && doc) {
+      this.splitLeftChips.innerHTML = '';
+      const tags = Array.isArray(doc.properties?.tags) ? doc.properties.tags : (Array.isArray(doc.tags) ? doc.tags : []);
+      const aliases = Array.isArray(doc.properties?.aliases) ? doc.properties.aliases : (Array.isArray(doc.aliases) ? doc.aliases : []);
+
+      for (const al of aliases.slice(0, 2)) {
+        const chip = h('span', {
+          class: 'prop-chip top-alias-chip',
+          title: t('Board alias (Click to edit)'),
+          style: 'cursor:pointer;font-size:11px;padding:2px 7px;border-radius:10px;background:rgba(168,85,247,0.14);color:#9333ea;font-weight:600;display:inline-flex;align-items:center;gap:3px;flex-shrink:0;'
+        }, h('span', { style: 'font-size:10px;opacity:0.85;' }, '🏷️'), al);
+        chip.addEventListener('click', () => {
+          if (!this.leftPropertiesDialog) {
+            this.leftPropertiesDialog = new PropertiesDialog(this.app, {
+              doc: this.leftStore.doc,
+              onSave: async () => {
+                await this.saveLeftBoard();
+                this.syncSplitTopbars();
+              }
+            });
+          } else {
+            this.leftPropertiesDialog.targetDoc = this.leftStore.doc;
+          }
+          this.leftPropertiesDialog.open();
+        });
+        this.splitLeftChips.appendChild(chip);
+      }
+      if (aliases.length > 2) {
+        this.splitLeftChips.appendChild(h('span', { style: 'font-size:10px;color:var(--text-2);' }, `+${aliases.length - 2}`));
+      }
+
+      for (const tg of tags.slice(0, 2)) {
+        const chip = h('span', {
+          class: 'prop-chip top-tag-chip',
+          title: t('Board tag (Click to edit)'),
+          style: 'cursor:pointer;font-size:11px;padding:2px 7px;border-radius:10px;background:rgba(0,120,212,0.12);color:var(--accent-2,#0078d4);font-weight:600;display:inline-flex;align-items:center;gap:3px;flex-shrink:0;'
+        }, `#${String(tg).replace(/^#+/, '')}`);
+        chip.addEventListener('click', () => {
+          if (!this.leftPropertiesDialog) {
+            this.leftPropertiesDialog = new PropertiesDialog(this.app, {
+              doc: this.leftStore.doc,
+              onSave: async () => {
+                await this.saveLeftBoard();
+                this.syncSplitTopbars();
+              }
+            });
+          } else {
+            this.leftPropertiesDialog.targetDoc = this.leftStore.doc;
+          }
+          this.leftPropertiesDialog.open();
+        });
+        this.splitLeftChips.appendChild(chip);
+      }
+      if (tags.length > 2) {
+        this.splitLeftChips.appendChild(h('span', { style: 'font-size:10px;color:var(--text-2);' }, `+${tags.length - 2}`));
+      }
+    }
+
+    // Also update main right board title & top properties chips
+    const rightTitleInput = document.getElementById('boardTitle');
+    if (rightTitleInput && this.app?.store?.doc) {
+      rightTitleInput.value = this.app.store.doc.name || this.app.store.doc.title || t('Untitled');
+    }
   }
 }

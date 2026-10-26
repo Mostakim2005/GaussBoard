@@ -979,11 +979,32 @@ export class Interaction {
         if (h.includes('n')) sy = (wp.y - anchor.y) / (box.y - anchor.y || 1);
         if (h === 'n' || h === 's') sx = 1;
         if (h === 'e' || h === 'w') sy = 1;
-        const uniform = mods.shift || a.objs.some((o) => o.type === 'image' || o.type === 'math' || o.type === 'diagram') || (h.length === 2 && !mods.alt);
+        const hasCard = a.objs.some((o) => (o.type === 'text' || o.type === 'note') && (o.markdown !== false || o.cardStyle || o.autoSize === false));
+        const uniform = mods.shift || a.objs.some((o) => o.type === 'image' || o.type === 'math' || o.type === 'diagram') || (h.length === 2 && !mods.alt && !hasCard);
         if (uniform && h.length === 2) { const s = Math.max(Math.abs(sx), Math.abs(sy)); sx = Math.sign(sx || 1) * s; sy = Math.sign(sy || 1) * s; }
         sx = clamp(sx, -20, 20); sy = clamp(sy, -20, 20);
         if (Math.abs(sx) < 0.02) sx = 0.02 * Math.sign(sx || 1);
         if (Math.abs(sy) < 0.02) sy = 0.02 * Math.sign(sy || 1);
+
+        if (this.pages?.length) {
+          const rects = pageRects(this.pages);
+          let pIdx = pageIndexForBox(this.pages, a.box);
+          if (pIdx < 0) pIdx = nearestPageIndex(this.pages, a.box.x + a.box.w / 2, a.box.y + a.box.h / 2);
+          const sheet = rects[pIdx];
+          if (sheet) {
+            const maxSx = sheet.w / Math.max(1, a.box.w);
+            const maxSy = sheet.h / Math.max(1, a.box.h);
+            if (uniform) {
+              const maxScale = Math.min(maxSx, maxSy);
+              sx = Math.min(Math.abs(sx), maxScale) * Math.sign(sx || 1);
+              sy = Math.min(Math.abs(sy), maxScale) * Math.sign(sy || 1);
+            } else {
+              sx = Math.min(Math.abs(sx), maxSx) * Math.sign(sx || 1);
+              sy = Math.min(Math.abs(sy), maxSy) * Math.sign(sy || 1);
+            }
+          }
+        }
+
         for (const o of a.objs) {
           const was = a.origin.get(o.id);
           Object.assign(o, structuredClone(was));
@@ -1278,6 +1299,14 @@ export class Interaction {
    * was, as any top-edge drag does.
    */
   fitResizedText(o, handle, was) {
+    const isMd = o.markdown !== false || o.cardStyle;
+    if (isMd || o.autoSize === false) {
+      o.fontSize = was.fontSize;
+      o.w = Math.max(120, o.w);
+      o.h = Math.max(60, o.h);
+      o.wrapW = o.w;
+      return;
+    }
     if (handle === 'e' || handle === 'w') o.fontSize = was.fontSize;
     const fit = this.app.textEditor?.fitBox?.(o, o.text || '', o.w);
     if (!fit) return;
@@ -1768,7 +1797,20 @@ export class Interaction {
     if (!b) return;
     let i = pageIndexForBox(pages, b);
     if (i < 0) i = nearestPageIndex(pages, b.x + b.w / 2, b.y + b.h / 2);
-    const { dx, dy } = offsetIntoRect(b, rects[i]);
+    const sheet = rects[i];
+    if (!sheet) return;
+
+    // Downscale oversized objects so they never cross into gutter or neighboring sheets
+    if (b.w > sheet.w || b.h > sheet.h) {
+      const scale = Math.min(sheet.w / Math.max(1, b.w), sheet.h / Math.max(1, b.h));
+      if (scale < 1) {
+        for (const o of objs) scaleObject(o, scale, scale, b.x, b.y);
+        b = null;
+        for (const o of objs) b = unionBox(b, boundsOf(o));
+      }
+    }
+
+    const { dx, dy } = offsetIntoRect(b, sheet);
     if (dx || dy) for (const o of objs) translateObject(o, dx, dy);
   }
 
@@ -1826,11 +1868,15 @@ export class Interaction {
 
     const obj = isTape ? {
       id: uid('cv'), type: 'curtain', subtype: 'tape', tool: 'tape',
-      color: '#a855f7',
-      neonColor: '#c084fc',
-      width: 34,
+      color: s.tapeColor || '#a855f7',
+      neonColor: s.tapeColor || '#c084fc',
+      width: s.tapeWidth || 34,
+      opacity: s.tapeOpacity != null ? s.tapeOpacity : 1.0,
+      texture: s.tapeTexture || 'stripes',
       points: [], bbox: { x: wp.x, y: wp.y, w: 0, h: 0 }, rotation: 0,
-      revealed: false
+      revealed: false,
+      assessments: [],
+      reviewCount: 0
     } : {
       id: uid('s'), type: 'stroke', tool,
       color: strokeColor,

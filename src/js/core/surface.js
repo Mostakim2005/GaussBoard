@@ -837,8 +837,12 @@ export class Surface {
     }
     for (const o of this._locked) {
       if (!boxesIntersect(vbox, worldBounds(o))) continue;
-      drawLockedOutline(ctx, cam, o);
-      drawLockBadge(ctx, cam, o);
+      const isSelected = this.selection.has(o.id) || (o.groupId && [...this.selection].some((id) => this.store.get(id)?.groupId === o.groupId));
+      const isHovered = this.hoverId === o.id || (o.groupId && this.store.get(this.hoverId)?.groupId === o.groupId);
+      if (isSelected || isHovered) {
+        drawLockedOutline(ctx, cam, o);
+        drawLockBadge(ctx, cam, o);
+      }
     }
 
     /*

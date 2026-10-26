@@ -27,7 +27,8 @@ export class ReplayBar {
       video: true,
       scratch: true,
       markdown: true,
-      pagemargin: true
+      pagemargin: true,
+      excerpt: true
     };
 
     this.loadState();
@@ -275,6 +276,17 @@ export class ReplayBar {
       this.app.openPageMarginDialog?.();
     });
 
+    // Snip Excerpt Button
+    this.btnSnipExcerpt = h('button', {
+      class: 'rb-btn rb-snip-excerpt',
+      title: t('Snip Excerpt (Capture linked excerpt screenshot from board)'),
+      style: 'display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:18px;font-size:12.5px;font-weight:500;color:inherit;transition:background 0.15s;',
+      html: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2"/><circle cx="14" cy="14" r="2"/></svg><span>${t('Snip')}</span>`
+    });
+    this.btnSnipExcerpt.addEventListener('click', () => {
+      this.app.startSnippingExcerpt?.();
+    });
+
     // 7. Video Export Button
     this.btnVideo = h('button', {
       class: 'rb-btn rb-video',
@@ -328,8 +340,8 @@ export class ReplayBar {
     this.el = h('div', {
       id: 'replayBar',
       class: 'replay-bar-hud',
-      style: 'position:absolute;z-index:21;display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--surface-glass,rgba(28,32,38,0.9));color:var(--text,#ffffff);border:1px solid var(--stroke-glass,rgba(255,255,255,0.16));border-radius:36px;box-shadow:0 10px 32px rgba(0,0,0,0.32),0 2px 6px rgba(0,0,0,0.18),inset 0 1px 0 rgba(255,255,255,0.12);font-family:inherit;font-size:13px;backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);transition:box-shadow 0.2s,border-color 0.2s;'
-    }, handle, this.btnOverview, this.btnSearch, this.btnAudio, this.btnPlayBar, this.btnMode, this.btnTape, this.btnSplit, this.btnMarkdown, this.btnPageMargin, this.btnVideo, this.btnScratch, this.btnMenu);
+      style: 'position:absolute;z-index:21;display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--surface-glass,rgba(255,255,255,0.92));color:var(--text,inherit);border:1px solid var(--stroke-glass,rgba(128,128,128,0.2));border-radius:36px;box-shadow:0 10px 32px rgba(0,0,0,0.22),0 2px 6px rgba(0,0,0,0.1),inset 0 1px 0 rgba(255,255,255,0.18);font-family:inherit;font-size:13px;backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);transition:box-shadow 0.2s,border-color 0.2s;'
+    }, handle, this.btnOverview, this.btnSearch, this.btnAudio, this.btnPlayBar, this.btnMode, this.btnTape, this.btnSplit, this.btnMarkdown, this.btnPageMargin, this.btnSnipExcerpt, this.btnVideo, this.btnScratch, this.btnMenu);
 
     this.updateVisibility();
   }
@@ -346,6 +358,7 @@ export class ReplayBar {
     if (this.btnScratch) this.btnScratch.style.display = this.visibleTools.scratch ? 'flex' : 'none';
     if (this.btnMarkdown) this.btnMarkdown.style.display = this.visibleTools.markdown !== false ? 'flex' : 'none';
     if (this.btnPageMargin) this.btnPageMargin.style.display = this.visibleTools.pagemargin !== false ? 'flex' : 'none';
+    if (this.btnSnipExcerpt) this.btnSnipExcerpt.style.display = this.visibleTools.excerpt !== false ? 'flex' : 'none';
   }
 
   syncReadingMode() {
@@ -515,6 +528,7 @@ export class ReplayBar {
     menu.appendChild(toolToggle('scratch', t('Scratch Eraser Info')));
     menu.appendChild(toolToggle('markdown', t('Markdown Note')));
     menu.appendChild(toolToggle('pagemargin', t('Page Margins')));
+    menu.appendChild(toolToggle('excerpt', t('Snip Excerpt')));
 
     if (this.app?.settings) {
       menu.appendChild(section(t('Behavior')));

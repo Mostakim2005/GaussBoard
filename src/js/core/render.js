@@ -57,9 +57,10 @@ function resolveWikilinkForRender(target, anchor, alias) {
  * Supports 4 models: 'canvas' | 'window' | 'minimal' | 'transparent'.
  */
 export function drawMarkdownCardContainer(ctx, o, isDark = darkBoard, hideText = false) {
-  const style = o.cardStyle || (o.background && o.background !== 'none' ? 'canvas' : (o.markdown === true ? 'canvas' : 'transparent'));
+  const isExplicitTransparent = o.cardStyle === 'transparent' || o.background === 'transparent';
+  const style = isExplicitTransparent ? 'transparent' : (o.cardStyle || 'canvas');
   if (style === 'transparent') {
-    if (o.background && o.background !== 'none') {
+    if (o.background && o.background !== 'none' && o.background !== 'transparent') {
       ctx.save();
       ctx.fillStyle = o.background;
       ctx.beginPath();
@@ -169,9 +170,11 @@ export function drawMarkdownBlock(ctx, o, hideText = false, onload = null, boxOv
   const h = Math.max(20, (boxOverride ? boxOverride.h : (o.h || 80)) - headerOffset);
 
   const isNote = o.type === 'note';
+  const isExplicitTransparent = o.cardStyle === 'transparent' || o.background === 'transparent';
+  const defaultSolidInk = darkBoard ? '#e2e8f0' : '#1e293b';
   const color = isNote
     ? (o.textColor || readableText(o.color || '#ffd94a'))
-    : inkPaint(o.color);
+    : (o.color ? inkPaint(o.color) : (isExplicitTransparent ? inkPaint(null) : defaultSolidInk));
   const fontSize = o.fontSize || (isNote ? Math.min(24, noteTypeRange(o).max) : 24);
   const fontFamily = faceOf(o.font);
   const align = o.align || 'left';
@@ -425,6 +428,22 @@ export function drawBackground(ctx, bg, cam, w, h, pages = null) {
     ctx.restore();
 
     strokePageEdge(ctx, sheet);
+
+    // Draw target page highlight when PageMarginDialog is open
+    if (typeof window !== 'undefined' && window.__marginHighlightPage === i) {
+      ctx.save();
+      ctx.strokeStyle = '#0078d4';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(sheet.x - 1, sheet.y - 1, sheet.w + 2, sheet.h + 2);
+      ctx.fillStyle = '#0078d4';
+      ctx.font = 'bold 12px sans-serif';
+      const badgeText = `Page ${i + 1}`;
+      const tw = ctx.measureText(badgeText).width;
+      ctx.fillRect(sheet.x - 1, sheet.y - 22, tw + 12, 20);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(badgeText, sheet.x + 5, sheet.y - 8);
+      ctx.restore();
+    }
   });
   ctx.restore();
 }
@@ -1120,7 +1139,47 @@ export function drawImage(ctx, o, onload) {
       ctx.fillText(o.label, o.x, o.y - 8);
     }
   }
-  if (o.excerptSource?.boardId) {
+  if (o.excerptSource?.boardId || o.isExcerpt) {
+    ctx.save();
+    // 1. Distinctive Excerpt Boundary Outline
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = Math.max(2, 2 / (ctx.getTransform ? ctx.getTransform().a : 1));
+    ctx.setLineDash([8, 5]);
+    ctx.strokeRect(o.x, o.y, o.w, o.h);
+    ctx.setLineDash([]);
+
+    // 2. Corner bracket notches
+    const bLen = Math.min(14, Math.min(o.w, o.h) * 0.16);
+    ctx.lineWidth = Math.max(2.5, 2.5 / (ctx.getTransform ? ctx.getTransform().a : 1));
+    ctx.beginPath();
+    ctx.moveTo(o.x, o.y + bLen); ctx.lineTo(o.x, o.y); ctx.lineTo(o.x + bLen, o.y);
+    ctx.moveTo(o.x + o.w - bLen, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w, o.y + bLen);
+    ctx.moveTo(o.x, o.y + o.h - bLen); ctx.lineTo(o.x, o.y + o.h); ctx.lineTo(o.x + bLen, o.y + o.h);
+    ctx.moveTo(o.x + o.w - bLen, o.y + o.h); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x + o.w, o.y + o.h - bLen);
+    ctx.stroke();
+
+    // 3. Branded Top-Left Pill: [ 🔗 Excerpt · SourceBoard ]
+    const srcName = o.excerptSource?.boardName || t('Excerpt');
+    const badgeText = `🔗 ${t('Excerpt')} · ${srcName}`;
+    const badgeFontSz = Math.max(10, Math.min(13, o.w * 0.035));
+    ctx.font = `600 ${badgeFontSz}px ${FONT}`;
+    const badgeW = ctx.measureText(badgeText).width + 12;
+    const badgeH = badgeFontSz + 8;
+    const badgeX = o.x + 4;
+    const badgeY = o.y + 4;
+
+    ctx.fillStyle = '#7e22ce';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 4);
+    else ctx.rect(badgeX, badgeY, badgeW, badgeH);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, badgeX + 6, badgeY + badgeH / 2);
+    ctx.restore();
+
     const size = Math.max(14, Math.min(22, Math.min(o.w, o.h) * 0.16));
     const bx = o.x + o.w - size - 5, by = o.y + 5;
     ctx.save();
@@ -1143,7 +1202,7 @@ export function drawImage(ctx, o, onload) {
     ctx.stroke();
 
     // LiquidText-style Elastic Tether line to source bounds if source bounds are available
-    const sb = o.excerptSource.bounds;
+    const sb = o.excerptSource?.bounds;
     if (sb && typeof sb.x === 'number' && typeof sb.y === 'number' && (o.showTether ?? true)) {
       const srcCenterX = sb.x + (sb.w || 0) / 2;
       const srcCenterY = sb.y + (sb.h || 0) / 2;
@@ -1216,12 +1275,12 @@ export function drawCurtain(ctx, o) {
     const pts = o.points;
     const w = o.width || 34;
     const tapeColor = o.color || '#a855f7';
-    const neonOutline = o.neonColor || '#c084fc';
-
+    const neonOutline = o.neonColor || o.color || '#c084fc';
+    const texture = o.texture || 'stripes';
+    const opacity = o.opacity != null ? o.opacity : 1;
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-
     if (o.revealed) {
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
@@ -1229,50 +1288,58 @@ export function drawCurtain(ctx, o) {
       ctx.lineWidth = w;
       ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
       ctx.stroke();
-
       ctx.lineWidth = w + 2;
       ctx.strokeStyle = 'rgba(192, 132, 252, 0.55)';
       ctx.stroke();
       ctx.restore();
       return;
     }
-
+    ctx.globalAlpha = opacity;
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.lineWidth = w;
     ctx.strokeStyle = tapeColor;
     ctx.stroke();
-
-    const b = bboxOfPoints(pts);
-    const pad = w / 2;
-    const minX = b.x - pad, minY = b.y - pad, bw = b.w + pad * 2, bh = b.h + pad * 2;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.lineWidth = w - 1;
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-    ctx.lineWidth = 3.5;
-    const gap = 12;
-    ctx.beginPath();
-    for (let d = -bh; d < bw; d += gap) {
-      ctx.moveTo(minX + d, minY + bh);
-      ctx.lineTo(minX + d + bh, minY);
+    if (texture !== 'plain') {
+      const b = bboxOfPoints(pts);
+      const pad = w / 2;
+      const minX = b.x - pad, minY = b.y - pad, bw = b.w + pad * 2, bh = b.h + pad * 2;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.lineWidth = w - 1;
+      ctx.stroke();
+      if (texture === 'dots') {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        for (let px = minX; px < minX + bw; px += 14) {
+          for (let py = minY; py < minY + bh; py += 14) {
+            ctx.beginPath();
+            ctx.arc(px, py, 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      } else {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 3.5;
+        const gap = 12;
+        ctx.beginPath();
+        for (let d = -bh; d < bw; d += gap) {
+          ctx.moveTo(minX + d, minY + bh);
+          ctx.lineTo(minX + d + bh, minY);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
     }
-    ctx.stroke();
-    ctx.restore();
-
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.lineWidth = w + 1.5;
     ctx.strokeStyle = neonOutline;
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = Math.min(1, opacity * 0.9 + 0.1);
     ctx.stroke();
-
     ctx.restore();
     return;
   }
@@ -1360,30 +1427,35 @@ export function drawObject(ctx, o, onload, editing = null) {
   const hideText = mine && !editing.cell;
   const hideCell = mine ? (editing.cell || null) : null;
   ctx.save();
-  ctx.globalAlpha *= o.alpha ?? 1;
-  if (o.rotation) {
-    const b = boundsOf(o);
-    ctx.translate(b.x + b.w / 2, b.y + b.h / 2);
-    ctx.rotate(o.rotation);
-    ctx.translate(-(b.x + b.w / 2), -(b.y + b.h / 2));
+  try {
+    ctx.globalAlpha *= o.alpha ?? 1;
+    if (o.rotation) {
+      const b = boundsOf(o);
+      ctx.translate(b.x + b.w / 2, b.y + b.h / 2);
+      ctx.rotate(o.rotation);
+      ctx.translate(-(b.x + b.w / 2), -(b.y + b.h / 2));
+    }
+    switch (o.type) {
+      case 'stroke': drawStroke(ctx, o); break;
+      case 'shape': drawShape(ctx, o, hideText); break;
+      case 'note': drawNote(ctx, o, hideText, onload); break;
+      case 'text': drawText(ctx, o, hideText, onload); break;
+      case 'image': drawImage(ctx, o, onload); break;
+      case 'emoji': drawEmoji(ctx, o); break;
+      case 'math': drawMath(ctx, o, onload); break;
+      case 'table': drawTable(ctx, o, hideCell); break;
+      case 'curtain': drawCurtain(ctx, o); break;
+      case 'connector': drawConnector(ctx, o, (c) => inkPaint(c)); break;
+      case 'boardlink': drawBoardLink(ctx, o, onload); break;
+      case 'audio': drawAudioCard(ctx, o); break;
+      case 'diagram': drawDiagram(ctx, o, onload); break;
+      case 'video': drawVideoCard(ctx, o, onload); break;
+    }
+  } catch (err) {
+    console.warn('drawObject error for:', o.type, o.id, err);
+  } finally {
+    ctx.restore();
   }
-  switch (o.type) {
-    case 'stroke': drawStroke(ctx, o); break;
-    case 'shape': drawShape(ctx, o, hideText); break;
-    case 'note': drawNote(ctx, o, hideText, onload); break;
-    case 'text': drawText(ctx, o, hideText, onload); break;
-    case 'image': drawImage(ctx, o, onload); break;
-    case 'emoji': drawEmoji(ctx, o); break;
-    case 'math': drawMath(ctx, o, onload); break;
-    case 'table': drawTable(ctx, o, hideCell); break;
-    case 'curtain': drawCurtain(ctx, o); break;
-    case 'connector': drawConnector(ctx, o, (c) => inkPaint(c)); break;
-    case 'boardlink': drawBoardLink(ctx, o, onload); break;
-    case 'audio': drawAudioCard(ctx, o); break;
-    case 'diagram': drawDiagram(ctx, o, onload); break;
-    case 'video': drawVideoCard(ctx, o, onload); break;
-  }
-  ctx.restore();
 }
 
 /* =================================================================== *
@@ -1532,7 +1604,7 @@ export function drawVideoCard(ctx, o, onload) {
 
   const thumbH = Math.max(30, h - 56);
   if (o.thumb) {
-    const img = image(o.thumb, onload);
+    const img = getImage(o.thumb, onload);
     if (img && img.naturalWidth) {
       ctx.save();
       ctx.beginPath();

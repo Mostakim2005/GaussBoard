@@ -39,11 +39,13 @@ export async function openPdf(data) {
     numPages: pdf.numPages,
 
     /** @returns {Promise<{dataUrl,width,height,page}>} */
-    async render(pageNo, scale = 2, type = 'image/png', quality) {
+    async render(pageNo, scale = 2, type, quality) {
       const page = await pdf.getPage(pageNo);
       const { canvas, width, height } = await renderPageTo(page, scale);
       page.cleanup();
-      return { dataUrl: canvas.toDataURL(type, quality), width, height, page: pageNo };
+      const format = scale <= 1.25 ? 'image/jpeg' : (type || 'image/png');
+      const q = scale <= 1.25 ? (quality ?? 0.75) : quality;
+      return { dataUrl: canvas.toDataURL(format, q), width, height, page: pageNo };
     },
 
     /** Small preview for the page picker. */

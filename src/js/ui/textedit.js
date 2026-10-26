@@ -10,8 +10,8 @@ import { boundsOf } from '../core/store.js';
 import { fitFontSize, readableText, wrapText, clamp } from '../core/util.js';
 import { faceOf, noteTypeRange, inkPaint } from '../core/render.js';
 import { objectRuns, normalizeRuns, layoutRich, fitRichSize, htmlToRuns, needsRich } from '../core/richtext.js';
-import { refSpans, refToken, refLabel, refMissing, wikilinksToRefs } from '../core/boardrefs.js';
-import { isMarkdown, renderMarkdownToHtml, toggleTaskAtLine } from '../core/markdown.js';
+import { refSpans, refToken, refLabel, refMissing, wikilinksToRefs, handleWikilinkDoubleClick } from '../core/boardrefs.js';
+import { isMarkdown, renderMarkdownToHtml, toggleTaskAtLine, parseFrontmatter } from '../core/markdown.js';
 import { openBoardPicker } from './boardpicker.js';
 import { updateSelectionBar } from './contextmenu.js';
 import { t } from '../i18n.js';
@@ -226,13 +226,19 @@ export class TextEditor {
     this.target = obj;
     this.cell = cell;
     this.previewMode = false;
+    const isMd = !cell && obj.markdown !== false && (obj.type === 'text' || obj.type === 'note');
+    if (isMd && obj.type === 'text' && (!obj.w || obj.w < 480) && (!obj.h || obj.h < 280) && (!obj.text || obj.text.length < 5)) {
+      obj.w = 640;
+      obj.h = 520;
+      obj.cardStyle = obj.cardStyle || 'canvas';
+      obj.autoSize = false;
+    }
     this.startH = obj.h;
     this.startW = obj.w;
     this.wrapW = obj.type === 'text'
       ? (obj.wrapW || Math.max(obj.w || 0, (obj.fontSize || 24) * 11.25)) : null;
 
     const ta = document.createElement('div');
-    const isMd = !cell && obj.markdown !== false && (obj.type === 'text' || obj.type === 'note');
     ta.className = isMd ? 'rt markdown-mode' : 'rt';
     ta.contentEditable = 'true';
     ta.setAttribute('role', 'textbox');
@@ -399,6 +405,18 @@ export class TextEditor {
             }
             return;
           }
+          const wl = e.target.closest('a.gb-wikilink, a.gb-obsidian-uri, a.gb-ext-link');
+          if (wl) {
+            e.preventDefault();
+            const href = wl.getAttribute('data-ref') || wl.getAttribute('href');
+            if (href) {
+              const bmatch = /^b:([^#]+)(?:#(.+))?/.exec(href);
+              const targetBoardId = bmatch ? bmatch[1] : href;
+              const refObj = { id: targetBoardId, name: wl.textContent || targetBoardId };
+              handleWikilinkDoubleClick(this.app, refObj, { x: e.clientX, y: e.clientY }, this.target);
+            }
+            return;
+          }
           this.toggleLivePreview();
         });
         this.previewEl = pv;
@@ -413,11 +431,17 @@ export class TextEditor {
       this.el.focus();
     }
     this.place();
+    updateSelectionBar(this.app, true);
   }
 
   renderPreviewDom() {
     if (!this.previewEl || !this.el) return;
     this.previewEl.innerHTML = renderMarkdownToHtml(this.el.value);
+    if (this.target?.lineNumbers !== false) {
+      this.previewEl.classList.add('gb-show-line-numbers');
+    } else {
+      this.previewEl.classList.remove('gb-show-line-numbers');
+    }
   }
 
   /**
@@ -448,18 +472,18 @@ export class TextEditor {
       box = { x: o.x + c * cw, y: o.y + r * ch, w: cw, h: ch };
     } else box = boundsOf(o);
 
-    if (o.type === 'note' && !this.cell) {
+    const isMd = !this.cell && (o.markdown !== false || o.cardStyle) && (o.type === 'text' || o.type === 'note');
+    if (isMd || o.autoSize === false) {
+      o.w = Math.max(120, o.w || 640);
+      o.h = Math.max(60, o.h || 520);
+      box = boundsOf(o);
+    } else if (o.type === 'note' && !this.cell) {
       const base = this.startH != null ? this.startH : o.h;
       const want = Math.max(base, this.noteHeight(o, this.el.value, base, this.runs()));
       if (want !== o.h) { o.h = want; box = boundsOf(o); app.surface.touch?.(); }
-    }
-
-    if (o.type === 'text' && !this.cell && o.autoSize !== false) {
+    } else if (o.type === 'text' && !this.cell && o.autoSize !== false) {
       const want = this.fitBox(o, this.el.value, this.wrapW, this.runs());
       if (want.h !== o.h || want.w !== o.w) { o.h = want.h; o.w = want.w; box = boundsOf(o); app.surface.touch?.(); }
-    } else if (o.type === 'text' && !this.cell) {
-      const want = this.fitBox(o, this.el.value, o.w, this.runs()).h;
-      if (want !== o.h) { o.h = want; box = boundsOf(o); app.surface.touch?.(); }
     }
 
     const pad = o.type === 'note' ? Math.max(10, o.w * 0.08) : o.type === 'shape' ? 10 : 0;
@@ -500,14 +524,21 @@ export class TextEditor {
       s.textAlign = this.cell ? 'center' : (o.align || (o.type === 'text' ? 'left' : 'center'));
       const ink = o.type === 'note' ? (o.textColor || readableText(o.color || '#ffd94a'))
         : inkPaint(o.color || o.textColor);
-      s.color = ink;
-      s.caretColor = ink;
-      s.background = o.type === 'note' ? o.color
-        : (!this.cell && o.background && o.background !== 'none' ? o.background : 'transparent');
-      s.outlineColor = o.type === 'note' ? ink : 'rgba(0,0,0,.45)';
+      const isTransparent = o.cardStyle === 'transparent' || o.background === 'transparent' || o.background === 'none';
+      const isDark = app.surface?.isDark?.() ?? false;
+      const defaultSolidBg = isDark ? '#202227' : '#ffffff';
+      s.background = isTransparent ? 'transparent'
+        : (o.background && o.background !== 'none' ? o.background : (isMd ? defaultSolidBg : (o.type === 'note' ? o.color : 'transparent')));
+      s.color = isMd && !isTransparent ? (isDark ? '#e2e8f0' : '#1e293b') : ink;
+      s.caretColor = isMd ? (isDark ? '#38bdf8' : '#0284c7') : ink;
+      s.outlineColor = o.type === 'note' ? ink : (isMd ? 'transparent' : 'rgba(0,0,0,.45)');
+      s.borderRadius = isMd ? '8px' : '0px';
+      s.boxShadow = isMd && !isTransparent ? '0 4px 16px rgba(0,0,0,0.12)' : 'none';
+      s.border = isMd && !isTransparent ? (isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.12)') : 'none';
+      s.overflowY = isMd ? 'auto' : 'visible';
       s.transform = o.rotation ? `rotate(${o.rotation}rad)` : '';
       s.transformOrigin = '0 0';
-      s.padding = '0';
+      s.padding = isMd ? '10px 14px' : '0';
       if (o.type === 'note' || o.type === 'shape' || this.cell) {
         const lines = this.el.value.split('\n').length;
         const contentH = lines * size * 1.28 * cam.z;
@@ -571,7 +602,14 @@ export class TextEditor {
     } else if ((target.text || '') !== value || !same(objectRuns(target), runs)) {
       const patch = { text: value };
       if (runs || target.runs !== undefined) patch.runs = runs || undefined;
-      if (target.type === 'text' && target.autoSize !== false) {
+      const isMd = target.markdown !== false && (target.type === 'text' || target.type === 'note');
+      if (target.type === 'text' && (isMd || target.autoSize === false)) {
+        if (this.startH != null) target.h = this.startH;
+        if (this.startW != null) target.w = this.startW;
+        patch.w = target.w;
+        patch.h = target.h;
+        patch.wrapW = target.w;
+      } else if (target.type === 'text' && target.autoSize !== false) {
         if (this.startH != null) target.h = this.startH;
         if (this.startW != null) target.w = this.startW;
         Object.assign(patch, this.fitBox(target, value, this.wrapW, runs));
@@ -580,6 +618,16 @@ export class TextEditor {
         if (this.startH != null) target.h = this.startH;
         const h = this.fitBox(target, value, target.w, runs).h;
         if (h !== target.h) patch.h = h;
+      }
+      if (isMd && value) {
+        try {
+          const fm = parseFrontmatter(value);
+          if (fm && fm.attributes) {
+            if (fm.attributes.title) patch.title = String(fm.attributes.title);
+            if (Array.isArray(fm.attributes.tags)) patch.tags = fm.attributes.tags;
+            if (Array.isArray(fm.attributes.aliases)) patch.aliases = fm.attributes.aliases;
+          }
+        } catch {}
       }
       if (target.type === 'note') {
         if (this.startH != null) target.h = this.startH;
@@ -667,6 +715,170 @@ export class TextEditor {
     this.app.afterTextEdit();
     this.app.surface.invalidate();
     this.app.syncUI();
+  }
+
+  toggleLinePrefix(prefix, regex) {
+    if (!this.el) return;
+    const a = this.el.selectionStart;
+    const b = this.el.selectionEnd;
+    const val = this.el.value;
+    const lines = val.split('\n');
+    let charCount = 0;
+    let startLine = 0, endLine = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const len = lines[i].length + 1;
+      if (charCount <= a && a < charCount + len) startLine = i;
+      if (charCount <= b && b <= charCount + len) { endLine = i; break; }
+      charCount += len;
+    }
+    for (let i = startLine; i <= endLine; i++) {
+      if (regex && regex.test(lines[i])) {
+        lines[i] = lines[i].replace(regex, '');
+      } else {
+        lines[i] = prefix + (regex ? lines[i].replace(regex, '') : lines[i]);
+      }
+    }
+    const newVal = lines.join('\n');
+    this.el.value = newVal;
+    this.place();
+    if (this.previewEl) this.renderPreviewDom();
+    this.app.surface.invalidate();
+    this.el.dispatchEvent(new Event('input'));
+  }
+
+  insertBlockText(template) {
+    if (!this.el) return;
+    const a = this.el.selectionStart;
+    const b = this.el.selectionEnd;
+    const val = this.el.value;
+    const before = val.slice(0, a);
+    const after = val.slice(b);
+    const nlBefore = before && !before.endsWith('\n') ? '\n\n' : '';
+    const nlAfter = after && !after.startsWith('\n') ? '\n\n' : '';
+    const textToInsert = `${nlBefore}${template}${nlAfter}`;
+    this._insertPlain?.(textToInsert);
+    this.place();
+    if (this.previewEl) this.renderPreviewDom();
+    this.app.surface.invalidate();
+  }
+
+  insertMarkdownTable(rows = 3, cols = 3) {
+    let header = '| ' + Array.from({ length: cols }, (_, i) => `Col ${i + 1}`).join(' | ') + ' |\n';
+    let sep = '| ' + Array.from({ length: cols }, () => '---').join(' | ') + ' |\n';
+    let body = '';
+    for (let r = 0; r < rows; r++) {
+      body += '| ' + Array.from({ length: cols }, (_, c) => `Item ${r + 1}.${c + 1}`).join(' | ') + ' |\n';
+    }
+    this.insertBlockText(header + sep + body.trimEnd());
+  }
+
+  insertCallout(calloutType = 'note', title = 'Note', body = 'Important recall details here.') {
+    const text = `> [!${calloutType}] ${title}\n> ${body}`;
+    this.insertBlockText(text);
+  }
+
+  insertCodeBlock(lang = 'javascript') {
+    const text = `\`\`\`${lang}\nconsole.log("Hello, Obsidian!");\n\`\`\``;
+    this.insertBlockText(text);
+  }
+
+  insertMermaidBlock() {
+    const text = `\`\`\`mermaid\ngraph TD\n  A[Start Note] --> B[Connect to Board]\n  B --> C[Active Recall]\n\`\`\``;
+    this.insertBlockText(text);
+  }
+
+  insertMathBlock() {
+    const text = `$$\nE = mc^2\n$$`;
+    this.insertBlockText(text);
+  }
+
+  deleteCurrentLineOrSelection() {
+    if (!this.el) return;
+    const a = this.el.selectionStart;
+    const b = this.el.selectionEnd;
+    if (a !== b) {
+      document.execCommand('delete');
+      this.place();
+      if (this.previewEl) this.renderPreviewDom();
+      return;
+    }
+    const val = this.el.value;
+    const lineStart = val.lastIndexOf('\n', a - 1) + 1;
+    let lineEnd = val.indexOf('\n', a);
+    if (lineEnd === -1) lineEnd = val.length;
+    else lineEnd += 1;
+    this.el.setSelectionRange(lineStart, lineEnd);
+    document.execCommand('delete');
+    this.place();
+    if (this.previewEl) this.renderPreviewDom();
+  }
+
+  clearFormatting() {
+    if (!this.el) return;
+    document.execCommand('removeFormat');
+    const a = this.el.selectionStart;
+    const b = this.el.selectionEnd;
+    const val = this.el.value;
+    const selected = val.slice(a, b);
+    if (selected) {
+      const stripped = selected.replace(/^#{1,6}\s+|^\s*[-*+]\s+(\[[ xX]\]\s+)?|^\s*\d+\.\s+|^>\s*/gm, '');
+      this._insertPlain?.(stripped);
+    }
+    this.place();
+    if (this.previewEl) this.renderPreviewDom();
+  }
+
+  setCardSizePreset(preset = 'halfPage') {
+    if (!this.target) return;
+    const o = this.target;
+    let w = 640, h = 520;
+    if (preset === 'wide') { w = 960; h = 680; }
+    else if (preset === 'compact') { w = 360; h = 240; }
+    else if (preset === 'halfPage') { w = 640; h = 520; }
+    o.w = w;
+    o.h = h;
+    o.wrapW = w;
+    o.autoSize = false;
+    o.cardStyle = o.cardStyle || 'canvas';
+    this.app.store.update(o.id, { w, h, wrapW: w, autoSize: false, cardStyle: o.cardStyle }, 'resize note');
+    this.place();
+    this.app.surface.touch?.();
+    this.app.surface.invalidate();
+    updateSelectionBar(this.app, true);
+  }
+
+  setCardBackground(bg) {
+    if (!this.target) return;
+    const o = this.target;
+    o.background = bg;
+    o.cardStyle = bg === 'transparent' ? 'transparent' : 'canvas';
+    this.app.store.update(o.id, { background: bg, cardStyle: o.cardStyle }, 'note background');
+    this.place();
+    this.app.surface.touch?.();
+    this.app.surface.invalidate();
+    updateSelectionBar(this.app, true);
+  }
+
+  setCardFontSize(size) {
+    if (!this.target) return;
+    const o = this.target;
+    o.fontSize = Number(size) || 20;
+    this.app.store.update(o.id, { fontSize: o.fontSize }, 'font size');
+    this.place();
+    this.app.surface.touch?.();
+    this.app.surface.invalidate();
+    updateSelectionBar(this.app, true);
+  }
+
+  toggleLineNumbers() {
+    if (!this.target) return;
+    const o = this.target;
+    o.lineNumbers = o.lineNumbers === false ? true : false;
+    this.app.store.update(o.id, { lineNumbers: o.lineNumbers }, 'toggle line numbers');
+    this.place();
+    if (this.previewEl) this.renderPreviewDom();
+    this.app.surface.invalidate();
+    updateSelectionBar(this.app, true);
   }
 
   reposition() { if (this.el) this.place(); }
