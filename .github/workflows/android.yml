@@ -1,10 +1,17 @@
 name: Android
+# DORMANT: Android is not supported by this fork yet. The automatic triggers are
+# removed on purpose so a push or a tag can never start an Android build. This
+# workflow can still be run by hand from the Actions tab (Run workflow) while the
+# Android side is being sorted out; restore the push/pull_request triggers below
+# once it builds and signs reliably.
+#
+# Restore with:
+#   push:
+#     branches: [main, 'android/**']
+#     paths: ['android/**', 'src/**', 'sync/**', 'test/android*', 'package.json', 'storage-location.js', '.github/workflows/android.yml']
+#   pull_request:
+#     paths: ['android/**', 'src/**', 'sync/**', 'test/android*', 'package.json', 'storage-location.js', '.github/workflows/android.yml']
 on:
-  push:
-    branches: [main, 'android/**']
-    paths: ['android/**', 'src/**', 'sync/**', 'test/android*', 'package.json', 'storage-location.js', '.github/workflows/android.yml']
-  pull_request:
-    paths: ['android/**', 'src/**', 'sync/**', 'test/android*', 'package.json', 'storage-location.js', '.github/workflows/android.yml']
   workflow_dispatch:
 permissions:
   contents: read

@@ -21,9 +21,15 @@
 #   ANDROID_KEY_ALIAS          - the key alias inside it
 name: Android release
 
+# DORMANT: Android is not supported by this fork yet, and the three signing
+# secrets it needs do not exist in this repository. The tag trigger is removed on
+# purpose, so pushing an android-* tag can never start a build that would fail
+# for a missing keystore. Run it by hand from the Actions tab when you want to.
+#
+# Restore the trigger with:
+#   push:
+#     tags: ['android-*']
 on:
-  push:
-    tags: ['android-*']
   workflow_dispatch:
 
 permissions:
