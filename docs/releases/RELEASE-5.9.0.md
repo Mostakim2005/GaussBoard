@@ -3,8 +3,8 @@
 > **Release Version**: `v5.9.0`  
 > **Date**: October 23, 2026  
 > **Git Commit Target**: `feat: implement Phase 5 JSON Canvas 1.0, Knowledge Graph View & Document Navigator (v5.9.0)`  
-> **Binary Deliverable**: [`releases/GazBoard-v5.9.0-Portable.exe`](../../releases/GazBoard-v5.9.0-Portable.exe) (108,168,272 bytes / 103.16 MiB)  
-> **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md)  
+> **Binary Deliverable**: `GazBoard-v5.9.0-Portable.exe` (108,168,272 bytes / 103.16 MiB)  
+> **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Invariant Compliance**: Strict verification across all 6 Golden Invariants (100% i18n parity, 1,240 base smoke tests passed, 39 custom tests passed, 0 native C++ dependencies).
 
 ---
@@ -78,5 +78,5 @@ Release **`v5.9.0`** completes **Phase 5 (Knowledge Interoperability & Document 
 ## 4. Rollback & Bisect Target
 
 If a regression occurs:
-- Rollback binary: [`GazBoard-v5.8.0-Portable.exe`](../../releases/GazBoard-v5.8.0-Portable.exe)
+- Rollback binary: `GazBoard-v5.8.0-Portable.exe`
 - Rollback Git commit: `bce627e`

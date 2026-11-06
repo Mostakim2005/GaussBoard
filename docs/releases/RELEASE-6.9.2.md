@@ -4,8 +4,8 @@
 > **Date**: October 25, 2026  
 > **Git Commit Target**: `fix(hardening): complete P0 and P1 senior hardening audit (v6.9.2)`  
 > **Binary Deliverables**:  
-> - [`releases/GaussBoard-v6.9.2-Portable.exe`](../../releases/GaussBoard-v6.9.2-Portable.exe) (`113,139,325 bytes` / `107.89 MiB`) — *Primary GaussBoard portable release*  
-> - [`releases/GazBoard-v6.9.2-Portable.exe`](../../releases/GazBoard-v6.9.2-Portable.exe) (`113,146,990 bytes` / `107.90 MiB`) — *Preserved GazBoard heritage build*  
+> - `GaussBoard-v6.9.2-Portable.exe` (`113,139,325 bytes` / `107.89 MiB`) — *Primary GaussBoard portable release*  
+> - `GazBoard-v6.9.2-Portable.exe` (`113,146,990 bytes` / `107.90 MiB`) — *Preserved GazBoard heritage build*  
 > **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Audit Record**: [`../hardening/AUDIT_LOG.md`](../hardening/AUDIT_LOG.md) (one line per finding, appended as it was fixed)  
 > **Invariant Compliance**: 6 Golden Invariants preserved; 100% i18n parity across 7 locales with **2,245** keys; 0 native C++ dependencies.
@@ -134,8 +134,8 @@ Audited subsystems: MNA circuit simulator & semiconductors, video export/MP4, Ma
 | **Source release** | repository `feat/cumulative-fixes` at tag `v6.9.2` | Source | Hardened application source |
 | **Hardening audit record** | `docs/hardening/AUDIT_LOG.md` | Documentation | 74 findings, fix status, verification, manual tests |
 | **Release dossier** | `docs/releases/RELEASE-6.9.2.md` | Documentation | This record |
-| **GaussBoard Portable** | [`releases/GaussBoard-v6.9.2-Portable.exe`](../../releases/GaussBoard-v6.9.2-Portable.exe) | Binary | Standalone zero-install portable Windows executable (`113,139,325 bytes`) with GaussBoard branding & EE STEM specialization |
-| **GazBoard Portable** | [`releases/GazBoard-v6.9.2-Portable.exe`](../../releases/GazBoard-v6.9.2-Portable.exe) | Binary | Preserved zero-install portable Windows executable (`113,146,990 bytes`) under original GazBoard heritage name |
+| **GaussBoard Portable** | `GaussBoard-v6.9.2-Portable.exe` | Binary | Standalone zero-install portable Windows executable (`113,139,325 bytes`) with GaussBoard branding & EE STEM specialization |
+| **GazBoard Portable** | `GazBoard-v6.9.2-Portable.exe` | Binary | Preserved zero-install portable Windows executable (`113,146,990 bytes`) under original GazBoard heritage name |
 
 ---
 

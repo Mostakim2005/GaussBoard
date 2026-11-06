@@ -35,12 +35,12 @@ app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 
 // The one place the app knows about the internet, and it only looks.
-const RELEASES_URL = 'https://github.com/fahim9778/GazBoard-Replay/releases';
+const RELEASES_URL = 'https://github.com/Mostakim2005/GazBoard/releases';
 // Overridable so the suite can serve a known reply from localhost and test the
 // whole chain - fetch, parse, compare, decide - without depending on the
 // network or on what happens to be released today.
 const UPDATE_API = process.env.GAZBOARD_UPDATE_API
-  || 'https://api.github.com/repos/fahim9778/GazBoard-Replay/releases?per_page=30';
+  || 'https://api.github.com/repos/Mostakim2005/GazBoard/releases?per_page=30';
 
 /*
  * Read a desktop version out of a release tag, or answer null.

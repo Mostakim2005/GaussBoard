@@ -8,7 +8,12 @@
 
 ## 1. Executive Summary
 
-* **Project**: **GazBoard Replay** (Windows-first fork of GazBoard v4.8.1).
+* **Project**: **GaussBoard** — a fork of GazBoard. The product name users see is GaussBoard; the
+  internal app identity, storage folder and `.gazboard` file extension deliberately stay under the
+  original name so upstream changes keep merging cleanly and existing boards keep opening. A full
+  internal rename is deferred until the fork is self-sufficient.
+* **Fork**: [`Mostakim2005/GazBoard`](https://github.com/Mostakim2005/GazBoard) (a real GitHub fork,
+  so upstream can be merged directly).
 * **Base Repository**: Upstream [GazBoard by theBoringCodes](https://github.com/fahim9778/GazBoard).
 * **Mission**: Deliver a lightning-fast, offline-first digital whiteboard tailored for Windows 10/11 tablet and desktop users, integrating study features inspired by **StarNote** and **Flexcil**:
   1. *Audio-Synchronized Note Replay*: Audio recordings capture sub-millisecond timestamps on every pen point (`p.t`), enabling temporal replay with electric cyan glow animations, waveform density scrubbing, and click-to-seek jump.
@@ -233,10 +238,10 @@ This section establishes mandatory operating directives for any AI assistant con
 
 ### 8.1. Autonomous Auditing & Vulnerability Discovery
 1. **Never Assume Code is Defect-Free**: Continuously audit recent releases (v4.8.12 through v4.8.20) for subtle regressions:
-   - State isolation leaks between split viewports ([`src/js/ui/split-workspace.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/split-workspace.js)).
-   - Coordinate space drift or precision loss during deep zooming or pan bounds ([`src/js/core/camera.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/camera.js), [`src/js/ui/pagemargin-dialog.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/pagemargin-dialog.js)).
-   - WeakMap and geometry cache invalidation gaps ([`src/js/core/ink.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/ink.js), [`src/js/core/render.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/render.js)).
-   - SVG `<foreignObject>` namespace compliance and unescaped HTML characters ([`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js)).
+   - State isolation leaks between split viewports ([`src/js/ui/split-workspace.js`](../src/js/ui/split-workspace.js)).
+   - Coordinate space drift or precision loss during deep zooming or pan bounds ([`src/js/core/camera.js`](../src/js/core/camera.js), [`src/js/ui/pagemargin-dialog.js`](../src/js/ui/pagemargin-dialog.js)).
+   - WeakMap and geometry cache invalidation gaps ([`src/js/core/ink.js`](../src/js/core/ink.js), [`src/js/core/render.js`](../src/js/core/render.js)).
+   - SVG `<foreignObject>` namespace compliance and unescaped HTML characters ([`src/js/core/markdown.js`](../src/js/core/markdown.js)).
 2. **Defensive Hardening**: When a potential flaw, vulnerability, or poor architectural decision is identified:
    - Do not wait for user complaints; proactively propose and implement the hardening fix.
    - Always accompany code changes with targeted unit tests in `test/custom-features.test.mjs` or `test/markdown.test.mjs`.

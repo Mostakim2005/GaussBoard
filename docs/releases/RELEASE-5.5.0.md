@@ -34,7 +34,7 @@ GazBoard Replay **v5.5.0** delivers the first major milestone of Phase 2 from th
      - **Mermaid.js** (`v10.9.1`): Flowcharts, sequence diagrams, mind maps, and decision trees.
      - **Chart.js** (`v4.4.7`): HTML5 Canvas spider/radar, bar, line, and doughnut charts.
      - **pdf-lib** (`v1.17.1`): Pure JS PDF metadata editing and vector annotation embedding.
-   - Central manifest [`libraries.json`](file:///C:/Users/kazir/Documents/Antigravity/CommonLibraries/libraries.json) and documentation [`README.md`](file:///C:/Users/kazir/Documents/Antigravity/CommonLibraries/README.md).
+   - Central manifest `libraries.json` and documentation [`README.md`](../../README.md).
 
 3. **In-App Library Inspector Modal (`src/js/ui/library-inspector.js`)**:
    - Interactive dialog accessible from Settings and the About window.
@@ -90,7 +90,7 @@ npm run smoke:custom
 ## 4. Binary Release Package
 
 - **Filename**: `GazBoard-v5.5.0-Portable.exe`
-- **Location**: [`releases/GazBoard-v5.5.0-Portable.exe`](../../releases/GazBoard-v5.5.0-Portable.exe)
+- **Location**: `GazBoard-v5.5.0-Portable.exe`
 - **Size**: 106,637,679 bytes (~106.6 MB)
 - **Format**: Zero-install standalone portable Windows executable
 - **Packaging Protocol**: Follows Antigravity Rule 5 (Portable by default, version-stamped filename)

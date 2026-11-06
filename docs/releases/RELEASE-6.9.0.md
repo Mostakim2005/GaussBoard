@@ -3,7 +3,7 @@
 > **Release Version**: `v6.9.0`  
 > **Date**: October 24, 2026  
 > **Git Commit Target**: `feat(core): Phase 9 Advanced Canvas, Workspace & Media Productivity (v6.9.0)`  
-> **Binary Deliverable**: [`releases/GazBoard-v6.9.0-Portable.exe`](../../releases/GazBoard-v6.9.0-Portable.exe) (`113,120,743 bytes` / `107.88 MiB`)  
+> **Binary Deliverable**: `GazBoard-v6.9.0-Portable.exe` (`113,120,743 bytes` / `107.88 MiB`)  
 > **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Invariant Compliance**: Strict adherence across all 6 Golden Invariants (100% i18n parity across 7 locales with 2,194 strings, 0 native C++ dependencies, preserved `p.t` stroke timestamps, finite audio safeguard, scene partitioning during audio replay, Study Tape toggle persistence).
 
@@ -79,7 +79,7 @@ Release **`v6.9.0` (Phase 9 — Advanced Canvas, Workspace & Media Productivity)
 
 | Deliverable | Path | Type | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Portable Binary** | [`releases/GazBoard-v6.9.0-Portable.exe`](../../releases/GazBoard-v6.9.0-Portable.exe) | Win32 Binary | Zero-install standalone executable with all Phase 1–9 capabilities bundled. |
+| **Portable Binary** | `GazBoard-v6.9.0-Portable.exe` | Win32 Binary | Zero-install standalone executable with all Phase 1–9 capabilities bundled. |
 | **Dataview Engine** | [`src/js/core/dataview.js`](../../src/js/core/dataview.js) | Core Module | Pure JS query engine for TABLE and LIST whiteboard object queries. |
 | **Kanban Component** | [`src/js/core/kanban.js`](../../src/js/core/kanban.js) | Core Module | Interactive in-canvas multi-column sprint Kanban board. |
 | **Orthogonal Connectors** | [`src/js/core/connectors.js`](../../src/js/core/connectors.js) | Core Module | Manhattan 90° orthogonal elbow routing and cardinal magnetic snap ports. |

@@ -36,8 +36,8 @@ export const PACKS = {
 
 /** Where a font file can be fetched from, in the order tried. */
 export const SOURCES = [
-  (file) => `https://cdn.jsdelivr.net/gh/fahim9778/GazBoard@main/fonts/${file}`,
-  (file) => `https://raw.githubusercontent.com/fahim9778/GazBoard/main/fonts/${file}`
+  (file) => `https://cdn.jsdelivr.net/gh/Mostakim2005/GazBoard@main/fonts/${file}`,
+  (file) => `https://raw.githubusercontent.com/Mostakim2005/GazBoard/main/fonts/${file}`
 ];
 
 /** The pack that goes with a language, if it has one. */

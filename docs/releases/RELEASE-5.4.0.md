@@ -14,7 +14,7 @@ GazBoard 5.4.0 marks the completion of **Phase 1** of the architectural roadmap:
 All additions were audited and guarded to ensure zero performance degradation and total compliance with the repository's invariants.
 
 ### 1.1 Binary Deliverable & Release Artifacts
-* **Portable Binary**: [`releases/GazBoard-v5.4.0-Portable.exe`](../../releases/GazBoard-v5.4.0-Portable.exe)
+* **Portable Binary**: `GazBoard-v5.4.0-Portable.exe`
 * **File Size**: 106,627,966 bytes (101.68 MB)
 * **Packaging Model**: Standalone, self-contained single-file portable Windows executable. Zero installation, zero registry writes, fully isolated user data. Built on demand via `npx electron-builder --win portable`.
 

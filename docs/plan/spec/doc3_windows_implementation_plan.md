@@ -11,19 +11,19 @@ Because GazBoard is a dedicated desktop application with full control over its H
 ## 1. Engineering Principles for Windows
 
 1. **Direct Native Canvas Rendering**:
-   * Instead of masking with DOM overlays or diffing scenes, GazBoard directly controls its 2D rendering pass in [render.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js). Ghosting, progressive reveals, and glowing pen tips are drawn natively at 60–120 FPS.
+   * Instead of masking with DOM overlays or diffing scenes, GazBoard directly controls its 2D rendering pass in [render.js](../../../src/js/core/render.js). Ghosting, progressive reveals, and glowing pen tips are drawn natively at 60–120 FPS.
 2. **Audio Clock as Single Source of Truth**:
    * The HTML5 `<audio>` element's `currentTime` is the absolute master clock. Visual animations, camera easing, and subtitle cues poll this clock via `requestAnimationFrame`—completely eliminating clock drift.
 3. **Strict Non-Destructive Rendering**:
-   * Stored stroke geometry, colors, opacities, and undo stacks in [store.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js) are **never mutated** for visual effects. Ghosting and pending states are computed transiently during the paint pass, guaranteeing that autosave cannot corrupt user drawings.
+   * Stored stroke geometry, colors, opacities, and undo stacks in [store.js](../../../src/js/core/store.js) are **never mutated** for visual effects. Ghosting and pending states are computed transiently during the paint pass, guaranteeing that autosave cannot corrupt user drawings.
 4. **Hardware Acceleration & Windows Pen Optimization**:
-   * Windows stylus input uses `PointerEvent.getCoalescedEvents()` for micro-timing accuracy and preserves compatibility with Windows Delegated Ink Trails ([inktrail.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/inktrail.js)).
+   * Windows stylus input uses `PointerEvent.getCoalescedEvents()` for micro-timing accuracy and preserves compatibility with Windows Delegated Ink Trails ([inktrail.js](../../../src/js/core/inktrail.js)).
 
 ---
 
 ## 2. Data Model Extensions
 
-The document model in [store.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js) is extended cleanly and backwards-compatibly:
+The document model in [store.js](../../../src/js/core/store.js) is extended cleanly and backwards-compatibly:
 
 ```mermaid
 erDiagram
@@ -214,7 +214,7 @@ export class AudioRecorder {
 
 ---
 
-### 3.2 Stroke Timestamping Engine ([tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js))
+### 3.2 Stroke Timestamping Engine ([tools.js](../../../src/js/core/tools.js))
 
 Integrate into GazBoard's existing stroke lifecycle:
 
@@ -243,11 +243,11 @@ Integrate into GazBoard's existing stroke lifecycle:
 
 ---
 
-### 3.3 Replay & Real-Time Reanimation Engine ([render.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js))
+### 3.3 Replay & Real-Time Reanimation Engine ([render.js](../../../src/js/core/render.js))
 
 During audio playback, `App` supplies the current playback state `replayState = { active: true, audioId, currentTimeMs, pendingStyle }` to the renderer.
 
-In [render.js:drawStroke](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js#L379):
+In [render.js:drawStroke](../../../src/js/core/render.js):
 ```javascript
 export function drawStroke(ctx, o, replayState = null) {
   const pts = o.points;
@@ -302,7 +302,7 @@ export function drawStroke(ctx, o, replayState = null) {
 
 ### 3.4 Interactive Click-to-Seek ("Audio Jump")
 
-Leverage GazBoard's spatial hit testing in [hit.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/hit.js):
+Leverage GazBoard's spatial hit testing in [hit.js](../../../src/js/core/hit.js):
 
 ```javascript
 // In tools.js pointerdown handler
@@ -331,7 +331,7 @@ onPointerDown(e) {
 
 ### 3.5 Floating Audio Player & Scrubber UI (`src/js/ui/audioplayer.js`)
 
-Designed as a sleek, non-intrusive floating bar following the pattern established by [timer.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/ui/timer.js):
+Designed as a sleek, non-intrusive floating bar following the pattern established by [timer.js](../../../src/js/ui/timer.js):
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -361,18 +361,18 @@ Designed as a sleek, non-intrusive floating bar following the pattern establishe
     revealed: false
   }
   ```
-* **Rendering in [render.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js)**:
+* **Rendering in [render.js](../../../src/js/core/render.js)**:
   * When `!revealed`: Draws opaque textured tape rectangle concealing underlying ink.
   * When `revealed`: Draws faint 15% opacity dashed outline revealing what is underneath.
 * **Interaction**: Tapping with pen or mouse flips `revealed = !revealed`.
 
-#### B. Gesture Scratch-Out Eraser ([tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js))
+#### B. Gesture Scratch-Out Eraser ([tools.js](../../../src/js/core/tools.js))
 * In `finishStroke()`: Evaluate point coordinates of the candidate stroke before committing it.
 * **Algorithm**:
   * Count sharp directional reversals along the X or Y axis ($> 4$ reversals).
   * Compute ratio of total travel distance to bounding box diagonal ($\text{length} / \text{diagonal} > 3.5$).
   * If both thresholds match: Treat the stroke as a scratch-out gesture.
-  * Find all strokes/objects intersecting the bounding box using [hit.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/hit.js) and call `this.store.remove(intersectedIds, 'scratch erase')`. Discard the scratch stroke without saving it.
+  * Find all strokes/objects intersecting the bounding box using [hit.js](../../../src/js/core/hit.js) and call `this.store.remove(intersectedIds, 'scratch erase')`. Discard the scratch stroke without saving it.
 
 #### C. PDF Excerpt & Hyperlink Cards
 * In selection tool: Box-select an area on an imported PDF page and click "Create Excerpt".
@@ -407,20 +407,20 @@ gantt
 
 ### Phase 1: Core Recording & Timestamping Engine
 * Create `src/js/core/audio.js` with `AudioRecorder`.
-* Add `t0`, `t1`, `audioId` to stroke objects in [tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js).
+* Add `t0`, `t1`, `audioId` to stroke objects in [tools.js](../../../src/js/core/tools.js).
 * Save audio assets to GazBoard’s local asset directory via `window.board.assets.put()`.
 
 ### Phase 2: Playback Bar & Real-Time Reanimation
 * Create floating audio bar `src/js/ui/audioplayer.js`.
-* Update [render.js:drawStroke](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js#L379) to support ghosting of pending strokes and progressive sub-stroke reveals.
-* Implement interactive click-to-seek in [tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js) with spatial hit test.
+* Update [render.js:drawStroke](../../../src/js/core/render.js) to support ghosting of pending strokes and progressive sub-stroke reveals.
+* Implement interactive click-to-seek in [tools.js](../../../src/js/core/tools.js) with spatial hit test.
 
 ### Phase 3: Study Tools & Timeline Intelligence
 * Implement the **Study Tape Tool** (`tape.js`, `render.js`).
 * Add stroke density tick marks and bookmarks to the audio scrubber bar.
-* Implement **Auto-Follow Camera** in [camera.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/camera.js).
+* Implement **Auto-Follow Camera** in [camera.js](../../../src/js/core/camera.js).
 
 ### Phase 4: Gestures & Media Export
-* Implement **Gesture Scratch-Out Eraser** in [tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js).
+* Implement **Gesture Scratch-Out Eraser** in [tools.js](../../../src/js/core/tools.js).
 * Implement PDF Excerpt cards with jump hyperlinks.
 * Implement **Animated Video Export** (`export-video.js`) combining canvas stream and audio into `.webm`.

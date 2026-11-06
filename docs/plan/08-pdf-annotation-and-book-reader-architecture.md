@@ -29,7 +29,7 @@ To elevate GazBoard into a world-class academic and technical PDF annotator (riv
 
 All required runtime libraries have been verified, downloaded, and registered in the system-wide repository:  
 `C:\Users\kazir\Documents\Antigravity\CommonLibraries\`  
-and cataloged in [`C:\Users\kazir\Documents\Antigravity\TOPIC_CATALOG.md`](file:///C:/Users/kazir/Documents/Antigravity/TOPIC_CATALOG.md).
+and cataloged in `C:\Users\kazir\Documents\Antigravity\TOPIC_CATALOG.md` (a scratch catalogue outside this repository).
 
 ---
 

@@ -3,7 +3,7 @@
 > **Release Version**: `v6.4.0`  
 > **Date**: October 24, 2026  
 > **Git Commit Target**: `feat(circuits): implement Phase 4 Realistic 2D/2.5D Industrial Circuit Simulation & Headless MNA Engine (v6.4.0)`  
-> **Binary Deliverable**: [`releases/GazBoard-v6.4.0-Portable.exe`](../../releases/GazBoard-v6.4.0-Portable.exe) (`108,231,694 bytes` / `103.22 MiB`)  
+> **Binary Deliverable**: `GazBoard-v6.4.0-Portable.exe` (`108,231,694 bytes` / `103.22 MiB`)  
 > **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Invariant Compliance**: Strict adherence across all 6 Golden Invariants (100% i18n parity, 1,240 smoke checks passed, 0 native C++ dependencies, preserved `p.t` stroke timestamps, Study Tape persistence).
 
@@ -77,7 +77,7 @@ It establishes an interactive **Realistic 2D/2.5D Industrial Circuit Simulation 
    - `node scripts/i18n-check.js`
    - **Result**: **1,993 / 1,993 translated, 0 missing, 0 errors** across all 7 supported locales (`ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, `zh-Hant.json`).
 3. **Binary Packaging Verification (Rule 5 Protocol)**:
-   - Standalone portable binary: [`releases/GazBoard-v6.4.0-Portable.exe`](../../releases/GazBoard-v6.4.0-Portable.exe) (`108,231,694 bytes`).
+   - Standalone portable binary: `GazBoard-v6.4.0-Portable.exe` (`108,231,694 bytes`).
    - Zero-installation, runs out of the box with zero registry writes or elevation.
 
 ---

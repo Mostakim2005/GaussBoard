@@ -1,7 +1,7 @@
 # GazBoard Replay — Comprehensive Manual QA Testing & Feedback Guide
 ## Testing & Field-Audit Protocol for Versions v4.8.1 through v6.0.0
 
-> **Target Build**: [`releases/GazBoard-v6.0.0-Portable.exe`](../releases/GazBoard-v6.0.0-Portable.exe) (Portable Zero-Install Executable, 103.16 MiB)  
+> **Target Build**: `GazBoard-v6.0.0-Portable.exe` (Portable Zero-Install Executable, 103.16 MiB)  
 > **Date**: October 2026  
 > **Author**: Senior Principal Architect QA & Engineering Team  
 > **Companion Documents**: [`INDEX.md`](INDEX.md) | [`releases/RELEASES_INDEX.md`](releases/RELEASES_INDEX.md) | [`DEVELOPER_HANDOVER.md`](DEVELOPER_HANDOVER.md)

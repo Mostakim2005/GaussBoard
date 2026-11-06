@@ -148,7 +148,7 @@ test('Choosing a theme tells Android, so the bars match the board', async () => 
 });
 
 test('The Chinese font is fetched by Android, since the page may reach no website itself', async () => {
-  const url = 'https://cdn.jsdelivr.net/gh/fahim9778/GazBoard@main/fonts/gazboard-noto-sans-sc-400-v1.woff2';
+  const url = 'https://cdn.jsdelivr.net/gh/Mostakim2005/GazBoard@main/fonts/gazboard-noto-sans-sc-400-v1.woff2';
   const bytes = Buffer.from('not really a font');
   const token = 'a'.repeat(32);
   const seen = [];
@@ -171,11 +171,11 @@ test('The Chinese font is fetched by Android, since the page may reach no websit
 test('A font server that says no, and a phone that cannot reach it, read like fetch() would', async () => {
   let reply = { ok: false, status: 404 };
   const { adapter } = await setup(async () => reply);
-  const said = await adapter.fetchFont('https://raw.githubusercontent.com/fahim9778/GazBoard/main/fonts/x.woff2');
+  const said = await adapter.fetchFont('https://raw.githubusercontent.com/Mostakim2005/GazBoard/main/fonts/x.woff2');
   assert.deepEqual({ ok: said.ok, status: said.status }, { ok: false, status: 404 },
     `a 404 came back as ${JSON.stringify(said)} — it must say "Server replied 404", not "No connection"`);
   reply = { ok: false, offline: true };
-  const err = await adapter.fetchFont('https://raw.githubusercontent.com/fahim9778/GazBoard/main/fonts/x.woff2').then(() => null, (e) => e);
+  const err = await adapter.fetchFont('https://raw.githubusercontent.com/Mostakim2005/GazBoard/main/fonts/x.woff2').then(() => null, (e) => e);
   assert.ok(err instanceof TypeError, `an unreachable server gave ${err} — fontpack.js counts a TypeError as "No connection"`);
 });
 

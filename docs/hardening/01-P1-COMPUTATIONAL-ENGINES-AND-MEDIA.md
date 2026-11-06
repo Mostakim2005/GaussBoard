@@ -35,25 +35,25 @@ An offline circuit simulation workstation simulating industrial automation circu
 - **Time Stepping**: Discrete time integration ($\Delta t = 50\,\mu\text{s}$) models capacitor charging ($I = C \frac{dV}{dt}$) and inductor flux ($V = L \frac{dI}{dt}$).
 
 ### 1.3 Primary Code Files & Key Locations
-- [`src/js/core/circuit-sim.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/circuit-sim.js):
+- [`src/js/core/circuit-sim.js`](../../src/js/core/circuit-sim.js):
   - `IndustrialCircuitSim` class definition (Lines 163–250)
   - `step(dt)` simulation loop & state updates (Lines 253–350)
   - Non-linear semiconductor diode/transistor companion evaluation (Lines 420–580)
   - NE555 timer internal comparator and flip-flop state machine (Lines 620–695)
   - Relay Ladder Logic (RLL) and motor contactor logic (Lines 700–850)
-- [`src/js/ui/circuit-workbench.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/circuit-workbench.js):
+- [`src/js/ui/circuit-workbench.js`](../../src/js/ui/circuit-workbench.js):
   - 2.5D interactive canvas renderer & electron animation loop (Lines 95–180)
   - Digital Multimeter (DMM) voltage/current/wattage probe hit-testing (Lines 220–290)
   - Dual-trace oscilloscope buffer sampling (Lines 340–410)
 
 ### 1.4 Interacting Files & Blast Radius
-- [`src/js/core/diagram-builder.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/diagram-builder.js): Bill of Materials (BOM) export.
-- [`src/js/app.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/app.js): Modal shortcut <kbd>Ctrl+Shift+E</kbd>.
+- [`src/js/core/diagram-builder.js`](../../src/js/core/diagram-builder.js): Bill of Materials (BOM) export.
+- [`src/js/app.js`](../../src/js/app.js): Modal shortcut <kbd>Ctrl+Shift+E</kbd>.
 - Web Audio API context for relay clicks and continuity buzzer.
 
 ### 1.5 Specific Failure Modes & Line-Level Fragility
 1. **Singular Conductance Matrix**: An ungrounded circuit node or an isolated floating wire results in a row of zeros in matrix $\mathbf{G}$, causing LU decomposition to divide by zero, propagating `NaN` across all voltages.
-   - *Fragile Point*: [`src/js/core/circuit-sim.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/circuit-sim.js#L280).
+   - *Fragile Point*: [`src/js/core/circuit-sim.js`](../../src/js/core/circuit-sim.js).
 2. **Exponential Explosion in Shockley Diodes**: Evaluating $I_S (e^{V_D/V_T} - 1)$ when $V_D > 1.5\text{V}$ yields numbers $>10^{25}$, causing floating-point overflow to `Infinity`.
 3. **Audio Context Starvation**: Rapid relay contact chatter can schedule hundreds of Web Audio oscillators per second, exhausting OS audio buffers.
 
@@ -94,22 +94,22 @@ Enables users to export high-definition video recordings (720p/1080p at 30/60 FP
 - **Automatic Fallback**: If WebCodecs hardware encoding is restricted by the OS or GPU, gracefully falls back to `MediaRecorder` WebM.
 
 ### 2.3 Primary Code Files & Key Locations
-- [`src/js/export-video.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/export-video.js):
+- [`src/js/export-video.js`](../../src/js/export-video.js):
   - `VideoExporter` class constructor (Lines 148–170)
   - `exportReplayVideo()` single-track export (Lines 172–320)
   - `exportStitchedReplayVideo()` multi-session export with MP4 muxer (Lines 323–520)
   - `pickRecordingsForVideoExport()` interactive modal (Lines 540–690)
-- [`src/vendor/mp4-muxer.mjs`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/vendor/mp4-muxer.mjs):
+- [`src/vendor/mp4-muxer.mjs`](../../src/vendor/mp4-muxer.mjs):
   - Pure JS ISO Base Media File Format (ISOBMFF) container serializer.
 
 ### 2.4 Interacting Files & Blast Radius
-- [`src/js/core/surface.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/surface.js): Offscreen canvas sizing and dirty draw calls.
-- [`src/js/core/replay.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/replay.js): Stroke temporal lookup.
+- [`src/js/core/surface.js`](../../src/js/core/surface.js): Offscreen canvas sizing and dirty draw calls.
+- [`src/js/core/replay.js`](../../src/js/core/replay.js): Stroke temporal lookup.
 - Electron / Browser file saver dialogs.
 
 ### 2.5 Specific Failure Modes & Line-Level Fragility
 1. **Memory Exhaustion on Long Renders**: Storing all encoded video chunks in RAM before finalizing causes out-of-memory crashes on $>20$-minute 1080p exports.
-   - *Fragile Point*: [`src/js/export-video.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/export-video.js#L353). Must use chunk streaming or progress garbage disposal.
+   - *Fragile Point*: [`src/js/export-video.js`](../../src/js/export-video.js). Must use chunk streaming or progress garbage disposal.
 2. **Keyframe Interval Drift**: If keyframe requests (`keyFrame: i % (fps * 2) === 0`) are skipped, seeking in the exported MP4 video will glitch or show black frames.
 3. **Non-Finite Audio Duration**: An unhandled `track.durationMs = 0` creates division-by-zero when calculating percentage progress: `pct = curMs / totalDurationMs`.
 
@@ -145,7 +145,7 @@ videoEncoder.configure({
 A specialized local-first Markdown rendering pipeline for canvas cards. Supports Obsidian extensions including `[[wikilinks]]`, tags (`#tag`), callout blocks (`> [!NOTE]`), interactive task checkboxes, KaTeX mathematical equations (`$...$`, `$$...$$`), sub/superscript (`~sub~`, `^sup^`), and YAML frontmatter.
 
 ### 3.2 Implementation Mechanics & Data Structures
-- **Multi-Phase Tokenizer**: In [`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js), text undergoes:
+- **Multi-Phase Tokenizer**: In [`src/js/core/markdown.js`](../../src/js/core/markdown.js), text undergoes:
   1. YAML frontmatter extraction (`extractFrontmatter`).
   2. KaTeX equation isolation: formulas are extracted and replaced with unique alphanumeric hashes (`__KATEX_MATH_0__`) to protect mathematical symbols from markdown regex rules.
   3. GFM block parsing: tables, callouts, lists, headers.
@@ -154,21 +154,21 @@ A specialized local-first Markdown rendering pipeline for canvas cards. Supports
 - **Card Styling Modes**: Four toggleable visual styles: `canvas`, `window`, `minimal`, and `transparent`.
 
 ### 3.3 Primary Code Files & Key Locations
-- [`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js):
+- [`src/js/core/markdown.js`](../../src/js/core/markdown.js):
   - `renderMarkdown()` orchestrator (Lines 40–120)
   - `extractFrontmatter()` YAML block-list parser (Lines 130–185)
   - `tokenizeObsidianLinks()` wikilink resolver (Lines 210–265)
-- [`src/js/core/render.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/render.js):
+- [`src/js/core/render.js`](../../src/js/core/render.js):
   - Canvas card layout, text wrapping, and HTML container rasterization (Lines 820–960)
 
 ### 3.4 Interacting Files & Blast Radius
-- [`src/js/core/boardrefs.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/boardrefs.js): Cross-board anchor navigation.
-- [`src/vendor/katex/katex.min.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/vendor/katex/katex.min.js): Offline mathematical typesetting engine.
+- [`src/js/core/boardrefs.js`](../../src/js/core/boardrefs.js): Cross-board anchor navigation.
+- [`src/vendor/katex/katex.min.js`](../../src/vendor/katex/katex.min.js): Offline mathematical typesetting engine.
 - SVG vector exports: Card HTML embedded in `<foreignObject>` tags.
 
 ### 3.5 Specific Failure Modes & Line-Level Fragility
 1. **Catastrophic Regex Backtracking**: Unanchored regexes with nested repetition (e.g. `(\[[^\]]+\]\([^)]+\))+`) hang the browser on malicious or deeply nested text.
-   - *Fragile Point*: [`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js#L230).
+   - *Fragile Point*: [`src/js/core/markdown.js`](../../src/js/core/markdown.js).
 2. **KaTeX Parse Exception Freezes**: An unclosed math bracket (e.g. `$\frac{1}{2$`) causes KaTeX to throw a fatal error if `throwOnError: false` is omitted, aborting board card rendering.
 3. **Currency Symbol Collision**: Prose containing dollar prices (e.g., "Costs \$10 and \$20") is misidentified as an inline LaTeX math formula.
 
@@ -207,21 +207,21 @@ A full mathematical graphing workstation (<kbd>Ctrl+Shift+G</kbd>). Plots 2D Car
 - **Extrema & Root Isolation**: Scans discrete interval segments to find zero-crossings ($y = 0$) and sign changes in numerical derivative ($\frac{dy}{dx} = 0$).
 
 ### 4.3 Primary Code Files & Key Locations
-- [`src/js/ui/function-grapher.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/function-grapher.js):
+- [`src/js/ui/function-grapher.js`](../../src/js/ui/function-grapher.js):
   - `FunctionGrapherModal` class (Lines 25–95)
   - 2D Canvas plot render loop & coordinate grid mapping (Lines 140–230)
   - Dynamic tangent slider & Riemann area shader (Lines 280–370)
   - Curve tracing crosshair & automated root/extrema ring badges (Lines 420–510)
-- [`src/vendor/function-plot.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/vendor/function-plot.js):
+- [`src/vendor/function-plot.js`](../../src/vendor/function-plot.js):
   - Curve sampling engine.
 
 ### 4.4 Interacting Files & Blast Radius
-- [`src/js/core/scientific-math.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/scientific-math.js): Scientific math utilities.
-- [`src/js/app.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/app.js): Whiteboard snapshot stamping.
+- [`src/js/core/scientific-math.js`](../../src/js/core/scientific-math.js): Scientific math utilities.
+- [`src/js/app.js`](../../src/js/app.js): Whiteboard snapshot stamping.
 
 ### 4.5 Specific Failure Modes & Line-Level Fragility
 1. **Vertical Asymptote Line Artifacts**: Plotting functions like $y = \tan x$ or $y = \frac{1}{x}$ connects $-\infty$ to $+\infty$ with an ugly vertical line if discontinuity detection is absent.
-   - *Fragile Point*: [`src/js/ui/function-grapher.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/function-grapher.js#L195).
+   - *Fragile Point*: [`src/js/ui/function-grapher.js`](../../src/js/ui/function-grapher.js).
 2. **Divide-by-Zero in Riemann Slicing**: When integrating across a pole ($x = 0$ in $\frac{1}{x}$), Simpson's rule accumulates `Infinity` or `NaN`.
 3. **Canvas Coordinate Overflow**: Extreme zoom limits (e.g. $10^{12}$) exceed Canvas2D integer precision, distorting gridlines.
 
@@ -267,20 +267,20 @@ A Google Chrome-style tab bar header (`TabBar`) allowing users to open and switc
 - **Smart Lease Locking**: When running multi-window desktop instances, acquires a timestamped lease lock to prevent two windows from simultaneously overwriting the same board file.
 
 ### 5.3 Primary Code Files & Key Locations
-- [`src/js/ui/tabs.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/tabs.js):
+- [`src/js/ui/tabs.js`](../../src/js/ui/tabs.js):
   - `TabBar` class & DOM tab pill rendering (Lines 15–90)
   - `WorkspaceSessionManager` serialization (Lines 120–185)
   - Tab close, reorder, and dirty dot indicators (Lines 210–280)
-- [`src/js/app.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/app.js):
+- [`src/js/app.js`](../../src/js/app.js):
   - Window focus lease check and active editor handshake (Lines 1120–1180)
 
 ### 5.4 Interacting Files & Blast Radius
-- [`src/js/core/store.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/store.js): Document loading and saving.
-- [`src/js/core/surface.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/surface.js): Canvas cache clearing on tab switch.
+- [`src/js/core/store.js`](../../src/js/core/store.js): Document loading and saving.
+- [`src/js/core/surface.js`](../../src/js/core/surface.js): Canvas cache clearing on tab switch.
 
 ### 5.5 Specific Failure Modes & Line-Level Fragility
 1. **Storage Quota Exceeded**: Storing multiple heavy boards with embedded images directly in `localStorage` exceeds the 5MB browser quota, throwing a fatal `QuotaExceededError`.
-   - *Fragile Point*: [`src/js/ui/tabs.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/tabs.js#L145).
+   - *Fragile Point*: [`src/js/ui/tabs.js`](../../src/js/ui/tabs.js).
 2. **Stale Session Overwrite**: Closing window A after window B made newer edits can overwrite the latest board revision if session saving lacks revision stamps.
 3. **Tab Bar Overflow Clipping**: Opening 25 tabs squashes tab widths below readable thresholds without a horizontal scroll container.
 
@@ -321,20 +321,20 @@ Generates clean 90-degree orthogonal elbow connectors for circuit schematics, mi
 - **Thickness Stepping**: Calibrates elbow chamfer radius to stroke line width.
 
 ### 6.3 Primary Code Files & Key Locations
-- [`src/js/core/connectors.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/connectors.js):
+- [`src/js/core/connectors.js`](../../src/js/core/connectors.js):
   - `routeOrthogonal()` Manhattan elbow routing (Lines 85–165)
   - `snapPortPoints()` cardinal port generator (Lines 180–215)
   - `drawArrowhead()` barbed and elongated arrowheads (Lines 240–310)
-- [`src/js/core/render.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/render.js):
+- [`src/js/core/render.js`](../../src/js/core/render.js):
   - Canvas connector rendering with endpoint caps (Lines 1120–1180)
 
 ### 6.4 Interacting Files & Blast Radius
-- [`src/js/core/tools.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/tools.js): Arrow drawing tool pointer events.
-- [`src/js/core/hit.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/hit.js): Hit-testing multi-segment polyline connectors.
+- [`src/js/core/tools.js`](../../src/js/core/tools.js): Arrow drawing tool pointer events.
+- [`src/js/core/hit.js`](../../src/js/core/hit.js): Hit-testing multi-segment polyline connectors.
 
 ### 6.5 Specific Failure Modes & Line-Level Fragility
 1. **Collinear Degeneration**: When start and end points share identical X or Y coordinates, an unhardened 3-bend algorithm generates zero-length segments that flip arrowhead angles $180^\circ$.
-   - *Fragile Point*: [`src/js/core/connectors.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/connectors.js#L112).
+   - *Fragile Point*: [`src/js/core/connectors.js`](../../src/js/core/connectors.js).
 2. **Infinite Pathfinding Loop on Overlapping Cards**: When two cards overlap, obstacle clearance bounding boxes intersect, causing path search to oscillate.
 
 ### 6.6 Concrete Hardening Directive for the Next AI

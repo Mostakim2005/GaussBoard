@@ -33,27 +33,27 @@ A chemical modeling environment combining a 2D skeletal sketcher (`ChemicalSketc
 
 ### 1.2 Implementation Mechanics & Data Structures
 - **3Dmol Integration**: Uses pure JS 3Dmol engine (`src/vendor/3Dmol-min.js`) rendering hardware-accelerated CPK models.
-- **SMILES Parser**: In [`src/js/ui/chemical-sketcher.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/chemical-sketcher.js), parses linear and branched SMILES (e.g., `CC(=O)OC1=CC=CC=C1C(=O)O` for Aspirin), resolving ring closures (`%10`, `1-9`), aromaticity (`c`, `n`), and stereochemical bonds.
+- **SMILES Parser**: In [`src/js/ui/chemical-sketcher.js`](../../src/js/ui/chemical-sketcher.js), parses linear and branched SMILES (e.g., `CC(=O)OC1=CC=CC=C1C(=O)O` for Aspirin), resolving ring closures (`%10`, `1-9`), aromaticity (`c`, `n`), and stereochemical bonds.
 - **Bond Measurement Geometry**:
   - Distance: Euclidean norm $d = \|\mathbf{r}_2 - \mathbf{r}_1\|$ in Ångströms.
   - Angle: $\theta = \arccos\left(\frac{(\mathbf{r}_1 - \mathbf{r}_2)\cdot(\mathbf{r}_3 - \mathbf{r}_2)}{\|\mathbf{r}_1 - \mathbf{r}_2\|\|\mathbf{r}_3 - \mathbf{r}_2\|}\right)$.
 
 ### 1.3 Primary Code Files & Key Locations
-- [`src/js/ui/molecule-viewer.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/molecule-viewer.js):
+- [`src/js/ui/molecule-viewer.js`](../../src/js/ui/molecule-viewer.js):
   - `MoleculeViewerModal` class (Lines 20–85)
   - 3D coordinate parsing & PDB importer (Lines 110–190)
   - Click-to-measure bond distance/angle tracker (Lines 220–305)
-- [`src/js/ui/chemical-sketcher.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/chemical-sketcher.js):
+- [`src/js/ui/chemical-sketcher.js`](../../src/js/ui/chemical-sketcher.js):
   - 2D Canvas bond drawing and ring stamps (Lines 35–140)
   - SMILES tokenizer and 2D coordinate layout generator (Lines 180–310)
 
 ### 1.4 Interacting Files & Blast Radius
-- [`src/vendor/3Dmol-min.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/vendor/3Dmol-min.js): WebGL canvas context.
-- [`src/js/core/render.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/render.js): Whiteboard molecule card stamps.
+- [`src/vendor/3Dmol-min.js`](../../src/vendor/3Dmol-min.js): WebGL canvas context.
+- [`src/js/core/render.js`](../../src/js/core/render.js): Whiteboard molecule card stamps.
 
 ### 1.5 Specific Failure Modes & Line-Level Fragility
 1. **WebGL Context Retention Leak**: Opening and closing `MoleculeViewerModal` 20 times exhausts the browser's 16-context WebGL limit, breaking rendering across the app.
-   - *Fragile Point*: [`src/js/ui/molecule-viewer.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/molecule-viewer.js#L75).
+   - *Fragile Point*: [`src/js/ui/molecule-viewer.js`](../../src/js/ui/molecule-viewer.js).
 2. **NaN Angle on Collinear Atoms**: Floating-point drift can yield $\frac{\mathbf{u}\cdot\mathbf{v}}{\|\mathbf{u}\|\|\mathbf{v}\|} = 1.0000000002$, causing `Math.acos()` to return `NaN`.
 3. **SMILES Ring Closure Stack Overflow**: Unmatched digit tags in malformed SMILES strings cause ring traversal loops.
 
@@ -95,18 +95,18 @@ A computer algebra system (CAS) executing exact symbolic calculus, polynomial fa
   $$x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$$
 
 ### 2.3 Primary Code Files & Key Locations
-- [`src/js/core/scientific-math.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/scientific-math.js):
+- [`src/js/core/scientific-math.js`](../../src/js/core/scientific-math.js):
   - `SymbolicCAS` solver interface (Lines 80–180)
   - `NotebookVariables` dependency manager (Lines 210–310)
-- [`src/vendor/nerdamer/nerdamer.core.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/vendor/nerdamer/nerdamer.core.js): Core CAS.
+- [`src/vendor/nerdamer/nerdamer.core.js`](../../src/vendor/nerdamer/nerdamer.core.js): Core CAS.
 
 ### 2.4 Interacting Files & Blast Radius
-- [`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js): Evaluating variable references in cards.
-- [`src/js/core/store.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/store.js): Document object change dispatch.
+- [`src/js/core/markdown.js`](../../src/js/core/markdown.js): Evaluating variable references in cards.
+- [`src/js/core/store.js`](../../src/js/core/store.js): Document object change dispatch.
 
 ### 2.5 Specific Failure Modes & Line-Level Fragility
 1. **Circular Dependency Recursion Hang**: A user defining `a = b + 1` and `b = a + 1` triggers infinite recursion during evaluation, freezing the main thread.
-   - *Fragile Point*: [`src/js/core/scientific-math.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/scientific-math.js#L245).
+   - *Fragile Point*: [`src/js/core/scientific-math.js`](../../src/js/core/scientific-math.js).
 2. **Nerdamer Factorization Timeout**: Extremely large polynomial powers (e.g. $(x+1)^{100}$) cause deep recursive AST traversal.
 
 ### 2.6 Concrete Hardening Directive for the Next AI
@@ -144,24 +144,24 @@ export function evaluateNotebookVariables(varMap) {
 Brings Obsidian-style Dataview queries and agile sprint management directly to the canvas. Users can write ````dataview blocks querying whiteboard objects (`TABLE type, tags, created WHERE tags CONTAINS "exam"`), or create interactive 3-column Kanban cards (`TODO`, `IN_PROGRESS`, `DONE`) with drag-and-drop task advancement.
 
 ### 3.2 Implementation Mechanics & Data Structures
-- **Safe Query Parser**: In [`src/js/core/dataview.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/dataview.js), parses `TABLE`/`LIST` statements with recursive AST filtering without using `eval()`.
-- **Kanban Card Component**: In [`src/js/core/kanban.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/kanban.js), stores column tasks in `o.kanbanData = { columns: [{ id, title, tasks: [{ id, text, done }] }] }`.
+- **Safe Query Parser**: In [`src/js/core/dataview.js`](../../src/js/core/dataview.js), parses `TABLE`/`LIST` statements with recursive AST filtering without using `eval()`.
+- **Kanban Card Component**: In [`src/js/core/kanban.js`](../../src/js/core/kanban.js), stores column tasks in `o.kanbanData = { columns: [{ id, title, tasks: [{ id, text, done }] }] }`.
 
 ### 3.3 Primary Code Files & Key Locations
-- [`src/js/core/dataview.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/dataview.js):
+- [`src/js/core/dataview.js`](../../src/js/core/dataview.js):
   - `parseDataviewQuery()` SQL-like tokenizer (Lines 25–110)
   - `executeDataviewQuery()` object filter & sorter (Lines 120–210)
-- [`src/js/core/kanban.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/kanban.js):
+- [`src/js/core/kanban.js`](../../src/js/core/kanban.js):
   - `KanbanManager` task state transition (Lines 30–120)
   - Interactive checkbox click hit-testing (Lines 140–190)
 
 ### 3.4 Interacting Files & Blast Radius
-- [`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js): Embedding dynamic tables in markdown cards.
-- [`src/js/core/store.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/store.js): Storing Kanban card mutations.
+- [`src/js/core/markdown.js`](../../src/js/core/markdown.js): Embedding dynamic tables in markdown cards.
+- [`src/js/core/store.js`](../../src/js/core/store.js): Storing Kanban card mutations.
 
 ### 3.5 Specific Failure Modes & Line-Level Fragility
 1. **Mutation-Requery Feedback Loop**: If rendering a Dataview result mutates an object in `store`, it triggers a store change event, which re-evaluates the query, creating an infinite loop.
-   - *Fragile Point*: [`src/js/core/dataview.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/dataview.js#L140).
+   - *Fragile Point*: [`src/js/core/dataview.js`](../../src/js/core/dataview.js).
 2. **Object Prototype Pollution**: Unvalidated query field access (e.g. `WHERE __proto__.polluted = true`) can access object prototypes.
 
 ### 3.6 Concrete Hardening Directive for the Next AI
@@ -196,20 +196,20 @@ A flashcard learning workstation implementing the modern Free Spaced Repetition 
 - **Deck Packaging**: Generates SQLite `collection.anki2` schema compressed inside `.apkg` files using offline JSZip.
 
 ### 4.3 Primary Code Files & Key Locations
-- [`src/js/core/fsrs.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/fsrs.js):
+- [`src/js/core/fsrs.js`](../../src/js/core/fsrs.js):
   - FSRS v5 17-parameter constants and next interval calculations (Lines 15–95)
-- [`src/js/core/anki.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/anki.js):
+- [`src/js/core/anki.js`](../../src/js/core/anki.js):
   - AnkiConnect desktop bridge & `.apkg` binary packaging (Lines 40–180)
-- [`src/js/ui/study-runner.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/study-runner.js):
+- [`src/js/ui/study-runner.js`](../../src/js/ui/study-runner.js):
   - Interactive active-recall review runner modal (Lines 35–185)
 
 ### 4.4 Interacting Files & Blast Radius
-- [`src/js/core/store.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/store.js): Persisting card review history (`card.reps`, `card.lapses`).
-- [`src/vendor/jszip.min.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/vendor/jszip.min.js): Zip compression.
+- [`src/js/core/store.js`](../../src/js/core/store.js): Persisting card review history (`card.reps`, `card.lapses`).
+- [`src/vendor/jszip.min.js`](../../src/vendor/jszip.min.js): Zip compression.
 
 ### 4.5 Specific Failure Modes & Line-Level Fragility
 1. **AnkiConnect Network Hang**: If desktop Anki is closed, `fetch('http://127.0.0.1:8765')` hangs until OS TCP timeout (up to 30 seconds) unless a strict `AbortController` timeout is enforced.
-   - *Fragile Point*: [`src/js/core/anki.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/anki.js#L65).
+   - *Fragile Point*: [`src/js/core/anki.js`](../../src/js/core/anki.js).
 2. **Negative Schedule Intervals**: Manually edited system clocks or anomalous review histories can produce $t < 0$, corrupting next review scheduling.
 
 ### 4.6 Concrete Hardening Directive for the Next AI
@@ -249,14 +249,14 @@ A side navigation drawer (`PdfSidebarDrawer`) displaying hierarchical PDF outlin
 - **Offline OCR**: Tesseract WASM worker (`src/vendor/tesseract/`) recognizes English text offline without sending pages to the cloud.
 
 ### 5.3 Primary Code Files & Key Locations
-- [`src/js/ui/pdf-sidebar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/pdf-sidebar.js):
+- [`src/js/ui/pdf-sidebar.js`](../../src/js/ui/pdf-sidebar.js):
   - `PdfSidebarDrawer` class & TOC tree builder (Lines 25–140)
-- [`src/js/core/ocr.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/ocr.js):
+- `src/js/core/ocr.js`:
   - Tesseract WASM worker pool & image chunk OCR (Lines 30–95)
 
 ### 5.4 Interacting Files & Blast Radius
-- [`src/js/core/pages.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/pages.js): PDF background page state.
-- [`src/vendor/tesseract/tesseract.min.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/vendor/tesseract/tesseract.min.js): WASM memory heap.
+- [`src/js/core/pages.js`](../../src/js/core/pages.js): PDF background page state.
+- [`src/vendor/tesseract/tesseract.min.js`](../../src/vendor/tesseract/tesseract.min.js): WASM memory heap.
 
 ### 5.5 Specific Failure Modes & Line-Level Fragility
 1. **WASM Heap Out-of-Memory**: Running OCR on high-resolution ($300\text{ DPI}$) scanned pages concurrently exhausts the 2GB 32-bit WASM memory address space.

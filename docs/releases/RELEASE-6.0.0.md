@@ -3,8 +3,8 @@
 > **Release Version**: `v6.0.0`  
 > **Date**: October 23, 2026  
 > **Git Commit Target**: `release: GazBoard v6.0.0 comprehensive architectural audit & hardened milestone`  
-> **Binary Deliverable**: [`releases/GazBoard-v6.0.0-Portable.exe`](../../releases/GazBoard-v6.0.0-Portable.exe) (108,169,116 bytes / 103.16 MiB)  
-> **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md)  
+> **Binary Deliverable**: `GazBoard-v6.0.0-Portable.exe` (108,169,116 bytes / 103.16 MiB)  
+> **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Invariant Compliance**: Strict adherence across all 6 Golden Invariants (100% i18n parity, 1,240 smoke checks passed, custom test suite passed, 0 native C++ dependencies).
 
 ---
@@ -64,7 +64,7 @@ Rather than hardcoding behaviors or introducing excessive toggles, `v6.0.0` esta
 
 ## 5. Artifact & Deliverable Matrix
 
-* **Portable Executable**: [`releases/GazBoard-v6.0.0-Portable.exe`](../../releases/GazBoard-v6.0.0-Portable.exe)
+* **Portable Executable**: `GazBoard-v6.0.0-Portable.exe`
 * **Master Architecture Index**: [`docs/INDEX.md`](../INDEX.md)
 * **Bootstrap Specifications**: [`AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)
 * **Releases Ledger**: [`docs/releases/RELEASES_INDEX.md`](RELEASES_INDEX.md)

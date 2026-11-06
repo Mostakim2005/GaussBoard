@@ -47,8 +47,8 @@ class MainActivity : ComponentActivity() {
      * here, and nothing else does.
      */
     val FONT_SOURCES = listOf(
-      "https://cdn.jsdelivr.net/gh/fahim9778/GazBoard@main/fonts/",
-      "https://raw.githubusercontent.com/fahim9778/GazBoard/main/fonts/")
+      "https://cdn.jsdelivr.net/gh/Mostakim2005/GazBoard@main/fonts/",
+      "https://raw.githubusercontent.com/Mostakim2005/GazBoard/main/fonts/")
     val FONT_FILE = Regex("gazboard-noto-sans-(sc|tc)-[0-9]{3}-v[0-9]{1,3}\\.woff2")
     const val FONT_CAP = 8 * 1024 * 1024
   }
@@ -380,10 +380,10 @@ class MainActivity : ComponentActivity() {
     return true
   }
   fun openReleases(raw: String): Boolean {
-    val url = raw.ifEmpty { "https://github.com/fahim9778/GazBoard/releases" }
+    val url = raw.ifEmpty { "https://github.com/Mostakim2005/GazBoard/releases" }
     val uri = Uri.parse(url)
     require(uri.scheme == "https" && uri.host == "github.com" &&
-      (uri.path == "/fahim9778/GazBoard/releases" || uri.path?.startsWith("/fahim9778/GazBoard/releases/tag/") == true))
+      (uri.path == "/Mostakim2005/GazBoard/releases" || uri.path?.startsWith("/Mostakim2005/GazBoard/releases/tag/") == true))
     onMain { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
     return true
   }
@@ -568,8 +568,8 @@ class MainActivity : ComponentActivity() {
   fun checkForUpdate(): JsonObject {
     // a store copy is the store's to update: report it as current, whatever GitHub has
     if (installStore() != "github") return json("ok" to true, "version" to BuildConfig.VERSION_NAME, "name" to BuildConfig.VERSION_NAME,
-      "url" to "https://github.com/fahim9778/GazBoard/releases", "prerelease" to false)
-    val connection = URL("https://api.github.com/repos/fahim9778/GazBoard/releases?per_page=30").openConnection() as HttpURLConnection
+      "url" to "https://github.com/Mostakim2005/GazBoard/releases", "prerelease" to false)
+    val connection = URL("https://api.github.com/repos/Mostakim2005/GazBoard/releases?per_page=30").openConnection() as HttpURLConnection
     try {
       connection.connectTimeout = 8000; connection.readTimeout = 8000
       connection.setRequestProperty("Accept", "application/vnd.github+json")
@@ -598,14 +598,14 @@ class MainActivity : ComponentActivity() {
       val build = bestBuild
       if (found == null || build == null) {
         return json("ok" to true, "version" to BuildConfig.VERSION_NAME,
-          "name" to BuildConfig.VERSION_NAME, "url" to "https://github.com/fahim9778/GazBoard/releases",
+          "name" to BuildConfig.VERSION_NAME, "url" to "https://github.com/Mostakim2005/GazBoard/releases",
           "prerelease" to false)
       }
       val version = "${build[0]}.${build[1]}.${build[2]}-android.${build[3]}"
       val name = (found["name"] as? JsonPrimitive)?.contentOrNull ?: bestTag
       // The tag page is where the APK actually is, so that is where to land.
       return json("ok" to true, "version" to version, "name" to name,
-        "url" to "https://github.com/fahim9778/GazBoard/releases/tag/" + bestTag,
+        "url" to "https://github.com/Mostakim2005/GazBoard/releases/tag/" + bestTag,
         "prerelease" to false)
     } finally { connection.disconnect() }
   }

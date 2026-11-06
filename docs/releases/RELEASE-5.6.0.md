@@ -81,7 +81,7 @@ npm run smoke:custom
 ## 4. Binary Release Package
 
 - **Filename**: `GazBoard-v5.6.0-Portable.exe`
-- **Location**: [`releases/GazBoard-v5.6.0-Portable.exe`](../../releases/GazBoard-v5.6.0-Portable.exe)
+- **Location**: `GazBoard-v5.6.0-Portable.exe`
 - **Size**: 106,648,811 bytes (~106.6 MB)
 - **Format**: Zero-install standalone portable Windows executable
 - **Packaging Protocol**: Follows Antigravity Rule 5 (Portable by default, version-stamped filename)

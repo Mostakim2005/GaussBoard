@@ -52,7 +52,7 @@ const { spawn, execFile } = require('child_process');
 const zlib = require('zlib');
 
 /** Where release files are downloaded from. Overridable so the suite can serve them from localhost. */
-const downloadBase = () => (process.env.GAZBOARD_UPDATE_DOWNLOADS || 'https://github.com/fahim9778/GazBoard/releases/download').replace(/\/+$/, '');
+const downloadBase = () => (process.env.GAZBOARD_UPDATE_DOWNLOADS || 'https://github.com/Mostakim2005/GazBoard/releases/download').replace(/\/+$/, '');
 
 const VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 

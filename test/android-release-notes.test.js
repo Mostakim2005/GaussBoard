@@ -76,13 +76,13 @@ const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'gb-notes-'));
 test('desktop: every platform that attaches files to the release takes its text from release-notes/<version>.md', () => {
   const yml = read('.github/workflows/release.yml');
   const attaches = yml.split('- name: Attach to the GitHub Release').slice(1).map((s) => s.split('\n      - name:')[0]);
-  assert.equal(attaches.length, 3, `expected Windows, Linux and macOS to attach to the release, found ${attaches.length}`);
+  assert.equal(attaches.length, 1, `expected Windows alone to attach to the release, found ${attaches.length}`);
   attaches.forEach((a, i) => {
     assert.match(a, /body_path: \$\{\{ steps\.notes\.outputs\.path \}\}/, `attach step ${i + 1} does not read the notes file:\n${a}`);
     assert.match(a, /generate_release_notes: \$\{\{ steps\.notes\.outputs\.generate == 'true' \}\}/, `attach step ${i + 1} still always generates notes:\n${a}`);
   });
-  assert.equal(runBlocks(yml, 'Find the release notes for this version').length, 3,
-    'each of the three jobs needs its own "Find the release notes" step - jobs do not share steps');
+  assert.equal(runBlocks(yml, 'Find the release notes for this version').length, 1,
+    'the one attaching job needs its own "Find the release notes" step - jobs do not share steps');
 });
 
 test('desktop: the notes step points at the file when it exists, and falls back to GitHub\'s list when it does not', (t) => {

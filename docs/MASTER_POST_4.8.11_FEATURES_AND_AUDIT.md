@@ -2,7 +2,7 @@
 > **History boundary:** this document is the source-checked historical record through v4.8.20 and the v4.8.21 hardening follow-up. The current release is v5.0.0; its cross-version feature ranking and follow-up audit are in [`releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](releases/AUDIT-POST-4.8.1-TO-5.0.0.md).
 ## Comprehensive Evolutionary Inventory, Subsystem Architecture Deep Dives, 6 Golden Invariants Ledger, and Actionable AI Hardening Runbook
 
-> **Breadcrumb Navigation**: [`docs/INDEX.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/docs/INDEX.md) → [`AI_BOOTSTRAP.md`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/AI_BOOTSTRAP.md) → **`MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md`**  
+> **Breadcrumb Navigation**: [`docs/INDEX.md`](./INDEX.md) → [`AI_BOOTSTRAP.md`](../AI_BOOTSTRAP.md) → **`MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md`**  
 > **Document Authority**: Authoritative Level 2/3 Technical Specification, Subsystem Architecture Map, and External AI Audit Dossier for all releases from `v4.8.11` to `v4.8.20`.  
 > **Target OS**: Windows 10 / 11 (64-bit Electron Portable Binary / NSIS Installer on-demand).  
 > **Feature history scope**: `v4.8.11`–`v4.8.20`; follow-up hardening is documented in [`releases/RELEASE-4.8.21.md`](releases/RELEASE-4.8.21.md).
@@ -17,26 +17,26 @@ The following ledger establishes the complete historical and technical lineage o
 
 | Version | Git Tag | Commit | Release Date | Core Theme & Technical Scope | Key Source Modules Touched | Test Footprint |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **v4.8.11** | `v4.8.11` | `12b59d6` | Oct 2026 | Replay seek synchronization, Surface-to-App wiring fix, recording rename persistence, and dead-zone camera follow. | [`src/js/app.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/app.js)<br>[`src/js/core/replay.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/replay.js)<br>[`src/js/ui/audio-bar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/audio-bar.js) | 33 tests |
-| **v4.8.12** | `v4.8.12` | `6b74f72` | Oct 2026 | Obsidian-style Markdown & Wikilinks engine for text boxes and sticky notes; GFM AST parser; KaTeX math; SVG `<foreignObject>` canvas rendering. | [`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js)<br>[`src/js/core/boardrefs.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/boardrefs.js)<br>[`src/js/core/render.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/render.js)<br>[`src/js/core/hit.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/hit.js) | 40 tests |
-| **v4.8.13** | `v4.8.13` | `35442a2` | Oct 2026 | Obsidian Markdown Cards (4 presentation models); 1:1 Page Margin handle kinematics up to 2000px; HUD margin/markdown buttons; i18n support. | [`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js)<br>[`src/js/ui/pagemargin-dialog.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/pagemargin-dialog.js)<br>[`src/js/ui/toolbar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/toolbar.js)<br>[`src/js/core/store.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/store.js) | 40 tests |
-| **v4.8.14** | `v4.8.14` | `7f8a51b` | Oct 2026 | Ribbon right-click ejection safety; laser settings persistence; settings flex-wrap reflow; smart audio popover free-space positioning. | [`src/js/ui/toolbar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/toolbar.js)<br>[`src/js/ui/panels.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/panels.js)<br>[`src/js/ui/audio-bar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/audio-bar.js)<br>[`src/css/app.css`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/css/app.css) | 41 tests |
-| **v4.8.15** | `v4.8.15` | `f4c2cc0` | Oct 2026 | Granular ribbon pens 1–6 visibility toggling; Sticky Note iconography polish; glassmorphic 3D menu cards with decoupled pin buttons. | [`src/js/ui/toolbar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/toolbar.js)<br>[`src/js/ui/icons.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/icons.js)<br>[`src/css/app.css`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/css/app.css) | 41 tests |
-| **v4.8.16** | `v4.8.16` | `9087c80` | Oct 2026 | Scribble eraser target guarding (protects text/notes by default); 3-mode sensitivity slider (`Low`, `Medium`, `High`); interactive inking preview. | [`src/js/core/scratch.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/scratch.js)<br>[`src/js/core/tools.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/tools.js)<br>[`src/js/ui/panels.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/panels.js) | 41 tests |
-| **v4.8.17** | `v4.8.17` | `05bc7e8` | Oct 2026 | Note Overview real thumbnail previews; inline modal `# Tag` & `Alias` prompt shortcuts; 3D glassmorphic Replay Bar HUD styling. | [`src/js/ui/note-overview.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/note-overview.js)<br>[`src/js/ui/replay-bar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/replay-bar.js) | 41 tests |
-| **v4.8.18** | `v4.8.18` | `cd61bba` | Oct 2026 | Split Study Workspace overhaul: true dual-interactive drawing with isolated stores, surfaces, ink nibs & undo stacks; autocomplete combobox (`setLast: false`). | [`src/js/ui/split-workspace.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/split-workspace.js)<br>[`src/js/core/tools.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/tools.js)<br>[`src/js/ui/properties-dialog.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/properties-dialog.js) | 41 tests |
-| **v4.8.19** | `v4.8.19` | `75caf1b` | Oct 2026 | Advanced Pen Suite: Brush (`brush`), Fountain (`fountain`), Calligraphy (`calligraphy`); closed polygon ribbon math; directional tine dilation; 1-click pen switcher. | [`src/js/core/ink.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/ink.js)<br>[`src/js/core/render.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/render.js)<br>[`src/js/core/tools.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/tools.js)<br>[`src/js/ui/toolbar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/toolbar.js)<br>[`src/js/export.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/export.js) | 42 tests |
-| **v4.8.20** | `v4.8.20` | `HEAD` | Oct 2026 | Hardening & Lateral Integrations: Split workspace `Ctrl+Z` smart routing; brush cache key fix; SVG markdown `<foreignObject>` export; KaTeX currency non-collision; YAML frontmatter metadata extraction; hardware stylus tilt modulation; pen color preservation. | [`src/js/app.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/app.js)<br>[`src/js/core/ink.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/ink.js)<br>[`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js)<br>[`src/js/core/tools.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/tools.js)<br>[`src/js/export.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/export.js)<br>[`src/js/ui/split-workspace.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/split-workspace.js)<br>[`src/js/ui/toolbar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/toolbar.js) | 45 tests |
+| **v4.8.11** | `v4.8.11` | `12b59d6` | Oct 2026 | Replay seek synchronization, Surface-to-App wiring fix, recording rename persistence, and dead-zone camera follow. | [`src/js/app.js`](../src/js/app.js)<br>[`src/js/core/replay.js`](../src/js/core/replay.js)<br>[`src/js/ui/audio-bar.js`](../src/js/ui/audio-bar.js) | 33 tests |
+| **v4.8.12** | `v4.8.12` | `6b74f72` | Oct 2026 | Obsidian-style Markdown & Wikilinks engine for text boxes and sticky notes; GFM AST parser; KaTeX math; SVG `<foreignObject>` canvas rendering. | [`src/js/core/markdown.js`](../src/js/core/markdown.js)<br>[`src/js/core/boardrefs.js`](../src/js/core/boardrefs.js)<br>[`src/js/core/render.js`](../src/js/core/render.js)<br>[`src/js/core/hit.js`](../src/js/core/hit.js) | 40 tests |
+| **v4.8.13** | `v4.8.13` | `35442a2` | Oct 2026 | Obsidian Markdown Cards (4 presentation models); 1:1 Page Margin handle kinematics up to 2000px; HUD margin/markdown buttons; i18n support. | [`src/js/core/markdown.js`](../src/js/core/markdown.js)<br>[`src/js/ui/pagemargin-dialog.js`](../src/js/ui/pagemargin-dialog.js)<br>[`src/js/ui/toolbar.js`](../src/js/ui/toolbar.js)<br>[`src/js/core/store.js`](../src/js/core/store.js) | 40 tests |
+| **v4.8.14** | `v4.8.14` | `7f8a51b` | Oct 2026 | Ribbon right-click ejection safety; laser settings persistence; settings flex-wrap reflow; smart audio popover free-space positioning. | [`src/js/ui/toolbar.js`](../src/js/ui/toolbar.js)<br>[`src/js/ui/panels.js`](../src/js/ui/panels.js)<br>[`src/js/ui/audio-bar.js`](../src/js/ui/audio-bar.js)<br>[`src/css/app.css`](../src/css/app.css) | 41 tests |
+| **v4.8.15** | `v4.8.15` | `f4c2cc0` | Oct 2026 | Granular ribbon pens 1–6 visibility toggling; Sticky Note iconography polish; glassmorphic 3D menu cards with decoupled pin buttons. | [`src/js/ui/toolbar.js`](../src/js/ui/toolbar.js)<br>[`src/js/ui/icons.js`](../src/js/ui/icons.js)<br>[`src/css/app.css`](../src/css/app.css) | 41 tests |
+| **v4.8.16** | `v4.8.16` | `9087c80` | Oct 2026 | Scribble eraser target guarding (protects text/notes by default); 3-mode sensitivity slider (`Low`, `Medium`, `High`); interactive inking preview. | [`src/js/core/scratch.js`](../src/js/core/scratch.js)<br>[`src/js/core/tools.js`](../src/js/core/tools.js)<br>[`src/js/ui/panels.js`](../src/js/ui/panels.js) | 41 tests |
+| **v4.8.17** | `v4.8.17` | `05bc7e8` | Oct 2026 | Note Overview real thumbnail previews; inline modal `# Tag` & `Alias` prompt shortcuts; 3D glassmorphic Replay Bar HUD styling. | [`src/js/ui/note-overview.js`](../src/js/ui/note-overview.js)<br>[`src/js/ui/replay-bar.js`](../src/js/ui/replay-bar.js) | 41 tests |
+| **v4.8.18** | `v4.8.18` | `cd61bba` | Oct 2026 | Split Study Workspace overhaul: true dual-interactive drawing with isolated stores, surfaces, ink nibs & undo stacks; autocomplete combobox (`setLast: false`). | [`src/js/ui/split-workspace.js`](../src/js/ui/split-workspace.js)<br>[`src/js/core/tools.js`](../src/js/core/tools.js)<br>[`src/js/ui/properties-dialog.js`](../src/js/ui/properties-dialog.js) | 41 tests |
+| **v4.8.19** | `v4.8.19` | `75caf1b` | Oct 2026 | Advanced Pen Suite: Brush (`brush`), Fountain (`fountain`), Calligraphy (`calligraphy`); closed polygon ribbon math; directional tine dilation; 1-click pen switcher. | [`src/js/core/ink.js`](../src/js/core/ink.js)<br>[`src/js/core/render.js`](../src/js/core/render.js)<br>[`src/js/core/tools.js`](../src/js/core/tools.js)<br>[`src/js/ui/toolbar.js`](../src/js/ui/toolbar.js)<br>[`src/js/export.js`](../src/js/export.js) | 42 tests |
+| **v4.8.20** | `v4.8.20` | `HEAD` | Oct 2026 | Hardening & Lateral Integrations: Split workspace `Ctrl+Z` smart routing; brush cache key fix; SVG markdown `<foreignObject>` export; KaTeX currency non-collision; YAML frontmatter metadata extraction; hardware stylus tilt modulation; pen color preservation. | [`src/js/app.js`](../src/js/app.js)<br>[`src/js/core/ink.js`](../src/js/core/ink.js)<br>[`src/js/core/markdown.js`](../src/js/core/markdown.js)<br>[`src/js/core/tools.js`](../src/js/core/tools.js)<br>[`src/js/export.js`](../src/js/export.js)<br>[`src/js/ui/split-workspace.js`](../src/js/ui/split-workspace.js)<br>[`src/js/ui/toolbar.js`](../src/js/ui/toolbar.js) | 45 tests |
 
 ---
 
 ## 2. Granular Technical Specifications by Version
 
 ### 2.1. Version v4.8.12 — Obsidian Markdown & Wikilinks Core Engine
-* **Commit**: `6b74f72` | **Release Dossier**: [`doc4_markdown_obsidian_specification_v4.8.12.md`](file:///C:/Users/kazir/.gemini/antigravity/brain/d07eff31-5f06-4560-abcb-89236f7c951a/doc4_markdown_obsidian_specification_v4.8.12.md)
+* **Commit**: `6b74f72` | **Release Dossier**: [`doc4_markdown_obsidian_specification_v4.8.12.md`](./plan/spec/doc4_markdown_obsidian_specification_v4.8.12.md)
 * **Problem Statement**: Text boxes and sticky notes were limited to plain text or basic HTML contenteditable spans, lacking structured documentation syntax, tables, mathematical equations, task checklists, and cross-board hyperlinking.
 * **Architecture & Mathematical Solution**:
-  1. **Markdown AST Parser ([`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/markdown.js))**:
+  1. **Markdown AST Parser ([`src/js/core/markdown.js`](../src/js/core/markdown.js))**:
      - Fast detection heuristic `isMarkdown(text)` scanning for headers (`#`), bold/italic (`**`, `*`), strikethrough (`~~`), code blocks (`` ` ``), tables (`|`), checklists (`- [ ]`), callouts (`> [!`), math (`$$`), or wikilinks (`[[`).
      - Modular tokenization compiler converting markdown strings into valid, strict XHTML markup.
      - Interactive task lists (`- [ ]`, `- [x]`) compiled into self-closing `<input type="checkbox" disabled="disabled" />` tags to satisfy XML serialization constraints.
@@ -46,7 +46,7 @@ The following ledger establishes the complete historical and technical lineage o
        ```html
        <a href="obsidian://open?board=Target%20Board&amp;heading=Heading" class="obsidian-wikilink" data-board="Target Board" data-heading="Heading">Custom Alias</a>
        ```
-  2. **Canvas Rendering via SVG `<foreignObject>` ([`src/js/core/render.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/render.js))**:
+  2. **Canvas Rendering via SVG `<foreignObject>` ([`src/js/core/render.js`](../src/js/core/render.js))**:
      - Standard Canvas 2D cannot rasterize rich formatted HTML directly. The markdown engine wraps the styled XHTML fragment inside an SVG container:
        ```xml
        <svg xmlns="http://www.w3.org/2000/svg" width="W" height="H">
@@ -58,13 +58,13 @@ The following ledger establishes the complete historical and technical lineage o
        </svg>
        ```
      - Encoded as a data URI (`data:image/svg+xml;charset=utf-8,...`) and rendered via `ctx.drawImage()`, caching the resulting `HTMLImageElement` in a `WeakMap` keyed by object version and text content.
-  3. **Spatial Hit Testing for Wikilinks ([`src/js/core/hit.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/hit.js))**:
+  3. **Spatial Hit Testing for Wikilinks ([`src/js/core/hit.js`](../src/js/core/hit.js))**:
      - Added `hitTestMarkdownCardWikilink(card, px, py)` calculating link bounding boxes from cached layout metrics to allow direct click navigation on canvas without opening the text editor.
 
 ---
 
 ### 2.2. Version v4.8.13 — Card Presentation Models & 1:1 Page Margin Kinematics
-* **Commit**: `35442a2` | **Release Dossier**: [`doc5_markdown_obsidian_and_margin_spec_v4.8.13.md`](file:///C:/Users/kazir/.gemini/antigravity/brain/d07eff31-5f06-4560-abcb-89236f7c951a/doc5_markdown_obsidian_and_margin_spec_v4.8.13.md)
+* **Commit**: `35442a2` | **Release Dossier**: [`doc5_markdown_obsidian_and_margin_spec_v4.8.13.md`](./plan/spec/doc5_markdown_obsidian_and_margin_spec_v4.8.13.md)
 * **Problem Statement**:
   1. All markdown notes looked identical, lacking visual variety for diagrams vs code vs formal lecture notes.
   2. The Page Margin Adjustment Dialog suffered from pointer-capture drift where margin handles lagged behind high-DPI mouse/stylus movements and clamped prematurely at 200px.
@@ -75,14 +75,14 @@ The following ledger establishes the complete historical and technical lineage o
      - `minimal`: Borderless clean card for seamless typography floating on paper rulings.
      - `transparent`: Completely transparent background showing only text and mathematical notation, ideal for annotating underneath.
      - Stored under `object.cardModel` and configured via card context menu or global defaults.
-  2. **1:1 Page Margin Kinematic Handle Tracking ([`src/js/ui/pagemargin-dialog.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/pagemargin-dialog.js))**:
+  2. **1:1 Page Margin Kinematic Handle Tracking ([`src/js/ui/pagemargin-dialog.js`](../src/js/ui/pagemargin-dialog.js))**:
      - **Old Broken Behavior**: Normalized proportional ratios multiplied across bounding boxes, causing non-linear cursor lag and drift when dragging margins on large or zoomed pages.
      - **Kinematic Solution**: Direct screen-to-world delta translation using pointer capture (`setPointerCapture`):
        $$\Delta x_{\text{world}} = \frac{x_{\text{pointer}} - x_{\text{origin}}}{\text{scale}}, \quad \Delta y_{\text{world}} = \frac{y_{\text{pointer}} - y_{\text{origin}}}{\text{scale}}$$
      - Extended maximum margin boundaries from $200\text{px}$ to $2,000\text{px}$, allowing wide Cornell-style margin layouts.
      - Applied asymmetric clamping:
        $$0 \le \text{margin}_{\text{left}} \le W_{\text{page}} - \text{margin}_{\text{right}} - 100$$
-  3. **Wikilink Action Dispatcher & Settings ([`src/js/core/boardrefs.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/boardrefs.js))**:
+  3. **Wikilink Action Dispatcher & Settings ([`src/js/core/boardrefs.js`](../src/js/core/boardrefs.js))**:
      - Added configurable double-click action setting (`settings.wikilinkAction`):
        - `'ask'`: Displays interactive modal dialog with action choices.
        - `'open'`: Automatically saves current board and opens the target board.
@@ -99,13 +99,13 @@ The following ledger establishes the complete historical and technical lineage o
   3. Narrow screens or small popovers caused text and inputs to overflow outside dialog containers.
   4. Audio session action menus opened in a fixed downward direction, clipping outside the bottom of the screen.
 * **Architecture & Hardening**:
-  1. **Ribbon Right-Click Ejection Safeguard ([`src/js/ui/toolbar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/toolbar.js))**:
+  1. **Ribbon Right-Click Ejection Safeguard ([`src/js/ui/toolbar.js`](../src/js/ui/toolbar.js))**:
      - Removed aggressive `contextmenu` listener on ribbon items that automatically ejected tools. Replaced with explicit `pinTool(id, false)` controls inside the `+` extended menu.
-  2. **Laser Trail Persistence Sync ([`src/js/ui/panels.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/panels.js))**:
+  2. **Laser Trail Persistence Sync ([`src/js/ui/panels.js`](../src/js/ui/panels.js))**:
      - Fixed two-way binding between `app.settings.laserDuration` and slider/select elements in the Inking Settings panel. Reopening the panel correctly initializes UI controls to the active persistent duration.
-  3. **Adaptive Flex-Wrap Reflow ([`src/css/app.css`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/css/app.css))**:
+  3. **Adaptive Flex-Wrap Reflow ([`src/css/app.css`](../src/css/app.css))**:
      - Added `flex-wrap: wrap; overflow: hidden;` across popovers and dialog forms to prevent container clipping on small display viewports.
-  4. **Smart Audio Popover Free-Space Positioning ([`src/js/ui/audio-bar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/audio-bar.js))**:
+  4. **Smart Audio Popover Free-Space Positioning ([`src/js/ui/audio-bar.js`](../src/js/ui/audio-bar.js))**:
      - Added `sessionMenuPosition(buttonRect, menuRect, viewport)`:
        ```javascript
        export function sessionMenuPosition(buttonRect, menuRect, viewport) {
@@ -127,13 +127,13 @@ The following ledger establishes the complete historical and technical lineage o
   2. The text/sticky note tool button in the ribbon displayed an ambiguous "T" icon without explanation.
   3. The `+` extended menu mixed pinning toggles and tool activations without clear separation, leading to accidental misclicks.
 * **Architecture & UI/UX Hardening**:
-  1. **Individual Pens 1–6 Visibility Matrix ([`src/js/ui/toolbar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/toolbar.js))**:
+  1. **Individual Pens 1–6 Visibility Matrix ([`src/js/ui/toolbar.js`](../src/js/ui/toolbar.js))**:
      - Added `settings.visiblePens = [1, 2, 3]` array.
      - Ribbon renderer iterates over registered pen slots; only slots present in `visiblePens` are drawn on the front ribbon.
-  2. **Iconography Polish ([`src/js/ui/icons.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/icons.js))**:
+  2. **Iconography Polish ([`src/js/ui/icons.js`](../src/js/ui/icons.js))**:
      - Updated sticky note icon to a crisp Fluent 24x24 note pad with folded corner and "T" emblem.
      - Added rich tooltip badge: `Sticky Note & Markdown Card (Click to place, double-click to edit)`.
-  3. **Decoupled Glassmorphic Extended Menu Cards ([`src/css/app.css`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/css/app.css))**:
+  3. **Decoupled Glassmorphic Extended Menu Cards ([`src/css/app.css`](../src/css/app.css))**:
      - Redesigned extended `+` menu items with acrylic backdrop-filter (`backdrop-filter: blur(16px)`), distinct colored separators, and independent `[Pin / Unpin]` buttons physically separated from tool trigger hitboxes.
 
 ---
@@ -143,7 +143,7 @@ The following ledger establishes the complete historical and technical lineage o
 * **Problem Statement**:
   1. When drawing fast cross-hatching or scribbling inside a text box or sticky note, the StarNote scribble eraser triggered and deleted the entire text object.
   2. The scribble eraser had a single fixed mathematical threshold, triggering too easily for energetic sketchers or failing for gentle stylus users.
-* **Architecture & Kinematic Discrimination ([`src/js/core/scratch.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/scratch.js), [`tools.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/tools.js))**:
+* **Architecture & Kinematic Discrimination ([`src/js/core/scratch.js`](../src/js/core/scratch.js), [`tools.js`](../src/js/core/tools.js))**:
   1. **Target Type Guarding**:
      - Added `settings.scribbleTargets = { strokes: true, shapes: true, text: false, notes: false }`.
      - When a scratch gesture is confirmed, `tools.js` inspects underlying hit targets. Objects of type `'text'` or `'note'` are protected by default unless explicitly enabled in settings.
@@ -161,7 +161,7 @@ The following ledger establishes the complete historical and technical lineage o
   1. In Note Overview, board cards displayed blank generic placeholders instead of visual board thumbnails.
   2. Adding tags (`#tag`) or aliases required opening the board, entering properties, and navigating dialogs.
   3. Replay Bar HUD looked flat and mismatched the Windows 11 acrylic glassmorphic UI.
-* **Architecture & Polish ([`src/js/ui/note-overview.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/note-overview.js), [`replay-bar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/replay-bar.js))**:
+* **Architecture & Polish ([`src/js/ui/note-overview.js`](../src/js/ui/note-overview.js), [`replay-bar.js`](../src/js/ui/replay-bar.js))**:
   1. **Thumbnail Priority Pipeline**:
      - `note-overview.js` loads board state and prioritizes `board.thumbnail` data URI over fallback icons. If thumbnail rendering fails, falls back gracefully to SVG category glyph.
   2. **Inline Modal Quick Prompts**:
@@ -177,16 +177,16 @@ The following ledger establishes the complete historical and technical lineage o
   1. Split study workspace suffered from cross-viewport event leakage: drawing on the left study board caused ink to mirror or corrupt the primary board.
   2. Tool selection and properties were coupled; modifying board properties in the split pane overwrote the primary board's metadata.
   3. The board picker lacked autocomplete and could not create new boards on the fly.
-* **Subsystem Architecture ([`src/js/ui/split-workspace.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/split-workspace.js))**:
+* **Subsystem Architecture ([`src/js/ui/split-workspace.js`](../src/js/ui/split-workspace.js))**:
   - Detailed in [Section 3.1](#31-split-study-workspace-dual-store-isolation) below.
 
 ---
 
 ### 2.8. Version v4.8.19 — Advanced Pen Suite (Brush, Fountain & Calligraphy)
-* **Commit**: `75caf1b` | **Release Dossier**: [`doc9_new_pen_types_release_v4.8.19.md`](file:///C:/Users/kazir/.gemini/antigravity/brain/d07eff31-5f06-4560-abcb-89236f7c951a/doc9_new_pen_types_release_v4.8.19.md)
+* **Commit**: `75caf1b` | **Release Dossier**: **doc9_new_pen_types_release_v4.8.19.md** (not retained in this repository)
 * **Problem Statement**:
   - GazBoard provided only standard round ballpoint pen and flat translucent highlighter. Study and sketch workflows required expressive inking: split-nib fountain flex handwriting, Chinese/Japanese calligraphy chisel ribbons, and sable hair artist brushes with velocity thinning.
-* **Subsystem Architecture ([`src/js/core/ink.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/ink.js))**:
+* **Subsystem Architecture ([`src/js/core/ink.js`](../src/js/core/ink.js))**:
   - Detailed in [Section 3.2](#32-advanced-pen-vector-geometry--rendering-pipeline) below.
 
 ---
@@ -347,7 +347,7 @@ This section provides a rigorous vulnerability audit across 10 critical operatio
 
 ### Audit Finding AF-01: Geometry WeakMap Cache Invalidation on Pen Width Change
 * **Severity**: Low / Performance
-* **File**: [`src/js/core/ink.js`](file:///C:/Users/kazir/Documents/OpenCode\GazBoard\src\js\core\ink.js#L560-L583)
+* **File**: [`src/js/core/ink.js`](../src/js/core/ink.js)
 * **Symptom**: If a stroke object's `width`, `slant`, or `softness` attribute is mutated in-place without replacing the `stroke.points` array reference, `runCache.get(pts)` returns stale cached geometry.
 * **Root Cause**: `runCache` is a `WeakMap` keyed solely by the `points` array reference. While `key` includes size and tool parameters, mutating points in-place without changing reference can bypass cache invalidation.
 * **Hardening Recommendation**:
@@ -355,7 +355,7 @@ This section provides a rigorous vulnerability audit across 10 critical operatio
 
 ### Audit Finding AF-02: SVG `<foreignObject>` XHTML Namespace Escaping
 * **Severity**: Medium / Render Stability
-* **File**: [`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode\GazBoard\src\js\core\markdown.js)
+* **File**: [`src/js/core/markdown.js`](../src/js/core/markdown.js)
 * **Symptom**: If user markdown contains raw unescaped HTML characters (e.g. `<foo>` or unclosed `&`), the SVG parser fails with `XML Parsing Error: mismatched tag`, resulting in a blank markdown card on canvas.
 * **Root Cause**: SVG `<foreignObject>` requires strict XML-compliant markup. Standard browser `innerHTML` accepts loose HTML, but SVG image data URIs reject malformed XML.
 * **Hardening Recommendation**:
@@ -372,7 +372,7 @@ This section provides a rigorous vulnerability audit across 10 critical operatio
 
 ### Audit Finding AF-03: Split Workspace Pointer Capture Cleanup on Sudden Blur
 * **Severity**: Medium / UX
-* **File**: [`src/js/ui/split-workspace.js`](file:///C:/Users/kazir/Documents/OpenCode\GazBoard\src\js\ui\split-workspace.js)
+* **File**: [`src/js/ui/split-workspace.js`](../src/js/ui/split-workspace.js)
 * **Symptom**: If the user draws a stroke in the left split pane and hits `Alt+Tab` or a system notification pops up mid-stroke, the pointer capture may remain stuck in down state.
 * **Root Cause**: Pointer up events are missed when window loses OS focus.
 * **Hardening Recommendation**:
@@ -380,14 +380,14 @@ This section provides a rigorous vulnerability audit across 10 critical operatio
 
 ### Audit Finding AF-04: Autocomplete Combobox Memory Footprint from Large Base64 Thumbnails
 * **Severity**: Low / Memory
-* **File**: [`src/js/ui/split-workspace.js`](file:///C:/Users/kazir/Documents/OpenCode\GazBoard\src\js\ui\split-workspace.js)
+* **File**: [`src/js/ui/split-workspace.js`](../src/js/ui/split-workspace.js)
 * **Symptom**: Opening the board picker in workspaces with 200+ boards can cause a momentary GC pause if all board thumbnail data URIs (~50KB each) are loaded into DOM simultaneously.
 * **Hardening Recommendation**:
   Implement virtualized list rendering or lazy-load thumbnail images via `IntersectionObserver` in the combobox dropdown.
 
 ### Audit Finding AF-05: Pen Type Switcher Color Preservation
 * **Severity**: Low / UX
-* **File**: [`src/js/ui/toolbar.js`](file:///C:/Users/kazir/Documents/OpenCode\GazBoard\src\js\ui\toolbar.js)
+* **File**: [`src/js/ui/toolbar.js`](../src/js/ui/toolbar.js)
 * **Symptom**: When switching from Calligraphy to Brush, the color swatch could desync if the target pen previously stored a distinct color.
 * **Hardening Recommendation**:
   `penTypeSwitcher` explicitly copies the active color:
@@ -395,35 +395,35 @@ This section provides a rigorous vulnerability audit across 10 critical operatio
 
 ### Audit Finding AF-06: KaTeX Math Delimiter Collisions with Currency Symbols
 * **Severity**: Low / Parsing
-* **File**: [`src/js/core/markdown.js`](file:///C:/Users/kazir/Documents/OpenCode\GazBoard\src\js\core\markdown.js)
+* **File**: [`src/js/core/markdown.js`](../src/js/core/markdown.js)
 * **Symptom**: Text like `$100 and $200` turns everything between them into an inline LaTeX formula.
 * **Hardening Recommendation**:
   Enforce whitespace rules on inline math: `(?<=\s|^)\$([^\s$].*?[^\s$])\$(?=\s|$|[.,?!])` ensuring opening dollar has no trailing space and closing dollar has no leading space.
 
 ### Audit Finding AF-07: High-DPI Stylus Scale Factor in Calligraphy Envelopes
 * **Severity**: Low / Visual Polish
-* **File**: [`src/js/core/ink.js`](file:///C:/Users/kazir/Documents/OpenCode\GazBoard\src\js\core\ink.js)
+* **File**: [`src/js/core/ink.js`](../src/js/core/ink.js)
 * **Symptom**: At extreme zoom-out levels ($< 15\%$), dense midpoint interpolation produces excess sub-pixel vertices.
 * **Hardening Recommendation**:
   Add distance culling: skip interpolating points where $\text{dist}(\mathbf{P}_i, \mathbf{P}_{i-1}) \times \text{scale} < 0.5\text{px}$.
 
 ### Audit Finding AF-08: Scribble Eraser Reversal Rate at High Digitizer PPS (233+ PPS)
 * **Severity**: Medium / Kinematics
-* **File**: [`src/js/core/scratch.js`](file:///C:/Users/kazir/Documents/OpenCode\GazBoard\src\js\core\scratch.js)
+* **File**: [`src/js/core/scratch.js`](../src/js/core/scratch.js)
 * **Symptom**: On high-frequency digitizers (Huion H950P at 233 PPS), a deliberate scribble produces twice as many sample points, which can dilute the reversal density calculation.
 * **Hardening Recommendation**:
   Downsample stroke points by arc length ($3\text{px}$ threshold) before evaluating reversal counts in `isScratchGesture`.
 
 ### Audit Finding AF-09: Context Menu Collision with Freehand Stroke Inception
 * **Severity**: Low / Input
-* **File**: [`src/js/core/tools.js`](file:///C:/Users/kazir/Documents/OpenCode\GazBoard\src\js\core\tools.js)
+* **File**: [`src/js/core/tools.js`](../src/js/core/tools.js)
 * **Symptom**: If the user holds the stylus barrel button (right-click) while moving, a context menu spawns while an ink stroke simultaneously begins.
 * **Hardening Recommendation**:
   `pointerdown` handler must verify `e.button === 0 && (e.buttons & 1) !== 0` before calling `startStroke()`.
 
 ### Audit Finding AF-10: Undo/Redo Boundary Clamping During Dual-Board Switching
 * **Severity**: Low / State
-* **File**: [`src/js/core/store.js`](file:///C:/Users/kazir/Documents/OpenCode\GazBoard\src\js\core\store.js)
+* **File**: [`src/js/core/store.js`](../src/js/core/store.js)
 * **Symptom**: Triggering undo on an empty history stack in split view should be a silent no-op.
 * **Hardening Recommendation**:
   Verify `store.undo()` returns `{ success: false }` and does not emit mutation events when `historyIndex <= 0`.

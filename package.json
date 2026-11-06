@@ -176,7 +176,7 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "fahim9778",
+      "owner": "Mostakim2005",
       "repo": "GazBoard",
       "releaseType": "release"
     },

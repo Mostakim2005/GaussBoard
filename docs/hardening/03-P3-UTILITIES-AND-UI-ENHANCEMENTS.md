@@ -32,11 +32,11 @@ The P3 tier consists of isolated tools and formatters with minimal blast radiuse
 An offline academic dictionary modal (<kbd>Ctrl+Shift+D</kbd>) based on WordNet and the Academic Word List (AWL). Features IPA phonetics, definitions, synonyms, antonyms, collocations, corpus sentences, native Web Speech API audio pronunciation, and a `[📸 Stamp Definition]` action creating a permanent whiteboard card.
 
 ### 1.2 Implementation Mechanics & Data Structures
-- **Lexical Graph**: Embedded database in [`src/js/ui/academic-dictionary.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/academic-dictionary.js) indexing words by lemma, part of speech (`n`, `v`, `adj`, `adv`), and semantic relation vectors.
+- **Lexical Graph**: Embedded database in [`src/js/ui/academic-dictionary.js`](../../src/js/ui/academic-dictionary.js) indexing words by lemma, part of speech (`n`, `v`, `adj`, `adv`), and semantic relation vectors.
 - **Audio Pronunciation**: Uses browser `window.speechSynthesis` with `SpeechSynthesisUtterance`, targeting English voices (`en-US`, `en-GB`).
 
 ### 1.3 Primary Code Files & Key Locations
-- [`src/js/ui/academic-dictionary.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/academic-dictionary.js):
+- [`src/js/ui/academic-dictionary.js`](../../src/js/ui/academic-dictionary.js):
   - `AcademicDictionaryModal` class (Lines 20–85)
   - Word lookup and morphological lemmatization (Lines 110–180)
   - `speakWord()` Web Speech TTS integration (Lines 210–245)
@@ -44,7 +44,7 @@ An offline academic dictionary modal (<kbd>Ctrl+Shift+D</kbd>) based on WordNet 
 
 ### 1.4 Specific Failure Modes & Line-Level Fragility
 1. **TTS Voice Lockup on Windows N Editions**: Windows N or stripped enterprise systems lack the Windows Media Feature Pack, causing `speechSynthesis.speak()` to hang silently without calling `onend`.
-   - *Fragile Point*: [`src/js/ui/academic-dictionary.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/academic-dictionary.js#L225).
+   - *Fragile Point*: [`src/js/ui/academic-dictionary.js`](../../src/js/ui/academic-dictionary.js).
 2. **Regex Injection on Search Filter**: Typing regex meta-characters (`[`, `*`, `+`) directly into the search bar throws an unhandled `SyntaxError`.
 
 ### 1.5 Concrete Hardening Directive for the Next AI
@@ -82,7 +82,7 @@ A writing enhancement utility analyzing whiteboard text notes. Computes the **Fl
 - **Pattern Dictionary**: Regex rules map conversational filler (e.g. "due to the fact that" $\to$ "because", "at this point in time" $\to$ "currently").
 
 ### 2.3 Primary Code Files & Key Locations
-- [`src/js/core/technical-linter.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/technical-linter.js):
+- [`src/js/core/technical-linter.js`](../../src/js/core/technical-linter.js):
   - `TechnicalLinter` class (Lines 15–75)
   - `countSyllables(word)` phonetic counting heuristics (Lines 90–140)
   - `computeReadability()` Flesch scoring (Lines 150–195)
@@ -90,7 +90,7 @@ A writing enhancement utility analyzing whiteboard text notes. Computes the **Fl
 
 ### 2.4 Specific Failure Modes & Line-Level Fragility
 1. **Division-by-Zero on Sentence Count**: Text with zero punctuation marks yields `sentenceCount = 0`, causing Flesch-Kincaid to return `NaN` or `Infinity`.
-   - *Fragile Point*: [`src/js/core/technical-linter.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/technical-linter.js#L162).
+   - *Fragile Point*: [`src/js/core/technical-linter.js`](../../src/js/core/technical-linter.js).
 2. **KaTeX Math String Mangling**: Auto-fix regex transformations replacing words like "in order to" can corrupt embedded LaTeX math blocks (e.g. `\int_{0}^{1}`).
 
 ### 2.5 Concrete Hardening Directive for the Next AI
@@ -129,16 +129,16 @@ An interactive 118-element periodic table modal (`PeriodicTableModal`). Displays
 - **Formula Lexer**: Parses chemical formulas with nested parentheses (e.g. $\text{Ca(OH)}_2$) and hydration dot multipliers.
 
 ### 3.3 Primary Code Files & Key Locations
-- [`src/js/ui/periodic-table.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/periodic-table.js):
+- [`src/js/ui/periodic-table.js`](../../src/js/ui/periodic-table.js):
   - 118-element database and category filters (Lines 20–160)
   - Bohr shell concentric ring canvas renderer (Lines 180–240)
   - Element card whiteboard stamp creator (Lines 260–310)
-- [`src/js/core/scientific-math.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/scientific-math.js):
+- [`src/js/core/scientific-math.js`](../../src/js/core/scientific-math.js):
   - `calculateMolarMass()` chemical formula parser (Lines 340–420)
 
 ### 3.4 Specific Failure Modes & Line-Level Fragility
 1. **Unbalanced Parentheses Syntax Error**: Typing `Ca(OH` throws an unhandled exception in the formula parser.
-   - *Fragile Point*: [`src/js/core/scientific-math.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/core/scientific-math.js#L365).
+   - *Fragile Point*: [`src/js/core/scientific-math.js`](../../src/js/core/scientific-math.js).
 2. **Hydration Multiplier Glitch**: Misparsing the dot symbol ($\cdot$ or `*`) as a multiplication operator instead of hydration addition.
 
 ### 3.5 Concrete Hardening Directive for the Next AI
@@ -172,14 +172,14 @@ A collection of floating and dockable UI controls:
 - **Proximity Sensor**: Auto-hides sidebar ribbon when active stylus coordinates approach within 48px of the toolbar boundary while drawing.
 
 ### 4.3 Primary Code Files & Key Locations
-- [`src/js/ui/audio-bar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/audio-bar.js): Audio transport controls (Lines 35–180).
-- [`src/js/ui/density-canvas.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/density-canvas.js): Waveform density canvas (Lines 20–110).
-- [`src/js/ui/replay-bar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/replay-bar.js): Floating dock logic (Lines 25–130).
-- [`src/js/ui/sidebar-ribbon.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/sidebar-ribbon.js): Double-layer engineering ribbon (Lines 30–210).
+- [`src/js/ui/audio-bar.js`](../../src/js/ui/audio-bar.js): Audio transport controls (Lines 35–180).
+- [`src/js/ui/density-canvas.js`](../../src/js/ui/density-canvas.js): Waveform density canvas (Lines 20–110).
+- [`src/js/ui/replay-bar.js`](../../src/js/ui/replay-bar.js): Floating dock logic (Lines 25–130).
+- [`src/js/ui/sidebar-ribbon.js`](../../src/js/ui/sidebar-ribbon.js): Double-layer engineering ribbon (Lines 30–210).
 
 ### 4.4 Specific Failure Modes & Line-Level Fragility
 1. **Pointer Capture Latching**: Releasing mouse or stylus outside window boundaries leaves `pointerCapture` active, causing the HUD to stick to the cursor permanently.
-   - *Fragile Point*: [`src/js/ui/replay-bar.js`](file:///C:/Users/kazir/Documents/OpenCode/GazBoard/src/js/ui/replay-bar.js#L85).
+   - *Fragile Point*: [`src/js/ui/replay-bar.js`](../../src/js/ui/replay-bar.js).
 2. **Proximity Timer Thrashing**: Rapid pen movements crossing the 48px boundary repeatedly schedule and cancel DOM transition animations, causing ribbon flickering.
 
 ### 4.5 Concrete Hardening Directive for the Next AI

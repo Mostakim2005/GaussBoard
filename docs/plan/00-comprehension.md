@@ -15,7 +15,7 @@
 GazBoard is a local-first, zero-cloud digital whiteboard built on the Electron desktop framework (Chromium runtime + Node.js backend) [VERIFIED IN CODE: package.json:6, main.js:665-702]. Its core design tenets are offline privacy, hardware stylus responsiveness, and zero framework overhead:
 * **UI & Rendering Runtime**: Built without web frameworks (zero React, Vue, Angular, or Svelte). It utilizes pure vanilla JavaScript ES6+ modules in the renderer process [VERIFIED IN CODE: src/index.html:17, 87]. Rendering is driven directly on an HTML5 `<canvas>` via `CanvasRenderingContext2D` [VERIFIED IN CODE: src/js/core/surface.js:23-45], avoiding third-party canvas engines (such as Fabric.js, Konva, or Pixi.js).
 * **Stylus & Ink Pipeline**: Leverages native W3C `PointerEvent` APIs, extracting sub-frame hardware digitizer samples via `e.getCoalescedEvents()` [VERIFIED IN CODE: src/js/core/tools.js:719] and Windows 10/11 DirectX Delegated Ink Trails via `navigator.ink.requestPresenter` [VERIFIED IN CODE: src/js/core/inktrail.js:24-49]. Ink curves are rendered using midpoint quadratic Bézier splines (`Path2D.quadraticCurveTo`) [VERIFIED IN CODE: src/js/core/ink.js:35-58] with discrete 5-step pressure-quantized runs (`pressureRuns`) [VERIFIED IN CODE: src/js/core/ink.js:80-145].
-* **Document Model & Mutation Flow**: State is managed centrally in a headless transaction store (`Store` in [store.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L28)). Mutations execute through discrete atomic operations (`{ t: 'add' | 'del' | 'set' | 'order' | 'doc' }`) with transaction boundaries (`commit(label, ops)`), an undo/redo stack (capped at 200 transactions), and an append-only op log (`this.log`, capped at 5000 ops) designed for remote sync replication [VERIFIED IN CODE: src/js/core/store.js:30-42, 63-116].
+* **Document Model & Mutation Flow**: State is managed centrally in a headless transaction store (`Store` in [store.js](../../src/js/core/store.js)). Mutations execute through discrete atomic operations (`{ t: 'add' | 'del' | 'set' | 'order' | 'doc' }`) with transaction boundaries (`commit(label, ops)`), an undo/redo stack (capped at 200 transactions), and an append-only op log (`this.log`, capped at 5000 ops) designed for remote sync replication [VERIFIED IN CODE: src/js/core/store.js:30-42, 63-116].
 * **Rendering Optimization (Frozen Canvas)**: To preserve 60–120 FPS pen tracking on complex whiteboards containing thousands of items, `Surface` maintains an offscreen backing buffer (`this._ink`) [VERIFIED IN CODE: src/js/core/surface.js:448-456, 553-558]. When idle or lifting the pen, all committed objects are rendered into `this._ink`. During active drawing gestures, only the single active stroke (`this.wet`) is rendered on top of the blitted frozen bitmap, reducing per-frame draw cost from 30–100ms down to ~0.02ms [VERIFIED IN CODE: src/js/core/surface.js:553-588].
 * **Storage & Persistence**: Boards are stored as atomic `.json` files in `<userData>/boards` [VERIFIED IN CODE: storage-location.js:9, main.js:250-265, 1249-1275]. Embedded media assets (images, PDF renders) are hashed via SHA-256 and deduplicated into a content-addressable storage folder (`<userData>/boards/assets/<sha256>.<ext>`) [VERIFIED IN CODE: main.js:226-235, 1281-1294].
 * **Document Interoperability**: Imports PDF pages via PDF.js [VERIFIED IN CODE: src/js/importers/pdf.js:1-85], Microsoft Word (`.docx`) and PowerPoint (`.pptx`) either via native Microsoft Office PowerShell COM automation on Windows [VERIFIED IN CODE: msoffice.js:43-97], LibreOffice CLI [VERIFIED IN CODE: soffice.js:34-60], or a built-in headless HTML/Mammoth conversion window [VERIFIED IN CODE: main.js:904-931, src/convert.html:1-83].
@@ -30,7 +30,7 @@ The target feature set defined in `doc1_feature_specification.md` [FROM MY DOCS]
 | :--- | :--- | :--- | :--- |
 | **F-101** | Live Audio Recording | Capture microphone audio during live board sessions with elapsed timer and level meter. | Chromium `navigator.mediaDevices.getUserMedia` & `MediaRecorder` in renderer [FROM MY DOCS: doc3:141-160]. |
 | **F-102** | Pause & Resume Continuity | Temporarily halt recording without timeline gaps or drift. | Accumulate recording elapsed time chunks in `AudioRecorder` class [FROM MY DOCS: doc3:135-175]. |
-| **F-103** | Stroke-to-Audio Timestamping | Every stroke captures start timestamp ($t_0$), end timestamp ($t_1$), and per-point time offsets ($p.t$). | Inject `audioId`, `t0`, `t1` in [tools.js:finishStroke](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js#L1730) [FROM MY DOCS: doc3:215-240]. |
+| **F-103** | Stroke-to-Audio Timestamping | Every stroke captures start timestamp ($t_0$), end timestamp ($t_1$), and per-point time offsets ($p.t$). | Inject `audioId`, `t0`, `t1` in [tools.js:finishStroke](../../src/js/core/tools.js) [FROM MY DOCS: doc3:215-240]. |
 | **F-104** | Pre-Existing Ink Immunity | Notes drawn prior to recording remain permanently visible and unlinked from playback. | Render pass skips replay opacity filters for strokes lacking `audioId` [FROM MY DOCS: doc2:134, doc3:255]. |
 | **F-201** | Synchronized Note Reveal | Progressive re-drawing of notes synchronized with audio playback. | Audio element `currentTime` drives visibility in `drawStroke` [FROM MY DOCS: doc3:250-297]. |
 | **F-202** | Pending Stroke Ghosting | Future notes shown translucent (12–15% opacity), hidden, or as bounding outlines. | Dynamic `ctx.globalAlpha = 0.12` or early return in `drawStroke` [FROM MY DOCS: doc3:258-266]. |
@@ -68,20 +68,20 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
   "order": ["s_101", "n_102"]
   ```
 * **Ground Truth in Code**:
-  1. In [store.js:emptyDoc()](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L23-L24), the **in-memory** runtime document (`this.doc`) indeed uses a dictionary for `objects` (`objects: {} // id -> object`) and an array for `order` (`order: [] // z-order, back to front`). This explains why `doc2` described that structure.
-  2. However, in [store.js:toJSON()](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L319-L332), the **serialized** on-disk JSON flattens objects into an **array** in z-order and drops `order` completely:
+  1. In [store.js:emptyDoc()](../../src/js/core/store.js), the **in-memory** runtime document (`this.doc`) indeed uses a dictionary for `objects` (`objects: {} // id -> object`) and an array for `order` (`order: [] // z-order, back to front`). This explains why `doc2` described that structure.
+  2. However, in [store.js:toJSON()](../../src/js/core/store.js), the **serialized** on-disk JSON flattens objects into an **array** in z-order and drops `order` completely:
      ```javascript
      // src/js/core/store.js:331
      objects: d.order.map((id) => d.objects[id]).filter(Boolean)
      ```
      `doc.order` is **never** serialized to disk [VERIFIED IN CODE: src/js/core/store.js:331]! In the saved board file, `objects` is an Array, and z-order is determined strictly by array index.
-  3. In [store.js:load()](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L354-L358) and [storage-location.js:isBoardFile()](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/storage-location.js#L49-L54), the loader explicitly includes backward compatibility for dictionaries:
+  3. In [store.js:load()](../../src/js/core/store.js) and [storage-location.js:isBoardFile()](../../storage-location.js), the loader explicitly includes backward compatibility for dictionaries:
      ```javascript
      const list = Array.isArray(data.objects) ? data.objects
        : Array.isArray(data.objectList) ? data.objectList
          : data.objects ? Object.values(data.objects) : [];
      ```
-* **Impact**: While `load()` tolerates a dictionary, serializing `objects` as a dictionary breaks `main.js:1237` (`(raw.objects || []).length` evaluates to `undefined`, breaking board counts in the library picker) and causes `app.externaliseAssets(doc)` ([app.js:579](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js#L579)) to abort (`if (!Array.isArray(doc.objects)) return doc`). All new serialization logic must adhere strictly to `objects: Array` on disk and `objects: {}` in memory.
+* **Impact**: While `load()` tolerates a dictionary, serializing `objects` as a dictionary breaks `main.js:1237` (`(raw.objects || []).length` evaluates to `undefined`, breaking board counts in the library picker) and causes `app.externaliseAssets(doc)` ([app.js:579](../../src/js/app.js)) to abort (`if (!Array.isArray(doc.objects)) return doc`). All new serialization logic must adhere strictly to `objects: Array` on disk and `objects: {}` in memory.
 
 ---
 
@@ -92,7 +92,7 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
   ```
   Doc3 assumes `assets.put` returns a string `assetId` and natively supports audio formats (`audio/webm`, `audio/ogg`, `audio/wav`).
 * **Ground Truth in Code**:
-  1. In [main.js:1285-1293](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L1285-L1293), `assets:put` returns an **object** `{ id }`, NOT a string:
+  1. In [main.js:1285-1293](../../main.js), `assets:put` returns an **object** `{ id }`, NOT a string:
      ```javascript
      // main.js:1290, 1292
      try { await fsp.access(file); return { id }; } catch { /* first time */ }
@@ -100,7 +100,7 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
      return { id };
      ```
      Calling `const assetId = await window.board.assets.put(...)` results in `assetId` being `{ id: '...' }`, causing `obj.assetId` to store an object or `[object Object]` if cast to string!
-  2. In [main.js:228-235](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L228-L235), `ASSET_EXT` and `ASSET_MIME` **only define image formats**:
+  2. In [main.js:228-235](../../main.js), `ASSET_EXT` and `ASSET_MIME` **only define image formats**:
      ```javascript
      const ASSET_EXT = {
        'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif',
@@ -124,7 +124,7 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
 ### Contradiction 3: `.gazboard` File Format (`.zip` vs Plain JSON)
 * **Document Claim**: `doc2_gazboard_architecture_analysis.md` (line 122) states:
   > *"Export Pipeline (export.js, board-export.js): Supports PNG, SVG, PDF... And .gazboard ZIP bundles via JSZip."*
-* **Ground Truth in Code**: In [export.js:664-665](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/export.js#L664-L665) and [board-export.js:48-50](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/board-export.js#L48-L50), exporting a single board produces a **raw, uncompressed UTF-8 JSON file**:
+* **Ground Truth in Code**: In [export.js:664-665](../../src/js/export.js) and [board-export.js:48-50](../../src/js/board-export.js), exporting a single board produces a **raw, uncompressed UTF-8 JSON file**:
   ```javascript
   // src/js/export.js:664-665
   const json = JSON.stringify(exportable(app.store.toJSON({ app: 'GazBoard', version: 1 })), null, 0);
@@ -143,9 +143,9 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
   * Global state management: Toolbar menu item "Answer cover" (`insert.curtain`) and "Cover answers again" (`curtain.coverAll`) [VERIFIED IN CODE: src/js/ui/toolbar.js:268, 714].
 * **Critical Technical Gaps Between Curtain and Tape**:
   While both serve active recall, simply reusing `curtain` as-is breaks the StarNote/Flexcil user experience in four ways:
-  1. *Creation Mechanism*: Upstream `curtain` is an inserted static card placed in the center of the viewport via `app.addCurtain()` ([app.js:1905-1915](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js#L1905-L1915)). Tape in Flexcil/StarNote is an interactive drawing tool: the user selects the Tape pen and drags a rectangular strip or polyline directly over words or formulas.
-  2. *Reveal Visuals*: Upstream `drawCurtain(ctx, o)` ([render.js:993](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js#L993)) executes `if (o.revealed) return;`. When revealed, a curtain is 100% invisible. Tape requires translucent reveal (~15% opacity with dashed/accent border) so students can read the text while still seeing where the tape strip is.
-  3. *Hit-Testing & Two-Way Toggling*: In [hit.js:28](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/hit.js#L28), `ghost(o) = (o.type === 'curtain' && !!o.revealed)`. Once revealed, `hitObject` ignores the curtain completely so taps pass through to underlying notes. Consequently, a revealed curtain CANNOT be tapped to hide it again! Tape requires a two-way toggle (tap to reveal, tap to re-conceal). To support Tape without breaking Curtain's pass-through property, `ghost(o)` must distinguish between standard curtains and tape objects, or handle tape toggling during study mode.
+  1. *Creation Mechanism*: Upstream `curtain` is an inserted static card placed in the center of the viewport via `app.addCurtain()` ([app.js:1905-1915](../../src/js/app.js)). Tape in Flexcil/StarNote is an interactive drawing tool: the user selects the Tape pen and drags a rectangular strip or polyline directly over words or formulas.
+  2. *Reveal Visuals*: Upstream `drawCurtain(ctx, o)` ([render.js:993](../../src/js/core/render.js)) executes `if (o.revealed) return;`. When revealed, a curtain is 100% invisible. Tape requires translucent reveal (~15% opacity with dashed/accent border) so students can read the text while still seeing where the tape strip is.
+  3. *Hit-Testing & Two-Way Toggling*: In [hit.js:28](../../src/js/core/hit.js), `ghost(o) = (o.type === 'curtain' && !!o.revealed)`. Once revealed, `hitObject` ignores the curtain completely so taps pass through to underlying notes. Consequently, a revealed curtain CANNOT be tapped to hide it again! Tape requires a two-way toggle (tap to reveal, tap to re-conceal). To support Tape without breaking Curtain's pass-through property, `ghost(o)` must distinguish between standard curtains and tape objects, or handle tape toggling during study mode.
   4. *Global Actions*: Upstream provides only `curtain.coverAll` ("Cover answers again"); it has no "Reveal All" command.
 * **Architectural Recommendation**: Treat `tape` not as an entirely separate subsystem, but as a specialized variant of `curtain` (e.g. `{ type: 'curtain', subtype: 'tape', drawn: true }` or a dedicated tool that outputs `type: 'curtain'`). Update `drawCurtain` to render translucent strips when `o.subtype === 'tape' && o.revealed`, and add two-way toggle handling in `tools.js`. This preserves 100% backward compatibility with upstream GazBoard (which will render them as standard curtains).
 
@@ -156,8 +156,8 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
   * `doc2:139` and `doc3:378` cite `camera.panTo(bounds)` for auto-follow camera and PDF excerpt jumping.
   * `doc3:320` cites `this.surface.pulseHighlight(boundsOf(obj))` for click-to-seek feedback.
 * **Ground Truth in Code**:
-  * [camera.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/camera.js) has only 43 lines [VERIFIED IN CODE: src/js/core/camera.js:1-43]. Its methods are `toScreen`, `toWorld`, `panBy`, `zoomAt`, `setZoom`, `viewport`, `fit`, `centerOn`, `toJSON`, and `load`. **There is no `panTo` method.**
-  * [surface.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js) contains zero references to `pulseHighlight` [VERIFIED IN CODE: src/js/core/surface.js].
+  * [camera.js](../../src/js/core/camera.js) has only 43 lines [VERIFIED IN CODE: src/js/core/camera.js:1-43]. Its methods are `toScreen`, `toWorld`, `panBy`, `zoomAt`, `setZoom`, `viewport`, `fit`, `centerOn`, `toJSON`, and `load`. **There is no `panTo` method.**
+  * [surface.js](../../src/js/core/surface.js) contains zero references to `pulseHighlight` [VERIFIED IN CODE: src/js/core/surface.js].
 * **Impact**: These methods must be newly authored. `camera.panTo` must implement smooth easing (requestAnimationFrame lerp) without blocking the main thread or causing race conditions with manual user gestures. Pulse animations must be registered in `surface.overlays` [VERIFIED IN CODE: src/js/core/surface.js:31, 723].
 
 ---
@@ -172,7 +172,7 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
     ```
   * During audio playback, neither `this.store.rev` nor the camera coordinates change between audio frames (unless auto-follow pans).
   * Consequently, `Surface.draw()` will repeatedly blit the static frozen canvas, completely ignoring changes in `audio.currentTime`!
-  * **The Fatal Baking Flaw**: Worse still, when `Surface._freezeScene()` ([surface.js:448-461](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js#L448-L461)) runs, it paints ALL objects on the board into `this._inkCanvas`. Future strokes belonging to the active recording session are therefore already burned into the frozen bitmap at 100% opacity! Blitting `this._inkCanvas` will paint future notes at full opacity, making ghosting (F-202) and synchronized reveals (F-201) physically impossible without scene partitioning.
+  * **The Fatal Baking Flaw**: Worse still, when `Surface._freezeScene()` ([surface.js:448-461](../../src/js/core/surface.js)) runs, it paints ALL objects on the board into `this._inkCanvas`. Future strokes belonging to the active recording session are therefore already burned into the frozen bitmap at 100% opacity! Blitting `this._inkCanvas` will paint future notes at full opacity, making ghosting (F-202) and synchronized reveals (F-201) physically impossible without scene partitioning.
   * If `invalidate()` is called on every animation frame to bypass the freeze cache, `drawScene()` will force a full redraw of all board objects (potentially thousands of strokes, PDF pages, text boxes) 60–120 times per second, dropping frames severely.
 * **Architectural Solution (Scene Partitioning)**:
   1. *Frozen Pre-existing Base*: When an audio recording session is loaded or playing, `_freezeScene()` partitions the scene: it bakes **only** objects that do not belong to the active replay track (`!o.audioId || o.audioId !== activeTrackId`). Background patterns, imported PDF pages, and pre-existing annotations are rasterized once into `this._inkCanvas`.
@@ -183,14 +183,14 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
      - Strokes with $t < t_0$ (future strokes) render with `globalAlpha = 0.12` (ghost) or return early (hidden).
      - The single active stroke with $t_0 \le t < t_1$ renders progressively along its midpoint spline with a glowing nib tip.
   3. *Sub-Stroke Slicing Performance Proof*:
-     Concerns regarding sub-stroke point slicing performance are mathematically unfounded. Because a human user can only draw **one stroke at a time**, at any given millisecond there is **at most ONE active stroke** where $t_0 \le t < t_1$. Slicing 50 points and calling `centrelinePath(visiblePts)` on a single stroke consumes less than 10 microseconds ($0.01\text{ms}$) in V8—less than 0.1% of a 16.6ms frame budget. All completed and ghosted strokes use pre-computed, cached `Path2D` instances via `inkPath(stroke)` ([ink.js:259-268](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/ink.js#L259-L268)).
+     Concerns regarding sub-stroke point slicing performance are mathematically unfounded. Because a human user can only draw **one stroke at a time**, at any given millisecond there is **at most ONE active stroke** where $t_0 \le t < t_1$. Slicing 50 points and calling `centrelinePath(visiblePts)` on a single stroke consumes less than 10 microseconds ($0.01\text{ms}$) in V8—less than 0.1% of a 16.6ms frame budget. All completed and ghosted strokes use pre-computed, cached `Path2D` instances via `inkPath(stroke)` ([ink.js:259-268](../../src/js/core/ink.js)).
 
 ---
 
 ### Contradiction 7: Document Model Persistence & Upstream Field Stripping
 * **Document Claim**: `doc3_windows_implementation_plan.md` (lines 198-201) proposes saving audio tracks by committing `{ t: 'doc', after: { audioTracks: [...] } }`, asserting this is backwards-compatible.
 * **Ground Truth in Code**:
-  1. In [store.js:toJSON()](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L327-L332), the return object is hardcoded:
+  1. In [store.js:toJSON()](../../src/js/core/store.js), the return object is hardcoded:
      ```javascript
      return { id: d.id, name: d.name, schema: 2, created: d.created, modified: d.modified,
        origin: d.origin || undefined,
@@ -199,7 +199,7 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
        camera: d.camera, objects: d.order.map((id) => d.objects[id]).filter(Boolean), ...extra };
      ```
      Any custom property on `this.doc` (including `audioTracks`) is **completely dropped** during serialization unless explicitly enumerated in `toJSON()`!
-  2. In [store.js:load()](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L343-L362), `load` instantiates a fresh `emptyDoc()` and copies only recognized keys. Any unknown fields in the loaded JSON file are silently discarded!
+  2. In [store.js:load()](../../src/js/core/store.js), `load` instantiates a fresh `emptyDoc()` and copies only recognized keys. Any unknown fields in the loaded JSON file are silently discarded!
 * **Impact**: For backwards compatibility with upstream GazBoard:
   * When upstream GazBoard opens a Replay board, it will ignore `audioTracks` without crashing (safe degradation).
   * However, if upstream GazBoard saves that board, `audioTracks` will be permanently stripped!
@@ -209,7 +209,7 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
 
 ### Contradiction 8: Page Strip 1D Vertical Stack vs Side-by-Side Split Workspace
 * **Document Claim**: `doc2_gazboard_architecture_analysis.md` (line 148) suggests implementing F-704 (Side-by-Side Split Study Workspace) via a "dual-sheet preset in pages.js (Reference sheet + Notebook sheet placed horizontally)".
-* **Ground Truth in Code**: In [pages.js:20-29](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/pages.js#L20-L29), page layout is hardcoded to a 1-dimensional vertical column centered on $x = 0$:
+* **Ground Truth in Code**: In [pages.js:20-29](../../src/js/core/pages.js), page layout is hardcoded to a 1-dimensional vertical column centered on $x = 0$:
   ```javascript
   let top = -pages[0].h / 2;
   for (const p of pages) {
@@ -224,7 +224,7 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
 ### Contradiction 9: LAN Sync Payload Limits vs Embedded Audio
 * **Document Claim**: `doc1` and `doc3` assume audio recordings can seamlessly travel with boards.
 * **Ground Truth in Code**:
-  * In [sync/node.js:63, 768](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/sync/node.js#L63), the LAN sync protocol enforces:
+  * In [sync/node.js:63, 768](../../sync/node.js), the LAN sync protocol enforces:
     ```javascript
     const MAX_BOARD_BYTES = 64 * 1024 * 1024; // 64 MB
     ```
@@ -237,14 +237,14 @@ A rigorous cross-comparison between the input planning documents (`doc1`, `doc2`
 ### Contradiction 10: Electron Security Posture & Unrestricted IPC File System Access
 * **Document Claim**: `doc2` states GazBoard has clean separation of concerns and robust security.
 * **Ground Truth in Code**:
-  * In [main.js:1114, 1126-1129](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L1114), `ipcMain.handle('fs:readFile')` and `ipcMain.handle('fs:writeFile')` accept arbitrary file paths with **zero path traversal checks or directory sandboxing**:
+  * In [main.js:1114, 1126-1129](../../main.js), `ipcMain.handle('fs:readFile')` and `ipcMain.handle('fs:writeFile')` accept arbitrary file paths with **zero path traversal checks or directory sandboxing**:
     ```javascript
     ipcMain.handle('fs:readFile', async (_e, p) => { const b = await fsp.readFile(p); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); });
     ipcMain.handle('fs:writeFile', async (_e, { filePath, data }) => { await fsp.writeFile(filePath, Buffer.from(data)); return true; });
     ```
-  * In [main.js:909](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L909), `convertWithHiddenWindow` creates a BrowserWindow with `preload.js` loaded and `sandbox: false`.
-  * [src/convert.html](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/convert.html) has **no Content-Security-Policy header or meta tag** and executes `document.getElementById('root').innerHTML = ...` with converted Word/PowerPoint HTML [VERIFIED IN CODE: src/convert.html:57, 66].
-  * In [main.js:734](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L734), `setWindowOpenHandler` passes any URL directly to `shell.openExternal(url)` without validating whether the protocol is `https:` or potentially dangerous (`file:`, `javascript:`, custom OS URI schemes).
+  * In [main.js:909](../../main.js), `convertWithHiddenWindow` creates a BrowserWindow with `preload.js` loaded and `sandbox: false`.
+  * [src/convert.html](../../src/convert.html) has **no Content-Security-Policy header or meta tag** and executes `document.getElementById('root').innerHTML = ...` with converted Word/PowerPoint HTML [VERIFIED IN CODE: src/convert.html:57, 66].
+  * In [main.js:734](../../main.js), `setWindowOpenHandler` passes any URL directly to `shell.openExternal(url)` without validating whether the protocol is `https:` or potentially dangerous (`file:`, `javascript:`, custom OS URI schemes).
 
 ---
 

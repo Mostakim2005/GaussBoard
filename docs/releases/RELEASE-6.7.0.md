@@ -3,7 +3,7 @@
 > **Release Version**: `v6.7.0`  
 > **Date**: October 24, 2026  
 > **Git Commit Target**: `feat(stem): Phase 7 STEM Powerhouse (v6.7.0)`  
-> **Binary Deliverable**: [`releases/GazBoard-v6.7.0-Portable.exe`](../../releases/GazBoard-v6.7.0-Portable.exe) (`113,075,190 bytes` / `107.84 MiB`)  
+> **Binary Deliverable**: `GazBoard-v6.7.0-Portable.exe` (`113,075,190 bytes` / `107.84 MiB`)  
 > **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Invariant Compliance**: Strict adherence across all 6 Golden Invariants (100% i18n parity across 7 locales, 0 native C++ dependencies, preserved `p.t` stroke timestamps, finite audio safeguard, scene partitioning during audio replay, Study Tape toggle persistence).
 
@@ -63,7 +63,7 @@ Release **`v6.7.0` (Phase 7 — STEM Powerhouse)** elevates GazBoard into an off
 
 | Deliverable | Path | Type | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Portable Binary** | [`releases/GazBoard-v6.7.0-Portable.exe`](../../releases/GazBoard-v6.7.0-Portable.exe) | Win32 Binary | Zero-install standalone executable with all Phase 1–7 STEM capabilities bundled. |
+| **Portable Binary** | `GazBoard-v6.7.0-Portable.exe` | Win32 Binary | Zero-install standalone executable with all Phase 1–7 STEM capabilities bundled. |
 | **Circuit Engine** | [`src/js/core/circuit-sim.js`](../../src/js/core/circuit-sim.js) | Core Module | Semiconductor, 555 timer, opamp, and logic gate SPICE-like simulation engine. |
 | **Circuit Workbench** | [`src/js/ui/circuit-workbench.js`](../../src/js/ui/circuit-workbench.js) | UI Component | Virtual breadboard, probe router, and schematic renderer. |
 | **Chemical Sketcher** | [`src/js/ui/chemical-sketcher.js`](../../src/js/ui/chemical-sketcher.js) | UI Component | 2D structure drawing, bond palette, and SMILES 2D/3D parser. |

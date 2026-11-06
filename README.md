@@ -12,12 +12,12 @@ Everything runs locally. On top of the original feature set, it can **import Wor
 
 <div align="center">
 
-## ⏬ [**Download the latest stable version**](https://github.com/fahim9778/GazBoard/releases/latest)
+## ⏬ [**Download the latest stable version**](https://github.com/Mostakim2005/GazBoard/releases/latest)
 
-[![Downloads](https://img.shields.io/github/downloads/fahim9778/GazBoard/total?label=downloads&color=0078d4)](https://github.com/fahim9778/GazBoard/releases)
-[![Stars](https://img.shields.io/github/stars/fahim9778/GazBoard?style=flat)](https://github.com/fahim9778/GazBoard/stargazers)
-[![Latest release](https://img.shields.io/github/v/release/fahim9778/GazBoard?label=latest&color=107c10)](https://github.com/fahim9778/GazBoard/releases/latest)
-[![License](https://img.shields.io/github/license/fahim9778/GazBoard)](LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/Mostakim2005/GazBoard/total?label=downloads&color=0078d4)](https://github.com/Mostakim2005/GazBoard/releases)
+[![Stars](https://img.shields.io/github/stars/Mostakim2005/GazBoard?style=flat)](https://github.com/Mostakim2005/GazBoard/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/Mostakim2005/GazBoard?label=latest&color=107c10)](https://github.com/Mostakim2005/GazBoard/releases/latest)
+[![License](https://img.shields.io/github/license/Mostakim2005/GazBoard)](LICENSE)
 
 🌐 [**try it in your browser**](https://gazboard.fahim9778.workers.dev/) — no install
 
@@ -49,6 +49,8 @@ The **portable** build installs nothing and keeps everything — boards, picture
 ### In a browser, without installing anything
 
 There is now a web build as well: **<https://gazboard.fahim9778.workers.dev/>**
+
+It is hosted by the upstream project, not by this fork, so it shows upstream's release rather than this one's changes.
 
 It is the same board — the same pens, the same import, the same export — running in the browser instead of as an installed app. It works offline once loaded, and
 it can be installed to your home screen or desktop from the browser's own menu.
@@ -512,4 +514,4 @@ export and settings are all here.
 
 MIT licensed. Not affiliated with or endorsed by Microsoft.
 
-*by theBoringCodes (of [@fahim9778](https://github.com/fahim9778))  — Co-created with ♥ by Claude Cowork & GPT Sol, Astra*
+*GaussBoard — a fork maintained by [@Mostakim2005](https://github.com/Mostakim2005). Built on GazBoard by theBoringCodes (of [@fahim9778](https://github.com/fahim9778))  — Co-created with ♥ by Claude Cowork & GPT Sol, Astra*

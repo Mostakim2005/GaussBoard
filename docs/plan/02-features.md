@@ -39,7 +39,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 * **Verdict**: Fully feasible with zero native Node addon dependencies.
 * **Technical Mechanism**:
   * Utilizes Chromium's standard `navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })` paired with `MediaRecorder` using MIME type `audio/webm;codecs=opus` [FROM MY DOCS: doc3:142-146].
-  * *Critical Electron Requirement*: In [main.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js), `session.defaultSession.setPermissionRequestHandler` is currently missing [VERIFIED IN CODE: main.js]. While dev builds grant media access implicitly, packaged production builds on Windows require an explicit permission handler in `main.js`:
+  * *Critical Electron Requirement*: In [main.js](../../main.js), `session.defaultSession.setPermissionRequestHandler` is currently missing [VERIFIED IN CODE: main.js]. While dev builds grant media access implicitly, packaged production builds on Windows require an explicit permission handler in `main.js`:
     ```javascript
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
       callback(permission === 'media');
@@ -49,12 +49,12 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [main.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js): Lines 148–160 (extend `app://` protocol for asset streaming), Lines 600–615 (configure `session.defaultSession.setPermissionRequestHandler` in `app.whenReady()`).
-  * [preload.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/preload.js): Lines 224–226 (add binary audio streaming IPC `board.assets.putBinary(stream/buffer)`).
-  * [src/js/app.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js): Line 215 (instantiate `AudioController`), Lines 4290–4430 (`onKeyDown` keyboard shortcut routing).
+  * [main.js](../../main.js): Lines 148–160 (extend `app://` protocol for asset streaming), Lines 600–615 (configure `session.defaultSession.setPermissionRequestHandler` in `app.whenReady()`).
+  * [preload.js](../../preload.js): Lines 224–226 (add binary audio streaming IPC `board.assets.putBinary(stream/buffer)`).
+  * [src/js/app.js](../../src/js/app.js): Line 215 (instantiate `AudioController`), Lines 4290–4430 (`onKeyDown` keyboard shortcut routing).
 * **Files Created**:
   * `src/js/core/audio-recorder.js`: Headless recording state machine, chunk accumulator, and wall-clock timer.
-  * `src/js/ui/audio-bar.js`: Floating draggable recording/playback HUD widget modeled on [timer.js:69-120](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/ui/timer.js#L69-L120).
+  * `src/js/ui/audio-bar.js`: Floating draggable recording/playback HUD widget modeled on [timer.js:69-120](../../src/js/ui/timer.js).
 * **Extension Points Used**:
   * App lifecycle hooks in `app.js`.
   * Preload bridge `window.board` [VERIFIED IN CODE: preload.js:162].
@@ -74,7 +74,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
     }
   ];
   ```
-* **Store Serialization Fix**: In [store.js:327-332](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L327-L332), `toJSON()` currently hardcodes property extraction and drops unknown keys [VERIFIED IN CODE: src/js/core/store.js:331]. `toJSON()` and `load()` must be updated to preserve `audioTracks`.
+* **Store Serialization Fix**: In [store.js:327-332](../../src/js/core/store.js), `toJSON()` currently hardcodes property extraction and drops unknown keys [VERIFIED IN CODE: src/js/core/store.js:331]. `toJSON()` and `load()` must be updated to preserve `audioTracks`.
 * **Upstream Behavior**: When opened in upstream GazBoard 4.8.1, `Store.load()` ignores `audioTracks` safely without crashing [VERIFIED IN CODE: src/js/core/store.js:343-362]. However, if the user saves the board in upstream GazBoard, `Store.toJSON()` will drop `audioTracks`.
 
 #### 5. UI/UX Behavior, States & Accessibility
@@ -180,7 +180,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js):
+  * [src/js/core/tools.js](../../src/js/core/tools.js):
     - Line 1535 (`startStroke(e, wp, tool)`): Inject `audioId` and `t0 = Math.round(rec.currentTimeMs)`.
     - Lines 714, 724 (`onPointerMove` -> `offer(p)`): Inject `t: Math.round(rec.currentTimeMs - a.t0)` into raw/cand points.
     - Line 1707 (`breakStroke` -> `tidy`): **CRITICAL FIX**: Currently, `tidy` executes:
@@ -217,7 +217,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 6. Subsystem Interactions
 * **Undo/Redo**: Full undo/redo fidelity. Undoing a stroke and redoing it preserves its exact original timestamps.
-* **Point Erasing ([erase.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/erase.js))**: When an eraser splits a stroke, `splitStroke` in [erase.js:65-115](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/erase.js#L65-L115) copies base stroke attributes. It must be updated to copy `audioId`, `t0`, and `t1` to split segments.
+* **Point Erasing ([erase.js](../../src/js/core/erase.js))**: When an eraser splits a stroke, `splitStroke` in [erase.js:65-115](../../src/js/core/erase.js) copies base stroke attributes. It must be updated to copy `audioId`, `t0`, and `t1` to split segments.
 
 #### 7. Performance Impact & Worst Case
 * **Storage Footprint**: Adding `t0`, `t1` and integer `t` to points increases JSON size by approximately 12–15% for handwritten boards [VERIFIED IN CODE: src/js/core/store.js:331]. Handled easily by V8.
@@ -254,8 +254,8 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/surface.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js): Lines 448–461 (`_freezeScene`), Lines 553–588 (`draw`).
-  * [src/js/core/render.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js): Lines 379–410 (`drawStroke`).
+  * [src/js/core/surface.js](../../src/js/core/surface.js): Lines 448–461 (`_freezeScene`), Lines 553–588 (`draw`).
+  * [src/js/core/render.js](../../src/js/core/render.js): Lines 379–410 (`drawStroke`).
 
 #### 4. Data Model Changes
 * **None**. Driven strictly by the absence or mismatch of `o.audioId`.
@@ -305,7 +305,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/surface.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js): Lines 448–461 (Scene Partitioning), Lines 553–588 (`draw`).
+  * [src/js/core/surface.js](../../src/js/core/surface.js): Lines 448–461 (Scene Partitioning), Lines 553–588 (`draw`).
   * `src/js/core/replay-engine.js` (NEW): Coordinates playback clock and stroke queries.
 
 #### 4. Data Model Changes
@@ -360,8 +360,8 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/render.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js): Lines 379–410 (`drawStroke`).
-  * [src/js/app.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js): Add `replayPendingStyle` to `this.settings`.
+  * [src/js/core/render.js](../../src/js/core/render.js): Lines 379–410 (`drawStroke`).
+  * [src/js/app.js](../../src/js/app.js): Add `replayPendingStyle` to `this.settings`.
 
 #### 4. Data Model Changes
 * **Settings**: New preference `settings.replayPendingStyle` in `localStorage['gazboard.settings']` (`'ghost'` | `'hidden'` | `'outline'`) [VERIFIED IN CODE: src/js/app.js:290].
@@ -409,8 +409,8 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/render.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js): Lines 385–430 (`drawStroke` sub-stroke path generation).
-  * [src/js/core/ink.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/ink.js): Export `centrelinePath` and `pressureRuns`.
+  * [src/js/core/render.js](../../src/js/core/render.js): Lines 385–430 (`drawStroke` sub-stroke path generation).
+  * [src/js/core/ink.js](../../src/js/core/ink.js): Export `centrelinePath` and `pressureRuns`.
 * **Files Created**:
   * `src/js/core/replay-engine.js`: Sub-stroke progressive point slicer and RAF interpolation loop.
 
@@ -507,8 +507,8 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js): Lines 1584–1640 (`tappedAnObject`).
-  * [src/js/core/surface.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js): Add `pulseHighlight(box, color)`.
+  * [src/js/core/tools.js](../../src/js/core/tools.js): Lines 1584–1640 (`tappedAnObject`).
+  * [src/js/core/surface.js](../../src/js/core/surface.js): Add `pulseHighlight(box, color)`.
 
 #### 4. Data Model Changes
 * **None**.
@@ -558,8 +558,8 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/camera.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/camera.js): Lines 30–42 (add `glideTo(box, vw, vh)`).
-  * [src/js/core/tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js): Pointer down disengages follow mode.
+  * [src/js/core/camera.js](../../src/js/core/camera.js): Lines 30–42 (add `glideTo(box, vw, vh)`).
+  * [src/js/core/tools.js](../../src/js/core/tools.js): Pointer down disengages follow mode.
 
 #### 4. Data Model Changes
 * **None**.
@@ -605,7 +605,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/app.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js): Line 4347 (`onKeyDown`).
+  * [src/js/app.js](../../src/js/app.js): Line 4347 (`onKeyDown`).
   * `src/js/ui/audio-bar.js`.
 
 #### 4. Data Model Changes
@@ -704,7 +704,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
   * `src/js/ui/audio-bar.js`.
-  * [src/js/core/store.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js): Stored in `track.bookmarks`.
+  * [src/js/core/store.js](../../src/js/core/store.js): Stored in `track.bookmarks`.
 
 #### 4. Data Model Changes
 * **Track Schema**:
@@ -759,7 +759,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
   * `src/js/core/subtitles.js` (NEW): SRT/VTT parser and cue lookup.
-  * [src/js/ui/panels.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/ui/panels.js): "Attach subtitles..." menu item in Audio Track options.
+  * [src/js/ui/panels.js](../../src/js/ui/panels.js): "Attach subtitles..." menu item in Audio Track options.
 
 #### 4. Data Model Changes
 * **Track Schema**: `track.subtitlesAssetId` points to stored `.vtt` text file in `assets/`.
@@ -809,7 +809,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js): Lines 1535–1640.
+  * [src/js/core/tools.js](../../src/js/core/tools.js): Lines 1535–1640.
   * `src/js/ui/audio-bar.js`.
 
 #### 4. Data Model Changes
@@ -850,7 +850,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
   - *Lock Moving*: Prevents translating or resizing synchronized lecture ink.
   - *Lock Erasing*: Prevents the eraser from cutting or removing synchronized lecture ink.
 * **Acceptance Criteria**:
-  1. *Eraser Guard*: When *Lock Erasing* is active, `strokesAlong()` in [hit.js:140](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/hit.js#L140) ignores any object where `o.audioId === activeTrack.id`.
+  1. *Eraser Guard*: When *Lock Erasing* is active, `strokesAlong()` in [hit.js:140](../../src/js/core/hit.js) ignores any object where `o.audioId === activeTrack.id`.
   2. *Move Guard*: When *Lock Moving* is active, selection drag handles refuse movement for synchronized objects, displaying GazBoard's standard lock toast: `t('This is locked — press the unlock button to edit it')` [VERIFIED IN CODE: src/js/app.js:1245].
 
 #### 2. Feasibility in Electron
@@ -858,8 +858,8 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js): Eraser and move gesture checks.
-  * [src/js/core/hit.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/hit.js): Line 140.
+  * [src/js/core/tools.js](../../src/js/core/tools.js): Eraser and move gesture checks.
+  * [src/js/core/hit.js](../../src/js/core/hit.js): Line 140.
 
 #### 4. Data Model Changes
 * **Settings**: `settings.lockSyncedInkErasing`, `settings.lockSyncedInkMoving`.
@@ -905,7 +905,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js): Line 1535 (`startStroke`).
+  * [src/js/core/tools.js](../../src/js/core/tools.js): Line 1535 (`startStroke`).
   * `src/js/ui/audio-bar.js`.
 
 #### 4. Data Model Changes
@@ -956,7 +956,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/app.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js): Lines 940–960 (`openBoard`), Lines 3175–3245 (sheet navigation).
+  * [src/js/app.js](../../src/js/app.js): Lines 940–960 (`openBoard`), Lines 3175–3245 (sheet navigation).
   * `src/js/core/audio-recorder.js`.
 
 #### 4. Data Model Changes
@@ -1010,7 +1010,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
   * `src/js/ui/audio-bar.js`.
-  * [src/js/app.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js): Add `deleteAudioTrack(trackId, deleteInk)`.
+  * [src/js/app.js](../../src/js/app.js): Add `deleteAudioTrack(trackId, deleteInk)`.
 
 #### 4. Data Model Changes
 * **Store Transaction**: Batch `set` or `del` operations in `store.commit`.
@@ -1058,10 +1058,10 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/export.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/export.js):
+  * [src/js/export.js](../../src/js/export.js):
     - Lines 657–668 (`saveBoardFile`): Inspect `doc.audioTracks`. If audio tracks exist, bundle board JSON and all associated audio binary files into a `.gazboard` ZIP archive using `JSZip` [VERIFIED IN CODE: src/js/board-export.js:45-50].
     - Lines 670–686 (`openBoardFile`): **CRITICAL FIX**: Currently executes `JSON.parse(new TextDecoder().decode(buf))` [export.js:678]. Handed a ZIP container, this crashes with `SyntaxError: Unexpected token 'P'`. Must inspect magic bytes (`buf[0] === 0x50 && buf[1] === 0x4b` for `PK`); if ZIP, extract `board.json` and unpack assets into local storage via `JSZip`; otherwise fall back to `JSON.parse`.
-  * [src/js/ui/panels.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/ui/panels.js): Audio track menu items.
+  * [src/js/ui/panels.js](../../src/js/ui/panels.js): Audio track menu items.
   * `src/js/ui/audio-bar.js`.
 
 #### 4. Data Model Changes
@@ -1116,7 +1116,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
   * Upstream GazBoard already features an active-recall Answer Cover system under type `'curtain'`.
   * Rather than creating an incompatible `type: 'tape'`, we implement Tape as a specialized variant:
     `{ type: 'curtain', subtype: 'tape', x, y, w, h, color: '#ffc83b', revealed: boolean }`.
-  * *Rendering Fix*: In [render.js:993](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js#L993), replace `if (o.revealed) return;` with:
+  * *Rendering Fix*: In [render.js:993](../../src/js/core/render.js), replace `if (o.revealed) return;` with:
     ```javascript
     if (o.revealed) {
       if (o.subtype !== 'tape') return;
@@ -1134,7 +1134,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
       return;
     }
     ```
-  * *Hit Testing Fix*: In [hit.js:28](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/hit.js#L28), update `ghost(o)`:
+  * *Hit Testing Fix*: In [hit.js:28](../../src/js/core/hit.js), update `ghost(o)`:
     ```javascript
     export const ghost = (o) => !!o && (!!o.hidden || (o.type === 'curtain' && o.subtype !== 'tape' && !!o.revealed));
     ```
@@ -1143,10 +1143,10 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/render.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js): Lines 980–1031 (`drawCurtain`).
-  * [src/js/core/hit.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/hit.js): Line 28 (`ghost`), Line 128 (`curtainAt`).
-  * [src/js/core/tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js): Line 1604 (`tappedAnObject` curtain toggle), Lines 1535–1560 (add tape drawing tool).
-  * [src/js/ui/toolbar.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/ui/toolbar.js): Add Tape tool icon to pen tray.
+  * [src/js/core/render.js](../../src/js/core/render.js): Lines 980–1031 (`drawCurtain`).
+  * [src/js/core/hit.js](../../src/js/core/hit.js): Line 28 (`ghost`), Line 128 (`curtainAt`).
+  * [src/js/core/tools.js](../../src/js/core/tools.js): Line 1604 (`tappedAnObject` curtain toggle), Lines 1535–1560 (add tape drawing tool).
+  * [src/js/ui/toolbar.js](../../src/js/ui/toolbar.js): Add Tape tool icon to pen tray.
 
 #### 4. Data Model Changes
 * **Object Schema**:
@@ -1207,11 +1207,11 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/ui/contextmenu.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/ui/contextmenu.js): Add "Create Reference Card" action to selection floating bar.
-  * [src/js/core/boardrefs.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/boardrefs.js): Extend reference token parsing to support sub-page bounding boxes (`@[Title](b:<boardId>#<page>:<x>,<y>,<w>,<h>)`) [VERIFIED IN CODE: src/js/core/boardrefs.js:21-29].
-  * [src/js/core/render.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/render.js): Lines 1102–1135 (extend `drawBoardLink` to render cropped thumbnail and page badge).
-  * [src/js/app.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js): Lines 1670–1692 (`openBoardRef`): When jumping to target, if `ref.box` exists, trigger `this.surface.cam.glideTo(ref.box)` and push previous camera position to `this.backStack` [VERIFIED IN CODE: src/js/app.js:1686].
-  * [src/js/core/camera.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/camera.js): Add `glideTo(box)`.
+  * [src/js/ui/contextmenu.js](../../src/js/ui/contextmenu.js): Add "Create Reference Card" action to selection floating bar.
+  * [src/js/core/boardrefs.js](../../src/js/core/boardrefs.js): Extend reference token parsing to support sub-page bounding boxes (`@[Title](b:<boardId>#<page>:<x>,<y>,<w>,<h>)`) [VERIFIED IN CODE: src/js/core/boardrefs.js:21-29].
+  * [src/js/core/render.js](../../src/js/core/render.js): Lines 1102–1135 (extend `drawBoardLink` to render cropped thumbnail and page badge).
+  * [src/js/app.js](../../src/js/app.js): Lines 1670–1692 (`openBoardRef`): When jumping to target, if `ref.box` exists, trigger `this.surface.cam.glideTo(ref.box)` and push previous camera position to `this.backStack` [VERIFIED IN CODE: src/js/app.js:1686].
+  * [src/js/core/camera.js](../../src/js/core/camera.js): Add `glideTo(box)`.
 
 #### 4. Data Model Changes
 * **Card Schema (Reusing GazBoard Native `boardlink` Object Type)**:
@@ -1280,7 +1280,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js):
+  * [src/js/core/tools.js](../../src/js/core/tools.js):
     - Line 957 (`onPointerUp`): GazBoard already implements the exact guard pattern:
       ```javascript
       if (!this.tappedAnObject(a, e)) this.finishStroke(a);
@@ -1291,7 +1291,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
       ```
     - Add `scratchedAnObject(a, e)` method: Evaluates points using `detectScratchOut(a.obj.points)`; if matched, finds intersected objects via `inBox(this.store, a.obj.bbox)` or `strokesAlong`, calls `this.discardTapMark()`, executes `this.store.removeMany(targets.map(o => o.id), 'scratch erase')`, and calls `this.surface.invalidate()`.
   * `src/js/core/recognize.js`: Add pure mathematical evaluator `detectScratchOut(points)`.
-  * [src/js/core/hit.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/hit.js): Utilize existing `inBox` [hit.js:92] and `strokesAlong` [hit.js:140].
+  * [src/js/core/hit.js](../../src/js/core/hit.js): Utilize existing `inBox` [hit.js:92] and `strokesAlong` [hit.js:140].
 
 #### 4. Data Model Changes
 * **None**. Standard `{ t: 'del', id, obj, index }` operations.
@@ -1300,7 +1300,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 * **Setting**: Toggle `settings.gestureScratchOut: boolean` (enabled by default). Sensitivity slider (`Low`, `Normal`, `High`).
 
 #### 6. Subsystem Interactions
-* **Shape Recognizer Interaction**: In [tools.js:1756-1760](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js#L1756-L1760), `recognize(obj.points)` runs *after* inking commits. Scratch-out evaluation MUST execute *before* `store.add(obj, 'draw')` to ensure scratch marks never enter document history.
+* **Shape Recognizer Interaction**: In [tools.js:1756-1760](../../src/js/core/tools.js), `recognize(obj.points)` runs *after* inking commits. Scratch-out evaluation MUST execute *before* `store.add(obj, 'draw')` to ensure scratch marks never enter document history.
 
 #### 7. Performance Impact & Worst Case
 * **Evaluation Cost**: Evaluating 40 points in `detectScratchOut` takes $< 0.02\text{ms}$ in V8 [VERIFIED IN CODE: src/js/core/recognize.js:1-100]. Zero perceptible latency on pen lift.
@@ -1340,15 +1340,15 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase & Architectural Trade-Off
 * **Approach A (2D World Layout)**:
-  * *Files*: [src/js/core/pages.js:20-29](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/pages.js#L20-L29).
-  * *Fatal Upstream Flaw*: Upstream GazBoard strictly assumes a 1D vertical stack [VERIFIED IN CODE: src/js/core/pages.js:1-12]. In [tools.js:1549](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js#L1549), `startStroke` asserts:
+  * *Files*: [src/js/core/pages.js:20-29](../../src/js/core/pages.js).
+  * *Fatal Upstream Flaw*: Upstream GazBoard strictly assumes a 1D vertical stack [VERIFIED IN CODE: src/js/core/pages.js:1-12]. In [tools.js:1549](../../src/js/core/tools.js), `startStroke` asserts:
     ```javascript
     const sheet = this.sheetAt(wp);
     if (this.pages.length && !sheet) return;
     ```
     When an Approach A board is opened in upstream GazBoard, the right-hand notebook notes land in the empty "desk/gutter" to the right of sheet 0. Because upstream `sheetAt(wp)` returns `null` there, upstream users **cannot draw on or interact with the notebook notes**!
 * **Approach B (Dual-Viewport Split Canvas — Flexcil Architecture)**:
-  * *Files Touched*: [src/js/app.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js) (manage active `surface`), [src/js/ui/panels.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/ui/panels.js) (split workspace toggle), `index.html` (CSS split pane container).
+  * *Files Touched*: [src/js/app.js](../../src/js/app.js) (manage active `surface`), [src/js/ui/panels.js](../../src/js/ui/panels.js) (split workspace toggle), `index.html` (CSS split pane container).
   * *100% Upstream Backward Compatibility*: Each pane hosts an independent standard GazBoard document. Both the Reference PDF board and the Study Notebook board remain 100% vanilla GazBoard files that open flawlessly in upstream GazBoard with zero desk-clipping bugs.
 
 #### 4. Data Model Changes
@@ -1406,7 +1406,7 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/core/tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js): Pointermove handling for laser tool.
+  * [src/js/core/tools.js](../../src/js/core/tools.js): Pointermove handling for laser tool.
   * `src/js/core/replay-engine.js`: Replays laser coordinates into `surface.laser`.
 
 #### 4. Data Model Changes
@@ -1470,8 +1470,8 @@ In accordance with architectural audit ground rules, all assertions are explicit
 
 #### 3. Where It Fits in Codebase
 * **Files Touched**:
-  * [src/js/export.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/export.js): Lines 650–689 (export menu integration).
-  * [src/js/ui/panels.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/ui/panels.js): Add "Video Replay (.webm)..." option to Export panel.
+  * [src/js/export.js](../../src/js/export.js): Lines 650–689 (export menu integration).
+  * [src/js/ui/panels.js](../../src/js/ui/panels.js): Add "Video Replay (.webm)..." option to Export panel.
 * **Files Created**:
   * `src/js/export-video.js` (NEW): Offscreen export controller, progress modal, and stream multiplexer.
 

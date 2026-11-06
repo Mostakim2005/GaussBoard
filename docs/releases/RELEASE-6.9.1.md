@@ -3,7 +3,7 @@
 > **Release Version**: `v6.9.1`  
 > **Date**: October 24, 2026  
 > **Git Commit Target**: `feat(core): Comprehensive Offline Libraries & UI/UX Discovery Entry Points Audit (v6.9.1)`  
-> **Binary Deliverable**: [`releases/GazBoard-v6.9.1-Portable.exe`](../../releases/GazBoard-v6.9.1-Portable.exe) (`113,130,063 bytes` / `107.89 MiB`)  
+> **Binary Deliverable**: `GazBoard-v6.9.1-Portable.exe` (`113,130,063 bytes` / `107.89 MiB`)  
 > **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Invariant Compliance**: Strict adherence across all 6 Golden Invariants (100% i18n parity across 7 locales with 2,238 strings, 0 native C++ dependencies, preserved `p.t` stroke timestamps, finite audio safeguard, scene partitioning during audio replay, Study Tape toggle persistence).
 

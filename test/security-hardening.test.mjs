@@ -12,12 +12,12 @@ test('external links accept web URLs only', () => {
 });
 
 test('release links are confined to the configured GitHub releases route', () => {
-  const base = 'https://github.com/fahim9778/GazBoard-Replay/releases';
+  const base = 'https://github.com/Mostakim2005/GazBoard/releases';
   assert.equal(security.isReleaseUrl(base, base), true);
   assert.equal(security.isReleaseUrl(`${base}/tag/v4.8.20`, base), true);
   for (const value of [
-    `${base}.attacker.invalid`, 'https://github.com.evil.invalid/fahim9778/GazBoard-Replay/releases',
-    'https://github.com/fahim9778/GazBoard-Replay/releases?redirect=attacker',
-    'https://user@github.com/fahim9778/GazBoard-Replay/releases'
+    `${base}.attacker.invalid`, 'https://github.com.evil.invalid/Mostakim2005/GazBoard/releases',
+    'https://github.com/Mostakim2005/GazBoard/releases?redirect=attacker',
+    'https://user@github.com/Mostakim2005/GazBoard/releases'
   ]) assert.equal(security.isReleaseUrl(value, base), false, value);
 });

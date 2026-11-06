@@ -3,7 +3,7 @@
 > **Release Version**: `v6.3.0`  
 > **Date**: October 24, 2026  
 > **Git Commit Target**: `feat(stem): implement Phase 3 STEM Engines, Interactive Simulations & Scientific UI/UX (v6.3.0)`  
-> **Binary Deliverable**: [`releases/GazBoard-v6.3.0-Portable.exe`](../../releases/GazBoard-v6.3.0-Portable.exe)  
+> **Binary Deliverable**: `GazBoard-v6.3.0-Portable.exe`  
 > **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Invariant Compliance**: Strict adherence across all 6 Golden Invariants (100% i18n parity, 1,240 smoke checks passed, 0 native C++ dependencies, preserved `p.t` stroke timestamps, Study Tape persistence).
 
@@ -74,7 +74,7 @@ It establishes an interactive **Grades 11–12 STEM & Scientific Simulation Suit
    - `node scripts/i18n-check.js`
    - **Result**: **1,954 / 1,954 translated, 0 missing, 0 errors** across all 7 supported locales (`ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, `zh-Hant.json`).
 3. **Binary Packaging Verification (Rule 5 Protocol)**:
-   - Standalone portable binary: [`releases/GazBoard-v6.3.0-Portable.exe`](../../releases/GazBoard-v6.3.0-Portable.exe).
+   - Standalone portable binary: `GazBoard-v6.3.0-Portable.exe`.
    - Zero-installation, runs out of the box with zero registry pollution.
 
 ---

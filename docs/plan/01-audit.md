@@ -59,7 +59,7 @@ GazBoard employs a decoupled, multi-process Electron architecture comprising an 
 ---
 
 ### 1.2 Preload Bridge & IPC Surface (`window.board`)
-The interface between the Electron main process and renderer process is strictly isolated via `contextBridge.exposeInMainWorld('board', { ... })` in [preload.js:162-286](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/preload.js#L162-L286):
+The interface between the Electron main process and renderer process is strictly isolated via `contextBridge.exposeInMainWorld('board', { ... })` in [preload.js:162-286](../../preload.js):
 
 | Namespace / Method | Channel / Mechanism | Purpose | Input / Output Signatures |
 | :--- | :--- | :--- | :--- |
@@ -190,8 +190,8 @@ GazBoard implements a custom 2D rendering pipeline designed to minimize CPU draw
 ```
 
 **Key Execution Rules**:
-1. **The Frozen Canvas Optimization**: In [surface.js:553-588](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js#L553-L588), committed items are baked into `this._inkCanvas`. When inking, GazBoard simply blits this pre-rendered bitmap and paints only the in-progress stroke on top via `_drawWet()`.
-2. **Viewport Culling**: In [surface.js:621-623](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js#L621-L623), the camera viewport bounds are computed with a 64px safety padding (`cam.viewport(w, h)`). Objects outside this bounding box bypass `drawObject()`.
+1. **The Frozen Canvas Optimization**: In [surface.js:553-588](../../src/js/core/surface.js), committed items are baked into `this._inkCanvas`. When inking, GazBoard simply blits this pre-rendered bitmap and paints only the in-progress stroke on top via `_drawWet()`.
+2. **Viewport Culling**: In [surface.js:621-623](../../src/js/core/surface.js), the camera viewport bounds are computed with a 64px safety padding (`cam.viewport(w, h)`). Objects outside this bounding box bypass `drawObject()`.
 3. **Screen-Space Overlays**: Transient visual effects (selection boxes, laser trails, subtitles, pulse rings) execute in `this.overlays` [VERIFIED IN CODE: src/js/core/surface.js:31, 723]. They are rendered in CSS pixel screen space *after* world transforms are restored, completely avoiding board state invalidation.
 
 ---
@@ -199,7 +199,7 @@ GazBoard implements a custom 2D rendering pipeline designed to minimize CPU draw
 ### 1.5 Document Store, Op-Log & Persistence Pipeline
 
 #### 1.5.1 Op-Based Transaction System (`Store`)
-Mutations in [store.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js) never alter `this.doc` directly. All changes pass through atomic operation objects:
+Mutations in [store.js](../../src/js/core/store.js) never alter `this.doc` directly. All changes pass through atomic operation objects:
 * `add`: Insert object `{ t: 'add', obj, index? }`
 * `del`: Remove object `{ t: 'del', id, obj, index }`
 * `set`: Update properties `{ t: 'set', id, before, after }`
@@ -252,14 +252,14 @@ DOCUMENT EXPORT PIPELINE:
 1. **Document Import Pipeline**:
    * **PDF**: Handled entirely in the renderer via `pdfjs-dist` [VERIFIED IN CODE: src/js/importers/pdf.js:1-85]. Pages are rendered to offscreen canvas bitmaps and inserted as `type: 'image'` objects.
    * **Microsoft Office Documents (`.docx`, `.pptx`)**:
-     - *Priority 1 (Windows)*: Native Microsoft Office COM automation via PowerShell in [msoffice.js:43-97](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/msoffice.js#L43-L97). Converts files cleanly to PDF via Word/PowerPoint COM objects.
-     - *Priority 2 (Cross-Platform CLI)*: LibreOffice headless CLI in [soffice.js:34-60](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/soffice.js#L34-L60).
-     - *Priority 3 (Built-in Fallback)*: Headless BrowserWindow [main.js:904-931](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L904-L931) running Mammoth.js for `.docx` and a custom pure-JS OOXML unpacker [src/js/importers/pptx.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/importers/pptx.js) for `.pptx`, printed via `win.webContents.printToPDF()`.
+     - *Priority 1 (Windows)*: Native Microsoft Office COM automation via PowerShell in [msoffice.js:43-97](../../msoffice.js). Converts files cleanly to PDF via Word/PowerPoint COM objects.
+     - *Priority 2 (Cross-Platform CLI)*: LibreOffice headless CLI in [soffice.js:34-60](../../soffice.js).
+     - *Priority 3 (Built-in Fallback)*: Headless BrowserWindow [main.js:904-931](../../main.js) running Mammoth.js for `.docx` and a custom pure-JS OOXML unpacker [src/js/importers/pptx.js](../../src/js/importers/pptx.js) for `.pptx`, printed via `win.webContents.printToPDF()`.
 2. **Export Pipeline**:
-   * **Single Board Export (`.gazboard`)**: In [export.js:664-665](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/export.js#L664-L665), single boards are serialized as **raw UTF-8 JSON text**. Images are inlined as base64 data URLs via `exportable(doc)`.
-   * **Batch Library Export**: In [board-export.js:45-50](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/board-export.js#L45-L50), `JSZip` is dynamically loaded ONLY when exporting two or more boards into a `.zip` archive.
-   * **Vector (SVG) & Bitmap (PNG)**: In [export.js:160-350](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/export.js#L160-L350), SVG exporter constructs clean XML path markup, handling ink midpoint curves, shapes, text, and curtains.
-   * **PDF Export**: In [main.js:933-950](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L933-L950), sheets are rasterized and passed to Electron's native `printToPDF`.
+   * **Single Board Export (`.gazboard`)**: In [export.js:664-665](../../src/js/export.js), single boards are serialized as **raw UTF-8 JSON text**. Images are inlined as base64 data URLs via `exportable(doc)`.
+   * **Batch Library Export**: In [board-export.js:45-50](../../src/js/board-export.js), `JSZip` is dynamically loaded ONLY when exporting two or more boards into a `.zip` archive.
+   * **Vector (SVG) & Bitmap (PNG)**: In [export.js:160-350](../../src/js/export.js), SVG exporter constructs clean XML path markup, handling ink midpoint curves, shapes, text, and curtains.
+   * **PDF Export**: In [main.js:933-950](../../main.js), sheets are rasterized and passed to Electron's native `printToPDF`.
 
 ---
 
@@ -301,7 +301,7 @@ GazBoard maintains a strict continuous integration and test verification pipelin
   - Runs on `ubuntu-latest` with Node.js 22 [VERIFIED IN CODE: .github/workflows/smoke.yml:15-21].
   - Executes `npm ci` followed by `npm run smoke:builtin` [VERIFIED IN CODE: .github/workflows/smoke.yml:23-24].
 * **Cross-Platform Smoke Test Harness (`scripts/smoke.js`)**:
-  - In [scripts/smoke.js:25-33](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/scripts/smoke.js#L25-L33), automatically detects headless Linux CI environments and executes under `xvfb-run -a electron . --smoke --no-sandbox`. On Windows and macOS, it executes native Electron directly.
+  - In [scripts/smoke.js:25-33](../../scripts/smoke.js), automatically detects headless Linux CI environments and executes under `xvfb-run -a electron . --smoke --no-sandbox`. On Windows and macOS, it executes native Electron directly.
 * **Comprehensive Test Suite (`test/smoke.js`)**:
   - A 17,202-line automated test suite executed inside the Electron main process, injecting and asserting JavaScript directly in `mainWindow` via `webContents.executeJavaScript` [VERIFIED IN CODE: main.js:729].
   - Tests verify pen tracking, coalesced points, quadratic ink splines, pressure quantisation, undo/redo stacks, atomic persistence, PDF/Office import, curtain cover/reveal, board-linking tokens, and localization dictionary completeness via `scripts/i18n-check.js` [VERIFIED IN CODE: test/smoke.js:15093-15094].
@@ -316,22 +316,22 @@ An exhaustive security audit of GazBoard's Electron architecture reveals both st
 
 | Security Feature | Implementation Status | Code Citation | Technical Evaluation & Risk |
 | :--- | :--- | :--- | :--- |
-| **`contextIsolation`** | **ENABLED** | [main.js:682](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L682) | Strong. Renderer JavaScript cannot access Node.js runtime or Electron internals directly. |
-| **`nodeIntegration`** | **DISABLED** | [main.js:683](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L683) | Strong. `require()`, `process`, and `Buffer` are inaccessible in renderer window context. |
-| **`sandbox`** | **DISABLED (`sandbox: false`)** | [main.js:684](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L684) | Moderate Risk. Chromium renderer sandbox is disabled to permit preload.js to invoke Node `crypto` and clipboard APIs. |
-| **Content Security Policy (CSP)** | **PARTIAL / MIXED** | [src/index.html:10](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/index.html#L10) | Strong on main window: `script-src 'self' app: 'wasm-unsafe-eval'`. No unsafe-eval for JS.<br>**CRITICAL VULNERABILITY**: `src/convert.html` has **NO CSP**! |
-| **Custom Protocol (`app://`)** | **PRIVILEGED & FILTERED** | [main.js:148-160](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L148-L160) | Strong. Registered with standard privileges. `registerProtocol` normalizes path and blocks traversal outside `SRC` directory. |
-| **External Navigation & Windows** | **OPEN / PERMISSIVE** | [main.js:734](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L734) | **VULNERABILITY**: `setWindowOpenHandler` passes any URL directly to `shell.openExternal(url)` without scheme validation! |
-| **IPC File System Validation** | **UNRESTRICTED / NO SANDBOX**| [main.js:1114, 1126](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L1114) | **CRITICAL VULNERABILITY**: `fs:readFile` and `fs:writeFile` accept arbitrary paths across the user's entire drive. |
+| **`contextIsolation`** | **ENABLED** | [main.js:682](../../main.js) | Strong. Renderer JavaScript cannot access Node.js runtime or Electron internals directly. |
+| **`nodeIntegration`** | **DISABLED** | [main.js:683](../../main.js) | Strong. `require()`, `process`, and `Buffer` are inaccessible in renderer window context. |
+| **`sandbox`** | **DISABLED (`sandbox: false`)** | [main.js:684](../../main.js) | Moderate Risk. Chromium renderer sandbox is disabled to permit preload.js to invoke Node `crypto` and clipboard APIs. |
+| **Content Security Policy (CSP)** | **PARTIAL / MIXED** | [src/index.html:10](../../src/index.html) | Strong on main window: `script-src 'self' app: 'wasm-unsafe-eval'`. No unsafe-eval for JS.<br>**CRITICAL VULNERABILITY**: `src/convert.html` has **NO CSP**! |
+| **Custom Protocol (`app://`)** | **PRIVILEGED & FILTERED** | [main.js:148-160](../../main.js) | Strong. Registered with standard privileges. `registerProtocol` normalizes path and blocks traversal outside `SRC` directory. |
+| **External Navigation & Windows** | **OPEN / PERMISSIVE** | [main.js:734](../../main.js) | **VULNERABILITY**: `setWindowOpenHandler` passes any URL directly to `shell.openExternal(url)` without scheme validation! |
+| **IPC File System Validation** | **UNRESTRICTED / NO SANDBOX**| [main.js:1114, 1126](../../main.js) | **CRITICAL VULNERABILITY**: `fs:readFile` and `fs:writeFile` accept arbitrary paths across the user's entire drive. |
 
 ### 2.2 Deep Vulnerability Analysis
 
 1. **Arbitrary File Read/Write via IPC**:
-   In [main.js:1114, 1126-1129](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L1114), `fs:readFile` and `fs:writeFile` execute raw Node `fs/promises` calls without checking whether target paths reside within `userData` or board directories. Any script executing in the renderer could theoretically read or overwrite arbitrary user files.
+   In [main.js:1114, 1126-1129](../../main.js), `fs:readFile` and `fs:writeFile` execute raw Node `fs/promises` calls without checking whether target paths reside within `userData` or board directories. Any script executing in the renderer could theoretically read or overwrite arbitrary user files.
 2. **Hidden Conversion Window XSS Vector**:
-   In [main.js:904-931](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L904-L931), `convertWithHiddenWindow` opens `app://board/convert.html` with `preload.js` loaded and `sandbox: false`. `convert.html` has **no CSP header** and assigns converted Office document contents to `root.innerHTML` [VERIFIED IN CODE: src/convert.html:57, 66]. A maliciously crafted `.docx` or `.pptx` containing script payloads could execute inside `convert.html`, obtain the full `window.board` bridge, and invoke unrestricted `writeFile`.
+   In [main.js:904-931](../../main.js), `convertWithHiddenWindow` opens `app://board/convert.html` with `preload.js` loaded and `sandbox: false`. `convert.html` has **no CSP header** and assigns converted Office document contents to `root.innerHTML` [VERIFIED IN CODE: src/convert.html:57, 66]. A maliciously crafted `.docx` or `.pptx` containing script payloads could execute inside `convert.html`, obtain the full `window.board` bridge, and invoke unrestricted `writeFile`.
 3. **Unvalidated `shell.openExternal`**:
-   In [main.js:734](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L734):
+   In [main.js:734](../../main.js):
    ```javascript
    mainWindow.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
    ```
@@ -341,7 +341,7 @@ An exhaustive security audit of GazBoard's Electron architecture reveals both st
    * `package-lock.json` pins `electron` at `43.5.0` [VERIFIED IN CODE: package-lock.json].
    * *Analysis*: Electron 43.x represents an ultra-modern Chromium baseline (Chromium 128+). No known public CVEs currently affect this version, but standard Electron hardening must be maintained.
 5. **Missing Media Device Permission Handler**:
-   In [main.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js), `session.defaultSession.setPermissionRequestHandler` is completely absent. While Electron's development mode allows media requests, in packaged Windows builds or restricted enterprise environments, `navigator.mediaDevices.getUserMedia` for microphone audio recording can fail silently or be denied without an explicit handler granting `'media'` permissions.
+   In [main.js](../../main.js), `session.defaultSession.setPermissionRequestHandler` is completely absent. While Electron's development mode allows media requests, in packaged Windows builds or restricted enterprise environments, `navigator.mediaDevices.getUserMedia` for microphone audio recording can fail silently or be denied without an explicit handler granting `'media'` permissions.
 
 ---
 
@@ -357,12 +357,12 @@ The application launch sequence follows a deterministic, local-first initializat
 ### 3.2 Rendering Performance on Large Boards
 * **Drawing Latency**: Normal handwriting costs $< 0.05\text{ms}$ per move because it paints solely into the wet layer on top of the frozen canvas [VERIFIED IN CODE: src/js/core/surface.js:557-558].
 * **Lift Invalidation Bottleneck**: When a stroke is finished, `finishStroke` calls `surface.extendFreeze(obj)` [VERIFIED IN CODE: src/js/core/tools.js:1740]. `extendFreeze` attempts to paint only the new stroke into the frozen canvas offscreen without a full redraw [VERIFIED IN CODE: src/js/core/surface.js:170-188]. However, if an eraser or move tool is used, the whole board must re-render (`repaintAll()`), which scales linearly ($O(N)$) with object count.
-* **Hit Testing Complexity**: In [hit.js:75-83](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/hit.js#L75-L83), `pick(store, p)` iterates backwards through `store.doc.order`. For strokes, it iterates through point segments checking `distToSegment` [VERIFIED IN CODE: src/js/core/hit.js:45]. For boards with $> 5,000$ strokes, un-indexed hit testing during rapid scrubbing could cause noticeable UI latency.
+* **Hit Testing Complexity**: In [hit.js:75-83](../../src/js/core/hit.js), `pick(store, p)` iterates backwards through `store.doc.order`. For strokes, it iterates through point segments checking `distToSegment` [VERIFIED IN CODE: src/js/core/hit.js:45]. For boards with $> 5,000$ strokes, un-indexed hit testing during rapid scrubbing could cause noticeable UI latency.
 
 ### 3.3 Memory & Autosave Characteristics
 * **Memory Pressure from Base64**: Bitmaps in memory (`store.objects[].src`) are held as base64 data URLs. A board with 20 imported slide images can consume 150–250 MB of renderer heap space.
 * **Autosave Throttling**:
-  * In [app.js:480-484](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js#L480-L484), `onGestureEnd()` triggers saving when a gesture finishes if `performance.now() - this._lastSaveAt > App.SAVE_CEILING` (default ceiling: 15 seconds).
+  * In [app.js:480-484](../../src/js/app.js), `onGestureEnd()` triggers saving when a gesture finishes if `performance.now() - this._lastSaveAt > App.SAVE_CEILING` (default ceiling: 15 seconds).
   * `_persistNow()` stringifies the entire document on the renderer main thread (`JSON.stringify(doc)`), and transmits the payload as a string to the main process [VERIFIED IN CODE: src/js/app.js:536]. While string serialization was optimized to prevent blocking structured clone algorithms, stringifying a 40 MB document during active audio recording could still introduce brief frame drops.
 
 ---
@@ -371,12 +371,12 @@ The application launch sequence follows a deterministic, local-first initializat
 
 | File / Component | Lines / Size | Fragility Rationale & Risk to Replay Features |
 | :--- | :--- | :--- |
-| [src/js/app.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js) | 5,446 lines (265 KB) | **Monolithic Controller**: Manages everything from board lifecycle, gestures, saving, asset externalization, to LAN sync UI. Adding audio player controls directly into `app.js` will exacerbate architectural coupling. |
-| [src/js/core/tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js) | 3,180 lines (142 KB) | **High Interaction Complexity**: Handles coalesced stylus points, Windows Ink trails, touch pan, eraser splitting, and shape recognition. Injecting stroke timestamping ($t_0, t_1$) and scratch-out gestures must be isolated to avoid regressing pen latency. |
-| [src/js/ui/panels.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/ui/panels.js) | 3,420 lines (160 KB) | **Monolithic DOM Management**: Constructs all sidebar settings, export menus, and board lists using manual string templating. Audio playback controls must be encapsulated in a clean standalone module (`audioplayer.js`). |
-| [src/js/core/surface.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js) | 1,023 lines (46 KB) | **Frozen Canvas Caching**: The freeze mechanism does not account for continuous audio clock changes. Modifying `Surface.draw()` without breaking `_freezeScene()` requires careful layering. |
-| [sync/node.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/sync/node.js) | 1,251 lines (59 KB) | **LAN Sync Hard Limits**: Enforces 64 MB maximum board payload (`MAX_BOARD_BYTES`). Adding audio tracks without strip/omit logic will crash LAN board transfer. |
-| [scripts/i18n-check.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/scripts/i18n-check.js) | 65 lines | **Strict Translation Guard**: Verifies that every English string in `t('...')` exists across all 7 locales (`bn`, `zh-Hans`, `zh-Hant`, `ar`, `es`, `pt-BR`, `de`). Adding new UI strings will break tests unless properly stubbed or translated. |
+| [src/js/app.js](../../src/js/app.js) | 5,446 lines (265 KB) | **Monolithic Controller**: Manages everything from board lifecycle, gestures, saving, asset externalization, to LAN sync UI. Adding audio player controls directly into `app.js` will exacerbate architectural coupling. |
+| [src/js/core/tools.js](../../src/js/core/tools.js) | 3,180 lines (142 KB) | **High Interaction Complexity**: Handles coalesced stylus points, Windows Ink trails, touch pan, eraser splitting, and shape recognition. Injecting stroke timestamping ($t_0, t_1$) and scratch-out gestures must be isolated to avoid regressing pen latency. |
+| [src/js/ui/panels.js](../../src/js/ui/panels.js) | 3,420 lines (160 KB) | **Monolithic DOM Management**: Constructs all sidebar settings, export menus, and board lists using manual string templating. Audio playback controls must be encapsulated in a clean standalone module (`audioplayer.js`). |
+| [src/js/core/surface.js](../../src/js/core/surface.js) | 1,023 lines (46 KB) | **Frozen Canvas Caching**: The freeze mechanism does not account for continuous audio clock changes. Modifying `Surface.draw()` without breaking `_freezeScene()` requires careful layering. |
+| [sync/node.js](../../sync/node.js) | 1,251 lines (59 KB) | **LAN Sync Hard Limits**: Enforces 64 MB maximum board payload (`MAX_BOARD_BYTES`). Adding audio tracks without strip/omit logic will crash LAN board transfer. |
+| [scripts/i18n-check.js](../../scripts/i18n-check.js) | 65 lines | **Strict Translation Guard**: Verifies that every English string in `t('...')` exists across all 7 locales (`bn`, `zh-Hans`, `zh-Hant`, `ar`, `es`, `pt-BR`, `de`). Adding new UI strings will break tests unless properly stubbed or translated. |
 
 ---
 
@@ -386,9 +386,9 @@ To ensure upstream mergeability and prevent breaking non-Windows platforms, ever
 
 | Platform Component | Location | Description & Operating System | Keep / Gate / Exclude Verdict | Technical Rationale & Implementation Guard |
 | :--- | :--- | :--- | :--- | :--- |
-| **Microsoft Office COM** | [msoffice.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/msoffice.js) | Spawns PowerShell COM automation for Word/PowerPoint conversion. **Windows only**. | **KEEP & GATE** | Core Windows feature. Already gated by `process.platform === 'win32'` [VERIFIED IN CODE: msoffice.js:107]. Keep untouched. |
-| **Windows Ink Trails** | [src/js/core/inktrail.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/inktrail.js) | DirectX Delegated Ink Trails API (`navigator.ink`). **Windows only**. | **KEEP & GATE** | Gated cleanly by `inkTrailSupported()` checking `/Windows/i.test(navigator.userAgent)` [VERIFIED IN CODE: inktrail.js:28]. Keep untouched. |
-| **Windows Firewall** | [sync/firewall.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/sync/firewall.js) | UAC PowerShell netsh rules for UDP/TCP sync ports. **Windows only**. | **KEEP & GATE** | Already isolated and loaded on-demand via `sync:firewall:*` [VERIFIED IN CODE: main.js:1385]. Keep untouched. |
+| **Microsoft Office COM** | [msoffice.js](../../msoffice.js) | Spawns PowerShell COM automation for Word/PowerPoint conversion. **Windows only**. | **KEEP & GATE** | Core Windows feature. Already gated by `process.platform === 'win32'` [VERIFIED IN CODE: msoffice.js:107]. Keep untouched. |
+| **Windows Ink Trails** | [src/js/core/inktrail.js](../../src/js/core/inktrail.js) | DirectX Delegated Ink Trails API (`navigator.ink`). **Windows only**. | **KEEP & GATE** | Gated cleanly by `inkTrailSupported()` checking `/Windows/i.test(navigator.userAgent)` [VERIFIED IN CODE: inktrail.js:28]. Keep untouched. |
+| **Windows Firewall** | [sync/firewall.js](../../sync/firewall.js) | UAC PowerShell netsh rules for UDP/TCP sync ports. **Windows only**. | **KEEP & GATE** | Already isolated and loaded on-demand via `sync:firewall:*` [VERIFIED IN CODE: main.js:1385]. Keep untouched. |
 | **Android WebView Bridge** | `android/`, `src/js/platform/android-*.js` | Native Java/Kotlin Android app and WebView adapter. | **KEEP** | Do NOT touch or delete. Upstream GazBoard actively supports Android. Must remain buildable. |
 | **Web PWA Platform** | `src/js/platform/web-*.js`, `src/sw.js` | Cloudflare Worker / Vercel web whiteboard build. | **KEEP** | Do NOT delete. Gated cleanly by `platform.isWeb` [VERIFIED IN CODE: src/js/platform/platform.js:12]. |
 | **Linux Packaging & xvfb**| `packaging/linux/`, `scripts/smoke.js` | AppImage/deb packaging and xvfb-run headless runner. | **KEEP** | Required for CI GitHub Actions (`smoke.yml` runs on `ubuntu-latest` with xvfb) [VERIFIED IN CODE: .github/workflows/smoke.yml:15]. |

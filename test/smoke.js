@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 // Headless smoke test: drives the real renderer through every subsystem and
 // writes screenshots to test/out/. Run with:  npm run smoke
 const path = require('node:path');
@@ -9095,7 +9095,7 @@ async function run(win, app) {
 
   check('a real reply is fetched, parsed and turned into a version and a link',
     served.ok === true && served.version === '99.9.9'
-      && (served.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9' || served.url === 'https://github.com/fahim9778/GazBoard-Replay/releases/tag/v99.9.9')
+      && (served.url === 'https://github.com/Mostakim2005/GazBoard/releases/tag/v99.9.9' || served.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9' || served.url === 'https://github.com/fahim9778/GazBoard-Replay/releases/tag/v99.9.9')
       && served.prerelease === false,
     JSON.stringify(served));
   check('a server error is reported, not thrown', broke.ok === false && !!broke.error, JSON.stringify(broke));
@@ -9108,7 +9108,7 @@ async function run(win, app) {
   check('a longer prerelease suffix ranks later', upd.shorterPreIsOlder === true);
   check('an Android release at the top of the list does not hide the desktop one',
     mixed.ok === true && mixed.version === '99.9.9'
-      && (mixed.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9' || mixed.url === 'https://github.com/fahim9778/GazBoard-Replay/releases/tag/v99.9.9'),
+      && (mixed.url === 'https://github.com/Mostakim2005/GazBoard/releases/tag/v99.9.9' || mixed.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9' || mixed.url === 'https://github.com/fahim9778/GazBoard-Replay/releases/tag/v99.9.9'),
     JSON.stringify(mixed));
   check('a list with no desktop release at all is refused rather than guessed at',
     androidOnly.ok === false, JSON.stringify(androidOnly));
@@ -9550,14 +9550,15 @@ async function run(win, app) {
     const pkgNow = JSON.parse(fsSync.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
     const wf = fsSync.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'release.yml'), 'utf8');
     const ship = {
-      publish: pkgNow.build && pkgNow.build.publish && pkgNow.build.publish.provider === 'github' && pkgNow.build.publish.owner === 'fahim9778' && pkgNow.build.publish.repo === 'GazBoard',
+      publish: pkgNow.build && pkgNow.build.publish && pkgNow.build.publish.provider === 'github' && (pkgNow.build.publish.owner === 'Mostakim2005' || pkgNow.build.publish.owner === 'fahim9778') && pkgNow.build.publish.repo === 'GazBoard',
       files: (pkgNow.build.files || []).includes('updater.js') && (pkgNow.build.files || []).includes('zsync.js'),
-      linuxFiles: /dist\/\*\.AppImage\.zsync/.test(wf),
       dep: !!(pkgNow.dependencies && pkgNow.dependencies['electron-updater']),
       winFiles: /dist\/latest\.yml/.test(wf) && /GazBoard-Setup-\*\.exe\.blockmap/.test(wf),
-      macFiles: (wf.match(/dist\/latest-mac\.yml/g) || []).length >= 2 && (wf.match(/dist\/\*\.zip\.blockmap/g) || []).length >= 2
+      // This fork builds Windows only. The linux/macos/web jobs were removed
+      // deliberately, so assert they are gone rather than that they exist.
+      windowsOnly: !/^  linux:$/m.test(wf) && !/^  macos:$/m.test(wf) && !/^  web:$/m.test(wf) && /^  windows:$/m.test(wf)
     };
-    check('updater: package.json makes electron-builder write latest.yml, packs updater.js and electron-updater, and the release uploads latest.yml, the blockmap and latest-mac.yml',
+    check('updater: package.json makes electron-builder write latest.yml, packs updater.js and electron-updater, and the release uploads latest.yml and the blockmap',
       Object.values(ship).every(Boolean), JSON.stringify(ship));
   }
 
@@ -15185,20 +15186,14 @@ module.exports.run = async (win, app) => {
       `${shots.length} screenshots; not in Screenshots/: ${missing.join(', ') || 'none'}`);
   }
 
-  /* ---- the Mac download is signed, so macOS never calls it damaged ---- */
+  /* ---- this fork ships Windows only, so no Mac build is attempted ---- */
   {
     const rfs = require('node:fs');
     const root = path.join(__dirname, '..');
-    const mac = JSON.parse(rfs.readFileSync(path.join(root, 'package.json'), 'utf8')).build?.mac || {};
     const wf = rfs.readFileSync(path.join(root, '.github', 'workflows', 'release.yml'), 'utf8');
-    check('the Mac app gets a free ad-hoc signature instead of none',
-      mac.identity === '-' && mac.hardenedRuntime === false,
-      `identity ${JSON.stringify(mac.identity)} (wanted "-"; null means unsigned, which macOS reports as "damaged" with no Open Anyway), ` +
-      `hardenedRuntime ${JSON.stringify(mac.hardenedRuntime)} (wanted false; an ad-hoc app with it on can refuse to launch)`);
-    check('and the release build refuses to ship a Mac app whose signature is broken',
-      /codesign --verify --deep --strict/.test(wf),
-      /codesign --verify --deep --strict/.test(wf) ? 'release.yml verifies every Mac app before it is attached'
-        : 'release.yml has no "codesign --verify --deep --strict" step — without it a broken signature only shows up on somebody\'s Mac');
+    check('the release workflow builds Windows and nothing else',
+      /^  windows:$/m.test(wf) && !/^  linux:$/m.test(wf) && !/^  macos:$/m.test(wf) && !/^  web:$/m.test(wf),
+      'release.yml should have a windows job and no linux, macos or web job');
   }
 
   /* ---- a text box hugs its words as you type, growing and shrinking ---- */

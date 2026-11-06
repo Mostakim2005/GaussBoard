@@ -28,8 +28,8 @@ However, an exhaustive audit against the live GazBoard source code reveals that 
   ```
   Doc3 converts the entire recorded audio Blob to a base64 Data URL string via `FileReader.readAsDataURL()`, passing it over IPC `assets.put`.
 * **Reality in Code**:
-  - In [main.js:228-235](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L228-L235), `ASSET_EXT` only defines image MIME types (`png, jpg, gif, webp, bmp, svg`). Any audio MIME type (`audio/webm`) defaults to extension `'.bin'` and MIME type `'application/octet-stream'`.
-  - A 45-minute lecture recording produces $\sim 25\text{ MB}$ of WebM data. Base64 encoding expands this to $33.3\text{ MB}$ in the renderer heap. Serializing across Electron's IPC bridge duplicates it, and `Buffer.from(body, 'base64')` in [main.js:245](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L245) creates another $25\text{ MB}$ allocation.
+  - In [main.js:228-235](../../main.js), `ASSET_EXT` only defines image MIME types (`png, jpg, gif, webp, bmp, svg`). Any audio MIME type (`audio/webm`) defaults to extension `'.bin'` and MIME type `'application/octet-stream'`.
+  - A 45-minute lecture recording produces $\sim 25\text{ MB}$ of WebM data. Base64 encoding expands this to $33.3\text{ MB}$ in the renderer heap. Serializing across Electron's IPC bridge duplicates it, and `Buffer.from(body, 'base64')` in [main.js:245](../../main.js) creates another $25\text{ MB}$ allocation.
   - **Catastrophic Seeking Penalty**: Chromium's HTML5 `<audio>` engine **cannot perform HTTP 206 Partial Content byte-range requests on `data:` URLs**. To seek forward 10 seconds, Chromium must decode and buffer the entire audio file in RAM, introducing 1–3 second audio stalls on clicks [GENERAL BEST PRACTICE].
 * **Missing Step**: Main process must extend `app://board/asset/<id>` protocol handling to stream audio directly from disk via `net.fetch(pathToFileURL(...))` [VERIFIED IN CODE: main.js:148-160], enabling native HTTP 206 range seeking with zero memory duplication. Audio writes must use streaming binary IPC.
 
@@ -42,7 +42,7 @@ However, an exhaustive audit against the live GazBoard source code reveals that 
   track.assetId = assetId;
   ```
 * **Reality in Code**:
-  - In [main.js:1290-1292](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L1290-L1292), `assets:put` returns an **Object**, NOT a string:
+  - In [main.js:1290-1292](../../main.js), `assets:put` returns an **Object**, NOT a string:
     ```javascript
     try { await fsp.access(file); return { id }; } catch { /* first time */ }
     await writeAtomic(file, d.buf);
@@ -56,10 +56,10 @@ However, an exhaustive audit against the live GazBoard source code reveals that 
 #### 3. Assumption: `drawStroke()` in `render.js` Renders Every Frame During Replay
 * **doc3 Proposal** (lines 254–293): Places progressive sub-stroke reveals and ghosting directly inside `drawStroke()` in `render.js`.
 * **Reality in Code**:
-  - In [surface.js:570-588](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js#L570-L588), `Surface.draw()` optimizes rendering by blitting an offscreen frozen canvas (`this._ink`) whenever `this._ink.key === this.freezeKey()`.
+  - In [surface.js:570-588](../../src/js/core/surface.js), `Surface.draw()` optimizes rendering by blitting an offscreen frozen canvas (`this._ink`) whenever `this._ink.key === this.freezeKey()`.
   - `freezeKey()` depends only on document revision, camera coordinates, canvas size, and DPR [VERIFIED IN CODE: src/js/core/surface.js:133]. During audio playback, **none of these change**.
   - Consequently, `Surface.draw()` repeatedly blits the static frozen canvas; `drawStroke()` is **never called** between audio frames!
-  - **The Fatal Baking Flaw**: In [surface.js:448-461](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js#L448-L461), `_freezeScene()` renders ALL board objects into `this._inkCanvas` at 100% opacity. Future strokes are therefore already baked into the frozen bitmap at full opacity! Blitting `this._inkCanvas` paints future notes at 100% opacity, making ghosting (F-202) physically impossible without scene partitioning.
+  - **The Fatal Baking Flaw**: In [surface.js:448-461](../../src/js/core/surface.js), `_freezeScene()` renders ALL board objects into `this._inkCanvas` at 100% opacity. Future strokes are therefore already baked into the frozen bitmap at full opacity! Blitting `this._inkCanvas` paints future notes at 100% opacity, making ghosting (F-202) physically impossible without scene partitioning.
 * **Missing Step**: Implement **Scene Partitioning** in `_freezeScene()` to exclude active session strokes from the frozen cache, rendering them dynamically on each RAF tick over the blitted background.
 
 ---
@@ -73,7 +73,7 @@ However, an exhaustive audit against the live GazBoard source code reveals that 
   ```
   Asserting this persists cleanly and backwards-compatibly.
 * **Reality in Code**:
-  - In [store.js:327-332](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L327-L332), `Store.toJSON()` returns a **strictly enumerated object literal**:
+  - In [store.js:327-332](../../src/js/core/store.js), `Store.toJSON()` returns a **strictly enumerated object literal**:
     ```javascript
     return { id: d.id, name: d.name, schema: 2, created: d.created, modified: d.modified,
       origin: d.origin || undefined,
@@ -82,7 +82,7 @@ However, an exhaustive audit against the live GazBoard source code reveals that 
       camera: d.camera, objects: d.order.map((id) => d.objects[id]).filter(Boolean), ...extra };
     ```
     Any custom property on `this.doc` (including `audioTracks`) is **completely dropped** during serialization!
-  - In [store.js:343-362](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L343-L362), `Store.load()` instantiates a fresh `emptyDoc()` and copies only recognized properties, discarding unknown keys.
+  - In [store.js:343-362](../../src/js/core/store.js), `Store.load()` instantiates a fresh `emptyDoc()` and copies only recognized properties, discarding unknown keys.
 * **Missing Step**: Must explicitly enumerate `audioTracks` in both `Store.toJSON()` and `Store.load()`. Furthermore, acknowledge that when upstream GazBoard opens and re-saves a Replay board, it will strip `audioTracks` (safe degradation, but one-way).
 
 ---
@@ -92,8 +92,8 @@ However, an exhaustive audit against the live GazBoard source code reveals that 
   - Calls `this.surface.pulseHighlight(boundsOf(obj))` for click-to-seek feedback.
   - Calls `this.surface.cam.panTo(targetBox)` for auto-follow camera and PDF excerpts.
 * **Reality in Code**:
-  - [camera.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/camera.js) has only 43 lines [VERIFIED IN CODE: src/js/core/camera.js:1-43]. Its methods are `toScreen`, `toWorld`, `panBy`, `zoomAt`, `setZoom`, `viewport`, `fit`, `centerOn`, `toJSON`, and `load`. **There is no `panTo` method.**
-  - [surface.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js) contains zero references to `pulseHighlight`.
+  - [camera.js](../../src/js/core/camera.js) has only 43 lines [VERIFIED IN CODE: src/js/core/camera.js:1-43]. Its methods are `toScreen`, `toWorld`, `panBy`, `zoomAt`, `setZoom`, `viewport`, `fit`, `centerOn`, `toJSON`, and `load`. **There is no `panTo` method.**
+  - [surface.js](../../src/js/core/surface.js) contains zero references to `pulseHighlight`.
 * **Missing Step**: Must implement smooth easing in `camera.glideTo(targetBox)` and register transient pulse animations in `surface.overlays` [VERIFIED IN CODE: src/js/core/surface.js:31, 723].
 
 ---
@@ -104,17 +104,17 @@ However, an exhaustive audit against the live GazBoard source code reveals that 
   - Upstream GazBoard **already implements an active-recall Answer Cover system** under type `'curtain'` [VERIFIED IN CODE: src/js/core/render.js:980-1031].
   - Creating a parallel `'tape'` type duplicates hit testing, spatial indexing, selection bounding boxes, and toolbar commands.
   - More critically: an unknown `type: 'tape'` in upstream GazBoard will fail to render entirely or throw unhandled type warnings.
-* **Missing Step**: Implement Tape as a specialized variant of `curtain`: `{ type: 'curtain', subtype: 'tape' }`. Update `drawCurtain` to render translucent fill on reveal and adjust `ghost(o)` in [hit.js:28](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/hit.js#L28) for two-way toggling.
+* **Missing Step**: Implement Tape as a specialized variant of `curtain`: `{ type: 'curtain', subtype: 'tape' }`. Update `drawCurtain` to render translucent fill on reveal and adjust `ghost(o)` in [hit.js:28](../../src/js/core/hit.js) for two-way toggling.
 
 ---
 
 #### 7. Assumption: Single Board Export produces a ZIP File
 * **doc3 Proposal**: Assumes exporting a single `.gazboard` file packages audio assets in a zip container.
 * **Reality in Code**:
-  - In [export.js:664-665](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/export.js#L664-L665), single board export generates a **raw, uncompressed UTF-8 JSON file**.
-  - `JSZip` is only loaded dynamically in [board-export.js:45-50](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/board-export.js#L45-L50) when exporting two or more boards simultaneously!
+  - In [export.js:664-665](../../src/js/export.js), single board export generates a **raw, uncompressed UTF-8 JSON file**.
+  - `JSZip` is only loaded dynamically in [board-export.js:45-50](../../src/js/board-export.js) when exporting two or more boards simultaneously!
   - Exporting a board with audio using existing code leaves the audio asset stranded on the user's local disk.
-  - **Fatal Import Crash**: Even worse, in [export.js:677-678](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/export.js#L677-L678), `openBoardFile` unconditionally executes:
+  - **Fatal Import Crash**: Even worse, in [export.js:677-678](../../src/js/export.js), `openBoardFile` unconditionally executes:
     ```javascript
     const buf = await window.board.readFile(paths[0]);
     const data = JSON.parse(new TextDecoder().decode(buf));
@@ -135,11 +135,11 @@ However, an exhaustive audit against the live GazBoard source code reveals that 
 #### 9. Assumption: LAN Sync Seamlessly Transmits Boards with Audio
 * **doc3 Proposal**: Assumes LAN collaboration works out-of-the-box.
 * **Reality in Code**:
-  - In [sync/node.js:63](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/sync/node.js#L63), the LAN sync protocol enforces:
+  - In [sync/node.js:63](../../sync/node.js), the LAN sync protocol enforces:
     ```javascript
     const MAX_BOARD_BYTES = 64 * 1024 * 1024; // 64 MB
     ```
-  - Traced through [app.js:5316-5356](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js#L5316-L5356) (`picturesForSending` and `sendBoardDoc`): GazBoard has **zero out-of-band asset transfer endpoints** over LAN. All assets are base64-inlined into the board JSON, and the entire payload is encrypted and base64-encoded (`P.seal`), expanding total wire size by $\sim 1.8\times$ [VERIFIED IN CODE: sync/node.js:787].
+  - Traced through [app.js:5316-5356](../../src/js/app.js) (`picturesForSending` and `sendBoardDoc`): GazBoard has **zero out-of-band asset transfer endpoints** over LAN. All assets are base64-inlined into the board JSON, and the entire payload is encrypted and base64-encoded (`P.seal`), expanding total wire size by $\sim 1.8\times$ [VERIFIED IN CODE: sync/node.js:787].
   - A 30 MB audio file expands to $> 54\text{ MB}$ on the wire, readily exceeding the 64 MB hard cap and triggering:
     ```javascript
     if (bytes > 60 * 1024 * 1024) {
@@ -165,7 +165,7 @@ However, an exhaustive audit against the live GazBoard source code reveals that 
 #### 11. Assumption: Point Timestamps ($p.t$) Persist Automatically Across Stroke Lifecycles
 * **doc3 Proposal**: Assumes capturing `p.t` during pointer events is sufficient for progressive reanimation.
 * **Reality in Code**:
-  - In [tools.js:1707](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js#L1707) (`breakStroke` -> `tidy`) and [tools.js:1734](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js#L1734) (`finishStroke`), GazBoard explicitly reconstructs each point object with hardcoded property extraction:
+  - In [tools.js:1707](../../src/js/core/tools.js) (`breakStroke` -> `tidy`) and [tools.js:1734](../../src/js/core/tools.js) (`finishStroke`), GazBoard explicitly reconstructs each point object with hardcoded property extraction:
     ```javascript
     obj.points = obj.points.map((p) => ({
       x: +p.x.toFixed(2), y: +p.y.toFixed(2), p: +(p.p ?? 0.5).toFixed(2)
@@ -247,7 +247,7 @@ git remote add upstream https://github.com/fahim9778/GazBoard.git
 ### 4.2 Branching Rules: Isolating Replay from Upstream
 1. **Never Make Ad-Hoc Edits on `main`**: All work occurs in dedicated, isolated feature branches branched directly from `upstream/main` whenever possible.
 2. **Minimal Touch Surface in Core Files**:
-   - Monolithic files like [app.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js) (5,446 lines) and [tools.js](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/tools.js) (3,047 lines) are high-conflict areas.
+   - Monolithic files like [app.js](../../src/js/app.js) (5,446 lines) and [tools.js](../../src/js/core/tools.js) (3,047 lines) are high-conflict areas.
    - Core files must contain **only small, single-line hook dispatches** to dedicated modular files (e.g. `this.replayEngine?.onFrame()`, `this.scratchRecognizer?.offer(stroke)`).
    - Logic must reside in newly created, isolated modules in `src/js/core/` and `src/js/ui/`.
 3. **Tracking Upstream Updates**:
@@ -261,7 +261,7 @@ git remote add upstream https://github.com/fahim9778/GazBoard.git
 
 ### 4.3 Versioning Strategy
 * **Document Schema Versioning**:
-  - Upstream GazBoard stores `schema: 2` in [store.js:327](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L327).
+  - Upstream GazBoard stores `schema: 2` in [store.js:327](../../src/js/core/store.js).
   - GazBoard Replay **MUST NOT increment `schema` to 3**. Incrementing `schema` would cause upstream GazBoard to reject or warn on load.
   - Replay additions (`audioTracks`, stroke `t0, t1`, curtain `subtype: 'tape'`) are purely **additive optional properties**.
 * **Application Versioning in `package.json`**:

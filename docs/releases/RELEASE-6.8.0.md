@@ -3,7 +3,7 @@
 > **Release Version**: `v6.8.0`  
 > **Date**: October 24, 2026  
 > **Git Commit Target**: `feat(core): Phase 8 Language, Math & Knowledge Core (v6.8.0)`  
-> **Binary Deliverable**: [`releases/GazBoard-v6.8.0-Portable.exe`](../../releases/GazBoard-v6.8.0-Portable.exe) (`113,095,961 bytes` / `107.86 MiB`)  
+> **Binary Deliverable**: `GazBoard-v6.8.0-Portable.exe` (`113,095,961 bytes` / `107.86 MiB`)  
 > **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Invariant Compliance**: Strict adherence across all 6 Golden Invariants (100% i18n parity across 7 locales with 2,143 strings, 0 native C++ dependencies, preserved `p.t` stroke timestamps, finite audio safeguard, scene partitioning during audio replay, Study Tape toggle persistence).
 
@@ -67,7 +67,7 @@ Release **`v6.8.0` (Phase 8 — Language, Math & Knowledge Core)** implements co
 
 | Deliverable | Path | Type | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Portable Binary** | [`releases/GazBoard-v6.8.0-Portable.exe`](../../releases/GazBoard-v6.8.0-Portable.exe) | Win32 Binary | Zero-install standalone executable with all Phase 1–8 capabilities bundled. |
+| **Portable Binary** | `GazBoard-v6.8.0-Portable.exe` | Win32 Binary | Zero-install standalone executable with all Phase 1–8 capabilities bundled. |
 | **Academic Dictionary** | [`src/js/ui/academic-dictionary.js`](../../src/js/ui/academic-dictionary.js) | UI Component | AWL lexicon, IPA phonetics, thesaurus chips, TTS audio, and note card stamping. |
 | **Writing & Grammar Linter** | [`src/js/core/technical-linter.js`](../../src/js/core/technical-linter.js) | Core Module | Tone elevation, subject-verb agreement, and Academic Style Score (0–100%). |
 | **Natural Math & CAS** | [`src/js/core/scientific-math.js`](../../src/js/core/scientific-math.js) | Core Module | Natural math to LaTeX converter, quadratic CAS solver, and matrix determinant. |

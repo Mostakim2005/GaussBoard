@@ -37,8 +37,8 @@ The following register details the specific technical risks associated with impl
 
 ### 2.1 Security & Privacy Checklist
 - [ ] **Electron Runtime Configuration**:
-  - [ ] `contextIsolation: true` verified in [main.js:682](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L682).
-  - [ ] `nodeIntegration: false` verified in [main.js:683](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L683).
+  - [ ] `contextIsolation: true` verified in [main.js:682](../../main.js).
+  - [ ] `nodeIntegration: false` verified in [main.js:683](../../main.js).
   - [ ] Window creation handles `setWindowOpenHandler` returning `{ action: 'deny' }` for all non-local navigation [VERIFIED IN CODE: main.js:734].
 - [ ] **Permission Request Validation**:
   - [ ] Explicit permission handler installed via `session.defaultSession.setPermissionRequestHandler`.

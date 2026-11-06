@@ -3,7 +3,7 @@
 > **Release Version**: `v6.2.0`  
 > **Date**: October 24, 2026  
 > **Git Commit Target**: `feat(study): implement Phase 2 Memory & Document Synthesis with FSRS v5, AnkiConnect & LiquidText Excerpts (v6.2.0)`  
-> **Binary Deliverable**: [`releases/GazBoard-v6.2.0-Portable.exe`](../../releases/GazBoard-v6.2.0-Portable.exe) (108,195,296 bytes / 103.18 MiB)  
+> **Binary Deliverable**: `GazBoard-v6.2.0-Portable.exe` (108,195,296 bytes / 103.18 MiB)  
 > **Parent Documentation**: [`RELEASES_INDEX.md`](RELEASES_INDEX.md) | [`../INDEX.md`](../INDEX.md) | [`../../AI_BOOTSTRAP.md`](../../AI_BOOTSTRAP.md)  
 > **Invariant Compliance**: Strict adherence across all 6 Golden Invariants (100% i18n parity, 1,240 smoke checks passed, 0 native C++ dependencies, preserved `p.t` stroke timestamps, Study Tape persistence).
 
@@ -79,7 +79,7 @@ It establishes a comprehensive **Memory & Document Synthesis Subsystem** inside 
    - `node scripts/i18n-check.js`
    - **Result**: **1,912 / 1,912 translated, 0 missing, 0 errors** across all 7 supported locales (`ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, `zh-Hant.json`).
 3. **Binary Packaging Verification (Rule 5 Protocol)**:
-   - Standalone portable binary: [`releases/GazBoard-v6.2.0-Portable.exe`](../../releases/GazBoard-v6.2.0-Portable.exe).
+   - Standalone portable binary: `GazBoard-v6.2.0-Portable.exe`.
    - Zero-installation, runs out of the box with zero registry pollution.
 
 ---

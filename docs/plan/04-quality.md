@@ -67,7 +67,7 @@ GazBoard runs within an Electron multi-process environment [VERIFIED IN CODE: ma
 ```
 
 #### 2.1.1 Audit of `sandbox: false`
-In [main.js:684](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L684), `sandbox: false` is explicitly configured. 
+In [main.js:684](../../main.js), `sandbox: false` is explicitly configured. 
 * **Reason in Base App**: Upstream GazBoard utilizes a non-sandboxed renderer preload bridge [VERIFIED IN CODE: preload.js:1-286] that relies on direct Node buffer marshalling across IPC without requiring a separate native helper process.
 * **Risk Evaluation**: In an offline whiteboard, the primary attack vector is not malicious web navigation (external links are denied and routed to default browser via `shell.openExternal` [VERIFIED IN CODE: main.js:734]), but rather **untrusted imported files** (.gazboard, .docx, .pptx, .pdf).
 * **Hardening Mandate**: To maintain 100% upstream mergeability, `sandbox: false` must be preserved, but the IPC surface and file deserialization boundaries must be hardened with strict schema validators so that untrusted input cannot leverage Node APIs through IPC.
@@ -91,19 +91,19 @@ In [main.js:684](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/mai
 
 ### 2.2 IPC & File-Path Validation
 
-The Electron context bridge in [preload.js:162-286](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/preload.js#L162-L286) exposes privileged Node file-system operations to the renderer.
+The Electron context bridge in [preload.js:162-286](../../preload.js) exposes privileged Node file-system operations to the renderer.
 
 #### 2.2.1 Audit of Existing IPC Channels
 
 1. **Arbitrary File Access via `fs:readFile` and `fs:writeFile`**:
-   - In [main.js:1114](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L1114):
+   - In [main.js:1114](../../main.js):
      ```javascript
      ipcMain.handle('fs:readFile', async (_e, p) => {
        const b = await fsp.readFile(p);
        return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
      });
      ```
-   - In [main.js:1126-1129](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L1126-L1129):
+   - In [main.js:1126-1129](../../main.js):
      ```javascript
      ipcMain.handle('fs:writeFile', async (_e, { filePath, data }) => {
        await fsp.writeFile(filePath, Buffer.from(data));
@@ -114,11 +114,11 @@ The Electron context bridge in [preload.js:162-286](file:///C:/Users/kazir/.gemi
    - **Mitigation for Replay**: Replay MUST NOT widen this surface. All new audio chunk persisters must NOT use raw `fs:writeFile` with client-provided paths. Instead, dedicated IPC endpoints (`recording:appendChunk`, `assets:putBinaryDirect`) must compute and enforce paths strictly inside `<userData>/boards/assets/` or `<userData>/temp/`.
 
 2. **Asset Store Traversal Defense**:
-   - In [main.js:227](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L227), GazBoard defines:
+   - In [main.js:227](../../main.js), GazBoard defines:
      ```javascript
      const ASSET_NAME = /^[0-9a-f]{64}\.[a-z0-9]{1,8}$/;
      ```
-   - In [main.js:1297-1304](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L1297-L1304), `assets:get` validates:
+   - In [main.js:1297-1304](../../main.js), `assets:get` validates:
      ```javascript
      if (!ASSET_NAME.test(String(id || ''))) return null;
      ```
@@ -131,7 +131,7 @@ The Electron context bridge in [preload.js:162-286](file:///C:/Users/kazir/.gemi
      ```
 
 3. **Protocol Boundary Validation in `app://`**:
-   - In [main.js:153-160](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L153-L160):
+   - In [main.js:153-160](../../main.js):
      ```javascript
      const target = path.normalize(path.join(SRC, rel));
      if (!target.startsWith(SRC)) return new Response('Forbidden', { status: 403 });
@@ -183,8 +183,8 @@ When upgrading single-board export to bundle audio assets into a `.gazboard` ZIP
   2. Reject single audio assets exceeding 200 MB.
 
 #### 2.3.3 Malicious JSON & Prototype Pollution
-* **Vulnerability**: In [store.js:343-362](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L343-L362), `Store.load(data)` deserializes raw parsed JSON into `this.doc`. If the JSON contains `__proto__` or `constructor` properties, prototype pollution can compromise the JS engine runtime.
-* **Assessment & Mitigation**: In [store.js:344](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L344), `Store.load()` instantiates a fresh `d = emptyDoc(...)` and selectively copies only explicit properties (`id, name, created, background, pages, camera, objects`). It does NOT do `Object.assign(this.doc, data)`. This prevents prototype pollution [VERIFIED IN CODE: store.js:344-362]. When adding `audioTracks` to `Store.load()`, properties must be validated individually:
+* **Vulnerability**: In [store.js:343-362](../../src/js/core/store.js), `Store.load(data)` deserializes raw parsed JSON into `this.doc`. If the JSON contains `__proto__` or `constructor` properties, prototype pollution can compromise the JS engine runtime.
+* **Assessment & Mitigation**: In [store.js:344](../../src/js/core/store.js), `Store.load()` instantiates a fresh `d = emptyDoc(...)` and selectively copies only explicit properties (`id, name, created, background, pages, camera, objects`). It does NOT do `Object.assign(this.doc, data)`. This prevents prototype pollution [VERIFIED IN CODE: store.js:344-362]. When adding `audioTracks` to `Store.load()`, properties must be validated individually:
   ```javascript
   if (Array.isArray(data.audioTracks)) {
     d.audioTracks = data.audioTracks.filter((t) => t && typeof t.id === 'string' && typeof t.assetId === 'string')
@@ -202,7 +202,7 @@ When upgrading single-board export to bundle audio assets into a `.gazboard` ZIP
 
 #### 2.3.4 Subtitle / Caption File Sanitization (F-403)
 * **Risk**: External `.srt` / `.vtt` files loaded by users may contain embedded HTML tags or malicious SVG/XSS payloads (`<script>alert(1)</script>` or `<img src=x onerror=...>`).
-* **Critical Framework Vulnerability**: GazBoard's DOM utility `h(...)` in [src/js/ui/popover.js:80-93](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/ui/popover.js#L80-L93) explicitly assigns `innerHTML` when `attrs.html` is passed (`else if (k === 'html') el.innerHTML = v;`).
+* **Critical Framework Vulnerability**: GazBoard's DOM utility `h(...)` in [src/js/ui/popover.js:80-93](../../src/js/ui/popover.js) explicitly assigns `innerHTML` when `attrs.html` is passed (`else if (k === 'html') el.innerHTML = v;`).
 * **Mitigation**: The subtitle parser in `src/js/core/subtitles.js` must strip all HTML tags using regex, and UI caption overlays must NEVER use `attrs.html`. Text must be mounted strictly via `document.createTextNode` or `el.textContent` (Canvas rendering uses `ctx.fillText`).
 
 ---
@@ -237,7 +237,7 @@ GazBoard maintains an exceptionally lean dependency tree [VERIFIED IN CODE: pack
 
 GazBoard incorporates an encrypted P2P LAN board sharing engine using UDP multicast discovery and TCP transfer [VERIFIED IN CODE: sync/node.js:1-150, sync/protocol.js:1-200].
 * **Cryptographic Foundation**: Contrary to assumptions of external libraries, GazBoard uses standard Node.js built-in `node:crypto` [VERIFIED IN CODE: sync/protocol.js:78-85, 123-131, 152-160]. Key exchange is performed via `crypto.generateKeyPairSync('x25519')` and `crypto.diffieHellman`. Device keys are derived with HKDF-SHA256 (`crypto.hkdfSync`). Payload sealing uses AES-256-GCM (`crypto.createCipheriv('aes-256-gcm', ...)`). The pairing code is an 8-character base-32 string generated in two 4-character chunks (`CODE_GROUPS = 2, CODE_GROUP_LEN = 4`, e.g. "7MPU-K7TM") [VERIFIED IN CODE: sync/protocol.js:36-53]. No external `libsodium` exists or should be added.
-* **Vulnerability in Replay**: In [sync/node.js:63](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/sync/node.js#L63), the protocol enforces:
+* **Vulnerability in Replay**: In [sync/node.js:63](../../sync/node.js), the protocol enforces:
   ```javascript
   const MAX_BOARD_BYTES = 64 * 1024 * 1024; // 64 MB
   ```
@@ -359,7 +359,7 @@ Electron's renderer process shares a single thread between the Chromium composit
   4. Renderer main-thread time per chunk: $< 0.5\text{ms}$. Zero stylus frame drops.
 
 #### 3.3.2 Non-Blocking Autosave Serialization
-In [app.js:520-536](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js#L520-L536), `_persistNow()` serializes the board document to JSON. Because audio tracks in Replay are stored as lightweight metadata pointers (`assetId: "b8f2c0....webm"`), the JSON document remains small ($< 2\text{ MB}$ even for 10,000 objects). `JSON.stringify(doc)` executes in $< 8\text{ms}$.
+In [app.js:520-536](../../src/js/app.js), `_persistNow()` serializes the board document to JSON. Because audio tracks in Replay are stored as lightweight metadata pointers (`assetId: "b8f2c0....webm"`), the JSON document remains small ($< 2\text{ MB}$ even for 10,000 objects). `JSON.stringify(doc)` executes in $< 8\text{ms}$.
 
 ---
 
@@ -368,7 +368,7 @@ In [app.js:520-536](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/
 During audio playback, seeking to a timestamp requires fast byte-range access.
 * **Why Data URLs Fail**: If an audio asset is loaded as a `data:audio/webm;base64,...` URL, Chromium's media pipeline cannot issue HTTP 206 Partial Content range requests. It must parse the entire string and decode from byte 0, causing a 1–3 second audio playback freeze on every click-to-seek jump.
 * **Exact Mitigation: Native Protocol Streaming via `net.fetch`**:
-  In [main.js:153-160](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L153-L160), `protocol.handle('app', ...)` is privileged with `stream: true` [VERIFIED IN CODE: main.js:149].
+  In [main.js:153-160](../../main.js), `protocol.handle('app', ...)` is privileged with `stream: true` [VERIFIED IN CODE: main.js:149].
   When the URL is `app://board/asset/<assetId>`:
   ```javascript
   const assetFile = path.join(assetsDir(), id);
@@ -384,12 +384,12 @@ During audio playback, seeking to a timestamp requires fast byte-range access.
 * **Content-Addressable Asset Deduplication**: Audio files are hashed using SHA-256 [VERIFIED IN CODE: main.js:1286]. If multiple boards reference the same recorded lecture or audio clip, the physical audio file is stored only once in `<userData>/boards/assets/`.
 
 #### 3.5.1 The Audio Asset Garbage Collection (GC) Dilemma
-In [main.js:223-224](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L223-L224), GazBoard states:
+In [main.js:223-224](../../main.js), GazBoard states:
 ```javascript
 // Nothing is ever deleted here. An orphaned file costs disk; a file deleted
 // while a board still wanted it costs someone their work.
 ```
-* **The Problem**: When a board is deleted in [main.js:1457-1475](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L1457-L1475) (`boards:delete`), only the board JSON file `<dataDir>/<id>.json` is unlinked. Physical files in `assets/` are NEVER touched. For images, unreferenced files cost tens of megabytes over years. For audio, a semester of recorded lectures can produce $20–50\text{ GB}$ of orphaned audio if users frequently delete or duplicate boards.
+* **The Problem**: When a board is deleted in [main.js:1457-1475](../../main.js) (`boards:delete`), only the board JSON file `<dataDir>/<id>.json` is unlinked. Physical files in `assets/` are NEVER touched. For images, unreferenced files cost tens of megabytes over years. For audio, a semester of recorded lectures can produce $20–50\text{ GB}$ of orphaned audio if users frequently delete or duplicate boards.
 * **Exact Replay Resolution**:
   1. Default: Strictly adhere to upstream philosophy—never delete assets automatically during normal board deletions.
   2. Safe Maintenance IPC (`assets:auditUnused`): Add an explicit IPC endpoint in `main.js` that:
@@ -444,12 +444,12 @@ GazBoard Replay is designed as a Windows-first application tailored for Surface 
 ### 4.2 Display Scaling (100% to 250%) & Multi-Monitor Transitions
 
 Windows laptops frequently operate at 125%, 150%, or 200% DPI scaling, often connected to a secondary 100% DPI desktop monitor.
-* **DPR Calculation**: In [surface.js:28](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js#L28):
+* **DPR Calculation**: In [surface.js:28](../../src/js/core/surface.js):
   ```javascript
   this.dpr = Math.min(window.devicePixelRatio || 1, 2.5);
   ```
   GazBoard clamps DPR to 2.5 to prevent memory explosion on 4K/8K displays.
-* **Device Pixel Snapping**: In [surface.js:357-367](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/surface.js#L357-L367), GazBoard snaps canvas clipping bounds to exact physical device pixels:
+* **Device Pixel Snapping**: In [surface.js:357-367](../../src/js/core/surface.js), GazBoard snaps canvas clipping bounds to exact physical device pixels:
   ```javascript
   const d = this.dpr || 1;
   const x0 = Math.floor(a.x * d - 1) / d, y0 = Math.floor(a.y * d - 1) / d;
@@ -457,7 +457,7 @@ Windows laptops frequently operate at 125%, 150%, or 200% DPI scaling, often con
   ```
   *Failure to do this at 125% or 150% scaling causes faint background seam lines and clipping artifacts.*
 * **Replay Invariant**: When drawing tape curtains, pulse highlight overlays, or density ticks, coordinates must use screen transform snapping via `surface.cam.toScreen(x, y)` to avoid blurry edges at fractional scaling.
-* **Monitor Hopping**: In [main.js:718](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L718):
+* **Monitor Hopping**: In [main.js:718](../../main.js):
   `screen.on('display-metrics-changed', () => send('window:resized'));`
   When the window is dragged across monitors with different DPIs, `Surface.resize()` updates `dpr`, reallocates `_inkCanvas`, and triggers `_freezeScene()`. Audio HUD widgets reposition smoothly.
 
@@ -504,20 +504,20 @@ A critical project mandate is maintaining seamless data exchange between upstrea
 ```
 
 #### 4.4.1 Schema Version Invariant
-* In [store.js:327](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L327), GazBoard records `schema: 2`.
+* In [store.js:327](../../src/js/core/store.js), GazBoard records `schema: 2`.
 * **RULE**: GazBoard Replay **MUST NOT** increment `schema` to 3. Incrementing `schema` would cause upstream GazBoard to reject the file or trigger unintended fallback resets. All Replay additions are strictly additive, optional fields.
 
 ---
 
 ### 4.5 Auto-Updater Fork Protection
 
-In [main.js:36-42](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L36-L42), the base app points to the upstream GitHub repository:
+In [main.js:36-42](../../main.js), the base app points to the upstream GitHub repository:
 ```javascript
 const RELEASES_URL = 'https://github.com/fahim9778/GazBoard/releases';
 const UPDATE_API = process.env.GAZBOARD_UPDATE_API
   || 'https://api.github.com/repos/fahim9778/GazBoard/releases?per_page=30';
 ```
-And in [package.json:165-170](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/package.json#L165-L170), `publish` is configured to `fahim9778/GazBoard`. In [updater.js:560](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/updater.js#L560), `NsisUpdater` automatically downloads new releases from this repository and reinstalls silently over the running application.
+And in [package.json:165-170](../../package.json), `publish` is configured to `fahim9778/GazBoard`. In [updater.js:560](../../updater.js), `NsisUpdater` automatically downloads new releases from this repository and reinstalls silently over the running application.
 * **Severe Fork Risk**: If an upstream release (e.g. v4.8.2) is published, an unmodified GazBoard Replay installation will prompt to update, download upstream v4.8.2, and overwrite itself, completely deleting all Replay features.
 * **Exact Mitigation**:
   1. In `package.json`, update `"publish"` to point to the fork repository (`"owner": "gazboard-replay"`, `"repo": "GazBoard"`).
@@ -552,15 +552,15 @@ Whiteboard software is frequently used in mission-critical classroom and lecture
   6. Clicking "Save to Board" moves the file to `assets/`, generates its SHA-256 ID, attaches the track to the last opened board, and commits a store transaction.
 
 #### 5.1.2 Document Autosave Continuity
-* In [app.js:536-543](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/app.js#L536-L543), GazBoard triggers `_persistNow()` debounced after every committed stroke.
-* In [main.js:1432-1456](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L1432-L1456), `boards:resume` reads the last open board pointer from disk on boot.
+* In [app.js:536-543](../../src/js/app.js), GazBoard triggers `_persistNow()` debounced after every committed stroke.
+* In [main.js:1432-1456](../../main.js), `boards:resume` reads the last open board pointer from disk on boot.
 * **Replay Invariant**: Autosave does NOT halt during audio recording. When a stroke is finished, it receives its timestamp and commits into `Store`; `_persistNow()` saves the updated stroke list immediately.
 
 ---
 
 ### 5.2 Atomic File Writes & Concurrency Analysis
 
-In [main.js:250-260](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L250-L260) and [storage-location.js:20-22](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/storage-location.js#L20-L22), GazBoard implements atomic file replacement:
+In [main.js:250-260](../../main.js) and [storage-location.js:20-22](../../storage-location.js), GazBoard implements atomic file replacement:
 ```javascript
 async function writeAtomic(file, text) {
   const tmp = file + '.' + process.pid + '.tmp';
@@ -594,13 +594,13 @@ async function writeAtomic(file, text) {
   ```
 
 #### 5.2.2 Storage Write Gating
-In [main.js:179-196](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/main.js#L179-L196), GazBoard provides `withStorageWrite(write)` and `pauseStorageWrites()`. All Replay file system operations (audio chunk writes, ZIP extraction) must wrap through `withStorageWrite()` so that switching the board storage folder mid-session pauses writes cleanly until the transition is complete.
+In [main.js:179-196](../../main.js), GazBoard provides `withStorageWrite(write)` and `pauseStorageWrites()`. All Replay file system operations (audio chunk writes, ZIP extraction) must wrap through `withStorageWrite()` so that switching the board storage folder mid-session pauses writes cleanly until the transition is complete.
 
 ---
 
 ### 5.3 Undo/Redo Correctness & Transaction Boundaries
 
-The headless store in [store.js:28-116](file:///C:/Users/kazir/.gemini/antigravity/scratch/GazBoard/src/js/core/store.js#L28-L116) enforces transaction boundaries with a 200-entry undo stack [VERIFIED IN CODE: store.js:40].
+The headless store in [store.js:28-116](../../src/js/core/store.js) enforces transaction boundaries with a 200-entry undo stack [VERIFIED IN CODE: store.js:40].
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
