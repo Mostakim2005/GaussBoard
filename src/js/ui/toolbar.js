@@ -813,6 +813,8 @@ function initPagebar(app) {
   btn('more').addEventListener('click', (e) => {
     const last = app.pageCount <= 1;
     openPopover(e.currentTarget, h('div', { class: 'menu' },
+      menuItem(app.pageStrip?.open ? t('Hide page pictures') : t('Show page pictures'), 'grid', () => app.pageStrip?.toggle()),
+      h('div', { class: 'menu-sep' }),
       menuItem(t('Add a page after this one'), 'insert', () => app.command('page.add')),
       menuItem(t('Duplicate this page'), 'duplicate', () => app.command('page.duplicate')),
       menuItem(t('Fit the whole pad in the window'), 'fit', () => app.command('view.fitAllPages')),
@@ -1951,6 +1953,7 @@ function teachingItems(app) {
   const lifted = app.store.objects.some((o) => o.type === 'curtain' && o.revealed);
   return [
     menuItem(app.presenting ? t('Stop presenting') : t('Present'), 'present', () => app.command('view.present'), { key: app.presenting ? 'Esc' : 'F5' }),
+    menuItem(app.viewMode ? t('Leave View mode') : t('View mode'), 'eye', () => app.command('view.viewMode'), { key: isPhoneLayout() ? '' : 'Ctrl+Alt+V' }),
     menuItem(app.timer?.visible ? t('Close the class timer') : t('Class timer'), 'timer', () => app.command('timer.open')),
     menuItem(t('Cover answers again'), 'curtain', () => app.command('curtain.coverAll'), { disabled: !lifted })
   ];
@@ -2145,6 +2148,7 @@ export function openExportPopover(app, anchor) {
  * popover instead of switching pens. The id says which pen without ambiguity.
  */
 export function choosePen(app, id, anchor) {
+  if (app.viewMode) { app.hintViewMode(); return; }
   const s = app.settings;
   const pen = penById(s, id);
   if (!pen) return;
@@ -2246,6 +2250,11 @@ export function syncToolbar(app) {
       ? t('Your finger draws — tap to move the board with it instead')
       : t('Your finger moves the board — tap to draw with it instead');
   }
+
+  const addBtn = bar.querySelector('.tool[data-pop="add"]');
+  if (addBtn) addBtn.classList.toggle('active', ['note', 'text', 'shape', 'emoji'].includes(app.tool) || !!app.ruler?.visible);
+  const moreBtn = bar.querySelector('.tool[data-pop="more"]');
+  if (moreBtn) moreBtn.classList.toggle('active', ['select', 'lasso', 'pan', 'laser'].includes(app.tool));
 
   for (const btn of bar.querySelectorAll('.tool')) {
     const t = btn.dataset.tool, c = btn.dataset.cmd;

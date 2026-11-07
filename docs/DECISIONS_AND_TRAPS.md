@@ -148,6 +148,53 @@ flowchart LR
   * `THIRD_PARTY_NOTICES.md` -> `Upstream Heritage & Divergence Notice`
   * `package.json` -> `homepage`, `repository`, `author`
 
+### [DECISION: Upstream-Commit-Classification-And-Triage] | Aliases: upstream commits, 36 commits, high risk, rejected, approved safe
+> **1-Line Summary:** Categorized the 36 upstream GazBoard commits into strict safety tiers: merged 7 approved safe commits into main, quarantined HIGH/MEDIUM risk commits for isolated branch evaluation, and explicitly rejected replay/timestamp-colliding commits.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`
+* **Original User Intention:** Safely absorb valuable upstream improvements (paper templates, table freeze defense, edge inking, page strip) while strictly preventing any collision with GaussBoard's custom EE engines, audio-ink sync, or invariants.
+* **Options Considered:**
+  * **Option A (Rejected):** Blind `git merge upstream/main`. Rejected because it would cause 3-way conflicts across package.json, app.js, and tools.js, and wipe out GaussBoard's EE tools, MNA circuits, and audio replay.
+  * **Option B (Chosen):** Audit all 36 commits individually; merge 7 conflict-free commits into `main`; quarantine high/medium risk commits in a dedicated evaluation branch (`feat/upstream-risk-eval`); and explicitly prohibit rejected commits.
+* **Upstream Commit Risk Taxonomy:**
+  * **`APPROVED_SAFE` (Merged into `main`):**
+    * Commit `14` (`5babfd0`): Music staff and guitar tab paper templates, View mode, bottom thumbnail page strip.
+    * Commit `16` (`1d6f4eb`): `repairTable()` sanitization bounding table rows/cols to `[1, 40]`, preventing infinite freeze loops on corrupted boards.
+    * Commit `17` (`bd08b86`): Smoke test hardening for View mode.
+    * Commit `18` (`b95604f`): Android-specific "Tap Done" View mode copy.
+    * Commit `30` (`7cb909c` pen-hold part): In-place scribble travel distance tracking (`HOLD_TRAVEL = 18`) preventing small shape fills from triggering the hold menu, plus `penHold` toggle setting.
+    * Commit `35` (`24532e8`): Margin inking stability (removes `draw` and `erase` from `EDGE_PANNABLE`, preventing canvas slippage during margin handwriting; bounds drawing to `visibleArea`).
+    * Commit `36` (`924109b`): Ergonomic enhancements (direct `[×]` close button on ruler, active tray highlights on phone toolbar, dual-hand touch disambiguation).
+  * **`HIGH_RISK` (Quarantined for `feat/upstream-risk-eval`):**
+    * Commit `25` (`bd5684d`): Set squares (30/60/90, 45/45/90), protractor, and ruler settings. High STEM value, but touches 550+ lines in `tools.js`; must be tested on a side branch to protect circuit wiring and pointer partitioning.
+    * Commit `30` (protractor typed angle input part): Dependent on Commit 25.
+  * **`MEDIUM_RISK` (Quarantined for `feat/upstream-risk-eval`):**
+    * Commit `32` (`32e2c40`): Press-and-hold radial shortcut menu ring. Must be evaluated on side branch against GaussBoard's long-press component context menus.
+    * Commit `34` (`031ad50`): Sliced rendering for heavy boards (>3,000 objects). Must be retrofitted with GaussBoard's TRAP 1 audio replay partition (`o.audioId !== activeTrackId`) before it can safely run.
+  * **`REJECTED` (Explicitly Prohibited):**
+    * Commit `12` (`33e5bd2` Shift straight lines): Strips `p.t` stroke timestamps and breaks holdToShape/connector architecture (Violates TRAP 2).
+    * Commit `27` (`b1060bf` Upstream replay & graphing): Upstream's naive stroke replay destroys GaussBoard's millisecond-accurate audio-ink sync replay engine (Violates TRAP 1 & TRAP 2); basic graphing is redundant with GaussBoard's CAS Math Studio & circuit simulator.
+  * **`SKIP / IRRELEVANT`:**
+    * Commits `1–11`, `13`: Already squashed and integrated in `bd80de6`.
+    * Commits `2`, `4`, `7`, `9`, `11`, `13`, `15`, `19–24`, `26`, `28`, `29`, `31`, `33`: Upstream version bumps, dependabot lockfile bumps, or Google Play draft uploads.
+* **Code Anchors (Grep Targets):**
+  * `src/js/ui/pagestrip.js` -> `PageStrip`
+  * `src/js/core/store.js` -> `repairTable`, `tableDim`
+  * `src/js/core/tools.js` -> `HOLD_TRAVEL`, `visibleArea`
+  * `docs/releases/ANDROID_READINESS.md` -> `Android Build Specification`
+
+### [DECISION: Android-Platform-Parity-And-Format-Alignment] | Aliases: android release, .gaussboard SAF, font whitelist
+> **1-Line Summary:** Aligned Android bridge and storage modules to GaussBoard branding and .gaussboard native format, achieving 100% test pass on Android test suite.
+* **Decision Maker:** `[DECIDED BY: AGENT - Approved by Human]`
+* **Original User Intention:** Ensure the Android APK build runs without problems, recognizes .gaussboard files, downloads CJK fonts from GaussBoard CDN, and aligns app branding with desktop.
+* **Options Considered:**
+  * **Option A (Rejected):** Leave Android files pointing to legacy GazBoard upstream endpoints. Rejected because font downloads and update checks fail or point to upstream repo, and file pickers refuse `.gaussboard` files.
+  * **Option B (Chosen):** Update `MainActivity.kt` font CDN bases, release update checks, SAF MIME filters, and `AndroidManifest.xml` app label to `GaussBoard`, while maintaining backward-compatible fallbacks for `.gazboard` and legacy folders in `BoardMirror.kt`.
+* **Code Anchors (Grep Targets):**
+  * `android/app/src/main/java/com/gazboard/app/MainActivity.kt` -> `FONT_SOURCES`, `FONT_FILE`
+  * `android/app/src/main/java/com/gazboard/app/BridgeFiles.kt` -> `normalizeBoardDuplicateName`
+  * `android/app/src/main/java/com/gazboard/app/BoardMirror.kt` -> `gazFolder`
+  * `test/android-board-export.test.js` -> `Lesson.gaussboard`
+
 ---
 
 ## 2. Do-Not-Touch Engineering Landmines (Traps)

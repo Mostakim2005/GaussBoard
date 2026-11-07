@@ -28,6 +28,7 @@ import { mathReady, mathsReady, naturalSize, sizeOfBox, onMathArrived } from './
 import { initToolbar, syncToolbar } from './ui/toolbar.js';
 import { initPresentBar, syncPresentBar } from './ui/present.js';
 import { ClassTimer } from './ui/timer.js';
+import { PageStrip } from './ui/pagestrip.js';
 import { createPanels } from './ui/panels.js';
 import { showContextMenu, updateSelectionBar } from './ui/contextmenu.js';
 import { closePopover, popoverOpen, openPopover, h } from './ui/popover.js';
@@ -103,7 +104,7 @@ export const DEFAULT_SETTINGS = {
   graphPhysics: true, showExcerptTethers: true, autoExportMarkdownSidecar: false,
   showGroupOutlines: true, showTabBar: true,
   sidebarRibbonVisible: false, sidebarRibbonPosition: 'left', sidebarRibbonStyle: 'glassmorphism', sidebarRibbonCategory: 'circuits',
-  edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, laserColor: '#ff2d2d',
+  edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, pageStrip: false, penHold: true, laserColor: '#ff2d2d',
   penOpacityEnabled: false, penOpacity: 1, laserTrailDuration: 520, boardLinkThumb: true,
   brushColor: '#201f1e', brushWidth: 8, brushOpacity: 0.9, brushSoftness: 'medium', brushVelocityThinning: true,
   fountainColor: '#002050', fountainWidth: 4, fountainSlant: 45, fountainFlex: 'normal',
@@ -293,6 +294,7 @@ class App {
     // Presenting and the class timer. Neither is part of the board: both
     // belong to the lesson, so they live on the app and outlast a board switch.
     this.presenting = false;
+    this.viewMode = false;
     this.presentToolsPinned = false;
     initPresentBar(this);
     this.timer = new ClassTimer(document.getElementById('stage'), {
@@ -462,7 +464,8 @@ class App {
     // the nib is a cursor, not a drawing - it has to be re-tinted by hand
     this.interaction?.refreshInkCursor?.();
     // the selection's colour dot shows default ink as drawn, which just changed
-    if (this.surface?.selection?.size) { try { updateSelectionBar(this); } catch { /* no bar yet */ } }
+    if (this.surface?.selection?.size) { try { updateSelectionBar(this);
+    this.pageStrip?.sync(); } catch { /* no bar yet */ } }
     // and on a phone the status bar and navigation bar belong to Android, not
     // to this stylesheet - a dark board in a light frame is only half a theme
     try { window.board?.setTheme?.(want); } catch {}
@@ -1115,6 +1118,9 @@ class App {
     if (!opts.startup && this.panels?.page) this.panels.close();
     data = await this.resolveAssets(data);
     this.store.load(data);
+    if (this.store.repaired) this.toast(this.store.repaired === 1
+      ? t('A table in this board had an impossible size and has been mended')
+      : t('{n} tables in this board had impossible sizes and have been mended', { n: this.store.repaired }), 'help', 6000);
     this.unsavedNew = false;
     this.surface.selection.clear();
     if (data.camera) this.surface.cam.load(data.camera);
@@ -4006,6 +4012,7 @@ class App {
     if (label) label.textContent = t('Page {n} of {total}', { n: i + 1, total: n });
     bar.querySelector('[data-page="prev"]').disabled = i <= 0;
     bar.querySelector('[data-page="next"]').disabled = i >= n - 1;
+    this.pageStrip?.markCurrent();
   }
 
   /**
@@ -5709,6 +5716,7 @@ class App {
     }
 
     if (e.code === 'Space') { this.interaction.spaceDown = true; e.preventDefault(); return; }
+    if (mod && e.altKey && !e.shiftKey && e.code === 'KeyV') { e.preventDefault(); this.toggleViewMode(); return; }
 
     // F5 presents, as it does in every slide program; Shift+F5 too.
     if (e.key === 'F5') { e.preventDefault(); if (!this.presenting) this.command('view.present'); return; }

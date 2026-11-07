@@ -43,8 +43,8 @@ test('Several chosen boards become a ZIP with distinct names and current unsaved
   const { app, current, writes, exportBoards } = await setup();
   await exportBoards(app, ['saved', 'current', 'saved']);
   const zip = await JSZip.loadAsync(writes[0].bytes);
-  assert.deepEqual(Object.keys(zip.files), ['Lesson.gazboard', 'Lesson (2).gazboard']);
-  assert.equal(JSON.parse(await zip.file('Lesson (2).gazboard').async('string')).objects[0].text, 'Latest unsaved edit বাংলা');
+  assert.deepEqual(Object.keys(zip.files), ['Lesson.gaussboard', 'Lesson (2).gaussboard']);
+  assert.equal(JSON.parse(await zip.file('Lesson (2).gaussboard').async('string')).objects[0].text, 'Latest unsaved edit বাংলা');
   assert.equal(app.store.doc, current);
 });
 

@@ -30,7 +30,7 @@ class BridgeFiles(private val context: Context) {
      * it back in front of the extension.
      */
     fun normalizeBoardDuplicateName(name: String): String {
-      val m = Regex("""^(.+)\.(gazboard|openboard)\s*\((\d+)\)$""", RegexOption.IGNORE_CASE)
+      val m = Regex("""^(.+)\.(gaussboard|gazboard|openboard)\s*\((\d+)\)$""", RegexOption.IGNORE_CASE)
         .matchEntire(name) ?: return name
       return "${m.groupValues[1].trimEnd()} (${m.groupValues[3]}).${m.groupValues[2]}"
     }

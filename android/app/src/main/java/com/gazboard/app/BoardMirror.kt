@@ -264,7 +264,9 @@ class BoardMirror(
   private fun gazFolder(root: Folder, create: Boolean): Folder? =
     if (root.name.equals("GazBoard", ignoreCase = true)) root else root.sub("GazBoard", create)
 
-  private fun label(root: Folder) = if (root.name.equals("GazBoard", ignoreCase = true)) root.name else "${root.name}/GazBoard"
+  private fun label(root: Folder) =
+    if (root.name.equals("GaussBoard", ignoreCase = true) || root.name.equals("GazBoard", ignoreCase = true)) root.name
+    else "${root.name}/GaussBoard"
 
   private fun release(t: Uri) {
     if (t.scheme != "content") return

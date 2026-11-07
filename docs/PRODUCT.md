@@ -149,6 +149,17 @@
 * **User Intention:** Larger board organization beyond current infinite canvas, without destabilizing shipped behavior.
 * **Target Integration Point:** `src/js/core/store.js` -> `doc.layers`, `src/js/core/render.js` -> `renderLayer`
 
+### [FEATURE: Presentation-View-Mode-And-Page-Strip] | Aliases: view mode, page strip, music staff, guitar tab, table repair
+> **1-Line Summary:** Read-only presentation view mode with fading ghost highlighters, thumbnail page strip, manuscript score templates, and automatic table corruption healing.
+* **User Intention (Non-Negotiable):** Teachers and students need to walk through boards without accidental edits (`Ctrl+Alt+V`), browse pages via quick sidebar thumbnails, write music notes on standard 5-line staff / 6-line guitar tab, and open legacy or damaged tables without UI lockup.
+* **Visual / UI Behavior:** View mode displays persistent top `#viewPill` with `Done` button; inking becomes temporary fading overlay; `#pagestrip` sidebar opens from left margin tab; background palette offers music staff and guitar tab; table loader auto-mends out-of-bounds tables up to 40x40.
+* **Code Anchors (Grep Targets):**
+  * `src/js/ui/pagestrip.js` -> `PageStrip`
+  * `src/js/core/render.js` -> `drawStaves`, `staffLayout`
+  * `src/js/core/surface.js` -> `ghosts`, `_drawGhosts`
+  * `src/js/core/store.js` -> `repairTable`, `frozen`
+  * `src/js/app.js` -> `toggleViewMode`, `hintViewMode`
+
 ## 3. Planned Features & App-Merge Wishlist
 
 ### [WISHLIST: Pane-Aware-Command-Dispatcher] | Aliases: pane commands, Delete routing, Copy routing
@@ -162,8 +173,9 @@
 * **Target Integration Point:** `src/js/core/store.js` -> `checkpoint`, `applyRemote`, `onOp`
 
 ## 4. Canonical References & Live Verification
-* **Core Documentation Suite:** `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS_AND_TRAPS.md`
+* **Core Documentation Suite:** `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS_AND_TRAPS.md`, `docs/releases/ANDROID_READINESS.md`
 * **Active Verification Suite:** `node scripts/smoke.js --new-features` (24/24 passing)
-* **Internationalization Suite:** `node scripts/i18n-check.js` (2,356/2,356 across 7 locales)
+* **Internationalization Suite:** `node scripts/i18n-check.js` (2,367/2,367 across 7 locales)
+* **Android Platform Suite:** `node --test test/android-*.test.js` (82/82 passing)
 * **Core Data Schemas & State:** `src/js/core/store.js` (`Store`, `doc.objects`, `doc.pages`, `doc.audioTracks`)
 * **Platform & Packaging:** `main.js`, `preload.js`, `package.json`

@@ -285,6 +285,72 @@ export function formatPageDate(iso, lang = currentLanguage()) {
   return f.format(new Date(+m[1], +m[2] - 1, +m[3], 12));
 }
 
+
+export const STAFF = {
+  staff: { lines: 5, gap: 0.35, period: 2.75 },   // gap = line gap / spacing; period = system height / staff height
+  tab: { lines: 6, gap: 0.42, period: 2.5 }
+};
+export function staffLayout(kind, base) {
+  const k = STAFF[kind];
+  const gap = base * k.gap;                      // world units between two lines of one staff
+  const height = gap * (k.lines - 1);
+  return { lines: k.lines, gap, height, period: height * k.period, top: 18 * MM, side: 12 * MM };
+}
+
+function drawStaves(ctx, bg, cam, base, kind, anchor, bounds, x0, y0, x1, y1, exact) {
+  const L = staffLayout(kind, base);
+  let z = cam.z;
+  let scale = 1;
+  if (!anchor && !exact) {
+    while (L.gap * z * scale < 4) scale *= 2;
+    while (L.gap * z * scale > 40) scale /= 2;
+  }
+  const gap = L.gap * z * scale, period = L.period * z * scale, height = L.height * z * scale;
+  if (gap < 1.5) return;
+  let left = x0, right = x1, first;
+  if (anchor && bounds) {
+    left = Math.max(x0, bounds.x + L.side * z);
+    right = Math.min(x1, bounds.x + bounds.w - L.side * z);
+    first = bounds.y + L.top * z;
+  } else {
+    first = (((anchor ? anchor.y : cam.y) % period) + period) % period;
+  }
+  if (right <= left) return;
+  ctx.globalAlpha = 0.85;
+  ctx.lineWidth = clamp(0.12 * MM * z, 1, 1.6);
+  const bottom = anchor && bounds ? bounds.y + bounds.h - L.top * z * 0.6 : Infinity;
+  let sy = first + Math.max(0, Math.floor((y0 - height - first) / period)) * period;
+  ctx.beginPath();
+  for (; sy < y1 && sy + height <= bottom; sy += period) {
+    if (sy + height < y0) continue;
+    for (let i = 0; i < L.lines; i++) {
+      const y = Math.round(sy + i * gap) + 0.5;
+      ctx.moveTo(left, y); ctx.lineTo(right, y);
+    }
+    if (anchor && bounds) {
+      const xl = Math.round(bounds.x + L.side * z) + 0.5, xr = Math.round(bounds.x + bounds.w - L.side * z) - 0.5;
+      ctx.moveTo(xl, Math.round(sy) + 0.5); ctx.lineTo(xl, Math.round(sy + height) + 0.5);
+      ctx.moveTo(xr, Math.round(sy) + 0.5); ctx.lineTo(xr, Math.round(sy + height) + 0.5);
+    }
+  }
+  ctx.stroke();
+  if (kind !== 'tab' || !anchor || !bounds || gap < 5) return;
+  ctx.font = `700 ${(gap * 1.3).toFixed(2)}px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const tx = bounds.x + L.side * z + gap * 1.3;
+  const paper = boardPaint(bg.color);
+  sy = first + Math.max(0, Math.floor((y0 - height - first) / period)) * period;
+  for (; sy < y1 && sy + height <= bottom; sy += period) {
+    if (sy + height < y0) continue;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = paper;
+    ctx.fillRect(tx - gap * 0.6, sy + 1.5, gap * 1.2, height - 3);
+    ctx.fillStyle = NOTEBOOK.date;
+    ['T', 'A', 'B'].forEach((ch, i) => ctx.fillText(ch, tx, sy + gap * (1 + i * 1.5)));
+  }
+}
+
 function drawNotebook(ctx, bg, cam, base, step, anchor, bounds, page, x0, y0, x1, y1) {
   const z = cam.z;
   ctx.strokeStyle = NOTEBOOK.line;
@@ -351,6 +417,8 @@ function drawPattern(ctx, bg, cam, w, h, anchor, bounds, page, exact = false) {
 
   if (pattern === 'notebook') {
     drawNotebook(ctx, bg, cam, base, step, anchor, bounds, page, x0, y0, x1, y1);
+  } else if (pattern === 'staff' || pattern === 'tab') {
+    drawStaves(ctx, bg, cam, base, pattern, anchor, bounds, x0, y0, x1, y1, exact);
   } else if (pattern === 'grid' || pattern === 'lines' || pattern === 'columns') {
     ctx.globalAlpha = 0.55;
     ctx.beginPath();
@@ -1235,7 +1303,7 @@ export function drawImage(ctx, o, onload) {
 }
 
 export function drawTable(ctx, o, hideCell = null) {
-  const cols = o.cols || 3, rows = o.rows || 3;
+  const cols = tableDim(o.cols), rows = tableDim(o.rows);
   const cw = o.w / cols, ch = o.h / rows;
   ctx.save();
   ctx.fillStyle = o.fill || '#ffffff';

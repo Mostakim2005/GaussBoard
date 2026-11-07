@@ -47,8 +47,8 @@ class MainActivity : ComponentActivity() {
      * here, and nothing else does.
      */
     val FONT_SOURCES = listOf(
-      "https://cdn.jsdelivr.net/gh/Mostakim2005/GazBoard@main/fonts/",
-      "https://raw.githubusercontent.com/Mostakim2005/GazBoard/main/fonts/")
+      "https://cdn.jsdelivr.net/gh/Mostakim2005/GaussBoard@main/fonts/",
+      "https://raw.githubusercontent.com/Mostakim2005/GaussBoard/main/fonts/")
     val FONT_FILE = Regex("gazboard-noto-sans-(sc|tc)-[0-9]{3}-v[0-9]{1,3}\\.woff2")
     const val FONT_CAP = 8 * 1024 * 1024
   }
@@ -312,7 +312,7 @@ class MainActivity : ComponentActivity() {
       val mappedTypes = extensionNames.map { MimeTypeMap.getSingleton().getMimeTypeFromExtension(it) }
       val types = mappedTypes.filterNotNull().distinct()
       val allExtensionsHaveMime = extensionNames.isNotEmpty() && mappedTypes.all { it != null }
-      val boardExport = save && options.str("defaultPath").substringAfterLast('.').lowercase() in listOf("gazboard", "openboard")
+      val boardExport = save && options.str("defaultPath").substringAfterLast('.').lowercase() in listOf("gaussboard", "gazboard", "openboard")
       // Android has no registered MIME for .gazboard/.openboard. If even one
       // requested extension is unknown, use */* so the document provider does
       // not hide boards that it labels as generic binary data. The importer
@@ -322,7 +322,7 @@ class MainActivity : ComponentActivity() {
       val intent = Intent(if (save) Intent.ACTION_CREATE_DOCUMENT else Intent.ACTION_OPEN_DOCUMENT).apply {
         addCategory(Intent.CATEGORY_OPENABLE)
         type = mime
-        if (save) putExtra(Intent.EXTRA_TITLE, options.str("defaultPath", "Board.gazboard").substringAfterLast('/').substringAfterLast('\\'))
+        if (save) putExtra(Intent.EXTRA_TITLE, options.str("defaultPath", "Board.gaussboard").substringAfterLast('/').substringAfterLast('\\'))
         else {
           putExtra(Intent.EXTRA_ALLOW_MULTIPLE, (options["properties"] as? JsonArray)?.any { it.jsonPrimitive.content == "multiSelections" } == true)
           if (allExtensionsHaveMime && types.isNotEmpty()) putExtra(Intent.EXTRA_MIME_TYPES, types.toTypedArray())
@@ -568,12 +568,12 @@ class MainActivity : ComponentActivity() {
   fun checkForUpdate(): JsonObject {
     // a store copy is the store's to update: report it as current, whatever GitHub has
     if (installStore() != "github") return json("ok" to true, "version" to BuildConfig.VERSION_NAME, "name" to BuildConfig.VERSION_NAME,
-      "url" to "https://github.com/Mostakim2005/GazBoard/releases", "prerelease" to false)
-    val connection = URL("https://api.github.com/repos/Mostakim2005/GazBoard/releases?per_page=30").openConnection() as HttpURLConnection
+      "url" to "https://github.com/Mostakim2005/GaussBoard/releases", "prerelease" to false)
+    val connection = URL("https://api.github.com/repos/Mostakim2005/GaussBoard/releases?per_page=30").openConnection() as HttpURLConnection
     try {
       connection.connectTimeout = 8000; connection.readTimeout = 8000
       connection.setRequestProperty("Accept", "application/vnd.github+json")
-      connection.setRequestProperty("User-Agent", "GazBoard-Android/${BuildConfig.VERSION_NAME}")
+      connection.setRequestProperty("User-Agent", "GaussBoard-Android/${BuildConfig.VERSION_NAME}")
       require(connection.responseCode == 200) { "GitHub replied ${connection.responseCode}" }
       val text = connection.inputStream.bufferedReader().use { it.readText() }
       require(text.length < 1024 * 1024)
@@ -598,14 +598,14 @@ class MainActivity : ComponentActivity() {
       val build = bestBuild
       if (found == null || build == null) {
         return json("ok" to true, "version" to BuildConfig.VERSION_NAME,
-          "name" to BuildConfig.VERSION_NAME, "url" to "https://github.com/Mostakim2005/GazBoard/releases",
+          "name" to BuildConfig.VERSION_NAME, "url" to "https://github.com/Mostakim2005/GaussBoard/releases",
           "prerelease" to false)
       }
       val version = "${build[0]}.${build[1]}.${build[2]}-android.${build[3]}"
       val name = (found["name"] as? JsonPrimitive)?.contentOrNull ?: bestTag
       // The tag page is where the APK actually is, so that is where to land.
       return json("ok" to true, "version" to version, "name" to name,
-        "url" to "https://github.com/Mostakim2005/GazBoard/releases/tag/" + bestTag,
+        "url" to "https://github.com/Mostakim2005/GaussBoard/releases/tag/" + bestTag,
         "prerelease" to false)
     } finally { connection.disconnect() }
   }

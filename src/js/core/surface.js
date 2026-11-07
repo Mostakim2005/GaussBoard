@@ -34,6 +34,7 @@ export class Surface {
     this.overlays = [];        // fn(ctx, surface) drawn in screen space
     this.wet = null;           // in-progress stroke object
     this.laser = [];           // pointer trail: {x,y,t} world points, never saved
+    this.ghosts = [];          // View mode highlighter marks: {obj,t}, fade by themselves, never saved
     /*
      * What an empty board says before anything is on it. Drawn over the board
      * rather than placed on it, the way the laser is: it is not an object, so
@@ -327,6 +328,22 @@ export class Surface {
     return { x: p.x - pad, y: p.y - pad, w: b.w * this.cam.z + pad * 2, h: b.h * this.cam.z + pad * 2 };
   }
 
+  
+  static GHOST_HOLD = 2600;      // ms a View mode highlight stays at full strength
+  static GHOST_FADE = 900;       // ms it then takes to fade away
+
+  /** A highlighter mark made in View mode: shown, then faded, never put on the board. */
+  addGhost(obj) {
+    this.ghosts.push({ obj, t: performance.now() });
+    this.dirty = true;
+  }
+
+  pruneGhosts() {
+    if (!this.ghosts.length) return;
+    const cut = performance.now() - Surface.GHOST_HOLD - Surface.GHOST_FADE;
+    this.ghosts = this.ghosts.filter((g) => g.t > cut);
+  }
+
   static LASER_LIFE = 520;       // ms a point stays visible
   static FADE_MS = 260;          // ms a lifted answer cover takes to melt away
 
@@ -346,6 +363,7 @@ export class Surface {
     this.resize();                 // cheap no-op unless the box or DPR moved
     // a fading trail has to keep repainting even when nothing else changed
     if (this.laser.length) { this.pruneLaser(); this.dirty = true; }
+    if (this.ghosts.length) { this.pruneGhosts(); this.dirty = true; }
     if (this._fades.size) this.dirty = true;
     if (!this.dirty) return;
     this.dirty = false;
@@ -618,7 +636,7 @@ export class Surface {
       if (this._slideSettle != null) clearTimeout(this._slideSettle);
       this._slideSettle = setTimeout(() => {
         this._slideSettle = null;
-        if (this.wet || this.laser.length) return;
+        if (this.wet || this.laser.length || this.ghosts.length) return;
         this._ink = null;
         this.invalidate();
       }, 140);
@@ -668,8 +686,50 @@ export class Surface {
       : setTimeout(run, 120);
   }
 
+  
+  /**
+   * View mode highlights. Each is painted onto a layer of its own and laid
+   * over the board at its own strength, because a highlighter already sets
+   * its own see-through-ness when it draws - fading it has to happen on top.
+   */
+  _drawGhosts(ctx) {
+    const now = performance.now();
+    const W = ctx.canvas.width, H = ctx.canvas.height;
+    let layer = this._ghostLayer;
+    if (!layer || layer.width !== W || layer.height !== H) {
+      layer = this._ghostLayer = document.createElement('canvas');
+      layer.width = W; layer.height = H;
+    }
+    const g = layer.getContext('2d');
+    const groups = [];
+    for (const ghost of this.ghosts) {
+      const age = now - ghost.t;
+      const strength = age < Surface.GHOST_HOLD ? 1 : 1 - (age - Surface.GHOST_HOLD) / Surface.GHOST_FADE;
+      if (strength <= 0) continue;
+      if (strength === 1 && groups.length && groups[0].strength === 1) groups[0].objs.push(ghost.obj);
+      else if (strength === 1) groups.unshift({ strength, objs: [ghost.obj] });
+      else groups.push({ strength, objs: [ghost.obj] });
+    }
+    for (const { strength, objs } of groups) {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, W, H);
+      for (const obj of objs) this._drawWet(g, obj);
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = strength;
+      ctx.drawImage(layer, 0, 0);
+      ctx.restore();
+    }
+  }
+
   /** The stroke under the pen, clipped to its own sheet. */
-  _drawWet(ctx) {
+  _drawWet(ctx, only = undefined) {
+    if (only !== undefined) {
+      const cam = this.cam, pages = this.store.doc.pages;
+      ctx.setTransform(this.dpr * cam.z, 0, 0, this.dpr * cam.z, this.dpr * cam.x, this.dpr * cam.y);
+      drawObject(ctx, only, () => this.invalidate(), this.editing);
+      return;
+    }
     const cam = this.cam, pages = this.store.doc.pages;
     setPageColor(this.store.doc.background?.color);
     ctx.setTransform(this.dpr * cam.z, 0, 0, this.dpr * cam.z, this.dpr * cam.x, this.dpr * cam.y);
@@ -729,11 +789,20 @@ export class Surface {
       // explicitly switched back to Writing mode during playback.
       if (this.wet) this._drawWet(ctx);
       this._painted = true;
-    } else if (this.wet || this.laser.length) {
+    } else if (this.wet || this.laser.length || this.ghosts.length) {
       const key = this.freezeKey();
-      if (!this._ink || this._ink.key !== key) this._ink = this._freezeScene(key);
+      const sliding = this.ghosts.length && !this.wet && !this.laser.length && this._ink && this._ink.key !== key && this._slideFrozen();
+      if (!sliding && (!this._ink || this._ink.key !== key)) this._ink = this._freezeScene(key);
+      if (sliding) {
+        clearTimeout(this._slideSettle);
+        this._slideSettle = setTimeout(() => {
+          this.slideSettles = (this.slideSettles || 0) + 1;
+          if (this._ink && this._ink.slid && this._ink.key === this.freezeKey()) { this._ink = null; this.invalidate(); }
+        }, 300);
+      }
       this.screenTransform();
       ctx.drawImage(this._ink.canvas, 0, 0, w, h);
+      if (this.ghosts.length) this._drawGhosts(ctx);
       if (this.wet) this._drawWet(ctx);
     } else if (this._bandOnly && this._band && this._painted && !this.showsGreeting() && !this._fades.size) {
       /*

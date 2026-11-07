@@ -9,6 +9,22 @@ export const CLIENT_ID = uid('c');
 
 export const CARD_STYLES = ['canvas', 'window', 'minimal', 'transparent'];
 
+export const TABLE_MAX = 40;
+export function tableDim(v) {
+  const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
+  if (typeof n !== 'number' || !Number.isFinite(n)) return 3;
+  return Math.min(TABLE_MAX, Math.max(1, Math.round(n)));
+}
+/** Mend a table's size in place. True when it needed mending. */
+export function repairTable(o) {
+  if (!o || o.type !== 'table') return false;
+  const rows = tableDim(o.rows), cols = tableDim(o.cols);
+  if (rows === o.rows && cols === o.cols) return false;
+  o.rows = rows; o.cols = cols;
+  return true;
+}
+
+
 let _defaultCardStyle = 'canvas';
 
 export function setDefaultCardStyle(s) {
@@ -58,6 +74,8 @@ export class Store {
     this.rev = 0;
     this.maxUndo = 200;
     this.maxLog = 5000;
+    this.frozen = false;
+    this.onFrozen = null;
   }
 
   /* ---------------- subscriptions ---------------- */
@@ -130,6 +148,7 @@ export class Store {
     switch (op.t) {
       case 'add': {
         normalizeTextObject(op.obj);
+        repairTable(op.obj);
         d.objects[op.obj.id] = op.obj;
         if (!d.order.includes(op.obj.id)) {
           if (op.index == null || op.index >= d.order.length) d.order.push(op.obj.id);
@@ -145,7 +164,7 @@ export class Store {
       }
       case 'set': {
         const o = d.objects[op.id];
-        if (o) Object.assign(o, op.after);
+        if (o) { Object.assign(o, op.after); repairTable(o); }
         break;
       }
       case 'order': d.order = op.after.slice(); break;
@@ -169,6 +188,7 @@ export class Store {
   commit(label, ops) {
     ops = (Array.isArray(ops) ? ops : []).filter((op) => op && typeof op === 'object' && typeof op.t === 'string');
     if (!ops.length) return;
+    if (this.frozen) { this.onFrozen?.(label); return; }
     const inverse = [];
     for (const op of ops) { inverse.unshift(this._invert(op)); this._apply(op); }
     this.undoStack.push({ label, ops, inverse });
@@ -210,6 +230,7 @@ export class Store {
   applyRemote(ops) { for (const op of ops) this._apply(op); this.syncDocumentTags(); this.emit('remote'); }
 
   undo() {
+    if (this.frozen) { this.onFrozen?.('undo'); return false; }
     const tx = this.undoStack.pop();
     if (!tx) return false;
     for (const op of tx.inverse) this._apply(op);
@@ -220,6 +241,7 @@ export class Store {
   }
 
   redo() {
+    if (this.frozen) { this.onFrozen?.('redo'); return false; }
     const tx = this.redoStack.pop();
     if (!tx) return false;
     for (const op of tx.ops) this._apply(op);
@@ -342,6 +364,7 @@ export class Store {
   }
 
   commitSnapshot(label, snap) {
+    if (this.frozen) { if (this.restoreSnapshot(snap)) this.emit('restore'); this.onFrozen?.(label); return; }
     const ops = [];
     for (const [id, before] of snap) {
       const now = this.get(id);
@@ -401,11 +424,14 @@ export class Store {
       : Array.isArray(data.objectList) ? data.objectList
         : Array.isArray(data.elements) ? data.elements
           : data.objects ? Object.values(data.objects) : [];
+    let repaired = 0;
     for (const o of list) {
       normalizeTextObject(o);
+      if (repairTable(o)) repaired++;
       d.objects[o.id] = o;
       d.order.push(o.id);
     }
+    this.repaired = repaired;
     this.doc = d;
     this.syncDocumentTags();
     this.rev++;

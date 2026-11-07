@@ -10,7 +10,7 @@ import { exportBoards } from '../board-export.js';
 import { BOARD_COLORS, PATTERNS } from './palettes.js';
 import { inkTrailSupported } from '../core/inktrail.js';
 import { setInkEngine } from '../core/ink.js';
-import { PATTERN_SPACINGS } from '../core/render.js';
+import { PATTERN_SPACINGS, staffLayout } from '../core/render.js';
 import { todayStamp } from '../core/pages.js';
 import * as F from '../core/folders.js';
 import * as Recent from '../core/recent.js';
@@ -210,6 +210,7 @@ export function createPanels(app) {
   const thumbCache = new Map();
   const activeTemplateTagFilters = new Set();
   function templates() {
+    if (app.viewMode) { app.hintViewMode(); return; }
     open('templates', t('Templates'), () => {
       const customList = loadCustomTemplates();
       const allTemplates = [...customList, ...TEMPLATES];
@@ -287,6 +288,7 @@ export function createPanels(app) {
 
   /* ---------------- background ---------------- */
   function background() {
+    if (app.viewMode) { app.hintViewMode(); return; }
     open('background', t('Canvas'), () => {
       const bg = app.store.doc.background;
       const colors = h('div', { class: 'bg-grid' });
@@ -342,8 +344,10 @@ export function createPanels(app) {
         spacingRow.appendChild(b);
       }
       const mm = (v) => (Math.round(v / (96 / 25.4) * 2) / 2).toLocaleString();
+      const staves = bg.pattern === 'staff' || bg.pattern === 'tab';
       const spacingNote = h('p', { style: 'margin:6px 0 0;font-size:12px;color:var(--text-2);line-height:1.6' },
-        t('About {mm} mm apart when printed. New boards use this spacing too.', { mm: mm(spacingNow) }));
+        staves ? t('Each staff is about {mm} mm tall when printed. New boards use this size too.', { mm: mm(staffLayout(bg.pattern, spacingNow).height) })
+          : t('About {mm} mm apart when printed. New boards use this spacing too.', { mm: mm(spacingNow) }));
       // notebook paper on a pad carries the date each sheet was started; this hides or shows it
       let dateRow = null;
       if (bg.pattern === 'notebook' && app.store.pageCount) {
@@ -498,7 +502,7 @@ export function createPanels(app) {
   }
 
   // the little tiles show a few repeats of the pattern rather than one line across the top
-  const PREVIEW_SIZE = { grid: '11px 11px', lines: '100% 11px', columns: '11px 100%', graph: '11px 11px', dots: '10px 10px', notebook: '100% 100%, 100% 9px' };
+  const PREVIEW_SIZE = { grid: '11px 11px', lines: '100% 11px', columns: '11px 100%', graph: '11px 11px', dots: '10px 10px', notebook: '100% 100%, 100% 9px', staff: '100% 26px', tab: '100% 30px' };
 
   function patternPreview(id, color = '#c8c6c4') {
     const c = encodeURIComponent(color);
@@ -509,6 +513,11 @@ export function createPanels(app) {
       case 'graph': return `linear-gradient(${color} 1px, transparent 1px), linear-gradient(90deg, ${color} 1px, transparent 1px)`;
       case 'dots': return `radial-gradient(${color} 1.2px, transparent 1.2px)`;
       case 'notebook': return 'linear-gradient(90deg, transparent 13px, #e0707f 13px, #e0707f 14px, transparent 14px), linear-gradient(#8db6e2 1px, transparent 1px)';
+      case 'staff': case 'tab': {
+        const n = id === 'tab' ? 6 : 5, stops = [];
+        for (let i = 0; i < n; i++) { const y = 4 + i * 3; stops.push(`transparent ${y}px`, `${color} ${y}px`, `${color} ${y + 1}px`, `transparent ${y + 1}px`); }
+        return `linear-gradient(${stops.join(', ')})`;
+      }
       default: return 'none';
     }
   }
@@ -1627,6 +1636,8 @@ export function createPanels(app) {
             t('Allow drawing translucent pen strokes for layering effects.')),
           row(t('Laser trail duration'), createLaserDurationSlider(app, Number(s.laserTrailDuration ?? 500)),
             t('How long the laser pointer trail lingers on screen before melting away.')),
+          row(t('Hold the pen still for menus'), mkToggle(() => s.penHold !== false, (v) => { s.penHold = v; app.interaction.cancelHold(); }),
+            t("On (default): holding the pen still on the board opens the menu, and on an object picks it up. Off: the pen only ever writes, so filling in small shapes never opens a menu. Use the pen's side button or the selection bar for menus instead. A finger keeps press-and-hold either way.")),
           row(t('Ruler snapping'), mkToggle(() => app.ruler.snap, (v) => (app.ruler.snap = v)))
         ),
         storage ? h('div', { class: 'section' }, h('h5', {}, t('Storage')), storage) : null,

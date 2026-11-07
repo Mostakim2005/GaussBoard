@@ -52,10 +52,15 @@ const HOLD_MS = 450;
  */
 const PEN_HOLD_MS = 700;
 const HOLD_SLOP = 11;
+const PINCH_WINDOW = 300;
+const PINCH_TRAVEL = 40;
+const PALM_SIZE = 80;
+const HOLD_JITTER = 1.5;
+const HOLD_TRAVEL = 18;
 const HANDLE_GRAB = 12;   // forgiving grab radius around a handle's 9px dot
 
 /** Gestures that should keep going while the canvas scrolls beneath them. */
-const EDGE_PANNABLE = new Set(['draw', 'erase', 'lasso', 'marquee', 'move', 'resize', 'rotate', 'shapeDraw', 'textDraw']);
+const EDGE_PANNABLE = new Set(['lasso', 'marquee', 'move', 'resize', 'rotate', 'shapeDraw', 'textDraw']);
 // 'laser' is deliberately absent: pointing near the edge of the window should
 // not drag the board out from under what you are pointing at.
 
@@ -210,6 +215,12 @@ export class Interaction {
 
   /* ------------------------------------------------------------ */
   effectiveTool(e) {
+    const tool = this.toolFor(e);
+    if (!this.app.viewMode) return tool;
+    return tool === 'laser' || tool === 'highlighter' || tool === 'pan' ? tool : 'pan';
+  }
+
+  toolFor(e) {
     if (this.spaceDown || e.button === 1) return 'pan';
     if (e.pointerType === 'pen' && (e.buttons & 32 || e.button === 5)) return 'eraser';  // pen tail
     /*
@@ -348,7 +359,13 @@ export class Interaction {
     const sp = this.surface.screenPoint(e);
     const wp = this.surface.cam.toWorld(sp.x, sp.y);
     if (e.pointerType === 'pen') this.app.notePenSeen();
+    if (this.isPalm(e)) {
+      try { this.canvas.releasePointerCapture?.(e.pointerId); } catch { /* never captured */ }
+      this.palmsIgnored = (this.palmsIgnored || 0) + 1;
+      return;
+    }
     this.pointers.set(e.pointerId, { sp, wp, type: e.pointerType });
+    if (this.pointers.size === 1) { this._firstId = e.pointerId; this._firstAt = performance.now(); this._firstLast = sp; this._firstTravel = 0; }
     // Where the board was last touched, for anything later that needs a place
     // and was not given one - Ctrl+V, most of all.
     this.app.boardPoint = { x: wp.x, y: wp.y, at: performance.now() };
@@ -366,6 +383,12 @@ export class Interaction {
       if (this.action && e.pointerType === 'touch' && types.includes('pen')) {
         this.pointers.delete(e.pointerId);
         try { this.canvas.releasePointerCapture?.(e.pointerId); } catch { /* never captured */ }
+        return;
+      }
+      if (this.lateTouch(e)) {
+        this.pointers.delete(e.pointerId);
+        try { this.canvas.releasePointerCapture?.(e.pointerId); } catch { /* never captured */ }
+        this.lateTouchesIgnored = (this.lateTouchesIgnored || 0) + 1;
         return;
       }
       if (this.action && !types.every((t) => t === 'touch')) this.startSecondaryPan(e, sp);
@@ -441,6 +464,17 @@ export class Interaction {
     // ruler interaction takes priority when it is showing
     if (this.ruler.visible) {
       const zone = this.rulerZone(sp);
+      if (zone === 'menu') {
+        this.action = null; this.actionId = null; this.cancelHold?.();
+        this.app.openRulerMenu({ x: e.clientX, y: e.clientY });
+        return;
+      }
+      if (zone === 'close') {
+        this.action = null; this.actionId = null; this.cancelHold?.();
+        this.pointers.delete(e.pointerId);
+        this.app.hideRuler();
+        return;
+      }
       // Whichever pointer grabbed the ruler owns it until it lifts, exactly as
       // for every other gesture. Without that, a palm settling on the glass
       // dragged the ruler, and a palm lifting ended the drag.
@@ -734,11 +768,16 @@ export class Interaction {
     // A palm sliding on the screen therefore dragged the pen's stroke over to
     // the palm - the ink jumped, or looked like it had simply gone missing.
     if (this.actionId != null && e.pointerId !== this.actionId) return;
+    if (e.pointerId === this._firstId && this._firstLast) {
+      this._firstTravel = (this._firstTravel || 0) + Math.hypot(sp.x - this._firstLast.x, sp.y - this._firstLast.y);
+      this._firstLast = sp;
+    }
 
     // Travelled too far to still be a press-and-hold: this is a stroke.
-    if (this._hold && e.pointerId === this._holdId && this._holdFrom
-        && Math.hypot(sp.x - this._holdFrom.x, sp.y - this._holdFrom.y) > HOLD_SLOP) {
-      this.cancelHold();
+    if (this._hold && e.pointerId === this._holdId && this._holdFrom) {
+      const last = this._holdLast || this._holdFrom, step = Math.hypot(sp.x - last.x, sp.y - last.y);
+      if (step >= HOLD_JITTER) { this._holdPath = (this._holdPath || 0) + step; this._holdLast = sp; }
+      if (Math.hypot(sp.x - this._holdFrom.x, sp.y - this._holdFrom.y) > HOLD_SLOP || this._holdPath > HOLD_TRAVEL) this.cancelHold();
     }
 
     // The drawn nib has to keep up with an ink stroke in flight. This is the
@@ -817,6 +856,7 @@ export class Interaction {
            * edge by definition.
            */
           if (!a.ruled && this.underThePlastic(raw)) { a.blocked = true; return; }
+          if (a.view && !this.onScreen(a.view, raw)) { a.blocked = true; return; }
           const cand = this.snapToRuler(raw, a);
           const prev = a.obj.points[a.obj.points.length - 1];
           // Replay slicing binary-searches these timestamps, so they may never
@@ -1464,8 +1504,9 @@ export class Interaction {
    */
   armHoldToMove(e, sp, wp) {
     this.cancelHold();
-    // A finger or a stylus. A mouse has a right button and does not need this.
+    if (this.app.viewMode) return;
     if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+    if (!this.holdAllowed(e)) return;
     // Bare board first, and before the test below. That test asks whether this
     // could become "pick the object up", which is a question about drawing and
     // panning - so with Select in hand it said no, and the board menu was
@@ -1481,6 +1522,8 @@ export class Interaction {
     // work from a pan too, not just from a stroke.
     if (!eligible()) return;
     this._holdFrom = sp;
+    this._holdLast = sp;
+    this._holdPath = 0;
     this._holdId = e.pointerId;
     this._hold = setTimeout(() => {
       this._hold = null;
@@ -1535,6 +1578,11 @@ export class Interaction {
     }
     this.surface.wet = null;
     this.surface.wetPieces = null;
+    if (this.app.viewMode) {
+      for (const piece of [...(a.pieces || []), obj]) if (piece.points.length) this.surface.addGhost(piece);
+      this.surface.invalidate();
+      return;
+    }
     this.action = null;
     this.actionId = null;
     this.cancelHold();
@@ -1568,7 +1616,9 @@ export class Interaction {
    * hold-to-select gesture on an object already makes.
    */
   armHoldOnBoard(e, sp, wp) {
+    if (this.app.viewMode) return;
     if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+    if (!this.holdAllowed(e)) return;
     if (this.pointers.size !== 1) return;
     /*
      * No test of what the press started, deliberately. Select begins a
@@ -1595,7 +1645,55 @@ export class Interaction {
   }
 
   /** Whatever this was, it is not a press-and-hold. */
+  
+  static MENU_AT = 28;
+  static closeGap(coarse) { return coarse ? 32 : 22; }
+  menuOrClose(dMenu, dClose, reach) {
+    if (dMenu >= reach && dClose >= reach) return null;
+    return dClose < dMenu ? 'close' : 'menu';
+  }
+
+  isPalm(e) {
+    return e.pointerType === 'touch' && Math.max(e.width || 0, e.height || 0) >= PALM_SIZE;
+  }
+
+  lateTouch(e) {
+    if (e.pointerType !== 'touch' || this.pointers.size !== 2) return false;
+    const dt = performance.now() - (this._firstAt || 0);
+    const d = this._firstTravel || 0;
+    return dt > PINCH_WINDOW || d > PINCH_TRAVEL;
+  }
+
+  holdAllowed(e) {
+    if (e.pointerType === 'pen' && this.app.settings && this.app.settings.penHold === false) return false;
+    return true;
+  }
+
+  visibleArea() {
+    const sf = this.surface;
+    if (typeof document === 'undefined' || !sf.canvas || !sf.canvas.getBoundingClientRect) return null;
+    const c = sf.canvas.getBoundingClientRect();
+    const holes = [];
+    for (const id of ['toolbar', 'zoombar', 'pagebar', 'ctxbar', 'pagestrip', 'pagetab']) {
+      const el = document.getElementById(id);
+      if (!el || !el.getBoundingClientRect) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1 || getComputedStyle(el).visibility === 'hidden' || getComputedStyle(el).display === 'none') continue;
+      holes.push({ x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height });
+    }
+    return { w: sf.width, h: sf.height, holes };
+  }
+
+  onScreen(view, wp) {
+    const p = this.surface.cam.toScreen(wp.x, wp.y);
+    if (p.x < 0 || p.y < 0 || p.x > view.w || p.y > view.h) return false;
+    for (const r of view.holes) if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) return false;
+    return true;
+  }
+
   cancelHold() {
+    this._holdLast = null;
+    this._holdPath = 0;
     if (this._hold) { clearTimeout(this._hold); this._hold = null; }
     this._holdFrom = null;
   }
@@ -3271,6 +3369,9 @@ export class Interaction {
       const kx = end * (len / 2 - kb.inset);
       if (Math.hypot(along - kx, perp - thick / 2) < reach) return 'rotate';
     }
+    const mx = -len / 2 + Interaction.MENU_AT, cx = mx + Interaction.closeGap(this.coarsePointer);
+    const btn = this.menuOrClose(Math.hypot(along - mx, perp - thick / 2), Math.hypot(along - cx, perp - thick / 2), reach);
+    if (btn) return btn;
     /*
      * A grip in the middle that moves the ruler whatever is being held.
      *
