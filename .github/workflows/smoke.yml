@@ -21,10 +21,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run smoke:builtin
+      - run: npm run smoke:new
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: GazBoard-editor-smoke
+          name: GaussBoard-editor-smoke
           path: test/out/
           retention-days: 7

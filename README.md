@@ -1,6 +1,6 @@
 <div align="center">
   
-# GazBoard
+# GaussBoard
 
 **A free-form whiteboard that runs entirely on your own device.**
 
@@ -12,12 +12,12 @@ Everything runs locally. On top of the original feature set, it can **import Wor
 
 <div align="center">
 
-## ⏬ [**Download the latest stable version**](https://github.com/Mostakim2005/GazBoard/releases/latest)
+## ⏬ [**Download the latest stable version**](https://github.com/Mostakim2005/GaussBoard/releases/latest)
 
-[![Downloads](https://img.shields.io/github/downloads/Mostakim2005/GazBoard/total?label=downloads&color=0078d4)](https://github.com/Mostakim2005/GazBoard/releases)
-[![Stars](https://img.shields.io/github/stars/Mostakim2005/GazBoard?style=flat)](https://github.com/Mostakim2005/GazBoard/stargazers)
-[![Latest release](https://img.shields.io/github/v/release/Mostakim2005/GazBoard?label=latest&color=107c10)](https://github.com/Mostakim2005/GazBoard/releases/latest)
-[![License](https://img.shields.io/github/license/Mostakim2005/GazBoard)](LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/Mostakim2005/GaussBoard/total?label=downloads&color=0078d4)](https://github.com/Mostakim2005/GaussBoard/releases)
+[![Stars](https://img.shields.io/github/stars/Mostakim2005/GaussBoard?style=flat)](https://github.com/Mostakim2005/GaussBoard/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/Mostakim2005/GaussBoard?label=latest&color=107c10)](https://github.com/Mostakim2005/GaussBoard/releases/latest)
+[![License](https://img.shields.io/github/license/Mostakim2005/GaussBoard)](LICENSE)
 
 🌐 [**try it in your browser**](https://gazboard.fahim9778.workers.dev/) — no install
 

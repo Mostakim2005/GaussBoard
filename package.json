@@ -177,7 +177,7 @@
     "publish": {
       "provider": "github",
       "owner": "Mostakim2005",
-      "repo": "GazBoard",
+      "repo": "GaussBoard",
       "releaseType": "release"
     },
     "dmg": {

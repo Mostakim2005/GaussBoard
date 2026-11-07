@@ -53,7 +53,7 @@ jobs:
         run: npm ci
 
       - name: Run the test suite
-        run: npx electron . --smoke
+        run: node scripts/smoke.js --new-features
         # a failed assertion exits non-zero, so a broken build never ships
 
       - name: Build the installer and the portable build
@@ -74,15 +74,15 @@ jobs:
           V="$(node -p "require('./package.json').version")"
           test -f dist/latest.yml || { echo "::error::no dist/latest.yml - is build.publish set in package.json?"; exit 1; }
           grep -q "^version: ${V}$" dist/latest.yml || { echo "::error::latest.yml is not for ${V}"; cat dist/latest.yml; exit 1; }
-          grep -q "GazBoard-Setup-${V}.exe" dist/latest.yml || { echo "::error::latest.yml does not name the installer"; cat dist/latest.yml; exit 1; }
+          grep -q "GaussBoard-Setup-${V}.exe" dist/latest.yml || { echo "::error::latest.yml does not name the installer"; cat dist/latest.yml; exit 1; }
           grep -q "sha512:" dist/latest.yml || { echo "::error::latest.yml has no checksum"; exit 1; }
-          test -s "dist/GazBoard-Setup-${V}.exe.blockmap" || { echo "::error::no blockmap for the installer"; exit 1; }
+          test -s "dist/GaussBoard-Setup-${V}.exe.blockmap" || { echo "::error::no blockmap for the installer"; exit 1; }
           cat dist/latest.yml
 
       - name: Upload build output as a workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GazBoard-windows
+          name: GaussBoard-windows
           path: |
             dist/*.exe
             dist/latest.yml
@@ -119,9 +119,9 @@ jobs:
           files: |
             dist/*.exe
             dist/latest.yml
-            dist/GazBoard-Setup-*.exe.blockmap
+            dist/GaussBoard-Setup-*.exe.blockmap
           fail_on_unmatched_files: true
-          name: GazBoard ${{ github.ref_name }}
+          name: GaussBoard ${{ github.ref_name }}
           body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: ${{ steps.notes.outputs.generate == 'true' }}
 
@@ -133,7 +133,7 @@ jobs:
         run: |
           set -euo pipefail
           ON="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
-          for f in dist/latest.yml dist/GazBoard-Setup-*.exe dist/GazBoard-Setup-*.exe.blockmap; do
+          for f in dist/latest.yml dist/GaussBoard-*.exe dist/GaussBoard-Setup-*.exe.blockmap; do
             n="$(basename "$f")"
             echo "$ON" | grep -qxF "$n" || { echo "::error::$n is not on the release - Windows cannot update itself without it"; exit 1; }
           done

@@ -801,7 +801,7 @@ function createWindow() {
     // the window ends up overlapping whatever it was meant to sit next to.
     minWidth: 460, minHeight: 480,
     backgroundColor: '#f3f2f1',
-    title: 'GazBoard',
+    title: 'GaussBoard',
     show: false,
     autoHideMenuBar: true,
     icon: path.join(SRC, 'assets', 'icon.png'),
@@ -903,7 +903,7 @@ function createWhiteboardWindow(opts = {}) {
     y: opts.y,
     minWidth: 460, minHeight: 480,
     backgroundColor: '#f3f2f1',
-    title: 'GazBoard',
+    title: 'GaussBoard',
     show: false,
     autoHideMenuBar: true,
     icon: path.join(SRC, 'assets', 'icon.png'),
@@ -1358,7 +1358,7 @@ function ipc() {
     // open where the boards are now (or were, when that folder has gone missing), as other apps do;
     // the usual place inside the app's own data is no help to anyone, so that one keeps the system's start
     const r = await dialog.showOpenDialog(mainWindow, {
-      title: 'Choose where GazBoard saves boards', properties: ['openDirectory', 'createDirectory'],
+      title: 'Choose where GaussBoard saves boards', properties: ['openDirectory', 'createDirectory'],
       defaultPath: pickerStart(activeDataDir || (storageFallback ? storedStorageLocation?.boardsDir : null))
     });
     if (r.canceled || !r.filePaths[0]) return { canceled: true };
@@ -1969,8 +1969,8 @@ async function prepareConfiguredStorage() {
     if (check.ok) return;
     const choice = process.argv.includes('--smoke') && process.env.GAZBOARD_TEST_STORAGE_FALLBACK === 'default'
       ? { response: 1 } : await dialog.showMessageBox({
-      type: 'warning', title: 'GazBoard storage folder unavailable',
-      message: 'GazBoard could not use your saved boards folder.',
+      type: 'warning', title: 'GaussBoard storage folder unavailable',
+      message: 'GaussBoard could not use your saved boards folder.',
       detail: `${activeDataDir}\n\n${check.reason}\n\nYour saved folder setting has not been changed.`,
       buttons: ['Retry', 'Use the default folder for this session', 'Choose a different folder'],
       defaultId: 0, cancelId: 0, noLink: true

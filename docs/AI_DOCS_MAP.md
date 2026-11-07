@@ -39,10 +39,10 @@
 | `docs/FEATURE_EVOLUTION-4.8.1-to-4.8.8.md` | Historical custom-feature changes through v4.8.8 | You need history for those versions. It is not current implementation authority. |
 | `docs/BASE_FEATURE_CATALOG-4.8.1.md` | Upstream v4.8.1 baseline only | You need to distinguish inherited behavior from later additions. |
 | `docs/plan/` and `docs/plan/spec/` | Historical plans, design proposals, and evaluations | You need original intent. Treat claims as proposals until confirmed in current source/tests. |
-| `docs/MASTER_ALL_FEATURES_CATALOG_AND_ARCHITECTURE.md` | Broad inventory plus future-facing proposals | Use targeted search for a specific feature; avoid reading it end to end. |
-| `docs/MASTER_POST_4.8.11_FEATURES_AND_AUDIT.md` | Source-checked history and architecture for v4.8.11–v4.8.20, with audit follow-up notes | You need the feature inventory or previous audit findings for these releases. |
-| `docs/releases/RELEASE-4.8.21.md` | Security hardening, Markdown metadata robustness, root causes, verification, and artifact record | You need the latest security/feature audit outcome or v4.8.21 release details. |
-| `docs/MASTER_HYBRID_ARCHITECTURE_EVALUATION.md` | Architecture evaluation/reference | Open only for architecture decisions or a task that cites it. |
+| `docs/PRODUCT.md` | Core vision, UX requirements, active features ledger, and roadmap | You need to verify user feature requirements or planned scope. |
+| `docs/ARCHITECTURE.md` | Visual Mermaid system maps, subsystem mechanics, and platform contracts | You need component relationships, data flow, or implementation recipes. |
+| `docs/DECISIONS_AND_TRAPS.md` | Architectural decision records (ADRs), pivot history, and code landmines | You are making an architectural change or avoiding known traps. |
+| `docs/VISUAL_GUIDE.html` | Interactive browser dashboard for system mechanics | Visual exploration and onboarding dashboard. |
 | `docs/PWA.md` | PWA-specific behavior and setup | You are working on the web/PWA target. |
 
 ## Which document is authoritative?
