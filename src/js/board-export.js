@@ -28,16 +28,16 @@ export async function exportBoards(app, ids) {
     if (doc.objects?.some((o) => o.type === 'image' && o.missing))
       throw new Error(t('“{name}” has missing images. Restore them before exporting.', { name: doc.name || t('Untitled board') }));
     const base = safeName(doc.name);
-    let name = base + '.gazboard', suffix = 2;
-    while (names.has(name.toLowerCase())) name = `${base} (${suffix++}).gazboard`;
+    let name = base + '.gaussboard', suffix = 2;
+    while (names.has(name.toLowerCase())) name = `${base} (${suffix++}).gaussboard`;
     names.add(name.toLowerCase());
     files.push({ name, content: JSON.stringify(exportable(doc)) });
   }
   const multiple = files.length > 1;
   const path = await window.board.saveDialog({
     title: multiple ? t('Export {n} boards', { n: files.length }) : t('Export selected board'),
-    defaultPath: multiple ? 'GazBoard-boards.zip' : files[0].name,
-    filters: [{ name: multiple ? t('ZIP archive') : t('GazBoard file'), extensions: [multiple ? 'zip' : 'gazboard'] }]
+    defaultPath: multiple ? 'GaussBoard-boards.zip' : files[0].name,
+    filters: [{ name: multiple ? t('ZIP archive') : t('GaussBoard file'), extensions: [multiple ? 'zip' : 'gaussboard'] }]
   });
   if (!path) return null;
   let bytes;

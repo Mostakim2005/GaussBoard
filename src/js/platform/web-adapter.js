@@ -68,7 +68,7 @@ export function createWebAdapter() {
       console.log('[platform] Data stored in persistent browser IndexedDB');
     },
     openReleases: (url) => {
-      window.open(url || 'https://github.com/Mostakim2005/GazBoard/releases', '_blank', 'noopener,noreferrer');
+      window.open(url || 'https://github.com/Mostakim2005/GaussBoard/releases', '_blank', 'noopener,noreferrer');
       return Promise.resolve(true);
     },
     checkForUpdate: () => updater.checkForUpdate(),

@@ -2128,7 +2128,7 @@ export function openExportPopover(app, anchor) {
     menuItem(t('Export Markdown note (.md)…'), 'text', () => app.command('export.markdownSidecar')),
     menuItem(t('Fit everything onto the paper'), 'shapes', () => app.command('page.fitContent'), { disabled: !app.store.pageCount }),
     h('div', { class: 'menu-sep' }),
-    menuItem(t('Save a copy (.gazboard)…'), 'doc', () => app.command('board.save'), { key: 'Ctrl+S' }),
+    menuItem(t('Save a copy (.gaussboard)…'), 'doc', () => app.command('board.save'), { key: 'Ctrl+S' }),
     menuItem(t('Open a board file…'), 'board', () => app.command('board.open'), { key: 'Ctrl+O' })
   );
   openPopover(anchor, body, { key: 'export', placement: 'bottom', align: 'end' });

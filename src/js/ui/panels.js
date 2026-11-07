@@ -2472,7 +2472,7 @@ export function createPanels(app) {
             if (window.board.openBoardsFolder) window.board.openBoardsFolder();
             else window.board.showItem(i.boardsDir || i.userData + '/boards');
           } }, t('Open that folder')));
-        main.appendChild(h('p', { class: 'gal-note' }, t('Choose boards to export. One saves as a .gazboard file; several save together in a ZIP. Extract the ZIP to open its boards.'))); main.appendChild(foot);
+        main.appendChild(h('p', { class: 'gal-note' }, t('Choose boards to export. One saves as a .gaussboard file; several save together in a ZIP. Extract the ZIP to open its boards.'))); main.appendChild(foot);
       } else if (i.isAndroid) {
         offerSafeCopy(main, all.length);
         const foot = h('div', { style: 'margin-top:16px;padding-top:12px;border-top:1px solid var(--stroke);font-size:12px;color:var(--text-2);line-height:1.6' },
@@ -2484,14 +2484,14 @@ export function createPanels(app) {
           window.board.backup ? h('div', { style: 'margin:8px 0 12px' }, safeCopy()) :
             h('p', {}, t('Uninstalling GazBoard or clearing its app storage deletes these local boards. Export copies you want to keep; exports are separate from autosave.')),
           h('button', { class: 'btn', style: 'width:100%', onclick: () => { app.command('board.save'); close(); } }, t('Save current board…')));
-        main.appendChild(h('p', { class: 'gal-note' }, t('Choose boards to export. One saves as a .gazboard file; several save together in a ZIP. Extract the ZIP to open its boards.'))); main.appendChild(foot);
+        main.appendChild(h('p', { class: 'gal-note' }, t('Choose boards to export. One saves as a .gaussboard file; several save together in a ZIP. Extract the ZIP to open its boards.'))); main.appendChild(foot);
       } else {
         const foot = h('div', { style: 'margin-top:16px;padding-top:12px;border-top:1px solid var(--stroke);font-size:12px;color:var(--text-2);line-height:1.6' },
           h('div', {}, all.length === 1
             ? t('{n} board, stored in browser persistence:', { n: all.length })
             : t('{n} boards, stored in browser persistence:', { n: all.length })),
           h('code', { style: 'font-size:11px;display:block;margin:4px 0 8px;word-break:break-all' }, i.userData));
-        main.appendChild(h('p', { class: 'gal-note' }, t('Choose boards to export. One saves as a .gazboard file; several save together in a ZIP. Extract the ZIP to open its boards.'))); main.appendChild(foot);
+        main.appendChild(h('p', { class: 'gal-note' }, t('Choose boards to export. One saves as a .gaussboard file; several save together in a ZIP. Extract the ZIP to open its boards.'))); main.appendChild(foot);
       }
     });
 
@@ -2911,7 +2911,7 @@ export function createPanels(app) {
       moveBoards(ids, to);
     });
     host.appendChild(h('p', { style: 'font-size:12px;color:var(--text-2)' },
-      t('Choose boards to export. One saves as a .gazboard file; several save together in a ZIP. Extract the ZIP to open its boards.')));
+      t('Choose boards to export. One saves as a .gaussboard file; several save together in a ZIP. Extract the ZIP to open its boards.')));
     if (!list.length && !folders.length) host.appendChild(h('p', { style: 'color:var(--text-2);font-size:13px' },
       here ? t('This folder is empty. Make a new board here, or move boards in with “Move to…” or by dragging them onto it.') : t('No saved boards yet.')));
     if (all.length > 1 && !F.folderList(app.settings).length) host.appendChild(h('p', { style: 'font-size:12px;color:var(--text-2)' },

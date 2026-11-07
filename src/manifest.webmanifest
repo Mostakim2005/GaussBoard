@@ -34,9 +34,9 @@
   "file_handlers": [
     {
       "action": "./index.html",
-      "name": "GazBoard Whiteboard",
+      "name": "GaussBoard Whiteboard",
       "accept": {
-        "application/json": [".gazboard", ".openboard", ".json"]
+        "application/json": [".gaussboard", ".gazboard", ".openboard", ".json"]
       }
     }
   ]

@@ -12,7 +12,7 @@ test('external links accept web URLs only', () => {
 });
 
 test('release links are confined to the configured GitHub releases route', () => {
-  const base = 'https://github.com/Mostakim2005/GazBoard/releases';
+  const base = 'https://github.com/Mostakim2005/GaussBoard/releases';
   assert.equal(security.isReleaseUrl(base, base), true);
   assert.equal(security.isReleaseUrl(`${base}/tag/v4.8.20`, base), true);
   for (const value of [

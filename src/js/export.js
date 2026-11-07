@@ -731,12 +731,12 @@ export function exportable(doc) {
 export async function saveBoardFile(app) {
   const filePath = await window.board.saveDialog({
     title: t('Save a copy'),
-    defaultPath: safeName(app.store.doc.name) + '.gazboard',
-    filters: [{ name: t('GazBoard file'), extensions: ['gazboard'] }, { name: 'JSON', extensions: ['json'] }]
+    defaultPath: safeName(app.store.doc.name) + '.gaussboard',
+    filters: [{ name: t('GaussBoard file'), extensions: ['gaussboard', 'gazboard'] }, { name: 'JSON', extensions: ['json'] }]
   });
   if (!filePath) return null;
 
-  const doc = exportable(app.store.toJSON({ app: 'GazBoard', version: 1 }));
+  const doc = exportable(app.store.toJSON({ app: 'GaussBoard', version: 1 }));
   const hasAudio = Array.isArray(doc.audioTracks) && doc.audioTracks.length > 0;
 
   if (hasAudio) {
@@ -770,7 +770,7 @@ export async function openBoardFile(app, opts = {}) {
   const paths = await window.board.openDialog({
     title: t('Open a board'),
     properties: ['openFile'],
-    filters: [{ name: t('GazBoard file'), extensions: ['gazboard', 'openboard', 'json'] }]
+    filters: [{ name: t('GaussBoard file'), extensions: ['gaussboard', 'gazboard', 'openboard', 'json'] }]
   });
   if (!paths || !paths.length) return false;
   const buf = await window.board.readFile(paths[0]);
@@ -782,7 +782,7 @@ export async function openBoardFile(app, opts = {}) {
     const Zip = await loadZip();
     const zip = await Zip.loadAsync(buf);
     const boardEntry = zip.file('board.json');
-    if (!boardEntry) throw new Error(t('Invalid .gazboard archive: missing board.json'));
+    if (!boardEntry) throw new Error(t('Invalid .gaussboard archive: missing board.json'));
     data = JSON.parse(await boardEntry.async('text'));
     if (window.board?.assets?.putBinaryDirect) {
       for (const [relPath, fileEntry] of Object.entries(zip.files || {})) {

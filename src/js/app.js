@@ -4916,7 +4916,7 @@ class App {
       [{ id: 'open', label: t('Open the download page'), primary: true }, { id: 'close', label: t('Close') }],
       { cancel: false }
     );
-    if (answer === 'open') await window.board.openReleases('https://github.com/Mostakim2005/GazBoard/releases/tag/v' + encodeURIComponent(n.to));
+    if (answer === 'open') await window.board.openReleases('https://github.com/Mostakim2005/GaussBoard/releases/tag/v' + encodeURIComponent(n.to));
     return n;
   }
 

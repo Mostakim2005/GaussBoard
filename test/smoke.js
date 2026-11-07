@@ -9095,7 +9095,7 @@ async function run(win, app) {
 
   check('a real reply is fetched, parsed and turned into a version and a link',
     served.ok === true && served.version === '99.9.9'
-      && (served.url === 'https://github.com/Mostakim2005/GazBoard/releases/tag/v99.9.9' || served.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9' || served.url === 'https://github.com/fahim9778/GazBoard-Replay/releases/tag/v99.9.9')
+      && (served.url === 'https://github.com/Mostakim2005/GaussBoard/releases/tag/v99.9.9' || served.url === 'https://github.com/Mostakim2005/GazBoard/releases/tag/v99.9.9' || served.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9' || served.url === 'https://github.com/fahim9778/GazBoard-Replay/releases/tag/v99.9.9')
       && served.prerelease === false,
     JSON.stringify(served));
   check('a server error is reported, not thrown', broke.ok === false && !!broke.error, JSON.stringify(broke));
@@ -9108,7 +9108,7 @@ async function run(win, app) {
   check('a longer prerelease suffix ranks later', upd.shorterPreIsOlder === true);
   check('an Android release at the top of the list does not hide the desktop one',
     mixed.ok === true && mixed.version === '99.9.9'
-      && (mixed.url === 'https://github.com/Mostakim2005/GazBoard/releases/tag/v99.9.9' || mixed.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9' || mixed.url === 'https://github.com/fahim9778/GazBoard-Replay/releases/tag/v99.9.9'),
+      && (mixed.url === 'https://github.com/Mostakim2005/GaussBoard/releases/tag/v99.9.9' || mixed.url === 'https://github.com/Mostakim2005/GazBoard/releases/tag/v99.9.9' || mixed.url === 'https://github.com/fahim9778/GazBoard/releases/tag/v99.9.9' || mixed.url === 'https://github.com/fahim9778/GazBoard-Replay/releases/tag/v99.9.9'),
     JSON.stringify(mixed));
   check('a list with no desktop release at all is refused rather than guessed at',
     androidOnly.ok === false, JSON.stringify(androidOnly));

@@ -9,7 +9,7 @@
 [![Latest release](https://img.shields.io/github/v/release/Mostakim2005/GaussBoard?label=latest&color=107c10)](https://github.com/Mostakim2005/GaussBoard/releases/latest)
 [![License](https://img.shields.io/github/license/Mostakim2005/GaussBoard)](LICENSE)
 
-### ⏬ [**Download Latest Stable Release (Windows, Linux, macOS, Android)**](https://github.com/Mostakim2005/GaussBoard/releases/latest)
+### ⏬ [**Download Latest Stable Release (Windows Portable & Installer)**](https://github.com/Mostakim2005/GaussBoard/releases/latest)
 
 </div>
 
@@ -73,7 +73,7 @@ GaussBoard is built specifically for **electrical engineering students, circuit 
 * **Eraser Safety:** Pen eraser only erases ink, never harming or altering the underlying imported document pages.
 
 ### 8. 🔒 100% Offline, Zero Cloud, & Local Encrypted LAN Sync
-* **No Account & No Cloud:** Everything runs and saves locally in your chosen boards folder (`.gazboard` format). No telemetry, no cloud subscriptions.
+* **No Account & No Cloud:** Everything runs and saves locally in your chosen boards folder (`.gaussboard` format, with seamless backward compatibility for `.gazboard` and `.openboard`). No telemetry, no cloud subscriptions.
 * **Device-to-Device LAN Handoff:** Securely transfer boards directly over local Wi-Fi using X25519 key exchange and AES-256-GCM encryption with one-time pairing codes.
 
 ---
@@ -82,17 +82,13 @@ GaussBoard is built specifically for **electrical engineering students, circuit 
 
 | Platform | Package | Notes |
 |---|---|---|
-| **Windows 10 / 11 (Portable)** | `GaussBoard-*-portable.exe` | **Recommended.** Portable zero-install binary. Keeps all data in a local folder. |
-| **Windows 10 / 11 (Installer)** | `GaussBoard-Setup-*.exe` | Standard Windows NSIS installer. |
+| **Windows 10 / 11 (Portable)** | `GaussBoard-*-portable.exe` | **Recommended.** Portable zero-install binary. Keeps all boards and settings in a local folder. |
+| **Windows 10 / 11 (Installer)** | `GaussBoard-Setup-*.exe` | Standard Windows NSIS desktop installer. |
 | **Android** | `GaussBoard-*-android-v*.apk` | Standalone offline APK for Android tablets and foldables. |
-| **macOS (Apple Silicon)** | `GaussBoard-*-arm64.dmg` | Native build for Apple M1/M2/M3/M4 chips. |
-| **macOS (Intel)** | `GaussBoard-*.dmg` | Native build for x64 Intel Macs. |
-| **Linux (AppImage)** | `GaussBoard-*.AppImage` | Portable Linux executable (`chmod +x`). |
-| **Linux (Debian / Ubuntu)** | `gaussboard_*_amd64.deb` | `sudo apt install ./gaussboard_*.deb` |
 
 > [!NOTE]
 > **Unsigned Binaries Notice:**  
-> Binaries are built directly from open source via automated GitHub Actions and are not signed with paid commercial certificates. Windows Defender SmartScreen may display *"Windows protected your PC"* (click **More info → Run anyway**). On macOS, open **System Settings → Privacy & Security** and click **Open Anyway** on first launch.
+> Binaries are built directly from open source via automated GitHub Actions and are not signed with paid commercial certificates. Windows Defender SmartScreen may display *"Windows protected your PC"* (click **More info → Run anyway**).
 
 ---
 
@@ -128,8 +124,6 @@ npm run smoke
 ### Packaging Binaries
 ```bash
 npm run dist:win     # Windows portable .exe and NSIS installer
-npm run dist:mac     # macOS .dmg and .zip
-npm run dist:linux   # Linux AppImage and .deb
 ```
 
 ---
