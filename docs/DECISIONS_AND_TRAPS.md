@@ -87,8 +87,8 @@ flowchart LR
 ```
 * **Code Anchors (Grep Targets):**
   * `package.json` -> `version`, `productName`, `homepage`
-  * `docs/releases/RELEASE-6.9.2.md` -> `v6.9.2`
-  * `docs/hardening/AUDIT_LOG.md` -> `FIXED`
+  * `src/js/core/store.js` -> `Store`
+  * `test/p1-hardening.test.mjs` -> `P1 suite`
 
 ### [DECISION: Conscious-Exclusion-Shift-Straight-Line] | Aliases: drawStraight, holdToShape, Ruler, Shift snapping
 > **1-Line Summary:** Refused upstream Shift-hold straight-line snapping because it strips p.t and breaks the holdToShape/connector architecture.
@@ -110,7 +110,7 @@ flowchart LR
 * **Code Anchors (Grep Targets):**
   * `src/js/core/connectors.js` -> `routeOrthogonal`
   * `src/js/core/tools.js` -> `holdToShape`
-  * `AI_BOOTSTRAP.md` -> `Conscious Exclusion`
+  * `src/js/core/ink.js` -> `preserveTime`
 
 ### [DECISION: Hardening-Audit-Live-Code-Over-Dossiers] | Aliases: v6.9.2 audit, P0 P1, 74 findings, 68 fixed
 > **1-Line Summary:** Audited v6.9.2 against live source rather than dossier status claims, fixing 68 of 74 P0+P1 findings and logging 6 open items.
@@ -120,8 +120,8 @@ flowchart LR
   * **Option A (Rejected):** Dossier self-attestation. Rejected because status text had drifted from code.
   * **Option B (Chosen):** Two-tier P0/P1 audit with interruption-safe log `docs/hardening/AUDIT_LOG.md` -> `FIXED`, plus release dossier `docs/releases/RELEASE-6.9.2.md` -> `v6.9.2` and focused tests `test/p1-hardening.test.mjs`.
 * **Code Anchors (Grep Targets):**
-  * `docs/hardening/AUDIT_LOG.md` -> `FIXED`
-  * `docs/releases/RELEASE-6.9.2.md` -> `74 findings`
+  * `src/js/core/store.js` -> `applyOp`, `checkpoint`
+  * `src/js/core/ink.js` -> `fitBezier`
   * `test/p1-hardening.test.mjs` -> `P1 suite`
 
 ---

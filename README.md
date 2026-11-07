@@ -103,21 +103,11 @@ npm run dist:linux   # AppImage + .deb
 Installers land in `dist/`. Build on the target OS (or use a CI matrix) — electron-builder
 does not cross-compile Windows installers from Linux without extra tooling.
 
-The audited v4.8.4 follow-up is labeled **V 4.8.4.1**. Its npm/Electron SemVer remains `4.8.4`,
-while the app release label and Windows artifacts use the requested `4.8.4.1` name. See
-[`docs/releases/RELEASE-4.8.4.1.md`](docs/releases/RELEASE-4.8.4.1.md) for the audit record,
-fixes, attribution and comparison with v4.8.5–v4.8.7.
-
-The current source and Windows release is **v5.2.0**. It adds visual excerpts that link back to
-their source board and region, transfer into either split-workspace pane, heading and block links,
-and Obsidian Markdown conveniences including highlights, footnotes, comments and block IDs. See
-[`docs/releases/RELEASE-5.2.0.md`](docs/releases/RELEASE-5.2.0.md) for implementation, test results,
-artifact hashes and limits. The previous replay improvements are described in
-[`docs/releases/RELEASE-5.0.0.md`](docs/releases/RELEASE-5.0.0.md), and
-[`docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md`](docs/releases/AUDIT-POST-4.8.1-TO-5.0.0.md)
-for the feature ranking and deeper cross-feature/security review. The release ledger is
-[`docs/releases/RELEASES_INDEX.md`](docs/releases/RELEASES_INDEX.md); fresh contributors and AI sessions
-should start with [`docs/DEVELOPER_HANDOVER.md`](docs/DEVELOPER_HANDOVER.md).
+For full architectural specifications, product intent, and engineering trap documentation,
+refer to the standardized documentation suite in docs/:
+- [docs/PRODUCT.md](docs/PRODUCT.md) — Product vision, UX intent, and active feature catalog.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Subsystem architecture, Mermaid data flows, and extension recipes.
+- [docs/DECISIONS_AND_TRAPS.md](docs/DECISIONS_AND_TRAPS.md) — Architectural pivot history, design decisions, and critical engineering landmines.
 
 On Linux, the AppImage needs FUSE 2 to run. Most desktops already have it; on newer Ubuntu
 it is `sudo apt install libfuse2`. Otherwise `./GazBoard-*.AppImage --appimage-extract`

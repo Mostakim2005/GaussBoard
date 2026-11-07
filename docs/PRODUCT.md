@@ -161,9 +161,9 @@
 * **User Intention:** Presence and shared editing if ever requested, while keeping offline-first handoff as the default.
 * **Target Integration Point:** `src/js/core/store.js` -> `checkpoint`, `applyRemote`, `onOp`
 
-## 4. Files That Prove It
-* Release record: `docs/releases/RELEASE-6.9.2.md` -> `v6.9.2` scope, 74 findings, 68 fixed, 6 open
-* Hardening audit: `docs/hardening/AUDIT_LOG.md` -> `FIXED`, `NOT FIXED`
-* Release ledger: `docs/releases/RELEASES_INDEX.md` -> `v6.9.2`, `GaussBoard`
-* Bootstrap router: `AI_BOOTSTRAP.md` -> `Store`, `doc.objects`, invariants
-* New-style maps: this file plus `docs/ARCHITECTURE.md`, `docs/DECISIONS_AND_TRAPS.md`, `docs/VISUAL_GUIDE.html`
+## 4. Canonical References & Live Verification
+* **Core Documentation Suite:** `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS_AND_TRAPS.md`
+* **Active Verification Suite:** `node scripts/smoke.js --new-features` (24/24 passing)
+* **Internationalization Suite:** `node scripts/i18n-check.js` (2,356/2,356 across 7 locales)
+* **Core Data Schemas & State:** `src/js/core/store.js` (`Store`, `doc.objects`, `doc.pages`, `doc.audioTracks`)
+* **Platform & Packaging:** `main.js`, `preload.js`, `package.json`
