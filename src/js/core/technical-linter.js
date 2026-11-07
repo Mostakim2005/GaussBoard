@@ -238,7 +238,7 @@ export class TechnicalLinter {
           length: m[0].length,
           match: m[0],
           rule: item.rule,
-          message: t(item.message)
+          message: item.message
         });
       }
     }

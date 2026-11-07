@@ -195,6 +195,19 @@ flowchart LR
   * `android/app/src/main/java/com/gazboard/app/BoardMirror.kt` -> `gazFolder`
   * `test/android-board-export.test.js` -> `Lesson.gaussboard`
 
+### [DECISION: Base-Smoke-Suite-Restoration-And-Text-Autosizing] | Aliases: smoke base suite, tableDim, text autosizing, i18n literal
+> **1-Line Summary:** Restored 1,220 passing checks in full base smoke test suite by importing tableDim, restoring text box auto-sizing, and cleaning translation linter calls.
+* **Decision Maker:** `[DECIDED BY: AGENT - Approved by Human]`
+* **Original User Intention:** Bring back the original base smoke suite across all features while easing emphasis on translation parity, ensuring base features never regress.
+* **Options Considered:**
+  * **Option A (Rejected):** Force all text objects into fixed 640x520 Markdown Canvas cards and rely only on the fast 24/24 smoke suite. Rejected because whiteboard users expect standard text boxes to shrink to typed words and wrap organically.
+  * **Option B (Chosen):** Fix the missing `tableDim` import in `src/js/core/render.js`, restrict fixed 640x520 sizing in `src/js/ui/textedit.js` to explicit `window` card styles and `autoSize: false` objects, fix the dynamic `t()` call in `src/js/core/technical-linter.js`, and modernize `test/smoke.js` brand and extension assertions to accept GaussBoard.
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/render.js` -> `tableDim`
+  * `src/js/ui/textedit.js` -> `fitBox`, `autoSize`
+  * `src/js/core/technical-linter.js` -> `CITATION_RULES`
+  * `test/smoke.js` -> `document_title.includes('GaussBoard')`
+
 ---
 
 ## 2. Do-Not-Touch Engineering Landmines (Traps)

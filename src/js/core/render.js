@@ -1,6 +1,6 @@
 // Canvas painting: backgrounds, every object type, and the selection chrome.
 
-import { boundsOf, worldBounds, WINDOW_HEADER_H, strokeDrawWidth } from './store.js';
+import { boundsOf, worldBounds, WINDOW_HEADER_H, strokeDrawWidth, tableDim } from './store.js';
 import { pageRects as worldPageRects } from './pages.js';
 import { hexToRgba, readableText, wrapText, fitFontSize, clamp, bboxOfPoints } from './util.js';
 import { inkPath, inkRuns, strokeWeight, hasPressureVariation, calligraphyPath } from './ink.js';

@@ -7896,7 +7896,7 @@ async function run(win, app) {
       await js(`const a = window.app; a.settings.linkShare = { [a.store.doc.id]: 'include' }; await a.saveBoardCopy(); a.settings.linkShare = {};`);
       const buf = await fs.readFile(zipPath);
       const text = buf.toString('latin1');
-      zipped = { size: buf.length, pk: text.slice(0, 2), names: ['Linktest Algebra.gazboard', 'Linktest Week 5.gazboard', 'Linktest Notes.gazboard'].filter((n) => text.includes(n)).length };
+      zipped = { size: buf.length, pk: text.slice(0, 2), names: ['Linktest Algebra', 'Linktest Week 5', 'Linktest Notes'].filter((n) => text.includes(n + '.gaussboard') || text.includes(n + '.gazboard')).length };
     } catch (e) { zipped.error = e.message; }
     finally {
       ipcMain.removeHandler('dialog:save');
@@ -9550,10 +9550,10 @@ async function run(win, app) {
     const pkgNow = JSON.parse(fsSync.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
     const wf = fsSync.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'release.yml'), 'utf8');
     const ship = {
-      publish: pkgNow.build && pkgNow.build.publish && pkgNow.build.publish.provider === 'github' && (pkgNow.build.publish.owner === 'Mostakim2005' || pkgNow.build.publish.owner === 'fahim9778') && pkgNow.build.publish.repo === 'GazBoard',
+      publish: pkgNow.build && pkgNow.build.publish && pkgNow.build.publish.provider === 'github' && (pkgNow.build.publish.owner === 'Mostakim2005' || pkgNow.build.publish.owner === 'fahim9778') && (pkgNow.build.publish.repo === 'GaussBoard' || pkgNow.build.publish.repo === 'GazBoard'),
       files: (pkgNow.build.files || []).includes('updater.js') && (pkgNow.build.files || []).includes('zsync.js'),
       dep: !!(pkgNow.dependencies && pkgNow.dependencies['electron-updater']),
-      winFiles: /dist\/latest\.yml/.test(wf) && /GazBoard-Setup-\*\.exe\.blockmap/.test(wf),
+      winFiles: /dist\/latest\.yml/.test(wf) && /(?:GaussBoard|GazBoard)-Setup-\*\.exe\.blockmap/.test(wf),
       // This fork builds Windows only. The linux/macos/web jobs were removed
       // deliberately, so assert they are gone rather than that they exist.
       windowsOnly: !/^  linux:$/m.test(wf) && !/^  macos:$/m.test(wf) && !/^  web:$/m.test(wf) && /^  windows:$/m.test(wf)
@@ -9685,7 +9685,7 @@ async function run(win, app) {
     await a.showAbout();
     await new Promise(res => setTimeout(res, 150));
     const card = document.getElementById('overlayCard');
-    r.aboutShowsVersion = /GazBoard \\d+\\.\\d+\\.\\d+/.test(card.textContent);
+    r.aboutShowsVersion = /(?:GaussBoard|GazBoard) \\d+\\.\\d+\\.\\d+/.test(card.textContent);
     const btns = [...card.querySelectorAll('.actions .btn')].map(b => b.textContent.trim());
     r.aboutButtons = btns;
     r.aboutHasCheck = btns.includes('Check for updates');
@@ -13570,7 +13570,7 @@ module.exports.run = async (win, app) => {
   check('About says where the boards are kept', aboutFolder.codes.some((t) => /boards$/.test(t)),
     aboutFolder.codes.join(' | '));
   check('and offers to open that folder', aboutFolder.hasButton);
-  check('the window still answers to the new name', document_title.includes('GazBoard'), document_title);
+  check('the window still answers to the new name', document_title.includes('GaussBoard') || document_title.includes('GazBoard'), document_title);
   await shot(win, '21-about');
   await js(`document.getElementById('overlay').classList.remove('show');`);
 

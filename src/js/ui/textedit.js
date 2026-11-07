@@ -227,10 +227,9 @@ export class TextEditor {
     this.cell = cell;
     this.previewMode = false;
     const isMd = !cell && obj.markdown !== false && (obj.type === 'text' || obj.type === 'note');
-    if (isMd && obj.type === 'text' && (!obj.w || obj.w < 480) && (!obj.h || obj.h < 280) && (!obj.text || obj.text.length < 5)) {
+    if (obj.cardStyle === 'window' && (!obj.w || obj.w < 480) && (!obj.h || obj.h < 280) && (!obj.text || obj.text.length < 5)) {
       obj.w = 640;
       obj.h = 520;
-      obj.cardStyle = obj.cardStyle || 'canvas';
       obj.autoSize = false;
     }
     this.startH = obj.h;
@@ -603,7 +602,7 @@ export class TextEditor {
       const patch = { text: value };
       if (runs || target.runs !== undefined) patch.runs = runs || undefined;
       const isMd = target.markdown !== false && (target.type === 'text' || target.type === 'note');
-      if (target.type === 'text' && (isMd || target.autoSize === false)) {
+      if (target.type === 'text' && target.autoSize === false) {
         if (this.startH != null) target.h = this.startH;
         if (this.startW != null) target.w = this.startW;
         patch.w = target.w;
