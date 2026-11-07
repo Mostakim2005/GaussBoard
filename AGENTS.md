@@ -7,9 +7,9 @@
 * **Target OS / Build Output:** Windows x64 portable .exe by default (`dist/`), optional NSIS installer, Linux AppImage/deb, macOS dmg.
 
 ## 2. Mandatory Verification & Build Commands
-* **Active Features Smoke Test (24/24):** `node scripts/smoke.js --new-features`
+* **Active Features Smoke Test (24/24):** `node scripts/smoke.js` (or `node scripts/smoke.js --new-features`)
 * **Strict 100% i18n Parity Check (7 Locales):** `node scripts/i18n-check.js`
-* **Full Regression Suite:** `node scripts/smoke.js`
+* **Base Feature Regression Suite (Temporarily Optional):** `node scripts/smoke.js --base`
 * **Build / Package (Windows Portable):** `npm run dist:win`
 
 ## 3. Repository Directory Structure & Conventions

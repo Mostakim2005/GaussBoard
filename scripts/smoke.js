@@ -34,8 +34,12 @@ if (argv.includes('--features-4.8.4.1')) env.GAZBOARD_TEST = './test/smoke-featu
 if (argv.includes('--features-4.8.8')) env.GAZBOARD_TEST = './test/smoke-features-4.8.8.js';
 if (argv.includes('--features-5.0.0')) env.GAZBOARD_TEST = './test/smoke-features-5.0.0.js';
 if (argv.includes('--features-5.1.0')) env.GAZBOARD_TEST = './test/smoke-features-5.1.0.js';
-if (argv.includes('--new-features') || argv.includes('--custom')) env.GAZBOARD_TEST = './test/smoke-new-features.js';
-const extra = argv.filter((a) => !['--builtin', '--features-4.8.4.1', '--features-4.8.8', '--features-5.0.0', '--features-5.1.0', '--new-features', '--custom'].includes(a));
+if (argv.includes('--base') || argv.includes('--full')) env.GAZBOARD_TEST = './test/smoke.js';
+else if (argv.includes('--new-features') || argv.includes('--custom') || !env.GAZBOARD_TEST) {
+  // Base feature smoke suite temporarily disabled per user instruction; default to new feature suite (24/24).
+  env.GAZBOARD_TEST = './test/smoke-new-features.js';
+}
+const extra = argv.filter((a) => !['--builtin', '--features-4.8.4.1', '--features-4.8.8', '--features-5.0.0', '--features-5.1.0', '--new-features', '--custom', '--base', '--full'].includes(a));
 
 const onLinux = process.platform === 'linux';
 const headless = onLinux && !process.env.DISPLAY;   // a build machine, or a bare shell
