@@ -5169,11 +5169,11 @@ class App {
     card.appendChild(h('h3', { style: 'margin-bottom:2px' }, 'GaussBoard ' + i.version));
     card.appendChild(h('p', {
       style: 'margin:0 0 4px;font-size:13px;color:var(--text-2);letter-spacing:.02em',
-      html: t('by <b style="color:var(--accent)">theBoringCodes</b>')
+      html: t('by <b style="color:var(--accent)">Kazi S. Mostakim</b>')
     }));
     card.appendChild(h('p', {
       style: 'margin:0 0 10px;font-size:12px;color:var(--accent);font-weight:600',
-      html: 'The Offline Engineering &amp; STEM Digital Whiteboard'
+      html: 'The Offline Electrical Engineering &amp; STEM Workstation'
     }));
     card.appendChild(h('div', {
       style: 'margin:10px 0 14px;padding:12px 14px;background:var(--surface-2,rgba(128,128,128,0.08));border-radius:8px;border-left:3px solid var(--accent);font-size:12px;line-height:1.6;color:var(--text)'
@@ -5186,6 +5186,16 @@ class App {
       h('div', { style: 'margin-bottom:8px' },
         h('b', {}, 'Tailored for Electrical Engineering: '),
         'Specially engineered for electrical engineering and STEM students, integrating real-time electro-mechanical MNA circuit simulation, 2D/3D calculus graphing, symbolic CAS, and active-recall audio replay.'
+      ),
+      h('div', { style: 'margin-bottom:8px' },
+        h('b', {}, 'Experimental Features & Active Development: '),
+        'Packed with specialized power features that may feel like feature creep to standard whiteboard users. Many advanced features are actively evolving and not yet fully battle-tested; updates and fixes are ongoing.'
+      ),
+      h('div', { style: 'margin-bottom:8px' },
+        h('b', {}, 'Looking for a General Whiteboard? '),
+        'For regular, everyday drawing and minimalist whiteboarding, visit the official upstream project ',
+        h('a', { href: 'https://github.com/fahim9778/GazBoard', target: '_blank', style: 'color:var(--accent)' }, 'GazBoard by theBoringCodes (MD. Fakhruddin Gazzali)'),
+        '. Full upstream credits and licenses are in ', h('b', {}, 'THIRD_PARTY_NOTICES.md'), '.'
       ),
       h('div', {},
         h('b', {}, 'Inspirations: '),
@@ -5207,9 +5217,13 @@ class App {
     },
       h('div', {}, h('b', { style: 'color:var(--text)' }, 'Fork Maintainer & Lead: '), 'Kazi S. Mostakim'),
       h('div', {
-        html: t('Developer &nbsp;<b style="color:var(--text)">MD. Fakhruddin Gazzali</b><br>Contact &nbsp;<a href="mailto:fahim9778@gmail.com" target="_blank" style="color:var(--accent)">fahim9778@gmail.com</a><br>Co-created with <span style="color:#e81123">&hearts;</span> by Claude Cowork &amp; GPT Sol, Astra')
+        html: t('Maintainer &nbsp;<b style="color:var(--text)">Kazi S. Mostakim</b><br>Contact &nbsp;<a href="mailto:kazi.s.mostakim@gmail.com" target="_blank" style="color:var(--accent)">kazi.s.mostakim@gmail.com</a><br>Co-created with <span style="color:#e81123">&hearts;</span> by AI Agent Harnesses &amp; Models')
       }),
-      h('div', {}, h('b', { style: 'color:var(--text)' }, 'Repository Heritage: '), 'Forked and evolved from the original open-source ', h('b', { style: 'color:var(--text)' }, 'GazBoard'), ' whiteboard architecture.'),
+      h('div', {},
+        h('b', { style: 'color:var(--text)' }, 'GaussBoard Repository: '),
+        h('a', { href: 'https://github.com/Mostakim2005/GaussBoard', target: '_blank', style: 'color:var(--accent)' }, 'https://github.com/Mostakim2005/GaussBoard')
+      ),
+      h('div', {}, h('b', { style: 'color:var(--text)' }, 'Upstream Heritage: '), 'Forked and evolved from the original open-source ', h('b', { style: 'color:var(--text)' }, 'GazBoard'), ' by MD. Fakhruddin Gazzali (theBoringCodes). See ', h('b', { style: 'color:var(--text)' }, 'THIRD_PARTY_NOTICES.md'), '.'),
       h('div', {}, h('b', { style: 'color:var(--text)' }, 'AI & Agent Harness Collaborative Engineering: '), 'Developed across agent harnesses and modern models: Google Antigravity (powered by Gemini 3.8 Flash & Gemini 4 Argon), Claude Opus 5 & 5.5, Claude Sonnet 5.5, OpenCode, DeepSeek v4.1 Flash, and Codex GPT-6 Luna.')
     ));
     const platformDetails = i.electron

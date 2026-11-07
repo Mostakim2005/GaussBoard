@@ -1438,8 +1438,8 @@ export function createPanels(app) {
           : t('Runtime: <b>Web / Progressive Web App</b> · {mode}', { mode: i.pwa ? t('Standalone App') : t('Browser') }) + '<br>' +
             t('Boards storage: <code style="font-size:11px">{path}</code>', { path: i.boardsDir || i.userData });
 
-        info.innerHTML = t('{app} · by {maker}', { app: `<b style="color:var(--text)">GaussBoard ${i.version}</b>`, maker: '<b style="color:var(--accent)">theBoringCodes</b>' }) + '<br>' +
-          `MD. Fakhruddin Gazzali · <a href="mailto:fahim9778@gmail.com" target="_blank" style="color:var(--accent)">fahim9778@gmail.com</a><br>` +
+        info.innerHTML = t('{app} · by {maker}', { app: `<b style="color:var(--text)">GaussBoard ${i.version}</b>`, maker: '<b style="color:var(--accent)">Kazi S. Mostakim</b>' }) + '<br>' +
+          `<a href="mailto:kazi.s.mostakim@gmail.com" target="_blank" style="color:var(--accent)">kazi.s.mostakim@gmail.com</a> · <a href="https://github.com/Mostakim2005/GaussBoard" target="_blank" style="color:var(--accent)">github.com/Mostakim2005/GaussBoard</a><br>` +
           t('Co-created with {heart} by {makers}', { heart: '<span style="color:#e81123">&hearts;</span>', makers: 'Claude Cowork, GPT Sol &amp; Astra' }) + '<br>' +
           platformLines;
       });
@@ -1877,6 +1877,17 @@ export function createPanels(app) {
               h('b', {}, 'Tailored for Electrical Engineering: '),
               'Specially engineered for electrical engineering and STEM students, integrating real-time electro-mechanical MNA circuit simulation, 2D/3D calculus graphing, symbolic CAS, and active-recall audio replay.'
             ),
+            h('div', { style: 'margin-bottom:8px' },
+              h('b', {}, 'Experimental Features & Active Development: '),
+              'Packed with specialized power features that may feel like feature creep to standard whiteboard users. Many advanced features are actively evolving and not yet fully battle-tested; updates and fixes are ongoing.'
+            ),
+            h('div', { style: 'margin-bottom:8px' },
+              h('b', {}, 'Looking for a General Whiteboard? '),
+              'For regular, everyday drawing and minimalist whiteboarding, visit the official upstream project ',
+              h('a', { href: 'https://github.com/fahim9778/GazBoard', target: '_blank', style: 'color:var(--accent)' }, 'GazBoard by theBoringCodes (MD. Fakhruddin Gazzali)'),
+              '. Full upstream credits and licenses are in ', h('b', {}, 'THIRD_PARTY_NOTICES.md'), '.'
+            ),
+            
             h('div', {},
               h('b', {}, 'Inspirations: '),
               'Inspired by a combination of ', h('b', {}, 'StarNote'), ', ', h('b', {}, 'Flexcil'), ', ', h('b', {}, 'LiquidText'), ', and ', h('b', {}, 'Microsoft OneNote'), '.'
@@ -1885,9 +1896,9 @@ export function createPanels(app) {
           h('div', {
             style: 'margin-bottom:12px;padding:10px 12px;border:1px solid var(--stroke,rgba(0,0,0,0.1));border-radius:8px;font-size:11.5px;line-height:1.7;color:var(--text-2)'
           },
-            h('div', {}, h('b', { style: 'color:var(--text)' }, 'Fork Maintainer & Lead: '), 'Kazi S. Mostakim'),
-            h('div', {}, h('b', { style: 'color:var(--text)' }, 'Original Creator & Upstream Author: '), 'MD. Fakhruddin Gazzali (', h('span', { style: 'color:var(--accent)' }, 'theBoringCodes'), ')'),
-            h('div', {}, h('b', { style: 'color:var(--text)' }, 'Repository Heritage: '), 'Forked and evolved from the original open-source ', h('b', { style: 'color:var(--text)' }, 'GazBoard'), ' whiteboard architecture.'),
+            h('div', {}, h('b', { style: 'color:var(--text)' }, 'Project Lead & Maintainer: '), 'Kazi S. Mostakim (', h('a', { href: 'mailto:kazi.s.mostakim@gmail.com', target: '_blank', style: 'color:var(--accent)' }, 'kazi.s.mostakim@gmail.com'), ')'),
+            h('div', {}, h('b', { style: 'color:var(--text)' }, 'GaussBoard Repository: '), h('a', { href: 'https://github.com/Mostakim2005/GaussBoard', target: '_blank', style: 'color:var(--accent)' }, 'https://github.com/Mostakim2005/GaussBoard')),
+            h('div', {}, h('b', { style: 'color:var(--text)' }, 'Upstream Heritage: '), 'Forked and evolved from GazBoard by MD. Fakhruddin Gazzali (theBoringCodes). For general whiteboard use, visit ', h('a', { href: 'https://github.com/fahim9778/GazBoard', target: '_blank', style: 'color:var(--accent)' }, 'GazBoard'), '. Detailed licenses in ', h('b', { style: 'color:var(--text)' }, 'THIRD_PARTY_NOTICES.md'), '.'),
             h('div', {}, h('b', { style: 'color:var(--text)' }, 'AI & Agent Harness Collaborative Engineering: '), 'Developed across agent harnesses and modern models: Google Antigravity (powered by Gemini 3.8 Flash & Gemini 4 Argon), Claude Opus 5 & 5.5, Claude Sonnet 5.5, OpenCode, DeepSeek v4.1 Flash, and Codex GPT-6 Luna.')
           ),
           h('p', { style: 'font-size:12px;color:var(--text-2);margin-top:10px;line-height:1.6' },

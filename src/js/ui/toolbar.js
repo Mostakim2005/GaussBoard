@@ -503,7 +503,7 @@ function initPhoneToolbar(app, bar) {
       h('div', { class: 'menu-sep' }),
       menuItem(t('Share on this network…'), 'share', () => app.panels.sharing()),
       menuItem(t('Settings'), 'settings', () => app.panels.settings()),
-      menuItem(t('About GazBoard'), 'board', () => app.showAbout()),
+      menuItem(t('About GaussBoard'), 'board', () => app.showAbout()),
       menuItem(t('Clear canvas'), 'trash', () => app.command('edit.clear'), { danger: true })
     ), { key: 'more' });
   });
@@ -2111,7 +2111,7 @@ export function openMorePopover(app, anchor) {
     menuItem(t('Runtime Libraries & Dependencies…'), 'shapes', () => app.command('help.libraries')),
     menuItem(t('Keyboard shortcuts'), 'help', () => app.showShortcuts()),
     menuItem(t('Check for updates…'), 'update', () => app.checkForUpdates({ force: true })),
-    menuItem(t('About GazBoard'), 'board', () => app.showAbout()),
+    menuItem(t('About GaussBoard'), 'board', () => app.showAbout()),
     menuItem(t('Clear canvas'), 'trash', () => app.command('edit.clear'), { danger: true })
   );
   openPopover(anchor, body, { key: 'more' });

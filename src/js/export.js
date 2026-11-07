@@ -89,14 +89,14 @@ export async function exportSvg(app, opts = {}) {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
 
 /* ------------------------------------------------------------------ *
- *  "Made with GazBoard"
+ *  "Made with GaussBoard"
  *
  *  A small grey line in the bottom-right corner of every exported page and
  *  picture, the way a website says who made it at the foot of the page. It
- *  never sits on the work. In a PDF and an SVG the word GazBoard is a link
+ *  never sits on the work. In a PDF and an SVG the word GaussBoard is a link
  *  to where the app comes from; a PNG is a flat picture and cannot be.
  * ------------------------------------------------------------------ */
-export const MADE_WITH = { lead: 'Made with ', name: 'GazBoard', url: 'https://github.com/fahim9778/GazBoard' };
+export const MADE_WITH = { lead: 'Made with ', name: 'GaussBoard', url: 'https://github.com/Mostakim2005/GaussBoard' };
 const STAMP_INK = 'rgba(96,94,92,0.72)';
 const stampFont = (size) => `${size}px ${faceOf('ui')}`;
 

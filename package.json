@@ -40,22 +40,22 @@
     "build:sync-demo": "node scripts/build-sync-demo.js"
   },
   "author": {
-    "name": "theBoringCodes",
-    "email": "fahim9778@gmail.com"
+    "name": "Kazi S. Mostakim",
+    "email": "kazi.s.mostakim@gmail.com"
   },
-  "homepage": "https://github.com/fahim9778/GazBoard",
+  "homepage": "https://github.com/Mostakim2005/GaussBoard",
   "repository": {
     "type": "git",
-    "url": "https://github.com/fahim9778/GazBoard"
+    "url": "https://github.com/Mostakim2005/GaussBoard.git"
   },
   "contributors": [
     {
-      "name": "MD. Fakhruddin Gazzali",
-      "email": "fahim9778@gmail.com"
-    },
-    {
       "name": "Kazi S. Mostakim",
       "email": "kazi.s.mostakim@gmail.com"
+    },
+    {
+      "name": "MD. Fakhruddin Gazzali",
+      "email": "fahim9778@gmail.com"
     }
   ],
   "license": "MIT",

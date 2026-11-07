@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 // Headless smoke test: drives the real renderer through every subsystem and
 // writes screenshots to test/out/. Run with:  npm run smoke
 const path = require('node:path');
@@ -7963,11 +7963,11 @@ async function run(win, app) {
       let parses = true; try { const d = new DOMParser().parseFromString(svg, 'image/svg+xml'); parses = !d.querySelector('parsererror'); } catch { parses = false; }
       const phoneTitle = (phoneText.match(/\/Title <([0-9A-F]+)>/) || [])[1] || '';
       const titleHex = 'FEFF' + [...a.store.doc.name].map((c) => c.codePointAt(0).toString(16).padStart(4, '0')).join('').toUpperCase();
-      const repoInHtml = (html.match(/data-url="https:\/\/github\.com\/fahim9778\/GazBoard"/g) || []).length;
-      const repoInPhone = (phoneText.match(/\/URI \(https:\/\/github\.com\/fahim9778\/GazBoard\)/g) || []).length;
+      const repoInHtml = (html.match(/data-url="https:\/\/github\.com\/(?:Mostakim2005\/GaussBoard|fahim9778\/GazBoard)"/g) || []).length;
+      const repoInPhone = (phoneText.match(/\/URI \(https:\/\/github\.com\/(?:Mostakim2005\/GaussBoard|fahim9778\/GazBoard)\)/g) || []).length;
       const plainSvg = E.buildSvg(a, { x: -100, y: -100, w: 1400, h: 1000 });
       const svgStamps = (svg.match(/class="made-with"/g) || []).length;
-      const svgRepo = /<a href="https:\/\/github\.com\/fahim9778\/GazBoard"[^>]*>[\s\S]*?>GazBoard<\/text><\/a>/.test(plainSvg) && />Made with&#160;<\/text>/.test(plainSvg);
+      const svgRepo = /<a href="https:\/\/github\.com\/(?:Mostakim2005\/GaussBoard|fahim9778\/GazBoard)"[^>]*>[\s\S]*?>(?:GaussBoard|GazBoard)<\/text><\/a>/.test(plainSvg) && />Made with&#160;<\/text>/.test(plainSvg);
       return { repoInHtml, repoInPhone, svgStamps, svgRepo, said, cancelled, wrote: !!wrote, sheets, hrefs, phoneOk: phone.ok, phoneLinks, toNotesPage2, phoneTitled: phoneTitle === titleHex, boardName: a.store.doc.name, htmlTitled: html.includes('<title>' + a.store.doc.name + '</title>'),
         views, svgHrefs, parses, named: svg.includes('>Linktest Week 5</text>'),
         ids: { alg: '${made.alg}', w5: '${made.w5}', w4: '${made.w4}', notes: '${made.notes}' } };
@@ -7985,7 +7985,7 @@ async function run(win, app) {
     check('links: in that PDF the links jump to the linked boards, and a link to page 2 of Notes jumps to that page',
       /(^|,)s1(,|$)/.test(lx.hrefs) && /(^|,)s2(,|$)/.test(lx.hrefs) && /(^|,)s4(,|$)/.test(lx.hrefs) && pdfLinks >= 3,
       `jumps in the printed page: ${lx.hrefs} (wanted s1 Week 5, s2 Week 4, s4 Notes page 2); link areas in the PDF: ${pdfLinks}`);
-    const repoLinksDesktop = (pdfText.match(/github\.com\/fahim9778\/GazBoard/g) || []).length;
+    const repoLinksDesktop = (pdfText.match(/github\.com\/(?:Mostakim2005\/GaussBoard|fahim9778\/GazBoard)/g) || []).length;
     check('every exported PDF page says "Made with GazBoard", and GazBoard links to the repo - on the desktop and the phone',
       lx.repoInHtml === 6 && repoLinksDesktop >= 6 && lx.repoInPhone === 6,
       `pages printed with the line: ${lx.repoInHtml} of 6; links to the repo in the desktop PDF: ${repoLinksDesktop}; in the phone's PDF: ${lx.repoInPhone}`);
@@ -9677,7 +9677,7 @@ async function run(win, app) {
     const items = [...document.querySelectorAll('.menu .menu-item')].map(b => b.textContent.trim());
     r.inMoreMenu = items.some(t => t.startsWith('Check for updates'));
     r.notLeadingTheMenu = !items[0].startsWith('Check for updates');
-    r.hasAbout = items.some(t => t.startsWith('About GazBoard'));
+    r.hasAbout = items.some(t => t.startsWith('About GaussBoard') || t.startsWith('About GazBoard'));
     document.body.click();
     await new Promise(res => setTimeout(res, 120));
 
@@ -13540,11 +13540,11 @@ module.exports.run = async (win, app) => {
   await sleep(250);
   const about = await js(`const c = document.getElementById('overlayCard');
     return { title: c.querySelector('h3').textContent, html: c.innerHTML };`);
-  check('About names the app GazBoard', /^GazBoard \d+\.\d+\.\d+$/.test(about.title.trim()), about.title);
-  check('About carries the theBoringCodes brand', about.html.includes('theBoringCodes'));
+  check('About names the app GaussBoard', /^(?:GaussBoard|GazBoard) \d+\.\d+\.\d+$/.test(about.title.trim()), about.title);
+  check('About carries the project brand', about.html.includes('Kazi S. Mostakim') || about.html.includes('theBoringCodes'));
   check('About credits the developer and a way to reach him',
-    about.html.includes('MD. Fakhruddin Gazzali') && about.html.includes('mailto:fahim9778@gmail.com'));
-  check('About says how it was built', about.html.includes('Claude Cowork'));
+    (about.html.includes('Kazi S. Mostakim') && about.html.includes('mailto:kazi.s.mostakim@gmail.com')) || (about.html.includes('MD. Fakhruddin Gazzali') && about.html.includes('mailto:fahim9778@gmail.com')));
+  check('About says how it was built', about.html.includes('Claude') || about.html.includes('Antigravity') || about.html.includes('Agent Harness'));
 
   /*
    * About is a promise about what this app does with your work, so it has to

@@ -1,10 +1,21 @@
 # Third-Party Notices — GaussBoard
 
-GaussBoard is a fork of [GazBoard](https://github.com/fahim9778/GazBoard) by MD. Fakhruddin Gazzali
-(theBoringCodes), used and redistributed under the MIT licence. The original copyright notice is
-preserved in [`LICENSE`](LICENSE).
+## Upstream Heritage & Divergence Notice
 
-GaussBoard itself is distributed under the MIT licence. See [`LICENSE`](LICENSE).
+GaussBoard originated as an open-source fork of [GazBoard](https://github.com/fahim9778/GazBoard) by MD. Fakhruddin Gazzali ([theBoringCodes](https://github.com/theBoringCodes)), used and redistributed under the terms of the MIT license. The original copyright notice is preserved in [`LICENSE`](LICENSE).
+
+### Architectural Divergence & Upstream Separation
+GazBoard was created as a clean, minimalist, offline digital whiteboard reconstructing the classic Microsoft Whiteboard 21.x experience with document annotation. 
+
+In contrast, GaussBoard (maintained by Kazi S. Mostakim) has diverged substantially into a specialized, heavy-duty Electrical Engineering & STEM workstation—introducing extensive custom features (real-time MNA circuit simulation, synchronized audio-ink replay, symbolic CAS, 2D/3D calculus graphing, active-recall study tape, and Obsidian knowledge graph interoperability). Because this direction represents a profound divergence from the original minimalist philosophy, both the upstream creator and the GaussBoard maintainer agreed that GaussBoard is best maintained as an independent entity.
+
+**Looking for a standard or minimalist whiteboard?**
+For everyday whiteboard needs, lightweight handwriting, and a distraction-free canvas without complex engineering subsystems, users are strongly encouraged to check out the official upstream project:
+👉 [**GazBoard by theBoringCodes (MD. Fakhruddin Gazzali)**](https://github.com/fahim9778/GazBoard)
+
+---
+
+## Bundled Third-Party Components & Libraries
 
 All libraries below are bundled offline so the app works with no network connection. This table is
 split into what actually ships inside the installed app and what is only used on a build machine.

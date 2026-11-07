@@ -2,506 +2,186 @@
   
 # GaussBoard
 
-**A free-form whiteboard that runs entirely on your own device.**
-
-</div>
-
-A free-form digital whiteboard for Windows, Linux, Android, and macOS — an offline rebuild of the classic **Microsoft Whiteboard 21.x** experience, with one deliberate difference: **No sign-in and no cloud.** 
-
-Everything runs locally. On top of the original feature set, it can **import Word, PowerPoint, and PDF files** onto the canvas as pages you draw over.
-
-<div align="center">
-
-## ⏬ [**Download the latest stable version**](https://github.com/Mostakim2005/GaussBoard/releases/latest)
+**The Offline Electrical Engineering & STEM Digital Workstation**
 
 [![Downloads](https://img.shields.io/github/downloads/Mostakim2005/GaussBoard/total?label=downloads&color=0078d4)](https://github.com/Mostakim2005/GaussBoard/releases)
 [![Stars](https://img.shields.io/github/stars/Mostakim2005/GaussBoard?style=flat)](https://github.com/Mostakim2005/GaussBoard/stargazers)
 [![Latest release](https://img.shields.io/github/v/release/Mostakim2005/GaussBoard?label=latest&color=107c10)](https://github.com/Mostakim2005/GaussBoard/releases/latest)
 [![License](https://img.shields.io/github/license/Mostakim2005/GaussBoard)](LICENSE)
 
-🌐 [**try it in your browser**](https://gazboard.fahim9778.workers.dev/) — no install
+### ⏬ [**Download Latest Stable Release (Windows, Linux, macOS, Android)**](https://github.com/Mostakim2005/GaussBoard/releases/latest)
 
 </div>
 
-![Six pens, a highlighter, and pressure-sensitive ink with no smoothing](Screenshots/gazboardpens.png)
-
+![GaussBoard Inking, Audio Sync, and Specialized STEM Tools](Screenshots/gazboardpens.png)
 
 ---
 
-## Get it
+## ⚡ Dedication & Engineering Vision
 
-| Platform | File | How |
+**GaussBoard** is named in honor of **Carl Friedrich Gauss** (1777–1855), the *"Prince of Mathematicians,"* whose foundational discoveries in electromagnetic field theory (Gauss's law, Gaussian flux surfaces), complex analysis, and computational mathematics anchor modern electrical engineering.
+
+GaussBoard is built specifically for **electrical engineering students, circuit designers, and STEM researchers** who require more than a generic digital whiteboard. It pairs a zero-lag, pressure-sensitive infinite canvas with an intensive suite of specialized engineering tools—ranging from synchronized audio-ink lecture recording to a real-time MNA circuit simulator, 2D/3D calculus graphing, symbolic CAS, and active-recall study tape.
+
+> [!NOTE]
+> **Intentional "Feature Creep" & Active Development Notice:**  
+> GaussBoard intentionally packs in extensive capabilities that might look like "feature creep" to users seeking an ordinary sketchbook, but are essential power tools for engineering coursework and technical analysis. Because GaussBoard integrates dozens of advanced experimental features, many subsystems are actively evolving, not yet fully battle-tested, and may contain bugs. Continuous updates, optimizations, and feature enhancements are in active progress.
+
+> [!TIP]
+> **Looking for a Clean, Minimalist Whiteboard?**  
+> GaussBoard is an intentionally divergent, highly specialized engineering tool. If you are looking for a simple, lightweight, distraction-free whiteboard for ordinary drawing, brainstorming, or non-STEM notes without the heavy engineering toolchain, **we strongly recommend checking out the official upstream project:**  
+> 👉 [**GazBoard by MD. Fakhruddin Gazzali (theBoringCodes)**](https://github.com/fahim9778/GazBoard) — an elegant, offline rebuild of the classic Microsoft Whiteboard 21.x experience. Full upstream acknowledgments, separation context, and licenses are detailed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+---
+
+## 🚀 Key Feature Highlights
+
+### 1. 🎙️ Synchronized Audio-Ink Lecture Recording & Replay
+* **Millisecond Stroke Sync:** Record audio while writing or sketching; pen strokes capture exact timestamps (`p.t`), preserving every nuance of your explanation.
+* **Waveform Scrubber & Navigation:** Scrub through recordings with an interactive waveform visualizer, 5s/10s/15s/30s quick skips, and named bookmarks.
+* **Camera Follow & Replay Isolation:** Automatically pans and zooms the viewport to follow writing during replay, with dynamic overlay passes that keep base canvas ink pristine.
+* **Writing vs. Reading Modes:** Switch to Read-only review or continue adding timestamped ink into existing recording sessions.
+
+### 2. ⚡ MNA Circuit Simulation & EE Workbench
+* **Headless MNA Solver:** Real-time Modified Nodal Analysis circuit engine supporting discrete semiconductors, diodes, transistors, and 555 timers.
+* **Industrial Motor Starter Presets:** Authentic ladder logic with Direct-On-Line (DOL) and Forward-Reverse starters featuring contactor latching and interlocks.
+* **Meters & Instrumentation:** Live Digital Multimeter (DMM) continuity testing with audible feedback and virtual oscilloscope signal viewing.
+* **Schematic & Wire Routing:** Orthogonal 90° wiring with magnetic snap terminals and automatic Bill of Materials (BOM) generation.
+
+### 3. 📐 Math Studio, Symbolic CAS & 2D/3D Grapher
+* **Offline Math Typesetting:** Integrated KaTeX editor with palettes for Calculus, Linear Algebra, Greek symbols, Physics constants, and matrix builders.
+* **Symbolic CAS:** Offline computer algebra system for symbolic differentiation, polynomial factorization, quadratic solving, and equation evaluation.
+* **2D & 3D Function Plotter:** Graph Cartesian \(y = f(x)\), 3D surfaces \(z = f(x, y)\), and polar curves \(r = f(\theta)\) with interactive tangent line tracking and Riemann sum visual approximations.
+
+### 4. 🗂️ Active Recall & Study Tape
+* **Study Tape:** Freehand masking tape that covers formulas and answers, toggling between concealed and revealed on tap.
+* **Answer Covers:** Rectangular occlusion covers that persist on the board, remaining hittable as faint outlines for flashcard-like active recall.
+* **Study Runner Modal:** Step-by-step active recall review runner designed for self-quizzing and exam preparation.
+
+### 5. 🪟 Split Workspace (Dual Board Study)
+* **Side-by-Side Dual Panes:** Open two independent boards simultaneously (e.g., lecture slides or textbook reference on the left, active problem solving on the right).
+* **Independent State:** Separate cameras, undo/redo stacks, and text editors with clean focus-lease management to prevent cross-pane edits.
+
+### 6. 🕸️ Knowledge Interop & Obsidian Graph
+* **JSON Canvas 1.0:** Bidirectional import and export for the open JSON Canvas standard.
+* **Obsidian Markdown Sidecar:** Automatically exports accompanying Markdown files with YAML frontmatter, tags, and KaTeX math blocks on save.
+* **Force-Directed Knowledge Graph:** Visualize connections, documents, and concepts across your board library in an interactive force-directed graph.
+
+### 7. 📄 Multi-Page Document Importers
+* **Supported Formats:** Direct import and page picking for `.pdf`, `.docx`, `.doc`, `.pptx`, `.ppt`, `.xlsx`, and `.txt`.
+* **High-Fidelity Page Annotation:** Renders pages as independent movable objects with selectable resolution (Standard 144 dpi, High 216 dpi, Maximum 300 dpi).
+* **Eraser Safety:** Pen eraser only erases ink, never harming or altering the underlying imported document pages.
+
+### 8. 🔒 100% Offline, Zero Cloud, & Local Encrypted LAN Sync
+* **No Account & No Cloud:** Everything runs and saves locally in your chosen boards folder (`.gazboard` format). No telemetry, no cloud subscriptions.
+* **Device-to-Device LAN Handoff:** Securely transfer boards directly over local Wi-Fi using X25519 key exchange and AES-256-GCM encryption with one-time pairing codes.
+
+---
+
+## 💾 Downloads & Installation
+
+| Platform | Package | Notes |
 |---|---|---|
-| **Windows 10 / 11** | `GazBoard-Setup-*.exe` | Run it. No admin rights needed. |
-| **Windows — portable** | `GazBoard-*-portable.exe` | Just run it. Nothing is installed. |
-| **Android** | `GazBoard-*-android-v*.apk` | Just download the APK and install; Allow to install if prompted by Play Protect |
-| **macOS — Apple Silicon** | `GazBoard-*-arm64.dmg` | Open it, drag to Applications. See the note below. |
-| **macOS — Intel** | `GazBoard-*.dmg` | Open it, drag to Applications. See the note below. |
-| **Ubuntu / Debian** | `gazboard_*_amd64.deb` | `sudo apt install ./gazboard_*.deb` |
-| **Other Linux** | `GazBoard-*.AppImage` | `chmod +x` it and run it. To update later, see below. |
+| **Windows 10 / 11 (Portable)** | `GaussBoard-*-portable.exe` | **Recommended.** Portable zero-install binary. Keeps all data in a local folder. |
+| **Windows 10 / 11 (Installer)** | `GaussBoard-Setup-*.exe` | Standard Windows NSIS installer. |
+| **Android** | `GaussBoard-*-android-v*.apk` | Standalone offline APK for Android tablets and foldables. |
+| **macOS (Apple Silicon)** | `GaussBoard-*-arm64.dmg` | Native build for Apple M1/M2/M3/M4 chips. |
+| **macOS (Intel)** | `GaussBoard-*.dmg` | Native build for x64 Intel Macs. |
+| **Linux (AppImage)** | `GaussBoard-*.AppImage` | Portable Linux executable (`chmod +x`). |
+| **Linux (Debian / Ubuntu)** | `gaussboard_*_amd64.deb` | `sudo apt install ./gaussboard_*.deb` |
 
-**Updating the Linux AppImage.** From this release on, the AppImage carries update information, so [AppImageUpdate](https://github.com/AppImageCommunity/AppImageUpdate) can fetch only what changed: `appimageupdatetool GazBoard-*.AppImage`. AppImages from earlier releases have no update information, so download this one manually first. GazBoard's own update check still just opens the release page.
-
-Not sure which Mac you have? Apple menu →  About This Mac. **Apple M1/M2/M3/M4** means Apple Silicon; anything saying **Intel** takes the other file.
-
-The **portable** build installs nothing and keeps everything — boards, pictures, settings — in a `GazBoard-Data` folder next to the `portable.exe`. Put those on a USB stick and your work travels with it; run it on a school or office PC and nothing is left behind. If the .exe sits somewhere it cannot write, it falls back to the normal per-user folder rather than refusing to start.
-
-### In a browser, without installing anything
-
-There is now a web build as well: **<https://gazboard.fahim9778.workers.dev/>**
-
-It is hosted by the upstream project, not by this fork, so it shows upstream's release rather than this one's changes.
-
-It is the same board — the same pens, the same import, the same export — running in the browser instead of as an installed app. It works offline once loaded, and
-it can be installed to your home screen or desktop from the browser's own menu.
-
-Two things to know before you rely on it:
-
-- **It is newer than the desktop app and less tested.** The desktop version is the one to use for anything that matters.
-- **Your boards live in that browser, on that device.** They are stored in the browser's own storage, not in a file and not in any cloud, so they do not follow you to another machine, and clearing your browsing data clears them. ***_Export anything you want to keep._***
-
-The web build was contributed by [Aditya Banik](https://github.com/voidplacer).
-
-### None of the downloads are code-signed, so each system might complain once, for the first-time only
-
-The app is the same on all three; signing certificates cost money that has not been spent yet.
-Every warning below is about the missing signature, not about the app.
-
-**Windows** shows a blue **“Windows protected your PC”** box — click **More info → Run anyway**.
-
-### macOS first run workaround
-
-**macOS** refuses the first launch, and its wording is alarming: either *“the developer cannot be verified”* or ***“GazBoard is damaged and can’t be opened. You should move it to the Trash.”*** Nothing is damaged. Open **System Settings → Privacy & Security**, scroll down, click **Open Anyway**, and confirm. macOS remembers, so this is once per install. If it still refuses, clear the download flag your browser attached:
-
-```sh
-xattr -dr com.apple.quarantine /Applications/GazBoard.app
-```
-
-**Linux** does not complain at all. If the AppImage says it requires FUSE:
-`sudo apt install libfuse2`, or unpack it with `./GazBoard-*.AppImage --appimage-extract` and run
-`squashfs-root/gazboard`.
+> [!NOTE]
+> **Unsigned Binaries Notice:**  
+> Binaries are built directly from open source via automated GitHub Actions and are not signed with paid commercial certificates. Windows Defender SmartScreen may display *"Windows protected your PC"* (click **More info → Run anyway**). On macOS, open **System Settings → Privacy & Security** and click **Open Anyway** on first launch.
 
 ---
 
-## Running it
+## 🛠️ Building & Developing Locally
 
 ```bash
-npm install      # pulls Electron (~200 MB) — the app's own libraries are already vendored
+# Clone the repository
+git clone https://github.com/Mostakim2005/GaussBoard.git
+cd GaussBoard
+
+# Install dependencies (pulls Electron runtime — libraries are vendored locally)
+npm install
+
+# Start the application
 npm start
+
+# Run with developer tools open
+npm run dev
 ```
 
-Development mode with DevTools: `npm run dev`
-
-### Building installers
-
+### Verification & Testing
 ```bash
-npm run dist:win     # NSIS installer + portable .exe
-npm run dist:mac     # .dmg + .zip
-npm run dist:linux   # AppImage + .deb
+# Run the active features smoke test suite (24/24 core capabilities)
+npm run smoke:new
+
+# Run the strict 100% i18n parity check across all 7 locales
+node scripts/i18n-check.js
+
+# Run the complete regression test suite
+npm run smoke
 ```
 
-Installers land in `dist/`. Build on the target OS (or use a CI matrix) — electron-builder
-does not cross-compile Windows installers from Linux without extra tooling.
-
-For full architectural specifications, product intent, and engineering trap documentation,
-refer to the standardized documentation suite in docs/:
-- [docs/PRODUCT.md](docs/PRODUCT.md) — Product vision, UX intent, and active feature catalog.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Subsystem architecture, Mermaid data flows, and extension recipes.
-- [docs/DECISIONS_AND_TRAPS.md](docs/DECISIONS_AND_TRAPS.md) — Architectural pivot history, design decisions, and critical engineering landmines.
-
-On Linux, the AppImage needs FUSE 2 to run. Most desktops already have it; on newer Ubuntu
-it is `sudo apt install libfuse2`. Otherwise `./GazBoard-*.AppImage --appimage-extract`
-unpacks it and `squashfs-root/gazboard` runs directly. The `.deb` has no such requirement.
+### Packaging Binaries
+```bash
+npm run dist:win     # Windows portable .exe and NSIS installer
+npm run dist:mac     # macOS .dmg and .zip
+npm run dist:linux   # Linux AppImage and .deb
+```
 
 ---
 
-## What it does
+## ⌨️ Essential Keyboard Shortcuts
 
-### Canvas
-- Infinite pan/zoom canvas (5 %–800 %), pinch-zoom and trackpad panning
-- Boards always open at 100%, centred on wherever you were last looking — a saved zoom of 36%
-  from fitting a document no longer greets you on the next launch
-- **The stylus inks, the mouse points.** The first time a stylus touches the tablet the app
-  remembers it, and from then on the mouse stops being a pen: with the pen or highlighter
-  selected, a mouse press on an object selects and drags it, and a drag on bare canvas pans. Tablet in one hand, mouse in the
-  other, no conflict and nothing to switch. On a machine that has never seen a stylus the
-  mouse draws as normal, so a mouse-only setup is unaffected. Settings ▸ Inking ▸ *Draw with
-  the mouse* pins it to Always or Never if you'd rather not rely on detection.
-- Notes, text, shapes, tables, select, lasso and the eraser all still take the mouse — only
-  inking is reserved for the stylus.
-- With an ink tool active the mouse drags objects and pans, but leaves no selection behind:
-  handles and the selection bar belong to Select and Lasso, so they never clutter your
-  handwriting.
-- Colours are sticky: recolour something from the selection bar and the next pen stroke, note,
-  text box or shape of that kind starts in the same colour.
-- Holding a mouse button *during* a stylus stroke drags the canvas under the moving pen; the
-  scroll wheel does the same.
-- **Edge auto-pan** — run the pen (or a dragged object) into the edge of the window and the
-  canvas scrolls on its own, speed rising the closer you get. The stroke carries on unbroken.
-  Toggle in Settings.
-- Backgrounds: eight paper colours plus a custom picker, and plain / grid / dots / lines /
-  columns / graph patterns that scale sensibly with zoom
-- Fit-to-board, reset zoom, zoom readout
-
-### Inking
-- Pen with pressure support (Wacom, Surface Pen, any PointerEvent-capable stylus), five
-  thicknesses, twelve colours. A stroke is drawn as **one stroked path down its centreline**,
-  curved through the midpoints of the samples. That has two properties worth the words: a
-  midpoint curve stays inside its control triangle so it can never overshoot into a loop or a
-  spike, and a single `stroke()` call rasterises the whole stroke once so a highlighter that
-  crosses itself cannot darken at the overlap. Width is constant along a stroke, like a felt
-  pen; pressure sets the weight of the whole stroke rather than wobbling along it.
-- **Ink is kept exactly as drawn.** Points are stored as captured — nothing is thinned or
-  re-fitted when you lift the pen, so the stroke you were watching is the stroke you keep.
-- Highlighter with multiply blending, six colours, four widths
-- Pen-tail-button erasing on styluses that report it
-- **Partial (point) erase** — dragging the eraser rubs ink out where it crosses, splitting a
-  stroke into the runs that survive rather than deleting the whole thing. Four eraser sizes.
-- Eraser modes: *erase parts of ink* (default), *erase whole objects*, *erase everything*
-- The eraser **grows as you scrub** — keep going and it widens up to 2.8x, then returns to the
-  size you picked when you lift, so clearing an area is one sweep rather than forty passes
-- Lasso select, then drag from inside the selection to move it without changing tools
-- **Straighten shapes I draw** (off by default) — a hand-drawn line, arrow, rectangle, circle,
-  ellipse, triangle, diamond, pentagon or hexagon snaps to clean geometry when you lift the
-  pen. The guess is checked against your ink before it is accepted: the candidate outline is
-  sampled and every point measured against it, so a scribble that happens to have four corners
-  is left as ink. One undo always returns the original stroke.
-- **Ruler** — drag to move, scroll over it to rotate (Shift for 5° steps); ink snaps to its edge
-
-### Objects
-- Sticky notes in eight colours and three sizes, with auto-fitting text
-- Text boxes with five sizes, alignment and a handwriting font option. Sizes are what you see:
-  a 32px text box or a 200px note placed while zoomed out to 36% is created large enough in
-  board units to still measure 32px and 200px on screen.
-- Placing a note or a text box hands the board back to the pen the moment you finish typing,
-  so the next stylus touch writes instead of dragging a marquee. Editing existing text from
-  Select stays in Select.
-- A text box shrinks to fit what you typed; a long line wraps at the width it started with
-  rather than running off. Resize it by hand and that size is kept.
-- Clicking existing text or a note with the Text or Note tool selects and opens it rather than
-  dropping a new one on top.
-- Fourteen shapes (rectangle, rounded rectangle, ellipse, triangle, right triangle, diamond,
-  pentagon, hexagon, octagon, star, cloud, line, arrow, double arrow) with outline, fill and
-  line-weight controls, and text inside any of them
-- Tables with editable cells and a header row
-- Images: insert, paste from clipboard, or drag and drop
-- Full transform model — move, resize from eight handles, rotate, Shift-constrain,
-  arrow-key nudge, z-order
-- Transform handles work under **any** tool: if you can see a handle you can drag it, without
-  switching back to Select first
-- **Lock** pins an object in place: it shows a padlock badge, marquee select and the eraser
-  skip it, Delete leaves it alone, and it has no drag handles. Click it to select it, then use
-  the unlock button on the selection bar (or right-click ▸ Unlock) to release it.
-- **Annotations belong to what they are drawn on.** Lock an imported page, mark it up, and the
-  ink is attached to it: unlock the page and move, resize or rotate it, and the annotations
-  travel with it. Delete the page and they go too — undo restores the pair. This is how
-  marking up a document is meant to work, and it is why locking exists.
-- Dragging with an ink tool draws a dashed outline of what you have hold of, so you can see
-  what is moving even though there is no persistent selection in that mode.
-
-### Selection
-- Marquee select, **lasso select**, Shift to add or remove, select all
-- Floating contextual toolbar over the selection (recolour, duplicate, order, lock, delete)
-- Right-click menu everywhere
-
-### Templates
-Fourteen built-in templates with live thumbnails: Brainstorm, SWOT, Kanban, Retrospective,
-Project planning, Effective meeting, KWL chart, Frayer model, Mind map, Decision matrix,
-Weekly planner, Empathy map, Flowchart starter, Blank.
-
-### Documents (the addition to the original)
-`Insert ▸ Document` — or just drag a file onto the canvas — accepts:
-
-| Format | Handled by |
-| --- | --- |
-| `.pdf` | pdf.js, rendered directly |
-| `.docx` `.doc` `.rtf` `.odt` | LibreOffice if installed, otherwise the built-in converter |
-| `.pptx` `.ppt` `.odp` | LibreOffice if installed, otherwise the built-in converter |
-| `.xlsx` `.xls` `.ods` `.txt` | LibreOffice |
-
-**You choose the pages.** Anything longer than one page opens a picker first: thumbnails of
-every page with checkboxes, a range box (`1-3, 7, 10-12`), and a choice of row, grid or
-stacked layout. Take page 4 of a 90-page PDF instead of all ninety.
-
-Every page becomes its own independent object on the board - never a group. Annotate over it,
-move it, resize it, lock it, export it with the rest of the board. **The ink eraser never
-touches it**: in ink mode the eraser only cuts ink, so you can rub an annotation off a page
-without harming the page. Removing a whole page is the eraser's explicit "erase whole objects"
-mode, or select it and press Delete.
-
-**Quality.** The picker offers Standard (144 dpi), High (216 dpi) and Maximum (300 dpi, print
-resolution) with a running estimate of what it will add to the board file. The page's size in
-board units is identical at every setting — only the number of pixels behind it changes, so
-raising it is purely about how far you can zoom in before it softens.
-
-**Fidelity note.** If LibreOffice is on the machine the app shells out to it
-(`soffice --headless --convert-to pdf`) and you get the real layout. If it is not, a built-in
-converter runs instead — `mammoth` for Word, a small OOXML reader for PowerPoint — rendered in
-a hidden window and printed to PDF. That path is readable rather than pixel-perfect: it keeps
-text, formatting, pictures, tables, shape positions and slide geometry, but it does not
-reproduce Word's exact pagination or PowerPoint's theme backgrounds. Settings ▸ About tells you
-which engine is active. Set `GAZBOARD_DISABLE_LIBREOFFICE=1` to force the built-in path.
-
-### Export and files
-- PNG (whole board or just the selection, 2× scale)
-- SVG (real vectors — strokes, shapes and text stay editable in Illustrator/Inkscape)
-- PDF (A4 / Letter / A3 / Legal / A5 or the board's own shape; portrait or landscape; margins;
-  the whole board on one sheet, or tiled at actual size across as many sheets as it takes)
-- `.gazboard` document files (Save a copy / Open); `.openboard` files from earlier versions still open
-- Autosave to a local board library, browsable from **Boards**
-
-By default, boards live in `<userData>/boards` — on Windows that is
-`%APPDATA%\GazBoard\boards`, on Linux `~/.config/GazBoard/boards`. In the desktop app,
-open **Settings → Storage → Change folder** to save them in another folder, including a
-Nextcloud, Syncthing or Dropbox folder. GazBoard copies boards there and leaves the originals
-in place unless you later choose **Move old copies to Trash**; images and imported pages
-are kept alongside them in an `assets` subfolder.
-**Uninstalling does not remove the default boards**, so reinstalling picks them up if the
-profile remains. A custom folder is outside GazBoard's profile and is left where you put it.
-The Boards panel shows the active folder and can open it.
-
-The location setting and the last-open-board pointer stay on this computer in `userData`;
-only the boards and their assets belong in the shared folder. If the chosen folder is
-unavailable at startup, GazBoard asks whether to retry, use the default for this session,
-or choose another folder. Using the default temporarily does not change the saved location.
-GazBoard does not watch for files changed by a sync client while it is running, so an open
-board can overwrite a newer synced copy on its next save. Sync clients may also leave
-conflicted-copy files in the folder. For now, edit a given board on one computer at a time.
-
-Boards are written atomically (temp file plus rename), and which board was open is
-recorded in a file by the main process rather than in browser storage — so a machine
-that is switched off rather than shut down cleanly still comes back to your work. If
-that pointer is ever lost, the app opens the most recent board that has something on
-it; it will not greet you with a blank canvas while your boards sit on disk.
+| Shortcut | Action |
+|---|---|
+| `P` / `H` / `E` | Select Pen / Highlighter / Eraser |
+| `V` / `L` | Marquee Select / Lasso Select |
+| `N` / `T` / `S` | Sticky Note / Text Box / Shape Tool |
+| `Space` + drag | Pan canvas |
+| `Ctrl` + Scroll / Pinch | Zoom in and out |
+| `Ctrl` + `0` / `Ctrl` + `Shift` + `F` | Reset zoom (100%) / Fit board to screen |
+| `Ctrl` + `Z` / `Ctrl` + `Y` | Undo / Redo |
+| `Ctrl` + `Shift` + `G` | 2D/3D Function Grapher & Calculus |
+| `Ctrl` + `Shift` + `R` | Active Study Session & Recall Runner |
+| `Alt` + `G` | Knowledge Graph View |
+| `Alt` + `T` | Document Navigator & Table of Contents |
+| `Ctrl` + `R` | Toggle interactive on-screen ruler |
+| `Ctrl` + `N` / `O` / `S` | New board / Open board / Save a copy |
 
 ---
 
-# Sharing on your own network
-
-**Settings → Share on this network** is off by default. While off, GazBoard does not open ports, advertise itself, or accept connections.
-
-When enabled, GazBoards on the same Wi-Fi can discover each other and send boards directly. Pair once using a code shown on the receiving computer, then choose **Send this board**.
-
-Transfers are device-to-device, with no server or third-party dependencies, using X25519 and AES-256-GCM through Node's built-in crypto.
-
-GazBoard normally uses:
-
-- **TCP 53318** for transfers
-- **UDP 53319** for discovery
-
-If the TCP port is busy, GazBoard chooses another free port and shows it. UDP discovery cannot change ports, so if 53319 is unavailable, automatic discovery stops but **Add a computer by address** still works.
-
-### Pairing
-
-There are two pairing modes:
-
-- **Just for now** — pairing disappears when GazBoard closes. Useful for classrooms or shared computers.
-- **Remember these computers** — pairing survives restarts. Useful for your own devices.
-
-### Receiving boards
-
-Nothing is accepted automatically. Before saving, GazBoard shows the sender, board name, size, and a small preview.
-
-If the board already exists, you can **Keep both** or **Replace my copy**. Escape declines the transfer.
-
-A separate checkbox controls whether accepted boards open immediately. It is on by default and remembers your choice.
-
-If several boards arrive together, only the last opens. Replacing the board currently open always reloads it to avoid autosaving an older copy over the replacement.
-
-### Firewall checks
-
-If another computer cannot reach GazBoard, the firewall is usually the cause. GazBoard checks firewall rules without administrator rights and reports what it finds, including the exact executable being checked.
-
-**Windows:** GazBoard can repair the rules. It removes blocking rules first, then allows the current program on Private and Domain/Work networks only. This requires one UAC prompt. It will not open the port on a network marked Public.
-
-**macOS and Linux:** GazBoard detects the active firewall and explains the required fix, but does not change it.
-
-It checks `socketfilterfw` on macOS and firewalld or ufw on Linux. Where permission prevents a reliable check, GazBoard says so instead of guessing.
-
-### Transfers
-
-Large boards can take time because image data expands during encoding and encryption.
-
-GazBoard shows real byte-transfer progress. Once uploading finishes, it says which computer it is waiting for instead of showing a fake percentage while the recipient decides.
-
-The progress dialog can be closed without cancelling the transfer.
-
-### Forgetting computers
-
-Choosing **Forget** removes the pairing locally first, then tells the other computer to forget it too.
-
-If that computer is offline, it removes the pairing the next time it tries to connect.
-
-### Scope
-
-GazBoard sharing is a deliberate file-style handoff, not live collaboration. 
-
-None of this is live collaboration, and it is not meant to be. There are no presence cursors and no shared editing session; a board is a thing you hand over, once, on purpose.
-
----
-
-## Keyboard shortcuts
-
-| | |
-| --- | --- |
-| `V` `L` `P` `H` `E` `N` `T` `S` | Select, Lasso, Pen, Highlighter, Eraser, Note, Text, Shape |
-| `Space` + drag, middle-drag | Pan |
-| Mouse drag with pen/highlighter selected | Pan (once a stylus has been used) |
-| Any mouse button during a pen stroke | Drag the canvas under the pen |
-| Run the pointer into the window edge | Auto-pan while drawing or dragging |
-| `Ctrl` + wheel, pinch | Zoom |
-| `Ctrl` `0` / `Ctrl` `+` / `Ctrl` `-` | Reset / in / out |
-| `Ctrl` `Shift` `F` | Fit to board |
-| `Ctrl` `Z` / `Ctrl` `Y` | Undo / redo |
-| `Ctrl` `C` `X` `V` `D` | Copy, cut, paste, duplicate |
-| `Ctrl` `A` / `Delete` | Select all / delete |
-| `F2`, double-click | Edit text of selection |
-| Arrow keys (`Shift` = ×10) | Nudge |
-| `Ctrl` `Shift` `]` / `[` | Bring to front / send to back |
-| `Ctrl` `R` | Ruler |
-| `Ctrl` `N` `O` `S` | New / open / save a copy |
-
----
-
-## Architecture
+## 🏛️ System Architecture
 
 ```
-main.js              Electron main: window, menus, app:// protocol, dialogs,
-                     board storage, document→PDF conversion
-preload.js           The only bridge into the renderer (contextIsolation on, no nodeIntegration)
-src/convert.html     Hidden window used by the built-in Office converter
+main.js              Electron main process: IPC, window lifecycle, native dialogs, atomic storage
+preload.js           Secure context bridge exposing window.board (contextIsolation active)
 src/js/core/
-  store.js           Document model + operation log + undo/redo
-  surface.js         Canvas view, culling, draw loop
-  camera.js          Pan/zoom transform
-  render.js          Every object type, backgrounds, selection chrome
-  tools.js           Pointer state machine for all tools
-  hit.js             Hit testing, marquee, lasso, eraser sweeps
-  recognize.js       Ink → shape classifier
-  transform.js       Move / scale / rotate maths
-src/js/importers/    pdf.js rasteriser, OOXML PowerPoint reader
-src/js/ui/           Toolbar, popovers, panels, context menu, text editing
+  store.js           Document state, op-log engine, and checkpoint / applyRemote seam
+  surface.js         Canvas 2D render loop, viewport culling, and replay overlay pass
+  ink.js             Pressure ink engine, midpoint Bezier fitting, and p.t timestamp capture
+  circuit-sim.js     Headless MNA solver, semiconductor models, 555 timer, and motor starters
+  scientific-math.js Offline CAS evaluator, quadratic solver, and LaTeX conversion
+  replay.js          Timestamped audio-ink synchronization and playback engine
+  tools.js           Pointer state machine (stylus inks, mouse points) and gesture classifier
+sync/                Offline peer-to-peer Wi-Fi handoff (UDP 53319 discovery + TCP 53318 transport)
 ```
 
-### About "structured for collaboration later"
-
-Nothing mutates the document directly. Every change is an **operation**
-(`add` / `del` / `set` / `order` / `doc`) that is applied, pushed onto the undo stack, and
-broadcast on `store.onOp()`. Two methods complete the seam:
-
-```js
-const snapshot = store.checkpoint();   // full state, resets the op log
-store.applyRemote(ops);                // replay a peer's ops, no undo entry, no echo
-```
-
-A sync layer only has to move `checkpoint()` once per peer and then stream ops — the editor
-itself needs no changes. The smoke suite asserts this: it checkpoints a board, performs
-edits, replays the log into a fresh `Store` and checks the two documents match.
+For comprehensive engineering specifications, consult the project documentation suite:
+* [`docs/PRODUCT.md`](docs/PRODUCT.md) — Source of truth for product intent and feature catalog.
+* [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Subsystem mechanics, Mermaid diagrams, and extension recipes.
+* [`docs/DECISIONS_AND_TRAPS.md`](docs/DECISIONS_AND_TRAPS.md) — Architectural pivot history, design decisions, and invariant traps.
 
 ---
 
-## Tests
+## 📜 Licensing, Heritage & Attribution
 
-```bash
-npm run smoke            # headless, uses LibreOffice if present
-npm run smoke:builtin    # forces the built-in Office converter
-npm run smoke:custom     # custom-feature, security, and release-fix smoke checks
-npm run smoke:features:4.8.8  # focused v4.8.8 UI feature checks
-npm run smoke:features:4.8.4.1  # crop and video-export audit fixes only
-npm run test:restart     # kills the app mid-session and checks the board comes back
-npm run test:storage     # storage path config and validation
-```
+* **Maintainer & Lead:** Kazi S. Mostakim ([@Mostakim2005](https://github.com/Mostakim2005)) · [kazi.s.mostakim@gmail.com](mailto:kazi.s.mostakim@gmail.com)
+* **Upstream Project:** Originated as a fork of [GazBoard](https://github.com/fahim9778/GazBoard) by MD. Fakhruddin Gazzali ([theBoringCodes](https://github.com/theBoringCodes)), used under the MIT license.
+* **Third-Party Notices:** Full license texts for all bundled open-source components and upstream credits are documented in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+* **AI & Agent Collaborative Engineering:** Developed, audited, and hardened across agent harnesses: Google Antigravity (powered by Gemini 3.8 Flash & Gemini 4 Argon), Claude Opus & Sonnet, OpenCode, DeepSeek v4.1 Flash, and Codex.
 
-The V 4.8.4.1 feature smoke runs separately from `npm run smoke`. It exercises crop
-cancel/apply/reset and undo, crop source bounds, and single/stitched video export duration,
-replay-clock isolation, timeout handling and cleanup. It does not run translation checks.
-
-The historical 4.8.8 custom-feature suite is separate from the mandatory regression suite. It covers
-the added inking, opacity, connector, template-tag, video-preset, margin geometry, audio,
-crop, zoom, and app-protocol security checks. Run `npm run smoke:custom` for the focused suite.
-
-as of 18-Oct-2026, the smoke suite has 1240 assertions covering boot, ink, partial and whole-object erase, stylus/mouse device roles,
-pan-while-drawing and edge auto-pan, shape recognition, notes/text/shapes/tables, undo/redo,
-transforms, hit testing, the pen tray, click-away deselect, the zoom readout, the handwriting
-font, the pen-nib cursor, the About plate, the handwriting default and its settings migration,
-PDF export page sizes and the pages it actually writes, board recovery after an unclean
-shutdown, carrying boards over from an older install, lock adoption of ink already drawn, templates, backgrounds, the ruler, PDF/Word/PowerPoint import,
-PNG rendering, save/load round-trips, the op-log seam, tool switching and panel UI.
-Erase coverage includes the split, the undo restore, a near miss, whole-object mode, and
-erasing off the end of a stroke. HiDPI coverage samples the far corner of the canvas buffer at
-1x / 1.25x / 1.5x / 2x to prove the whole surface is painted, and the suite is also run end to
-end under `--force-device-scale-factor` at each of those scales.
-Screenshots and a results file are written to `test/out/`.
-
----
-## Screenshots
-![Annotating a lecture slide imported from PowerPoint](Screenshots/gazboardannotateslide.png)
-
-![Freeform canvas with imported reference images and multi-color ink](Screenshots/gazboardcanvas.png)
-
-![GazBoard desktop app — main window](Screenshots/gazboardhero.png)
-
-![Importing selected pages from a PowerPoint deck](Screenshots/gazboardimport.png)
-
-![Sticky notes for structuring a semester plan](Screenshots/gazboardnotes.png)
-
-![Exporting a board as a PDF](Screenshots/gazboardpdfexport.png)
-
-![Six pens, a highlighter, and pressure-sensitive ink with no smoothing](Screenshots/gazboardpens.png)
-
-![Shapes, arrows, and connected diagram nodes](Screenshots/gazboardshapes.png)
-
-![The MS Whiteboard–style pen tray toolbar](Screenshots/gazboardtoolbar.png)
-
-![Multi Size Page Support](Screenshots/gazboardmultisizecanvas.png)
-
----
-
-## macOS (Special Notes)
-
-GazBoard runs on macOS 11 and later, on both Apple Silicon and Intel. It is the same application —
-same boards, same file format, same everything.
-
-**Apple Silicon** takes `GazBoard-<version>-arm64.dmg`; **Intel** takes `GazBoard-<version>.dmg`.
-Apple menu →  About This Mac tells you which. The wrong one either will not run at all (arm64 on
-Intel) or will run slowly under Rosetta (Intel on Apple Silicon).
-
-### The first launch will be refused, and the message is misleading
-
-macOS will say either *"GazBoard cannot be opened because the developer cannot be verified"* or,
-more alarmingly, ***"GazBoard is damaged and can't be opened. You should move it to the Trash."***
-
-**Nothing is damaged.** macOS says that about any application not signed with an Apple developer
-certificate, which costs $99 a year and has not been bought while the Mac build is still finding
-out whether anyone wants it. The file is fine; macOS simply refuses to vouch for it.
-
-To open it:
-
-1. Open **System Settings → Privacy & Security**
-2. Scroll down to the line about GazBoard being blocked, and click **Open Anyway**
-3. Confirm once more
-
-macOS remembers the decision, so this is a first-launch-only step.
-
-If it still refuses with "damaged", the download-quarantine flag your browser attached is the
-culprit. Open Terminal and run:
-
-```sh
-xattr -dr com.apple.quarantine /Applications/GazBoard.app
-```
-
-The app is ad-hoc signed, which is what lets it run on Apple Silicon at all; what is missing is the
-Developer ID and Apple's notarisation. It is built from the same source as the Windows and Linux
-downloads, by the same automated workflow.
-
----
-## Not included
-
-Everything in Microsoft Whiteboard 21.x that only exists because of the Microsoft account:
-sign-in, cloud boards, sharing links, real-time co-authoring, presence cursors, reactions,
-Bing image search, and the Teams meeting integration. Ink, canvas, objects, templates,
-export and settings are all here.
-
-MIT licensed. Not affiliated with or endorsed by Microsoft.
-
-*GaussBoard — a fork maintained by [@Mostakim2005](https://github.com/Mostakim2005). Built on GazBoard by theBoringCodes (of [@fahim9778](https://github.com/fahim9778))  — Co-created with ♥ by Claude Cowork & GPT Sol, Astra*
+*GaussBoard is an independent open-source project and is not affiliated with or endorsed by Microsoft.*

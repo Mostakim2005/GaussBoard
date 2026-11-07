@@ -1105,7 +1105,7 @@ function buildMenu() {
         { role: 'toggleDevTools', label: T('Developer tools') }
       ]
     },
-    { label: T('Help'), submenu: [ { label: T('Keyboard shortcuts'), click: cmd('help.shortcuts') }, { label: T('About GazBoard'), click: cmd('help.about') } ] }
+    { label: T('Help'), submenu: [ { label: T('Keyboard shortcuts'), click: cmd('help.shortcuts') }, { label: T('About GaussBoard'), click: cmd('help.about') } ] }
   ];
   return Menu.buildFromTemplate(template);
 }

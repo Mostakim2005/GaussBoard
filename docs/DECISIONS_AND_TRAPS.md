@@ -124,6 +124,30 @@ flowchart LR
   * `src/js/core/ink.js` -> `fitBezier`
   * `test/p1-hardening.test.mjs` -> `P1 suite`
 
+### [DECISION: Upstream-Relegation-And-EE-Positioning] | Aliases: Gauss homage, EE workstation, third-party notices, brand separation
+> **1-Line Summary:** Relegated upstream GazBoard to third-party notices, established GaussBoard as an independent Electrical Engineering & STEM workstation honoring Carl Friedrich Gauss, and updated repository links to Mostakim2005/GaussBoard.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`
+* **Original User Intention:** Acknowledge that GaussBoard's extensive feature set (MNA circuit simulation, audio-ink sync, CAS, 2D/3D graphing, study tape) profoundly diverged from upstream's minimalist vision; position GaussBoard as an EE power tool with ongoing updates, and direct casual whiteboard users to upstream.
+* **Options Considered:**
+  * **Option A (Rejected):** Retain upstream links and generic whiteboard branding. Rejected because users were confused by upstream links, and the original author agreed GaussBoard operates as a separate specialized entity.
+  * **Option B (Chosen):** Update README, About dialog, export stamps, and package metadata to `Mostakim2005/GaussBoard`, move upstream GazBoard credit to `THIRD_PARTY_NOTICES.md`, recommend upstream for general users, and maintain 100% i18n parity across all 7 locales.
+* **Visual Pivot Map (What Failed vs. What Works):**
+```mermaid
+flowchart LR
+    subgraph Divergent["❌ Generic Upstream Branding"]
+        A1[Minimalist Whiteboard Clone] --> A2[Upstream link confusion]
+    end
+    subgraph Independent["✅ GaussBoard Independent EE Workstation"]
+        B1[Carl Friedrich Gauss EE Workstation] --> B2[Power-tool clarity + Upstream in Notices]
+    end
+```
+* **Code Anchors (Grep Targets):**
+  * `README.md` -> `Dedication & Engineering Vision`
+  * `src/js/app.js` -> `showAbout`
+  * `src/js/export.js` -> `MADE_WITH`
+  * `THIRD_PARTY_NOTICES.md` -> `Upstream Heritage & Divergence Notice`
+  * `package.json` -> `homepage`, `repository`, `author`
+
 ---
 
 ## 2. Do-Not-Touch Engineering Landmines (Traps)
