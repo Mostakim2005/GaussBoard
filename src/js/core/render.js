@@ -719,10 +719,59 @@ export function pencilDarkness(o) {
 /** A pencil on its side lays down a wider line. */
 export function pencilWidth(o) { return strokeDrawWidth({ ...o, effect: 'pencil' }); }
 
-export function drawStroke(ctx, o) {
+export function drawStroke(ctx, o, camZ = null) {
   const pts = o.points;
   if (!pts || !pts.length) return;
 
+  if (camZ == null) {
+    try {
+      const m = ctx.getTransform ? ctx.getTransform() : null;
+      camZ = m ? Math.hypot(m.a, m.b) || 1 : 1;
+    } catch { camZ = 1; }
+  }
+
+  // Zoom-Aware Level of Detail (Rule 4): Sub-pixel culling at extreme zoom-out
+  if (camZ < 0.35) {
+    const wb = o.bbox || (pts.length > 1 ? {
+      w: Math.abs(pts[pts.length - 1].x - pts[0].x),
+      h: Math.abs(pts[pts.length - 1].y - pts[0].y)
+    } : null);
+    if (wb && wb.w * camZ < 1.5 && wb.h * camZ < 1.5) {
+      if (o.opacity != null && o.opacity < 0.1) return;
+      ctx.save();
+      ctx.fillStyle = inkStyle(ctx, o);
+      const dotW = 1.5 / camZ;
+      ctx.fillRect(pts[0].x - dotW / 2, pts[0].y - dotW / 2, dotW, dotW);
+      ctx.restore();
+      return;
+    }
+  }
+
+  // Zoom-Aware Level of Detail (Rule 4): Stroke downsampling with stride lineTo
+  if (camZ < 0.35 && pts.length > 30 && o.tool !== 'calligraphy' && o.effect !== 'pencil') {
+    const step = camZ < 0.15 ? 4 : 2;
+    ctx.save();
+    if (o.tool === 'highlighter') {
+      ctx.globalAlpha = o.opacity ?? 0.5;
+      ctx.globalCompositeOperation = (o.colorPop !== false && !lightInk()) ? 'multiply' : 'source-over';
+      ctx.lineWidth = o.width || 20;
+    } else {
+      if (o.opacity != null && o.opacity < 1) ctx.globalAlpha = o.opacity;
+      ctx.lineWidth = o.width || 4;
+    }
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = inkStyle(ctx, o);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = step; i < pts.length - 1; i += step) {
+      ctx.lineTo(pts[i].x, pts[i].y);
+    }
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
   if (o.tool === 'calligraphy') {
     const envelope = calligraphyPath(o);
     if (!envelope) return;
