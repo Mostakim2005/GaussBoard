@@ -210,6 +210,7 @@ export function initToolbar(app) {
   sep('2');
 
   iconTool({ ribbonId: 'ruler', cmd: 'ruler', icon: 'ruler', title: t('Ruler (Ctrl+R)'), onClick: () => app.command('ruler') });
+  iconTool({ ribbonId: 'holdMode', cmd: 'toggleHoldMode', icon: 'radial', title: t('Hold gesture mode'), onClick: () => app.command('toggleHoldMode') });
   iconTool({ ribbonId: 'text', tool: 'text', icon: 'text', dot: true, key: 'T',
     title: t('Text Box (T) \u2014 click canvas to write notes or markdown; click again for font & size'),
     onClick: toggleTool('text') });
@@ -2087,6 +2088,7 @@ export function openInsertPopover(app, anchor) {
     ribbonToolItem(t('Study Tape'), 'curtain', () => { app.setTool('tape'); app.syncUI(); }, 'tape'),
     ribbonToolItem(t('Eraser'), 'eraser', () => { app.setTool('eraser'); app.syncUI(); }, 'eraser', 'E'),
     ribbonToolItem(t('Ruler'), 'ruler', () => app.command('ruler'), 'ruler', 'Ctrl+R'),
+    ribbonToolItem(t('Hold gesture mode'), 'radial', () => app.command('toggleHoldMode'), 'holdMode'),
     ribbonToolItem(t('Text Box'), 'text', () => { app.setTool('text'); app.syncUI(); }, 'text', 'T'),
     ribbonToolItem(t('Sticky Note'), 'note', () => { app.setTool('note'); app.syncUI(); }, 'note', 'N'),
     ribbonToolItem(t('Shapes'), 'shapes', () => { app.setTool('shape'); app.syncUI(); openToolPopover(app, anchor, 'shape'); }, 'shape', 'S'),

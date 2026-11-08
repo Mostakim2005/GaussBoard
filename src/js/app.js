@@ -48,6 +48,8 @@ import { ReplayBar } from './ui/replay-bar.js';
 import { exportVideoFile } from './export-video.js';
 import { SearchDialog } from './ui/search-dialog.js';
 import { NoteOverviewDrawer } from './ui/note-overview.js';
+import { RadialMenu } from './ui/radial.js';
+import { HoldGestureManager } from './core/hold-manager.js';
 import { TabBar } from './ui/tabs.js';
 import { VisualizationDialog } from './ui/visualization-dialog.js';
 import { SidebarRibbon } from './ui/sidebar-ribbon.js';
@@ -279,6 +281,8 @@ class App {
       if (mathFrame) return;
       mathFrame = requestAnimationFrame(() => { mathFrame = 0; this.surface?.repaintAll?.(); });
     });
+    this.radial = new RadialMenu(this);
+    this.holdManager = new HoldGestureManager(this);
     this.panels = createPanels(this);
     this.interaction = new Interaction(this);
     // Links to other boards show those boards' names and pictures: when the list changes, so do they.
@@ -2735,6 +2739,7 @@ class App {
         break;
       }
       case 'ruler': case 'view.ruler': this.toggleRuler(); break;
+      case 'toggleHoldMode': this.toggleHoldGestureMode(); break;
       case 'view.background': this.panels.background(); break;
 
       case 'insert.image': pickAndInsertImage(this); break;
@@ -2892,6 +2897,23 @@ class App {
     r.triBase = Math.max(120 / this.surface.cam.z, Math.min(r.length * 0.55, (v.h * 0.6) / tall, v.w * 0.6));
     // hang it from a little above the middle, so the whole triangle is in view
     if (r.y + r.triBase * tall > v.y + v.h * 0.92) r.y = Math.max(v.y + v.h * 0.12, v.y + v.h * 0.92 - r.triBase * tall);
+  }
+
+  showRadial(at, wp) {
+    if (this.viewMode || this.settings.holdGestureMode === 'off') return;
+    if (this.settings.holdGestureMode === 'classic') {
+      this.showContextMenu(at);
+      return;
+    }
+    this.radial.show(at, wp);
+  }
+
+  toggleHoldGestureMode() {
+    const next = this.holdManager.cycleMode();
+    if (next === 'radial') this.toast(t('Hold menu: Radial ring'));
+    else if (next === 'classic') this.toast(t('Hold menu: Classic list'));
+    else this.toast(t('Hold gestures disabled'));
+    this.syncUI();
   }
 
   toggleRuler() {

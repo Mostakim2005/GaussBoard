@@ -142,6 +142,21 @@ export class Interaction {
        */
       this.cancelHold();
       if (this.ruler.visible && this.rulerZone(this.surface.screenPoint(e))) { this.app.openRulerMenu({ x: e.clientX, y: e.clientY }); return; }
+      if (e.pointerType === 'pen' && this.action && this.action.type !== 'radial' && !this.app.viewMode) {
+        const penId = [...this.pointers.entries()].find(([, p]) => p.type === 'pen')?.[0];
+        const sp = this.surface.screenPoint(e), wp = this.surface.cam.toWorld(sp.x, sp.y);
+        const evalHold = this.app.holdManager?.evaluateHold(e, wp, sp);
+        if (evalHold?.type === 'radial' && penId != null && !pick(this.store, wp, 8 / this.surface.cam.z) && !(this.ruler.visible && this.rulerZone(sp))) {
+          this.discardTapMark();
+          this.app.setSelection([]);
+          this._boardMenuAt = Date.now();
+          this.app.showRadial({ clientX: e.clientX, clientY: e.clientY }, wp);
+          this.action = { type: 'radial' };
+          this.actionId = penId;
+          this.surface.invalidate();
+          return;
+        }
+      }
       if (Date.now() - (this._boardMenuAt || 0) < 1200) return;
       if (this._lastDownType === 'touch' || this.action?.holdMenu) return;
       // A right-DRAG panned the canvas, so it is not a right-CLICK: swallow the
@@ -316,6 +331,7 @@ export class Interaction {
       return;
     }
     try { this.canvas.setPointerCapture?.(e.pointerId); } catch { /* synthetic or already-released pointer */ }
+    if (this.app.radial?.open) this.app.radial.close();
     this.surface.cam.cancelGlide?.();
     this._lastDownType = e.pointerType;
     if (e.pointerType === 'pen') this._penAt = performance.now();
@@ -775,6 +791,7 @@ export class Interaction {
     // A palm sliding on the screen therefore dragged the pen's stroke over to
     // the palm - the ink jumped, or looked like it had simply gone missing.
     if (this.actionId != null && e.pointerId !== this.actionId) return;
+    if (this.action && this.action.type === 'radial') { this.app.radial?.track(e.clientX, e.clientY); return; }
     if (e.pointerId === this._firstId && this._firstLast) {
       this._firstTravel = (this._firstTravel || 0) + Math.hypot(sp.x - this._firstLast.x, sp.y - this._firstLast.y);
       this._firstLast = sp;
@@ -1145,6 +1162,11 @@ export class Interaction {
     if (this.pinch) { if (this.pointers.size < 2) this.pinch = null; return; }
     const a = this.action;
     if (!a || (this.actionId != null && e.pointerId !== this.actionId)) return;
+    if (a.type === 'radial') {
+      this.action = null; this.actionId = null;
+      this.app.radial?.release(e.clientX, e.clientY);
+      return;
+    }
     this.stopEdgePan();
     this.lastMotion = null;
     const sp = this.surface.screenPoint(e);
@@ -1648,7 +1670,14 @@ export class Interaction {
       this.discardTapMark();
       this.app.setSelection([]);
       this._boardMenuAt = Date.now();
-      this.app.showContextMenu(e);
+      const evalHold = this.app.holdManager?.evaluateHold(e, wp, sp) || { type: 'context' };
+      if (evalHold.type === 'radial') {
+        this.app.showRadial({ clientX: e.clientX, clientY: e.clientY }, wp);
+        this.action = { type: 'radial' };
+        this.actionId = e.pointerId;
+      } else {
+        this.app.showContextMenu(e);
+      }
       this.surface.invalidate();
     }, e.pointerType === 'pen' ? PEN_HOLD_MS : HOLD_MS);
   }

@@ -2372,5 +2372,11 @@
  "0° points": "اتجاه الصفر°",
  "Right →": "يمين →",
  "Up ↑": "أعلى ↑",
- "See-through": "الشفافية"
+ "See-through": "الشفافية",
+ "Insert & more…": "إدراج والمزيد…",
+ "Shortcuts": "اختصارات",
+ "Hold gesture mode": "وضع إيماءة الضغط المطوّل",
+ "Hold menu: Radial ring": "قائمة الضغط المطوّل: حلقة دائرية",
+ "Hold menu: Classic list": "قائمة الضغط المطوّل: قائمة تقليدية",
+ "Hold gestures disabled": "إيماءات الضغط المطوّل معطلة"
 }
