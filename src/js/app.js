@@ -2988,6 +2988,21 @@ class App {
     this.circuitWorkbenchModal.show();
   }
 
+  openCircuitComponentProperties(comp) {
+    if (this.circuitWorkbenchModal?.openProperties) {
+      this.circuitWorkbenchModal.openProperties(comp);
+      return;
+    }
+    this.openCircuitWorkbench();
+    this.toast(t('Circuit Simulation Workbench'), 'shapes', 1400);
+  }
+
+  inspectCover(cover) {
+    if (!cover) return;
+    this.toast(t('Study Tape'), 'check', 1400);
+    this.surface?.invalidate?.();
+  }
+
   openMoleculeViewer(moleculeId = 'water') {
     if (!this.moleculeViewerModal) this.moleculeViewerModal = new MoleculeViewerModal(this);
     if (moleculeId) this.moleculeViewerModal.loadMolecule(moleculeId);

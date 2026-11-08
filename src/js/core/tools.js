@@ -387,6 +387,11 @@ export class Interaction {
     // and was not given one - Ctrl+V, most of all.
     this.app.boardPoint = { x: wp.x, y: wp.y, at: performance.now() };
 
+    if (this.pointers.size >= 2) {
+      this.cancelHold();
+      this.cancelShapeHold();
+    }
+
     if (this.pointers.size === 2) {
       // Two fingers pinch. A mouse (or a second pen) arriving while a stroke
       // is already down means "pan the canvas under what I'm drawing" instead.
@@ -1564,9 +1569,18 @@ export class Interaction {
       // The mark never becomes an object, so there is nothing to undo. A pan
       // has moved nothing either - the slop check above cancels the hold long
       // before the board travels far enough to notice.
-      this.surface.wet = null;
-      this.surface.wetPieces = null;
-      this.action = null;
+      this.abortActiveStroke();
+      const evalHold = this.app.holdManager?.evaluateHold(e, wp, sp);
+      if (evalHold?.type === 'component') {
+        this.app.openCircuitComponentProperties?.(evalHold.target);
+        this.surface.invalidate();
+        return;
+      }
+      if (evalHold?.type === 'cover') {
+        this.app.inspectCover?.(evalHold.target);
+        this.surface.invalidate();
+        return;
+      }
       this.app.setSelection([hit.id]);
       if (hit.locked) this.action = { type: 'holdSelect' };
       else if (!this.startMoveOnSelection(wp)) { this.actionId = null; return; }
@@ -1667,7 +1681,7 @@ export class Interaction {
       // follow, and by now this may be one of two pointers rather than one.
       const only = [...this.pointers.values()];
       if (only.length !== 1 || only[0].type !== e.pointerType) return;
-      this.discardTapMark();
+      this.abortActiveStroke();
       this.app.setSelection([]);
       this._boardMenuAt = Date.now();
       const evalHold = this.app.holdManager?.evaluateHold(e, wp, sp) || { type: 'context' };
@@ -1675,7 +1689,11 @@ export class Interaction {
         this.app.showRadial({ clientX: e.clientX, clientY: e.clientY }, wp);
         this.action = { type: 'radial' };
         this.actionId = e.pointerId;
-      } else {
+      } else if (evalHold.type === 'component') {
+        this.app.openCircuitComponentProperties?.(evalHold.target);
+      } else if (evalHold.type === 'cover') {
+        this.app.inspectCover?.(evalHold.target);
+      } else if (evalHold.type !== 'none') {
         this.app.showContextMenu(e);
       }
       this.surface.invalidate();
@@ -1740,6 +1758,13 @@ export class Interaction {
     this.cancelShapeHold();
     if (this.app?.settings?.holdToShape === false) return;
     if (!a?.obj || a.obj.tool !== 'pen' || a.ruled) return;
+    const pts = a.obj.points;
+    if (!pts || pts.length < 5) return;
+    let travel = 0;
+    for (let i = 1; i < pts.length; i++) {
+      travel += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    }
+    if (travel * (this.surface?.cam?.z || 1) < 24) return;
     this._shapeHoldTimer = setTimeout(() => {
       this._shapeHoldTimer = null;
       if (this.action !== a || a.pieces?.length || (a.obj.points?.length || 0) < 5) return;
@@ -2243,6 +2268,27 @@ export class Interaction {
     this.surface.wetPieces = null;
     this.action = null;
     this.actionId = null;
+  }
+
+  abortActiveStroke() {
+    this.discardTapMark();
+  }
+
+  hitCover(wp, tol = 8 / (this.surface?.cam?.z || 1)) {
+    return curtainAt(this.store, wp, tol);
+  }
+
+  hitCircuitComponent(wp) {
+    if (this.app.circuitWorkbench?.isOpen && this.app.circuitWorkbench?.hitComponent) {
+      return this.app.circuitWorkbench.hitComponent(wp);
+    }
+    if (this.app.circuitWorkbenchModal?.isOpen && this.app.circuitWorkbenchModal?.hitComponent) {
+      return this.app.circuitWorkbenchModal.hitComponent(wp);
+    }
+    if (this.app.hitCircuitComponent) {
+      return this.app.hitCircuitComponent(wp);
+    }
+    return null;
   }
 
   offerScratchOut(a, e) {
