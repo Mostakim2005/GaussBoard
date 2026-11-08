@@ -73,7 +73,7 @@ sequenceDiagram
   * `src/js/core/util.js` -> `uid`, `unionBox`
 
 ### [SUBSYSTEM: Inking-Rendering] | Aliases: Canvas 2D, Bezier, DirectInk, pressure, background, culling
-> **1-Line Summary:** Full-speed Canvas 2D with frozen base layer plus dynamic overlay, midpoint curves that never loop, and single-stroke rasterization.
+> **1-Line Summary:** Full-speed Canvas 2D with 3-layer progressive composition (Layer 0 background, Layer 1 progressive ink snapshot with dynamic 3.0-8.0ms budgeting, Layer 2 live 60 FPS overlays), midpoint curves that never loop, and single-stroke rasterization with zoom LOD.
 * **How It Works (Plain English):** A stroke is one stroked path down its centerline curved through sample midpoints, staying inside its control triangle. Width is constant like felt pen; pressure sets stroke weight. Ink is stored exactly as captured, never thinned, and points keep p.t.
 * **Data Flow Diagram:**
 ```mermaid
@@ -159,6 +159,36 @@ flowchart LR
   * `src/js/core/fsrs.js` -> `scheduleReview`, `exportClozeDeck`
   * `src/vendor/libraries.json` -> `manifestVersion`, `bundledPath`
   * `src/js/ui/library-inspector.js` -> `LibraryInspector`, `listVersions`
+
+### [SUBSYSTEM: Gesture-Arbitration-And-Radial-HUD] | Aliases: gesture arbitration, HoldGestureManager, RadialShortcutRing, radial menu, dwell timer
+> **1-Line Summary:** Hardware-differentiated gesture arbitration engine with dual dwell timers, domain priority dispatching, and zero-dot radial shortcut ring.
+* **How It Works (Plain English):** The coordinator replaces fragmented, conflicting setTimeout calls. It splits hold into two distinct dwell phases: a Stationary Dwell Timer (< 18px movement) that opens domain modals (circuit component properties, answer cover toggle) or on empty canvas opens the Radial Menu (stylus) / Context Menu (mouse), and a Post-Stroke Dwell Timer (>= 24px stroke with pause) that triggers holdToShape. On stationary hold triggers, interaction.abortActiveStroke() immediately cleans up the 1-point buffer to prevent phantom ink dots and undo artifacts. Placing a second finger down immediately cancels pending holds to preserve smooth pinch-to-zoom.
+* **Data Flow Diagram:**
+```mermaid
+flowchart TD
+    PD[Pointer Down] --> MT{Pointers >= 2?}
+    MT -->|Yes| Cancel[Cancel Hold & Allow Pinch Zoom]
+    MT -->|No| InitHold[Start Stationary Hold Timer]
+    InitHold --> PM[Pointer Move / Draw]
+    PM --> DistCheck{Travel >= 18px?}
+    DistCheck -->|Yes| AbortStat[Abort Stationary Hold]
+    AbortStat --> PostStroke[Start Post-Stroke Dwell Timer]
+    PostStroke --> PauseCheck{Paused >= 450ms?}
+    PauseCheck -->|Yes| HoldShape[interaction.holdToShape]
+    PauseCheck -->|No| RegularStroke[Regular Ink Stroke]
+    DistCheck -->|No (Stationary)| StatTimer{Held >= 450-700ms?}
+    StatTimer -->|Yes| Discard[interaction.abortActiveStroke]
+    Discard --> DomainHit{Hit Domain Component?}
+    DomainHit -->|Circuit Component| CompModal[Open Component Modal]
+    DomainHit -->|Study Cover| ToggleCover[Toggle Conceal/Reveal]
+    DomainHit -->|Empty Canvas| DevCheck{Pointer Type?}
+    DevCheck -->|Pen / Stylus| RadialHUD[Open RadialShortcutRing]
+    DevCheck -->|Mouse / Touch| ContextHUD[Open Context Menu]
+```
+* **Code Anchors (Grep Targets):**
+  * `src/js/ui/hold-manager.js` -> `HoldGestureManager`
+  * `src/js/ui/radial.js` -> `RadialShortcutRing`
+  * `src/js/core/interaction.js` -> `abortActiveStroke`
 
 ## 2. Tech Stack & Why We Chose It
 

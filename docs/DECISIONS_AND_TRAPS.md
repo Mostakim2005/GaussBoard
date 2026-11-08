@@ -215,6 +215,24 @@ flowchart LR
 
 ## 2. Do-Not-Touch Engineering Landmines (Traps)
 
+### [DECISION: Centralized-Hold-Gesture-Arbitration-And-Dual-Dwell-Timer] | Aliases: hold manager, gesture arbitration, dual dwell, stationary vs post-stroke
+> **1-Line Summary:** Centralize all long-press and dwell interactions into HoldGestureManager with distinct Stationary (<18px) and Post-Stroke (>=24px) timers.
+* **Problem Solved:** Ad-hoc setTimeout calls across interaction.js, circuits, and radial menus collided. Drawing quick strokes across components triggered unwanted property dialogs, tiny dots triggered shape conversions, and stationary holds left stray 1-point ink dots on the canvas before opening menus.
+* **Why This Decision Was Made:** Splitting into two timers cleanly separates stationary modal/radial menu invocation (<18px) from post-stroke shape recognition (>=24px). Adding abortActiveStroke() guarantees zero phantom ink dots and zero spurious undo records. Multi-touch monitoring (pointers.size >= 2) immediately clears timers for fluid pinch zoom.
+* **Protected Code Anchors (Grep Targets):**
+  * `src/js/ui/hold-manager.js` -> `HoldGestureManager`
+  * `src/js/core/interaction.js` -> `abortActiveStroke`
+  * `test/hold-manager.test.mjs`
+
+### [DECISION: Smart-Slicing-Over-Raw-Index-And-Spatial-Tiling] | Aliases: smart slicing, heavy canvas, dynamic frame budget, zoom LOD
+> **1-Line Summary:** Implement progressive canvas rendering via Smart Slicing with atomic cover bundling, dynamic frame budget (3.0-8.0ms), and zoom LOD, explicitly rejecting raw index slicing and spatial tile caching.
+* **Problem Solved:** Upstream raw index slicing (commit 031ad50) broke z-order, caused secret equations to flash through Answer Covers (TRAP 6), and baked active audio replay sessions into static layers (TRAP 1). Spatial tile caching (512x512) risked severe cache-invalidation bugs during lasso moves and erasing.
+* **Why This Decision Was Made:** Smart Slicing preserves store.doc.order z-index, pre-scans opaque Answer Covers to cull hidden strokes underneath, strictly excludes active audio replay tracks, dynamically scales its CPU slice budget based on active audio recording (3.5ms) or MNA circuit simulation (3.0ms), and applies zoom-out LOD downsampling (camZ < 0.35) for massive boards.
+* **Protected Code Anchors (Grep Targets):**
+  * `src/js/core/surface.js` -> `_paintOrder`, `_paintHeavy`, `_getSliceBudgetMs`
+  * `src/js/core/render.js` -> `drawStroke` (LOD)
+  * `test/sliced-rendering.test.mjs`
+
 ### [TRAP: Pt-Timestamp-Stripping] | Aliases: p.t, stroke timestamps, audio sync, eraser fragment, t0 t1
 > **1-Line Summary:** Never rebuild stroke points without preserving p.t, or audio replay loses millisecond sync.
 * **Strict Rule:** **NEVER** strip `p.t` in point generators, smoothing passes, curve fitters, or partial-erasure rebuilds in `src/js/core/tools.js` -> `toolStateMachine` and `src/js/core/ink.js` -> `preserveTime`.
@@ -268,3 +286,19 @@ flowchart LR
   * `src/js/core/circuit-sim.js` -> `solveMNA`, `stepSim`, `armatureLatch`
   * `src/js/ui/circuit-workbench.js` -> `openWorkbench`
   * `src/js/core/connectors.js` -> `routeOrthogonal`
+
+
+### [TRAP: Raw-Index-Slicing-Cover-Leak] | Aliases: raw slicing, smart slicing, TRAP 6, secret flash, z-order leak
+> **1-Line Summary:** Never slice board objects by arbitrary array indices without pre-culling strokes enclosed under opaque Answer Covers or checking active audio tracks.
+* **Strict Rule:** **NEVER** render sliced objects in arbitrary batch sizes directly to background layers without `_paintOrder` pre-filtering that culls strokes beneath concealed covers (`idx < cover.index`) and excludes `audioId === activeTrackId`.
+* **Why This Trap Exists (Plain English):** In a heavy board with 8,000 objects, if an Answer Cover sits at index 4,000 and hidden equations sit at index 500, a naive progressive slicer that takes 5 frames will render the secret equations in frame 1 and conceal them in frame 3, creating an obvious "secret flash". Furthermore, slicing into background layers bakes active replay ink into static images, violating TRAP 1.
+* **Protected Code Anchors (Grep Targets):**
+  * `src/js/core/surface.js` -> `_paintOrder`, `_paintHeavy`
+
+### [TRAP: Gesture-Menu-Phantom-Ink] | Aliases: phantom ink dot, abortActiveStroke, radial open, contextmenu hold
+> **1-Line Summary:** Opening a modal or gesture HUD on pointer hold must explicitly discard the active inking buffer and abort undo records.
+* **Strict Rule:** **NEVER** open a stationary hold menu (RadialShortcutRing, context menu, or circuit component modal) while a pointer is down without first calling `interaction.abortActiveStroke()`.
+* **Why This Trap Exists (Plain English):** On pointerdown, the ink engine immediately initializes `currentStroke` with the first contact point. If the user holds still to open a radial menu and lifts their stylus, `pointerup` would commit that 1-point stroke to the document, leaving stray ink dots all over the canvas and pushing phantom entries to the undo stack.
+* **Protected Code Anchors (Grep Targets):**
+  * `src/js/core/interaction.js` -> `abortActiveStroke`
+  * `src/js/ui/hold-manager.js` -> `handlePointerDown`, `_fireStationaryHold`

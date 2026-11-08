@@ -170,6 +170,25 @@
   * `test/set-squares-protractor.test.mjs` -> `triCorners`, `protGeom`
 
 
+### [FEATURE: Centralized-Hold-Gesture-Manager] | Aliases: hold manager, radial menu, long press, dual dwell timers, gesture arbitration
+> **1-Line Summary:** Centralized hardware-differentiated hold gesture coordinator with dual dwell timers, domain component priority, pinch abort, and zero-dot radial ring invocation.
+* **User Intention (Non-Negotiable):** Users holding stylus or mouse pointers on the board need intuitive modal inspections and shortcut rings without false triggers during quick sketching, tiny dot writes, or multi-touch zooms, and without leaving phantom 1-point ink dots or orphan undo entries.
+* **Visual / UI Behavior:** Stationary hold (< 18px travel) on empty board opens an 8-item SVG radial menu ring for stylus or contextual menu for mouse; post-stroke dwell (>= 24px travel with pause) converts freehand lines to geometric shapes (`holdToShape`); holding on domain objects (circuit components, answer covers) opens their native properties or toggle action with strict priority over radial HUD; two-finger pinch immediately cancels pending holds.
+* **Code Anchors (Grep Targets):**
+  * `src/js/ui/hold-manager.js` -> `HoldGestureManager`, `handlePointerDown`, `handlePointerMove`, `cancelHold`
+  * `src/js/ui/radial.js` -> `RadialShortcutRing`, `showAt`, `dispatchItem`
+  * `src/js/core/interaction.js` -> `abortActiveStroke`, `onPointerDown`, `onPointerUp`
+  * `test/hold-manager.test.mjs` -> `testHoldManager`
+
+### [FEATURE: Smart-Progressive-Slicing-And-Zoom-LOD] | Aliases: progressive rendering, smart slicing, heavy canvas, zoom LOD, sub-pixel culling
+> **1-Line Summary:** High-capacity progressive canvas slicer with atomic cover bundling, dynamic CPU frame budgeting (3.0–8.0ms), and zoom-aware level-of-detail downsampling.
+* **User Intention (Non-Negotiable):** Heavy boards containing 5,000+ to 20,000+ objects must render smoothly across pan and zoom operations without freezing the UI, leaking concealed answer cover secrets, or dropping frames during audio replay or MNA circuit simulation.
+* **Visual / UI Behavior:** Canvas uses 3-layer progressive composition: Layer 0 (grid/background), Layer 1 (`_inkCanvas` built progressively in background via dynamic time slices), and Layer 2 (live 60 FPS unbaked overlays for wet strokes, audio replay, and circuit electrons); pre-filtering culls hidden strokes below opaque answer covers to prevent secret flash; zoom-out (`camZ < 0.35`) performs sub-pixel culling and stride-based point downsampling.
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/surface.js` -> `_paintHeavy`, `_paintOrder`, `_getSliceBudgetMs`, `_inkCanvas`, `_build`
+  * `src/js/core/render.js` -> `drawStroke` (LOD downsampling & sub-pixel culling)
+  * `test/sliced-rendering.test.mjs` -> `testSlicedRendering`
+
 ## 3. Planned Features & App-Merge Wishlist
 
 ### [WISHLIST: Pane-Aware-Command-Dispatcher] | Aliases: pane commands, Delete routing, Copy routing
@@ -185,7 +204,7 @@
 ## 4. Canonical References & Live Verification
 * **Core Documentation Suite:** `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS_AND_TRAPS.md`, `docs/releases/ANDROID_READINESS.md`
 * **Active Verification Suite:** `node scripts/smoke.js --new-features` (24/24 passing)
-* **Internationalization Suite:** `node scripts/i18n-check.js` (2,367/2,367 across 7 locales)
+* **Internationalization Suite:** `node scripts/i18n-check.js` (2,380/2,380 across 7 locales)
 * **Android Platform Suite:** `node --test test/android-*.test.js` (82/82 passing)
 * **Core Data Schemas & State:** `src/js/core/store.js` (`Store`, `doc.objects`, `doc.pages`, `doc.audioTracks`)
 * **Platform & Packaging:** `main.js`, `preload.js`, `package.json`
