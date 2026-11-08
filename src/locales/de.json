@@ -2365,5 +2365,12 @@
  "Hold the pen still for menus": "Stift still halten öffnet Menüs",
  "On (default): holding the pen still on the board opens the menu, and on an object picks it up. Off: the pen only ever writes, so filling in small shapes never opens a menu. Use the pen's side button or the selection bar for menus instead. A finger keeps press-and-hold either way.": "An (Standard): Den Stift still auf dem Whiteboard halten öffnet das Menü, auf einem Objekt hebt es dieses auf. Aus: Der Stift schreibt nur, beim Ausmalen kleiner Formen öffnet sich nie ein Menü. Für Menüs dann die Seitentaste des Stifts oder die Auswahlleiste nutzen. Mit dem Finger funktioniert Gedrückthalten weiterhin.",
  "Leave View mode": "Ansichtsmodus beenden",
- "View mode": "Ansichtsmodus"
+ "View mode": "Ansichtsmodus",
+ "Triangle 45°": "Geodreieck 45°",
+ "Triangle 30°/60°": "Zeichendreieck 30°/60°",
+ "Protractor": "Winkelmesser",
+ "0° points": "0° zeigt nach",
+ "Right →": "Rechts →",
+ "Up ↑": "Oben ↑",
+ "See-through": "Durchsichtigkeit"
 }

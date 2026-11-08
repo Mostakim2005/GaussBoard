@@ -2365,5 +2365,12 @@
  "Hold the pen still for menus": "পেন স্থির ধরে রাখলে মেনু খুলবে",
  "On (default): holding the pen still on the board opens the menu, and on an object picks it up. Off: the pen only ever writes, so filling in small shapes never opens a menu. Use the pen's side button or the selection bar for menus instead. A finger keeps press-and-hold either way.": "চালু (ডিফল্ট): বোর্ডে পেন স্থির ধরে রাখলে মেনু খোলে, আর কোনো অবজেক্টের ওপর ধরলে সেটা তুলে নেয়। বন্ধ: পেন শুধু লিখবে, তাই ছোট আকার ভরাট করার সময় কখনো মেনু খুলবে না। মেনুর জন্য পেনের সাইড বাটন বা সিলেকশন বার ব্যবহার করুন। আঙুলে চেপে ধরা দুই অবস্থাতেই কাজ করবে।",
  "Leave View mode": "View mode থেকে বের হন",
- "View mode": "View mode"
+ "View mode": "View mode",
+ "Triangle 45°": "ত্রিভুজ ৪৫°",
+ "Triangle 30°/60°": "ত্রিভুজ ৩০°/৬০°",
+ "Protractor": "চাঁদা",
+ "0° points": "০° কোন দিকে",
+ "Right →": "ডানে →",
+ "Up ↑": "উপরে ↑",
+ "See-through": "স্বচ্ছতা"
 }

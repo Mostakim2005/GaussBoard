@@ -164,7 +164,10 @@ flowchart LR
     * Commit `30` (`7cb909c` pen-hold part): In-place scribble travel distance tracking (`HOLD_TRAVEL = 18`) preventing small shape fills from triggering the hold menu, plus `penHold` toggle setting.
     * Commit `35` (`24532e8`): Margin inking stability (removes `draw` and `erase` from `EDGE_PANNABLE`, preventing canvas slippage during margin handwriting; bounds drawing to `visibleArea`).
     * Commit `36` (`924109b`): Ergonomic enhancements (direct `[×]` close button on ruler, active tray highlights on phone toolbar, dual-hand touch disambiguation).
+  * **`HARDENED_AND_INTEGRATED` (Integrated on `feat/upstream-risk-eval`):**
+    * Commit `25` (`bd5684d`) & Commit `30` (typed angle): Set squares (30/60/90, 45/45/90), protractor, and ruler settings. Hardened to enforce p.t timestamp preservation on projected points (TRAP 2), restrict drafting edge snapping exclusively to stylus input without trapping mouse pointers, bypass ruler latching during connector/wire routing, and maintain 100% i18n parity across all 7 locales.
   * **`HIGH_RISK` (Quarantined for `feat/upstream-risk-eval`):**
+    * (Set squares & Protractor promoted to Hardened & Integrated above)
     * Commit `25` (`bd5684d`): Set squares (30/60/90, 45/45/90), protractor, and ruler settings. High STEM value, but touches 550+ lines in `tools.js`; must be tested on a side branch to protect circuit wiring and pointer partitioning.
     * Commit `30` (protractor typed angle input part): Dependent on Commit 25.
   * **`MEDIUM_RISK` (Quarantined for `feat/upstream-risk-eval`):**

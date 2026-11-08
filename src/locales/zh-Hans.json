@@ -2365,5 +2365,12 @@
  "Hold the pen still for menus": "笔静止按住时打开菜单",
  "On (default): holding the pen still on the board opens the menu, and on an object picks it up. Off: the pen only ever writes, so filling in small shapes never opens a menu. Use the pen's side button or the selection bar for menus instead. A finger keeps press-and-hold either way.": "开（默认）：在白板上按住笔不动会打开菜单，按在对象上则会拿起它。关：笔只用于书写，涂满小图形时绝不会弹出菜单。请改用笔的侧键或选择栏打开菜单。手指长按在两种情况下都照常有效。",
  "Leave View mode": "退出查看模式",
- "View mode": "查看模式"
+ "View mode": "查看模式",
+ "Triangle 45°": "三角板 45°",
+ "Triangle 30°/60°": "三角板 30°/60°",
+ "Protractor": "量角器",
+ "0° points": "0° 朝向",
+ "Right →": "向右 →",
+ "Up ↑": "向上 ↑",
+ "See-through": "透明度"
 }

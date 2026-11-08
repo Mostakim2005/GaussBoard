@@ -2365,5 +2365,12 @@
  "Hold the pen still for menus": "Mantener quieto el lápiz abre menús",
  "On (default): holding the pen still on the board opens the menu, and on an object picks it up. Off: the pen only ever writes, so filling in small shapes never opens a menu. Use the pen's side button or the selection bar for menus instead. A finger keeps press-and-hold either way.": "Activado (predeterminado): mantener el lápiz quieto en la pizarra abre el menú y, sobre un objeto, lo levanta. Desactivado: el lápiz solo escribe, así que rellenar formas pequeñas nunca abre un menú. Usa el botón lateral del lápiz o la barra de selección para los menús. Con el dedo, mantener pulsado sigue funcionando.",
  "Leave View mode": "Salir del modo vista",
- "View mode": "Modo vista"
+ "View mode": "Modo vista",
+ "Triangle 45°": "Escuadra 45°",
+ "Triangle 30°/60°": "Cartabón 30°/60°",
+ "Protractor": "Transportador",
+ "0° points": "0° apunta a",
+ "Right →": "Derecha →",
+ "Up ↑": "Arriba ↑",
+ "See-through": "Transparencia"
 }

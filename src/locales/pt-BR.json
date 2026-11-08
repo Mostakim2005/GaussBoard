@@ -2365,5 +2365,12 @@
  "Hold the pen still for menus": "Segurar a caneta parada abre menus",
  "On (default): holding the pen still on the board opens the menu, and on an object picks it up. Off: the pen only ever writes, so filling in small shapes never opens a menu. Use the pen's side button or the selection bar for menus instead. A finger keeps press-and-hold either way.": "Ativado (padrão): segurar a caneta parada no quadro abre o menu e, sobre um objeto, o pega. Desativado: a caneta só escreve, então preencher formas pequenas nunca abre um menu. Use o botão lateral da caneta ou a barra de seleção para os menus. Com o dedo, manter pressionado continua funcionando.",
  "Leave View mode": "Sair do modo visualização",
- "View mode": "Modo visualização"
+ "View mode": "Modo visualização",
+ "Triangle 45°": "Esquadro 45°",
+ "Triangle 30°/60°": "Esquadro 30°/60°",
+ "Protractor": "Transferidor",
+ "0° points": "0° aponta para",
+ "Right →": "Direita →",
+ "Up ↑": "Cima ↑",
+ "See-through": "Transparência"
 }
