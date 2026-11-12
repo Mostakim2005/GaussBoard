@@ -85,9 +85,10 @@ jobs:
           }
 
           const summary = items.map((i) => `${i.branch}@${i.short_sha}`).join(', ');
-          console.log('Discovered deduplicated Electron/Chromium branches:', items);
+          const matrixObj = { include: items };
+          console.log('Discovered deduplicated Electron/Chromium branches:', matrixObj);
 
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${JSON.stringify(items)}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${JSON.stringify(matrixObj)}\n`);
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `summary=${summary}\n`);
           EOF
 
@@ -96,13 +97,12 @@ jobs:
     runs-on: windows-latest
     strategy:
       fail-fast: false
-      matrix:
-        target: ${{ fromJson(needs.discover-branches.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.discover-branches.outputs.matrix) }}
     steps:
-      - name: Checkout branch (${{ matrix.target.branch }} @ ${{ matrix.target.short_sha }})
+      - name: Checkout branch (${{ matrix.branch }} @ ${{ matrix.short_sha }})
         uses: actions/checkout@v4
         with:
-          ref: ${{ matrix.target.full_sha }}
+          ref: ${{ matrix.full_sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -121,10 +121,10 @@ jobs:
       - name: Rename binaries with Engine, Version, Branch, and Commit SHA
         shell: bash
         env:
-          VERSION: ${{ matrix.target.version }}
-          SLUG: ${{ matrix.target.slug }}
-          SHA: ${{ matrix.target.short_sha }}
-          IS_PRIMARY: ${{ matrix.target.is_primary }}
+          VERSION: ${{ matrix.version }}
+          SLUG: ${{ matrix.slug }}
+          SHA: ${{ matrix.short_sha }}
+          IS_PRIMARY: ${{ matrix.is_primary }}
         run: |
           set -euo pipefail
           mkdir -p dist-release
@@ -151,10 +151,10 @@ jobs:
 
           ls -lh dist-release/
 
-      - name: Upload build output as a workflow artifact (${{ matrix.target.slug }})
+      - name: Upload build output as a workflow artifact (${{ matrix.slug }})
         uses: actions/upload-artifact@v4
         with:
-          name: GaussBoard-Electron-Chromium-Windows-${{ matrix.target.slug }}-${{ matrix.target.short_sha }}
+          name: GaussBoard-Electron-Chromium-Windows-${{ matrix.slug }}-${{ matrix.short_sha }}
           path: dist-release/*
           if-no-files-found: error
 
