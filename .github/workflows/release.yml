@@ -178,6 +178,6 @@ jobs:
         with:
           files: dist-release/*
           fail_on_unmatched_files: true
-          name: GaussBoard [Electron-Chromium] ${{ github.ref_name }} (Branches: ${{ needs.discover-branches.outputs.summary }})
+          name: "GaussBoard [Electron-Chromium] ${{ github.ref_name }} (Branches: ${{ needs.discover-branches.outputs.summary }})"
           body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: ${{ steps.notes.outputs.generate == 'true' }}
