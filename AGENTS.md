@@ -4,7 +4,7 @@
 ## 1. Project Tech Stack & Environment
 * **Runtime / Language:** Node.js v20+, Vanilla ES6 JavaScript modules, Electron 43.
 * **Framework / Host:** HTML5 Canvas 2D, Electron Desktop & PWA Web Adapter (zero frontend frameworks, zero C++ native addons).
-* **Target OS / Build Output:** Windows x64 portable .exe by default (`dist/`), optional NSIS installer, Linux AppImage/deb, macOS dmg.
+* **Target OS / Build Output:** Windows x64 portable `.exe` by default (`dist/`), NSIS installer `.exe`, Linux AppImage/deb, macOS dmg. Every cloud release binary uses the self-identifying naming scheme `GaussBoard-Electron-Chromium-v<Version>-branch-<BranchSlug>-<ShortSHA>-<Type>.exe` across all deduplicated branches.
 
 ## 2. Mandatory Verification & Build Commands
 * **Active Features Smoke Test (24/24):** `node scripts/smoke.js` (or `node scripts/smoke.js --new-features`)

@@ -302,3 +302,23 @@ flowchart LR
 * **Protected Code Anchors (Grep Targets):**
   * `src/js/core/interaction.js` -> `abortActiveStroke`
   * `src/js/ui/hold-manager.js` -> `handlePointerDown`, `_fireStationaryHold`
+
+### [DECISION: Multi-Branch-Deduplicated-Electron-Release-Naming] | Aliases: Electron-Chromium naming, branch-aware release, discover-branches, SHA deduplication
+> **1-Line Summary:** Upgraded `.github/workflows/release.yml` to discover all remote branches (`origin/*`), deduplicate identical commit SHAs, build each unique branch in parallel, and name every `.exe` with Engine (`Electron-Chromium`), Version, Branch Slug, and Short Commit SHA.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`
+* **Original User Intention:** Prevent confusion between the Electron/Chromium repository (`Mostakim2005/GaussBoard`) and the Rust/Tauri port (`Mostakim2005/gaussboard-rust-port`), ensure releases build across all distinct branches without duplicates, and make every `.exe` filename explicitly state its runtime engine, branch, and commit hash.
+* **Options Considered:**
+  * **Option A (Rejected):** Build only the tagged branch with generic `GaussBoard-vX.Y.Z-Portable.exe` names. Rejected because it hides whether a binary is Electron or Rust and which branch/commit produced it.
+  * **Option B (Chosen):** Add a `discover-branches` job to `.github/workflows/release.yml` that scans `refs/remotes/origin/*`, groups by commit SHA to prevent duplicate builds, and outputs `GaussBoard-Electron-Chromium-v<Version>-branch-<BranchSlug>-<ShortSHA>-Portable.exe` and `...-Setup.exe`.
+* **Visual Pivot Map (What Failed vs. What Works):**
+```mermaid
+flowchart LR
+    subgraph Old["❌ Single-Branch Generic Naming"]
+        O1["GaussBoard-v6.9.3-Portable.exe"] --> O2["Ambiguous Runtime & Branch"]
+    end
+    subgraph New["✅ Deduplicated Multi-Branch Electron Naming"]
+        N1["discover-branches (SHA Deduplicated)"] --> N2["GaussBoard-Electron-Chromium-vX.Y.Z-branch-<Slug>-<SHA>-Portable.exe"]
+    end
+```
+* **Code Anchors (Grep Targets):**
+  * `.github/workflows/release.yml` -> `discover-branches`, `GaussBoard-Electron-Chromium-v`
