@@ -749,8 +749,12 @@ export async function saveBoardFile(app) {
         const audioBuf = await window.board?.recording?.readAsset?.(tr.assetId);
         if (audioBuf && audioBuf.byteLength > 0) {
           zip.file('assets/' + tr.assetId, new Uint8Array(audioBuf));
+        } else {
+          console.warn(`[export] Missing or empty audio asset for track ${tr.id || tr.assetId}: ${tr.assetId}`);
         }
-      } catch {}
+      } catch (err) {
+        console.warn(`[export] Failed to read audio asset ${tr.assetId}:`, err);
+      }
     }
     const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 1 } });
     await window.board.writeFile(filePath, bytes.buffer);

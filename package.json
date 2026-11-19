@@ -134,7 +134,7 @@
       "maintainer": "theBoringCodes <fahim9778@gmail.com>",
       "desktop": {
         "entry": {
-          "Name": "GazBoard",
+          "Name": "GaussBoard",
           "StartupWMClass": "gazboard"
         }
       },
@@ -182,7 +182,7 @@
       "releaseType": "release"
     },
     "dmg": {
-      "title": "GazBoard ${version}",
+      "title": "GaussBoard ${version}",
       "contents": [
         {
           "x": 140,
@@ -200,7 +200,6 @@
   },
   "desktopName": "gazboard.desktop",
   "dependencies": {
-    "electron-updater": "6.8.10",
-    "mp4-muxer": "^5.2.2"
+    "electron-updater": "6.8.10"
   }
 }

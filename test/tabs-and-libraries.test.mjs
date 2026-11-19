@@ -44,8 +44,12 @@ test('libraries.json manifest includes required libraries and versions', () => {
   assert.equal(pdflib.version, '1.17.1');
 });
 
-test('Shared CommonLibraries repository exists on C: with all engines', () => {
+test('Shared CommonLibraries repository exists on C: with all engines', (t) => {
   const sharedDir = 'C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries';
+  if (!fs.existsSync(sharedDir)) {
+    t.skip('External developer CommonLibraries directory is not present on this machine');
+    return;
+  }
   assert.ok(fs.existsSync(sharedDir), 'CommonLibraries folder exists');
 
   const manifestPath = path.join(sharedDir, 'libraries.json');
@@ -70,12 +74,12 @@ test('TabBar in-memory LRU session cache and tab life cycle', async () => {
   const mockDoc = { id: 'board-alpha', name: 'Alpha Study Board', objects: { 's1': { type: 'stroke' } } };
   const mockStore = {
     doc: JSON.parse(JSON.stringify(mockDoc)),
-    _undoStack: [{ op: 'add', id: 's1' }],
-    _redoStack: [],
+    undoStack: [{ op: 'add', id: 's1' }],
+    redoStack: [],
     reset() {
       this.doc = { id: 'temp', name: 'Untitled board', objects: {} };
-      this._undoStack = [];
-      this._redoStack = [];
+      this.undoStack = [];
+      this.redoStack = [];
     }
   };
 
@@ -89,6 +93,22 @@ test('TabBar in-memory LRU session cache and tab life cycle', async () => {
     },
     settings: { showTabBar: true },
     saveBeforeLeaving: async () => {},
+    loadBoard: async (payload) => {
+      mockStore.doc = {
+        id: payload.id,
+        name: payload.name,
+        objects: Array.isArray(payload.objects)
+          ? Object.fromEntries(payload.objects.map((o) => [o.id || 's1', o]))
+          : (payload.objects || {})
+      };
+      if (payload.camera) {
+        mockApp.surface.cam.x = payload.camera.x;
+        mockApp.surface.cam.y = payload.camera.y;
+        mockApp.surface.cam.z = payload.camera.z;
+      }
+      mockStore.undoStack = [];
+      mockStore.redoStack = [];
+    },
     newBoard(silent) {
       mockStore.doc = { id: 'board-beta', name: 'Beta Notes', objects: {} };
     },

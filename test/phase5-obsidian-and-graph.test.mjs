@@ -124,4 +124,28 @@ describe('Phase 5: Markdown Sidecar and Knowledge Graph Data', () => {
     assert.ok(md.includes('```mermaid'));
     assert.ok(md.includes('f(x)-->df/dx'));
   });
+
+  it('exportMarkdownSidecarFile uses window.board.saveDialog and writeFile when available', async () => {
+    const { exportMarkdownSidecarFile } = await import('../src/js/core/markdown-sidecar.js');
+    const writes = [];
+    let dialogOpts = null;
+    global.window = {
+      board: {
+        saveDialog: async (opts) => { dialogOpts = opts; return 'C:/tmp/My_Board.md'; },
+        writeFile: async (filePath, buf) => { writes.push({ filePath, text: new TextDecoder().decode(buf) }); }
+      }
+    };
+    const toasts = [];
+    const mockApp = {
+      store: { name: 'My Board', doc: { objects: { n1: { type: 'note', text: 'Sidecar note' } } } },
+      toast: (msg) => toasts.push(msg)
+    };
+    await exportMarkdownSidecarFile(mockApp);
+    assert.ok(dialogOpts, 'Should invoke window.board.saveDialog');
+    assert.equal(dialogOpts.defaultPath, 'My_Board.md');
+    assert.equal(writes.length, 1, 'Should write sidecar file via window.board.writeFile');
+    assert.equal(writes[0].filePath, 'C:/tmp/My_Board.md');
+    assert.ok(writes[0].text.includes('Sidecar note'));
+    assert.equal(toasts[0], 'Exported My_Board.md');
+  });
 });

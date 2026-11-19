@@ -1721,6 +1721,14 @@ function ipc() {
     return { assetId: hash, durationMs };
   }));
 
+  handleIpc('recording:readAsset', async (_e, assetId) => {
+    if (!ASSET_NAME.test(String(assetId || ''))) return null;
+    try {
+      const buf = await fsp.readFile(path.join(assetsDir(), assetId));
+      return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    } catch { return null; }
+  });
+
   handleIpc('assets:putBinaryDirect', async (_e, { assetId, buffer }) => withStorageWrite(async () => {
     if (!ASSET_NAME.test(String(assetId || ''))) return false;
     const dest = path.join(assetsDir(), assetId);

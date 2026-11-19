@@ -322,3 +322,14 @@ flowchart LR
 ```
 * **Code Anchors (Grep Targets):**
   * `.github/workflows/release.yml` -> `discover-branches`, `GaussBoard-Electron-Chromium-v`
+
+### [DECISION: Cross-Platform-Audio-Asset-Export-And-Preload-Disposers] | Aliases: recording:readAsset, saveDialog contract, onChannel disposers, sw.js precache parity
+> **1-Line Summary:** Implemented `recording.readAsset` across Electron/Web/Android so `.gaussboard` ZIP exports never drop audio recordings, unified Obsidian/Markdown exports on `saveDialog` + `writeFile`, added unsubscribe disposers to `preload.js`, and enforced 100% `src/sw.js` module precache parity.
+* **Decision Maker:** `[DECIDED BY: AGENT - Approved by Human]`
+* **Original User Intention:** Close all remaining Rust-port backport gaps (`rememberRecentPen`, `sw.js`, `smoke-custom.js`) and resolve all critical/high/medium audit bugs from Report 1 on `feat/upstream-risk-eval`.
+* **Code Anchors (Grep Targets):**
+  * `main.js` -> `recording:readAsset`
+  * `preload.js` -> `onChannel`, `recording.readAsset`
+  * `src/js/export.js` -> `saveBoardFile`
+  * `src/js/ui/radial.js` -> `rememberRecentPen`
+  * `src/sw.js` -> `PRECACHE_ASSETS`

@@ -1,5 +1,5 @@
 # System Architecture (`docs/ARCHITECTURE.md`)
-> **1-Line Summary:** Plain-English visual map of how GaussBoard 6.9.2 works, why we chose each tool, and step-by-step recipes for adding new features.
+> **1-Line Summary:** Plain-English visual map of how GaussBoard 6.9.3 works, why we chose each tool, and step-by-step recipes for adding new features.
 
 ## 1. High-Level Visual System Map
 ```mermaid
@@ -20,7 +20,7 @@ flowchart TB
     Surface --> Study[Study Tape + Covers]
     Import[Importers: PDF, PPTX, OOXML, mammoth] --> Store
     ElectronMain[Electron Main: Window, IPC, Conversion, Storage] --> Store
-    Store --> Boards[(Boards Folder: boards/*.gazboard + assets/)]
+    Store --> Boards[(Boards Folder: boards/*.json + assets/)]
     PWA[PWA: Service Worker + Web Adapter] --> Store
 ```
 

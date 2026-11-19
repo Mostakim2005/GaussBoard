@@ -271,3 +271,15 @@ test('Tiny dot / short stroke (< 24px) does not trigger holdToShape', () => {
   interaction.armShapeHold(strokeAction, { x: 53, y: 52 });
   assert.equal(!interaction._shapeHoldTimer, true, 'Post-stroke dwell timer not armed for tiny dot');
 });
+
+test('rememberRecentPen tracks the 3 most recent unique pens for RadialMenu', async () => {
+  const { rememberRecentPen, ringPens } = await import('../src/js/ui/radial.js');
+  const settings = { activePen: 'black', recentPens: [] };
+  rememberRecentPen(settings, 'blue');
+  rememberRecentPen(settings, 'red');
+  rememberRecentPen(settings, 'green');
+  rememberRecentPen(settings, 'blue'); // moves blue to front without duplicates
+  assert.deepEqual(settings.recentPens, ['blue', 'green', 'red']);
+  const ring = ringPens(settings).map((p) => p.id);
+  assert.deepEqual(ring, ['blue', 'green', 'red']);
+});

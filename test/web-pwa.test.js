@@ -1358,6 +1358,24 @@ async function runTests() {
     const app = fs.readFileSync(path.join(SRC, 'js/app.js'), 'utf8');
     check('and start-up gives up on sharing before touching anything',
       /if \(!window\.board \|\| !window\.board\.sync\) return;/.test(app));
+
+    // Ensure every ES module in src/js/**/*.js is included in src/sw.js PRECACHE_ASSETS
+    const swSource = fs.readFileSync(path.join(SRC, 'sw.js'), 'utf8');
+    const allJsModules = [];
+    const collectJs = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) collectJs(full);
+        else if (e.name.endsWith('.js')) {
+          allJsModules.push('./' + path.relative(SRC, full).replace(/\\/g, '/'));
+        }
+      }
+    };
+    collectJs(path.join(SRC, 'js'));
+    const missingFromSw = allJsModules.filter((m) => !swSource.includes(`'${m}'`));
+    check('every src/js/**/*.js module is registered in src/sw.js PRECACHE_ASSETS',
+      missingFromSw.length === 0,
+      missingFromSw.length ? `missing: ${missingFromSw.join(', ')}` : '');
   } catch (e) {
     check('desktop-only sharing checks failed', false, e.message);
   }

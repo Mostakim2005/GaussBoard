@@ -9,6 +9,7 @@ import {
 } from './palettes.js';
 import { EMOJI_GROUPS, searchEmoji } from '../core/emoji.js';
 import { inkPaint, isDarkBoard, isDarkColor } from '../core/render.js';
+import { rememberRecentPen } from './radial.js';
 import { t } from '../i18n.js';
 
 const TOOL_ICON = {
@@ -2156,6 +2157,7 @@ export function choosePen(app, id, anchor) {
   if (!pen) return;
   const held = app.tool === 'pen' && heldPenId(s) === id;
   s.activePen = id;
+  rememberRecentPen(s, id);
   s.penColor = pen.color;
   s.penEffect = pen.effect;
   app.saveSettings();

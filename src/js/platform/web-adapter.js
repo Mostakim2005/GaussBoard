@@ -99,7 +99,12 @@ export function createWebAdapter() {
     assets: {
       put: (dataUrl) => storage.putAsset(dataUrl),
       get: (id) => storage.getAsset(id),
-      have: (ids) => storage.haveAssets(ids)
+      have: (ids) => storage.haveAssets(ids),
+      putBinaryDirect: (assetId, buffer) => storage.putBinaryAssetDirect(assetId, buffer)
+    },
+
+    recording: {
+      readAsset: (assetId) => storage.readAssetBuffer(assetId)
     },
 
     importToPdf: async (filePath) => {

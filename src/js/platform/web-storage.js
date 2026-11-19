@@ -474,6 +474,54 @@ export async function getAsset(id) {
   });
 }
 
+export async function readAssetBuffer(id) {
+  if (!ASSET_NAME.test(String(id || ''))) return null;
+  const db = await openDatabase();
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction('assets', 'readonly');
+      const store = tx.objectStore('assets');
+      const req = store.get(id);
+      req.onsuccess = () => {
+        const item = req.result;
+        if (!item) { resolve(null); return; }
+        if (item.buffer) { resolve(item.buffer); return; }
+        if (item.dataUrl) {
+          const d = decodeDataUrl(item.dataUrl);
+          resolve(d?.buffer || null);
+          return;
+        }
+        resolve(null);
+      };
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+export async function putBinaryAssetDirect(assetId, buffer) {
+  if (!ASSET_NAME.test(String(assetId || '')) || !buffer) return false;
+  try {
+    const rawBuf = buffer instanceof ArrayBuffer
+      ? buffer
+      : (ArrayBuffer.isView(buffer) ? buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) : null);
+    if (!rawBuf) return false;
+    const ext = String(assetId).split('.').pop();
+    const mime = ASSET_MIME[ext] || (ext === 'webm' ? 'audio/webm' : 'application/octet-stream');
+    const db = await openDatabase();
+    return new Promise((resolve) => {
+      const tx = db.transaction('assets', 'readwrite');
+      const store = tx.objectStore('assets');
+      store.put({ id: assetId, mime, buffer: rawBuf, created: Date.now() });
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  } catch {
+    return false;
+  }
+}
+
 export async function haveAssets(ids) {
   const list = Array.isArray(ids) ? ids : [];
   const out = {};

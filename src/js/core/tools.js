@@ -388,8 +388,12 @@ export class Interaction {
     this.app.boardPoint = { x: wp.x, y: wp.y, at: performance.now() };
 
     if (this.pointers.size >= 2) {
-      this.cancelHold();
-      this.cancelShapeHold();
+      const types = [...this.pointers.values()].map((p) => p.type);
+      const isPalmTouchDuringPen = e.pointerType === 'touch' && types.includes('pen') && (this.action || this.lateTouch(e));
+      if (!isPalmTouchDuringPen) {
+        this.cancelHold();
+        this.cancelShapeHold();
+      }
     }
 
     if (this.pointers.size === 2) {

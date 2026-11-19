@@ -48,7 +48,7 @@ import { ReplayBar } from './ui/replay-bar.js';
 import { exportVideoFile } from './export-video.js';
 import { SearchDialog } from './ui/search-dialog.js';
 import { NoteOverviewDrawer } from './ui/note-overview.js';
-import { RadialMenu } from './ui/radial.js';
+import { RadialMenu, rememberRecentPen } from './ui/radial.js';
 import { HoldGestureManager } from './core/hold-manager.js';
 import { TabBar } from './ui/tabs.js';
 import { VisualizationDialog } from './ui/visualization-dialog.js';
@@ -2926,7 +2926,8 @@ class App {
       r.y = v.y + v.h / 2;
       r.length = Math.min(1200, v.w * 0.7);
       r.thickness = 78 / this.surface.cam.z;
-      this.fitTriangle();      const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+      this.fitTriangle();
+      const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
       this.toast(coarse
         ? t('Ruler on — drag the middle to move it, drag a blue knob at either end to turn it')
         : t('Ruler on — drag the grip in the middle to move it, scroll over it or drag a blue knob to turn it'));
@@ -3438,6 +3439,18 @@ class App {
     const canvasObj = exportToJsonCanvas(this.store.doc);
     const content = JSON.stringify(canvasObj, null, 2);
     const defaultFilename = `${boardName.replace(/[^a-zA-Z0-9_\-]/g, '_')}.canvas`;
+
+    if (window.board?.saveDialog && window.board?.writeFile) {
+      const filePath = await window.board.saveDialog({
+        title: t('Save a copy'),
+        defaultPath: defaultFilename,
+        filters: [{ name: 'Obsidian Canvas (*.canvas)', extensions: ['canvas'] }]
+      });
+      if (!filePath) return;
+      await window.board.writeFile(filePath, new TextEncoder().encode(content).buffer);
+      this.toast(t('Exported {name}', { name: filePath.split(/[\\/]/).pop() || defaultFilename }));
+      return;
+    }
 
     if (window.board?.saveFile) {
       const res = await window.board.saveFile({
@@ -5951,6 +5964,7 @@ class App {
       if (pen) {
         e.preventDefault();
         this.settings.activePen = pen.id;
+        rememberRecentPen(this.settings, pen.id);
         this.settings.penColor = pen.color;
         this.settings.penEffect = pen.effect;
         this.saveSettings();

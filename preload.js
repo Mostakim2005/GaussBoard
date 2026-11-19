@@ -159,6 +159,12 @@ function clipboardWriteForTests(payload) {
   } catch { return false; }
 }
 
+function onChannel(channel, fn) {
+  const wrapped = (_e, ...args) => fn(...args);
+  ipcRenderer.on(channel, wrapped);
+  return () => ipcRenderer.removeListener(channel, wrapped);
+}
+
 contextBridge.exposeInMainWorld('board', {
   info: () => ipcRenderer.invoke('app:info'),
   clipboardSignature,
@@ -189,9 +195,9 @@ contextBridge.exposeInMainWorld('board', {
   newWindow: (opts) => ipcRenderer.invoke('window:new', opts || {}),
   claimLease: () => ipcRenderer.invoke('window:claimLease'),
   getLeaseState: () => ipcRenderer.invoke('window:getLeaseState'),
-  onLeaseChanged: (cb) => ipcRenderer.on('lease:state', (_e, state) => cb(state)),
-  onBoardExternalUpdate: (cb) => ipcRenderer.on('board:externalUpdate', (_e, info) => cb(info)),
-  onOpenBoardById: (cb) => ipcRenderer.on('board:openById', (_e, id) => cb(id)),
+  onLeaseChanged: (cb) => onChannel('lease:state', (state) => cb(state)),
+  onBoardExternalUpdate: (cb) => onChannel('board:externalUpdate', (info) => cb(info)),
+  onOpenBoardById: (cb) => onChannel('board:openById', (id) => cb(id)),
   storage: {
     get: () => ipcRenderer.invoke('storage:get'),
     choose: () => ipcRenderer.invoke('storage:choose'),
@@ -201,9 +207,9 @@ contextBridge.exposeInMainWorld('board', {
     readCatalogue: () => ipcRenderer.invoke('storage:catalogue:read'),
     writeCatalogue: (json) => ipcRenderer.invoke('storage:catalogue:write', json),
     flushAck: (ticket, ok) => ipcRenderer.invoke('storage:flush-ack', ticket, ok),
-    onFlush: (cb) => ipcRenderer.on('storage:flush', (_e, ticket) => cb(ticket)),
-    onResume: (cb) => ipcRenderer.on('storage:resume', (_e, result) => cb(result)),
-    onChanged: (cb) => ipcRenderer.on('storage:changed', () => cb())
+    onFlush: (cb) => onChannel('storage:flush', (ticket) => cb(ticket)),
+    onResume: (cb) => onChannel('storage:resume', (result) => cb(result)),
+    onChanged: (cb) => onChannel('storage:changed', () => cb())
   },
   openReleases: (url) => ipcRenderer.invoke('shell:openExternal', url),
   checkForUpdate: () => ipcRenderer.invoke('updates:check'),
@@ -213,7 +219,7 @@ contextBridge.exposeInMainWorld('board', {
     download: (version) => ipcRenderer.invoke('updates:download', version),
     install: (opts) => ipcRenderer.invoke('updates:install', opts || {}),
     note: () => ipcRenderer.invoke('updates:note'),
-    onProgress: (cb) => ipcRenderer.on('updates:progress', (_e, p) => cb(p))
+    onProgress: (cb) => onChannel('updates:progress', (p) => cb(p))
   },
 
   boards: {
@@ -238,7 +244,8 @@ contextBridge.exposeInMainWorld('board', {
   recording: {
     start: (sessionId) => ipcRenderer.invoke('recording:start', sessionId),
     appendChunk: (sessionId, chunk) => ipcRenderer.invoke('recording:appendChunk', { sessionId, chunk }),
-    finish: (sessionId, durationMs) => ipcRenderer.invoke('recording:finish', { sessionId, durationMs })
+    finish: (sessionId, durationMs) => ipcRenderer.invoke('recording:finish', { sessionId, durationMs }),
+    readAsset: (assetId) => ipcRenderer.invoke('recording:readAsset', assetId)
   },
 
   /*
@@ -271,12 +278,12 @@ contextBridge.exposeInMainWorld('board', {
       commands: () => ipcRenderer.invoke('sync:firewall:commands')
     },
     // the device list changed underfoot
-    onPeers: (fn) => ipcRenderer.on('sync:peers', (_e, peers) => fn(peers)),
-    onReceiving: (fn) => ipcRenderer.on('sync:receiving', (_e, info) => fn(info)),
+    onPeers: (fn) => onChannel('sync:peers', (peers) => fn(peers)),
+    onReceiving: (fn) => onChannel('sync:receiving', (info) => fn(info)),
     // a board is at the door; answer with an outcome string, or null to decline
-    onIncoming: (fn) => ipcRenderer.on('sync:incoming', (_e, msg) => fn(msg)),
+    onIncoming: (fn) => onChannel('sync:incoming', (msg) => fn(msg)),
     // bytes going out during a send, so a long transfer does not look hung
-    onSendProgress: (fn) => ipcRenderer.on('sync:sendProgress', (_e, p) => fn(p)),
+    onSendProgress: (fn) => onChannel('sync:sendProgress', (p) => fn(p)),
     // One channel, not one per question: a ticket that has already timed out
     // comes back as false rather than as a missing-handler error.
     answer: (ticket, outcome) => ipcRenderer.invoke('sync:answer', { ticket, outcome })
@@ -287,13 +294,13 @@ contextBridge.exposeInMainWorld('board', {
   importTakesBytes: true,
   exportPdf: (payload) => ipcRenderer.invoke('export:pdf', payload),
 
-  onMenu: (cb) => ipcRenderer.on('menu:command', (_e, id) => cb(id)),
+  onMenu: (cb) => onChannel('menu:command', (id) => cb(id)),
   // The native menu bar belongs to the main process, so it is told which
   // language to rebuild itself in.
   setLanguage: (code) => ipcRenderer.send('app:language', code),
-  onOpenFile: (cb) => ipcRenderer.on('board:open', (_e, data) => cb(data)),
-  onWindowResized: (cb) => ipcRenderer.on('window:resized', () => cb()),
-  onFlush: (cb) => ipcRenderer.on('app:flush', async () => { await cb(); ipcRenderer.send('app:flushed'); }),
+  onOpenFile: (cb) => onChannel('board:open', (data) => cb(data)),
+  onWindowResized: (cb) => onChannel('window:resized', () => cb()),
+  onFlush: (cb) => onChannel('app:flush', async () => { await cb(); ipcRenderer.send('app:flushed'); }),
   // starting up: what is being opened (for the starting-up window), and that the board is on screen
   startupStep: (text) => ipcRenderer.send('app:startupStep', String(text || '')),
   startupDone: (info) => ipcRenderer.send('app:startupDone', info && typeof info === 'object' ? JSON.parse(JSON.stringify(info)) : {}),
