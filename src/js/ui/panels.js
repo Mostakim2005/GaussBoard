@@ -1535,6 +1535,13 @@ export function createPanels(app) {
                   app.interaction.hideInkPointer(); }),
                 t('Off (default): drawing with a finger shows no pen nib, because your fingertip is already on the spot and the nib only hides under your hand. A stylus or a mouse on this machine still gets one. Switch on if you are on a Surface or another touchscreen PC and want the nib under your finger too.'))
             : null,
+          row(t('Show the pen in screen recordings'), mkToggle(() => s.recordPointer === true, (v) => {
+            s.recordPointer = v;
+            app.saveSettings();
+            app.interaction?.hideGlow?.();
+            app.splitWorkspace?.leftInteraction?.hideGlow?.();
+          }),
+            t('Off (default). Zoom and other recorders only capture the mouse pointer, so a pen writes with no pointer in the video and the arrow stays parked wherever the mouse was. On: a faint glow follows the pen whenever it is near the screen, hovering or writing, so recordings show where you are. Your pen and its pointer feel exactly the same.')),
           // Interactive Scribble-to-Erase Configuration Card
           (() => {
             const card = h('div', {
@@ -1710,6 +1717,8 @@ export function createPanels(app) {
               t('Asks GitHub at most twice a day whether a newer version exists, and tells you if so. Nothing is downloaded or installed automatically, and nothing about you or your boards is ever sent. Off means the app never touches the network.')),
           row(t('Shortcut letters on the toolbar'), mkToggle(() => s.showToolKeys !== false, (v) => (s.showToolKeys = v)),
             t('Shows the key for each tool in the corner of its button — V, P, H, E and so on — so you can switch without stopping to look them up.')),
+          row(t('Draw ahead of the pen'), mkToggle(() => s.drawAhead === true, (v) => { s.drawAhead = v; app.saveSettings(); }),
+            t('Off (default). On: while you write, a short guess of where the pen is going is drawn just ahead of the ink, so the line keeps up with the nib. The guess is never kept: what is saved is exactly what you wrote. Leave it off if you ever see the tip overshoot.')),
           row(t('Low-latency inking'), mkToggle(() => s.lowLatencyInk, (v) => { s.lowLatencyInk = v; app.toast(t('Takes effect next time GazBoard opens')); }),
             t('Shaves a little lag off the pen by letting the canvas skip a buffering step. On some graphics drivers this makes the board flicker while you write or drag, especially with imported document pages on it — leave it off if you see that. Applies when the app is reopened.')),
           // Windows only: elsewhere the switch would do nothing, so it is not offered.

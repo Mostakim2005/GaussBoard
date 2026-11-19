@@ -61,6 +61,7 @@ export class Surface {
     this.hoverId = null;
     this._raf = null;
     this._warming = null;      // handle of a queued idle rebuild, see warmFreeze()
+    this.wetTail = null;       // where the pen is about to be, drawn ahead of the live stroke - see Interaction.predictTail
     this._build = null;        // Sliced progressive build: { canvas, order, index, total, camX, camY, camZ, rev }
     this._shownFor = null;     // Stretched snapshot while sharpening: { canvas, cam: { x, y, z }, rev }
     this._needsRepaintAfterBuild = false;
@@ -788,8 +789,7 @@ export class Surface {
     // Layer 2: Live Unbaked Overlays (Always 60 FPS)
     const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
     if (isReplay) this.drawReplaySession(ctx);
-    if (this.wet) this._drawWet(ctx);
-    if (this.wetPieces) for (const piece of this.wetPieces) this._drawWetPiece(ctx, piece);
+    if (this.wet || this.wetPieces) this._drawWet(ctx);
     if (this.ghosts.length) this._drawGhosts(ctx);
     if (this.laser.length) this._drawLaser(ctx);
 
@@ -1009,7 +1009,13 @@ export class Surface {
      * of the line would vanish the moment the pen came out the other side.
      */
     if (this.wetPieces) for (const piece of this.wetPieces) one(piece);
-    one(this.wet);
+    // the predicted tail (see Interaction.predictTail): only while it still belongs to these very points
+    const tail = this.wetTail;
+    if (this.wet && tail && tail.forPts === this.wet.points && tail.len === this.wet.points.length && tail.points.length) {
+      one({ ...this.wet, points: this.wet.points.concat(tail.points) });
+    } else {
+      one(this.wet);
+    }
   }
 
   /**

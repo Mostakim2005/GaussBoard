@@ -2378,5 +2378,12 @@
  "Hold gesture mode": "按住手势模式",
  "Hold menu: Radial ring": "按住菜单：环形快捷盘",
  "Hold menu: Classic list": "按住菜单：经典列表",
- "Hold gestures disabled": "按住手势已禁用"
+ "Hold gestures disabled": "按住手势已禁用",
+ "Erase shapes too": "也擦除形状",
+ "The eraser now also rubs out lines and shapes it crosses": "橡皮擦现在也会擦除碰到的线条和形状",
+ "The eraser leaves shapes alone": "橡皮擦不会擦除形状",
+ "Draw ahead of the pen": "在笔尖前预先绘制",
+ "Off (default). On: while you write, a short guess of where the pen is going is drawn just ahead of the ink, so the line keeps up with the nib. The guess is never kept: what is saved is exactly what you wrote. Leave it off if you ever see the tip overshoot.": "默认关闭。开启后：书写时，会在墨迹前方绘制一小段对笔尖去向的预测，让线条紧跟笔尖。预测部分从不保存：保存的正是你写下的内容。如果看到笔尖超前，可以关闭此项。",
+ "Show the pen in screen recordings": "在屏幕录制中显示笔",
+ "Off (default). Zoom and other recorders only capture the mouse pointer, so a pen writes with no pointer in the video and the arrow stays parked wherever the mouse was. On: a faint glow follows the pen whenever it is near the screen, hovering or writing, so recordings show where you are. Your pen and its pointer feel exactly the same.": "默认关闭。Zoom 等录制工具只捕获鼠标指针，所以录像里笔在写字却没有指针，箭头还停在鼠标原来的位置。开启后：只要笔靠近屏幕，无论悬停还是书写，都会有一圈淡淡的光跟着笔，录像里就能看出你在哪儿。笔和指针的手感完全不变。"
 }

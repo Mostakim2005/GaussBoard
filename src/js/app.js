@@ -92,7 +92,7 @@ export const DEFAULT_SETTINGS = {
   // makes Reset to defaults put every pen back to the colour it shipped with.
   highlighterColor: '#fff100', highlighterWidth: 20, highlighterOpacity: 0.5, highlighterColorPop: true,
   audioInkSync: true, replayDisplayMode: 'reveal', replayOutlineColor: '#00e5ff', replayOutlineEffect: 'neon', replayCameraFollow: true, replayCameraMode: 'viewport',
-  eraserSize: 30, eraserMode: 'partial',
+  eraserSize: 30, eraserMode: 'partial', eraseShapes: false,
   // the pencil's scratch while it draws: on, so the pencil is heard to be a pencil; Settings or its own menu turn it off
   pencilSound: true,
   pdfPaper: 'a4', pdfOrientation: '', pdfMargin: 'narrow', pdfMode: 'fit', pdfQuality: 2,
@@ -106,7 +106,7 @@ export const DEFAULT_SETTINGS = {
   graphPhysics: true, showExcerptTethers: true, autoExportMarkdownSidecar: false,
   showGroupOutlines: true, showTabBar: true,
   sidebarRibbonVisible: false, sidebarRibbonPosition: 'left', sidebarRibbonStyle: 'glassmorphism', sidebarRibbonCategory: 'circuits',
-  edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, pageStrip: false, penHold: true, laserColor: '#ff2d2d',
+  edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, drawAhead: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, pageStrip: false, penHold: true, laserColor: '#ff2d2d',
   penOpacityEnabled: false, penOpacity: 1, laserTrailDuration: 520, boardLinkThumb: true,
   brushColor: '#201f1e', brushWidth: 8, brushOpacity: 0.9, brushSoftness: 'medium', brushVelocityThinning: true,
   fountainColor: '#002050', fountainWidth: 4, fountainSlant: 45, fountainFlex: 'normal',
@@ -140,6 +140,8 @@ export const DEFAULT_SETTINGS = {
   // and a phone has no hover for it to belong to. On is for a touchscreen PC
   // whose owner wants it anyway. See showInkPointer() in tools.js.
   nibOnTouch: false,
+  // Draw a soft glow under a hovering or writing pen too, so screen recordings show where the pen is.
+  recordPointer: false,
   // A short two-note chime when a board starts arriving. On by default: the
   // thing it prevents is being halfway through a sentence when an "accept
   // this board?" dialog appears out of nowhere. See showReceiving().
@@ -1209,6 +1211,10 @@ class App {
     this.tool = tool;
     // a pen nib left behind by the tool it belonged to is just a stray picture
     if (!isInk) this.interaction.hideInkPointer();
+    if (tool === 'eraser') {
+      this.interaction?.hideGlow?.();
+      this.splitWorkspace?.leftInteraction?.hideGlow?.();
+    }
     if (tool !== 'laser') this.surface.laser.length = 0;   // no stale dot left behind
     // panning is a view change, not an edit - it must not throw a selection away
     if (tool !== 'select' && tool !== 'lasso' && tool !== 'pan') this.setSelection([]);

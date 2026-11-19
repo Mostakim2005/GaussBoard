@@ -221,6 +221,8 @@ export function buildSvg(app, box, others = []) {
   return parts.join('\n');
 }
 
+let neonSeq = 0;
+
 /** Every object of a board, as SVG elements. */
 function svgObjects(objects, meas) {
   const parts = [];
@@ -253,6 +255,18 @@ function svgObjects(objects, meas) {
         const op = hl ? (o.opacity ?? 0.38)
           : pencil ? +(pencilDarkness(o) * (o.opacity ?? 1)).toFixed(2)
           : (o.opacity != null && o.opacity < 1 ? o.opacity : null);
+        if (!hl && o.effect === 'neon') {
+          // a neon line goes out as its glow (a blurred copy) under a paler core, so it still shines in the file
+          const fid = 'gbneon' + (++neonSeq), w = o.width || 4;
+          const hex = /^#[0-9a-f]{6}$/i.test(o.color || '') ? o.color : '#b026ff';
+          const core = '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * 0.55 + 255 * 0.45).toString(16).padStart(2, '0')).join('');
+          const opAttr = op != null ? ` opacity="${op}"` : '';
+          parts.push(`<g${opAttr}${rot}><defs><filter id="${fid}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${+(w * 1.1).toFixed(2)}"/></filter></defs>`
+            + `<path d="${d}" fill="none" stroke="${hex}" stroke-width="${w * 1.6}" stroke-linecap="round" stroke-linejoin="round" filter="url(#${fid})"/>`
+            + `<path d="${d}" fill="none" stroke="${hex}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`
+            + `<path d="${d}" fill="none" stroke="${core}" stroke-width="${+(w * 0.42).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/></g>`);
+          continue;
+        }
         parts.push(`<path d="${d}" fill="none" stroke="${o.color}" stroke-width="${pencil ? +pencilWidth(o).toFixed(2) : o.width}" stroke-linecap="round" stroke-linejoin="round"${op != null ? ` opacity="${op}"` : ''}${rot}/>`);
       }
     } else if (o.type === 'connector') {

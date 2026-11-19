@@ -189,6 +189,17 @@
   * `src/js/core/render.js` -> `drawStroke` (LOD downsampling & sub-pixel culling)
   * `test/sliced-rendering.test.mjs` -> `testSlicedRendering`
 
+### [FEATURE: Upstream-51x-Inking-And-Eraser-Suite] | Aliases: neon pen, erase shapes too, pen glow, recordPointer, drawAhead, predictTail
+> **1-Line Summary:** Glowing neon pen effect, optional shape-outline erasing (`eraseShapes`), screen-recording pen halo (`recordPointer`), and optional ephemeral draw-ahead prediction (`drawAhead`).
+* **User Intention (Non-Negotiable):** Teachers and STEM students need high-visibility neon ink for dark/light boards, safe opt-in shape erasing without accidentally deleting labelled diagrams or covered answers, visible pen location in screen recordings, and optional latency-masking prediction that never mutates saved timestamps.
+* **Visual / UI Behavior:** Pen popover offers `Neon` effect with 8 neon swatches and auto-switches plain dark ink to neon purple (`#b026ff`); Eraser popover adds off-by-default `Erase shapes too` switch; Settings adds off-by-default `Show the pen in screen recordings` (`#penGlow` / `.pen-glow`) and `Draw ahead of the pen` (`surface.wetTail`).
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/render.js` -> `drawNeon`, `NEON_REACH`, `inkStyle`
+  * `src/js/core/hit.js` -> `outlineAlong`, `getScratch`
+  * `src/js/core/tools.js` -> `followGlow`, `hideGlow`, `predictTail`, `eraseSweep`
+  * `src/js/core/surface.js` -> `_drawWet`, `wetTail`
+  * `test/upstream-51x-features.test.mjs` -> `Neon pen`, `Erase shapes toggle`, `Pen glow`, `Draw-ahead prediction`
+
 ## 3. Planned Features & App-Merge Wishlist
 
 ### [WISHLIST: Pane-Aware-Command-Dispatcher] | Aliases: pane commands, Delete routing, Copy routing
@@ -204,7 +215,7 @@
 ## 4. Canonical References & Live Verification
 * **Core Documentation Suite:** `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS_AND_TRAPS.md`, `docs/releases/ANDROID_READINESS.md`
 * **Active Verification Suite:** `node scripts/smoke.js --new-features` (24/24 passing)
-* **Internationalization Suite:** `node scripts/i18n-check.js` (2,380/2,380 across 7 locales)
+* **Internationalization Suite:** `node scripts/i18n-check.js` (2,387/2,387 across 7 locales)
 * **Android Platform Suite:** `node --test test/android-*.test.js` (82/82 passing)
 * **Core Data Schemas & State:** `src/js/core/store.js` (`Store`, `doc.objects`, `doc.pages`, `doc.audioTracks`)
 * **Platform & Packaging:** `main.js`, `preload.js`, `package.json`

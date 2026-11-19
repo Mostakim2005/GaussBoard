@@ -916,6 +916,16 @@ body.presenting #backPill { top: 12px; }
   background-repeat: no-repeat; background-size: 26px 26px;
   will-change: transform;
 }
+/* The pen glow for screen recordings: a faint light centred on the tip (see followGlow in tools.js) */
+#penGlow, .pen-glow {
+  position: absolute; left: -24px; top: -24px; width: 48px; height: 48px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 200, 40, .5) 0%, rgba(255, 200, 40, .24) 38%, rgba(255, 200, 40, 0) 70%);
+  /* hard-light: the warm channels lighten a dark page and the blue darkens a white one,
+     so the same glow reads as a soft yellow light on either */
+  mix-blend-mode: hard-light;
+  pointer-events: none; z-index: 13; will-change: transform;
+}
+#penGlow[hidden], .pen-glow[hidden] { display: none; }
 
 #editLayer { position: absolute; inset: 0; pointer-events: none; z-index: 15; }
 /*
@@ -1538,7 +1548,7 @@ body.presenting.show-tools #toolbar { translate: 0 0; opacity: 1; pointer-events
  *  person put them, and a board made in one language must look the same
  *  opened in another - so the canvas and the text editor stay left to right.
  * =================================================================== */
-[dir="rtl"] #c, [dir="rtl"] #editLayer, [dir="rtl"] #inkNib { direction: ltr; }
+[dir="rtl"] #c, [dir="rtl"] #editLayer, [dir="rtl"] #inkNib, [dir="rtl"] #penGlow, [dir="rtl"] .pen-glow { direction: ltr; }
 /* My boards: the folder path, folders, and picking rows up to drop on them */
 .crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin: 0 0 10px; font-size: 13px; }
 .crumb { border: 0; background: none; color: var(--accent-2); padding: 6px 8px; border-radius: 6px; cursor: pointer; font: inherit; min-height: 36px; max-width: 14em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

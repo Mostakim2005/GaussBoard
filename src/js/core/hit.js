@@ -7,7 +7,14 @@ import { shapePath, noteTypeRange } from './render.js';
 import { hitConnector } from './connectors.js';
 import { TASK_LINE_RE, toggleTaskAtLine } from './markdown.js';
 
-const scratch = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+let scratch = null;
+function getScratch() {
+  if (scratch) return scratch;
+  if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
+  const ctx = document.createElement('canvas')?.getContext?.('2d') || null;
+  if (ctx && typeof ctx.isPointInStroke === 'function') scratch = ctx;
+  return scratch;
+}
 
 /** Map a world point into an object's un-rotated local space. */
 export function toLocal(o, p) {
@@ -37,18 +44,20 @@ export function hitObject(o, p, tol = 6) {
     return false;
   }
 
-  if (o.type === 'shape' && scratch) {
+  if (o.type === 'shape') {
+    const sc = getScratch();
+    if (!sc) return pointInBox(lp, { x: b.x - tol, y: b.y - tol, w: b.w + tol * 2, h: b.h + tol * 2 });
     if (!pointInBox(lp, { x: b.x - tol, y: b.y - tol, w: b.w + tol * 2, h: b.h + tol * 2 })) return false;
     const filled = o.fill && o.fill !== 'none';
-    scratch.save();
-    shapePath(scratch, o.kind, o.x, o.y, o.w, o.h);
+    sc.save();
+    shapePath(sc, o.kind, o.x, o.y, o.w, o.h);
     let hit = false;
-    if (filled && o.kind !== 'line' && o.kind !== 'arrow' && o.kind !== 'doubleArrow') hit = scratch.isPointInPath(lp.x, lp.y);
+    if (filled && o.kind !== 'line' && o.kind !== 'arrow' && o.kind !== 'doubleArrow') hit = sc.isPointInPath(lp.x, lp.y);
     if (!hit) {
-      scratch.lineWidth = Math.max((o.lineWidth || 3) + tol * 1.4, 8);
-      hit = scratch.isPointInStroke(lp.x, lp.y);
+      sc.lineWidth = Math.max((o.lineWidth || 3) + tol * 1.4, 8);
+      hit = sc.isPointInStroke(lp.x, lp.y);
     }
-    scratch.restore();
+    sc.restore();
     return hit;
   }
 
@@ -256,6 +265,29 @@ export function strokesAlong(store, a, b, radius) {
     }
   }
   return hits;
+}
+
+/**
+ * Does the eraser, swept from a to b with this radius, touch a shape's outline?
+ * The outline only - never the inside, filled or not - so rubbing out what is
+ * written inside a box never takes the box with it.
+ */
+export function outlineAlong(o, a, b, radius) {
+  if (!o || o.type !== 'shape' || ghost(o)) return false;
+  const sc = getScratch();
+  if (!sc) return false;
+  const steps = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / Math.max(2, radius / 2)));
+  sc.save();
+  shapePath(sc, o.kind, o.x, o.y, o.w, o.h);
+  sc.lineWidth = (o.lineWidth || 3) + radius * 2;
+  sc.lineCap = 'round'; sc.lineJoin = 'round';
+  let hit = false;
+  for (let i = 0; i <= steps && !hit; i++) {
+    const p = toLocal(o, { x: a.x + ((b.x - a.x) * i) / steps, y: a.y + ((b.y - a.y) * i) / steps });
+    hit = sc.isPointInStroke(p.x, p.y);
+  }
+  sc.restore();
+  return hit;
 }
 
 export function normalizeBox(b) {

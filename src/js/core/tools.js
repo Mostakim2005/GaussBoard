@@ -3,7 +3,7 @@
 import { uid, bboxOfPoints, clamp, dist, simplify, unionBox } from './util.js';
 import { isScratchGesture } from './scratch.js';
 import { boundsOf, worldBounds, withAttached, withGroups} from './store.js';
-import { pick, pickAll, inBox, inLasso, strokesAlong, normalizeBox, curtainAt, toLocal, taskCheckboxAt, toggleTaskAtPoint, toggleCardCollapseAtPoint } from './hit.js';
+import { pick, pickAll, inBox, inLasso, strokesAlong, normalizeBox, curtainAt, toLocal, outlineAlong, taskCheckboxAt, toggleTaskAtPoint, toggleCardCollapseAtPoint } from './hit.js';
 import { handlePositions, HANDLE, HANDLES, drawShape, inkPaint, linkRectsOf, inQuad } from './render.js';
 import { translateObject, scaleObject, rotateObjectAround, normalizeRect, anchorFor, CURSORS } from './transform.js';
 import { recognize, fitError, MAX_FIT_ERROR } from './recognize.js';
@@ -98,6 +98,8 @@ export class Interaction {
     c.addEventListener('pointermove', (e) => this.onMove(e), { signal });
     c.addEventListener('pointerup', (e) => this.onUp(e), { signal });
     c.addEventListener('pointercancel', (e) => this.onUp(e), { signal });
+    // the pen leaving the screen always takes its glow along, mid-gesture or not
+    c.addEventListener('pointerleave', (e) => { if (e.pointerType === 'pen') this.hideGlow(); }, { signal });
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       window.addEventListener('blur', () => this.finishOnWindowBlur(), { signal });
     }
@@ -109,7 +111,11 @@ export class Interaction {
       // else entirely, is worse than no nib at all
       this.hideInkPointer();
       this.eraserCursor = null;
+      this.hideGlow();
       this.surface.invalidate();
+    }, { signal });
+    c.addEventListener('pointerrawupdate', (e) => {
+      if (e.pointerType === 'pen') this.followGlow(e);
     }, { signal });
     c.addEventListener('wheel', (e) => this.onWheel(e), { passive: false, signal });
     c.addEventListener('dblclick', (e) => this.onDoubleClick(e), { signal });
@@ -185,6 +191,9 @@ export class Interaction {
     this.stopEdgePan();
     PencilSound.stop();
     this.hideInkPointer();
+    this.hideGlow();
+    if (this._glowOwned && this._glowEl?.parentNode) this._glowEl.remove();
+    this._glowEl = undefined;
     if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
   }
 
@@ -223,6 +232,7 @@ export class Interaction {
     this.pinch = null;
     this.lastMotion = null;
     this.hideInkPointer();
+    this.hideGlow();
     this.surface?.invalidate?.();
   }
 
@@ -369,13 +379,17 @@ export class Interaction {
     if (this.action && this.actionId != null && !this.pointers.has(this.actionId)) {
       PencilSound.stop();
       this.surface.wet = null;
+      this.surface.wetTail = null;
       this.surface.wetPieces = null;
       this.action = null;
       this.actionId = null;
     }
     const sp = this.surface.screenPoint(e);
     const wp = this.surface.cam.toWorld(sp.x, sp.y);
-    if (e.pointerType === 'pen') this.app.notePenSeen();
+    if (e.pointerType === 'pen') {
+      this.app.notePenSeen();
+      this.followGlow(e, sp);
+    }
     if (this.isPalm(e)) {
       try { this.canvas.releasePointerCapture?.(e.pointerId); } catch { /* never captured */ }
       this.palmsIgnored = (this.palmsIgnored || 0) + 1;
@@ -743,7 +757,7 @@ export class Interaction {
     if (this.moveRightPan(e)) return;
     if (e.pointerType === 'pen' && e.buttons) this.app.notePenSeen();
     const sp = this.surface.screenPoint(e);
-    if (e.pointerType === 'pen') { this._penAt = performance.now(); this._penSp = sp; this._mouseSp = null; }
+    if (e.pointerType === 'pen') { this._penAt = performance.now(); this._penSp = sp; this._mouseSp = null; this.followGlow(e, sp); }
     const wp = this.surface.cam.toWorld(sp.x, sp.y);
     if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { sp, wp, type: e.pointerType });
     this.app.boardPoint = { x: wp.x, y: wp.y, at: performance.now() };
@@ -942,11 +956,12 @@ export class Interaction {
           if (a.heldShape && a.heldAt && dist(a.heldAt, wp) * this.surface.cam.z > 14) {
             a.heldShape = null;
           }
-          if (this.app?.settings?.holdToShape !== false && a.obj.tool === 'pen' && a.obj.effect !== 'pencil' && !a.ruled) {
+          if (this.app?.settings?.holdToShape !== false && a.obj.tool === 'pen' && a.obj.effect !== 'pencil' && a.obj.effect !== 'neon' && !a.ruled) {
             this.armShapeHold(a, wp);
           }
         }
         this.sendInkTrail(e, a, wp, pressure);
+        this.surface.wetTail = this.predictTail(e, a);
         break;
       }
       case 'erase': {
@@ -1626,6 +1641,7 @@ export class Interaction {
       if (this.action.snap) this.store.restoreSnapshot(this.action.snap);
     }
     this.surface.wet = null;
+    this.surface.wetTail = null;
     this.surface.wetPieces = null;
     if (this.app.viewMode) {
       for (const piece of [...(a.pieces || []), obj]) if (piece.points.length) this.surface.addGhost(piece);
@@ -1640,6 +1656,45 @@ export class Interaction {
     this.app.syncUI();
     this.surface.invalidate();
     return ['shapeDraw', 'textDraw', 'draw', 'lasso', 'marquee', 'move', 'resize', 'rotate'].includes(kind);
+  }
+
+  /**
+   * Where the pen is about to be: a short tail drawn ahead of the ink, never kept.
+   *
+   * Draws at most three predicted samples from getPredictedEvents(), clamped to
+   * PREDICT_REACH screen pixels and gated against corner overshoot, ruled
+   * strokes, Study Tape curtains, and off-sheet/off-screen coordinates.
+   * Never mutates a.obj.points or stroke timestamps (TRAP 2).
+   */
+  predictTail(e, a) {
+    if (this.app.settings?.drawAhead !== true || !e || typeof e.getPredictedEvents !== 'function') return null;
+    if (!a || a.type !== 'draw' || a.obj?.type !== 'stroke' || a.straight || a.ruled || a.edgePending || a.blocked || a.offView) return null;
+    const pts = a.obj && a.obj.points;
+    if (!pts || pts.length < 2) return null;
+    const last = pts[pts.length - 1];
+    const prev = pts[pts.length - 2];
+    let preds;
+    try { preds = e.getPredictedEvents(); } catch { return null; }
+    if (!preds || !preds.length) return null;
+    const z = this.surface.cam.z, reach = Interaction.PREDICT_REACH / z;
+    const tail = [];
+    for (const pe of preds.slice(0, 3)) {
+      const sp = this.surface.screenPoint(pe);
+      const q = this.surface.cam.toWorld(sp.x, sp.y);
+      const d = Math.hypot(q.x - last.x, q.y - last.y);
+      if (d > reach) {
+        if (d > 0) tail.push({ x: last.x + (q.x - last.x) * reach / d, y: last.y + (q.y - last.y) * reach / d, p: last.p });
+        break;
+      }
+      tail.push({ x: q.x, y: q.y, p: last.p });
+    }
+    if (!tail.length) return null;
+    const ux = last.x - prev.x, uy = last.y - prev.y, vx = tail[tail.length - 1].x - last.x, vy = tail[tail.length - 1].y - last.y;
+    const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+    if (!lu || !lv || (ux * vx + uy * vy) / (lu * lv) < 0.85) return null;
+    if (a.sheet && !tail.every((q) => inRect(a.sheet, q.x, q.y))) return null;
+    if (a.view && !tail.every((q) => this.onScreen(a.view, q))) return null;
+    return { forPts: pts, len: pts.length, points: tail };
   }
 
   /**
@@ -1761,7 +1816,7 @@ export class Interaction {
   armShapeHold(a, wp) {
     this.cancelShapeHold();
     if (this.app?.settings?.holdToShape === false) return;
-    if (!a?.obj || a.obj.tool !== 'pen' || a.ruled) return;
+    if (!a?.obj || a.obj.tool !== 'pen' || a.obj.effect === 'pencil' || a.obj.effect === 'neon' || a.ruled) return;
     const pts = a.obj.points;
     if (!pts || pts.length < 5) return;
     let travel = 0;
@@ -2089,6 +2144,7 @@ export class Interaction {
       }
     }
     this.surface.wet = obj;
+    this.surface.wetTail = null;
     this.action = act;
     if (this.app?.settings?.autoDimBarsWhileInking !== false && typeof document !== 'undefined') {
       document.body?.classList?.add('inking-active');
@@ -2269,6 +2325,7 @@ export class Interaction {
     PencilSound.stop();
     if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
     this.surface.wet = null;
+    this.surface.wetTail = null;
     this.surface.wetPieces = null;
     this.action = null;
     this.actionId = null;
@@ -2361,6 +2418,7 @@ export class Interaction {
       this.surface.wetPieces = a.pieces;
     }
     a.obj.points = [];
+    this.surface.wetTail = null;
   }
 
   finishStroke(a) {
@@ -2374,6 +2432,7 @@ export class Interaction {
       if (tilt > 0.05) obj.tilt = tilt;
     }
     this.surface.wet = null;
+    this.surface.wetTail = null;
     this.surface.wetPieces = null;
     if (obj.audioId) {
       const clock = audioInkClock(this.app);
@@ -2463,7 +2522,9 @@ export class Interaction {
      */
     this.surface.extendFreeze?.(obj);
 
-    if ((this.app.settings.inkToShape || a.heldShape) && obj.tool === 'pen' && obj.effect !== 'pencil') {
+    // a pencil sketch stays a sketch: guide lines are meant to be rough. A neon line stays a
+    // glowing line too: a shape has no glow, and straightening it would put the light out.
+    if ((this.app.settings.inkToShape || a.heldShape) && obj.tool === 'pen' && obj.effect !== 'pencil' && obj.effect !== 'neon') {
       const r = a.heldShape || recognize(obj.points);
       // classified AND actually shaped like the thing it was classified as
       const fit = r ? fitError(obj.points, r.kind, r) : 1;
@@ -2608,6 +2669,20 @@ export class Interaction {
     const r = (this.app.settings.eraserSize / 2 / this.surface.cam.z) * grow;
     a.radiusPx = r * this.surface.cam.z;
     const hits = strokesAlong(store, from, to, r);
+    const erasedBoxes = [];
+    const covers = store.objects.filter((c) => c && c.type === 'curtain' && !c.revealed);
+    const underConcealedCover = (target) => {
+      if (!covers.length) return false;
+      const at = store.indexOf(target.id);
+      const b = worldBounds(target);
+      for (const c of covers) {
+        if (store.indexOf(c.id) < at) continue;
+        const cb = worldBounds(c);
+        if (b.x >= cb.x - 4 && b.y >= cb.y - 4
+            && b.x + b.w <= cb.x + cb.w + 4 && b.y + b.h <= cb.y + cb.h + 4) return true;
+      }
+      return false;
+    };
     let changed = false;
 
     for (const o of hits) {
@@ -2621,6 +2696,24 @@ export class Interaction {
       //
       // Removing a picture is what Select and Delete are for: deliberate,
       // visible, and aimed at one thing.
+      //
+      // Drawn shapes are the one exception, when "Erase shapes too" is on. A circle that "Straighten shapes"
+      // made out of your ink, a line, an arrow, a box from the shape tray - these
+      // are drawing, and people reach for the eraser to get rid of them. Only
+      // their OUTLINE counts, and only a bare shape (no words in it, nothing
+      // locked, and not concealed under an answer cover): rubbing out ink written inside a box must leave
+      // the box, and a labelled flowchart box is a note, not a scribble. A shape goes whole, in either mode.
+      if (o.type === 'shape') {
+        if (this.app.settings.eraseShapes !== true || o.text || underConcealedCover(o) || !outlineAlong(o, from, to, r)) continue;
+        const wb = worldBounds(o);
+        const pad = (o.lineWidth || 3) + 6;
+        erasedBoxes.push({ x: wb.x - pad, y: wb.y - pad, w: wb.w + pad * 2, h: wb.h + pad * 2 });
+        const index = store.rawRemove(o.id);
+        if (a.fragments.has(o.id)) a.fragments.delete(o.id);
+        else if (!a.originals.has(o.id)) a.originals.set(o.id, { obj: structuredClone(o), index });
+        changed = true;
+        continue;
+      }
       if (o.type !== 'stroke') continue;
       const partial = a.mode === 'partial';
       const isFragment = a.fragments.has(o.id);
@@ -2667,6 +2760,7 @@ export class Interaction {
       boxes.push({ x: a.lastRing.x - a.lastRing.r, y: a.lastRing.y - a.lastRing.r,
         w: a.lastRing.r * 2, h: a.lastRing.r * 2 });
     }
+    boxes.push(...erasedBoxes);
     a.lastRing = { x: to.x, y: to.y, r: ringR };
     let band = boxes[0];
     for (const b of boxes.slice(1)) {
@@ -2880,6 +2974,57 @@ export class Interaction {
     this.inkPointer = null;
     this.cancelNibHide();
     const el = this.nibEl();
+    if (el && !el.hidden) el.hidden = true;
+  }
+
+  /*
+   * The pen glow, for screen recordings.
+   *
+   * Zoom and other recorders capture the screen and the mouse pointer, so a
+   * hovering or writing stylus produces ink with no pointer visible. A soft
+   * yellow halo moves via transform on its own layer (#penGlow on main #stage,
+   * or .pen-glow inside a split pane), stepping aside whenever an eraser is
+   * active or the pointer leaves.
+   */
+  glowEl() {
+    if (this._glowEl === undefined) {
+      if (this.opts?.penGlow) {
+        this._glowEl = this.opts.penGlow;
+        return this._glowEl;
+      }
+      const doc = typeof document !== 'undefined' ? document : null;
+      const parent = this.canvas?.parentElement;
+      let el = parent?.querySelector?.('#penGlow, .pen-glow') || null;
+      if (!el && this.canvas?.id === 'c' && doc && typeof doc.getElementById === 'function') {
+        el = doc.getElementById('penGlow');
+      }
+      if (!el && parent && typeof parent.appendChild === 'function' && doc && typeof doc.createElement === 'function') {
+        el = doc.createElement('div');
+        el.className = 'pen-glow';
+        el.hidden = true;
+        parent.appendChild(el);
+        this._glowOwned = true;
+      }
+      this._glowEl = el || null;
+    }
+    return this._glowEl;
+  }
+
+  followGlow(e, sp = null) {
+    if (this.app.settings?.recordPointer !== true) { this.hideGlow(); return; }
+    if ((e.buttons & 32) || this.tool === 'eraser' || this.action?.type === 'erase' || this.effectiveTool(e) === 'eraser') {
+      this.hideGlow();
+      return;
+    }
+    const el = this.glowEl();
+    if (!el) return;
+    const p = sp || this.surface.screenPoint(e);
+    el.style.transform = 'translate3d(' + Math.round(p.x) + 'px,' + Math.round(p.y) + 'px,0)';
+    if (el.hidden) el.hidden = false;
+  }
+
+  hideGlow() {
+    const el = this._glowEl;
     if (el && !el.hidden) el.hidden = true;
   }
 
@@ -3266,6 +3411,7 @@ export class Interaction {
     if (this.action && this.lastMotion) this.applyMotion(this.lastMotion.sp, this.lastMotion.mods, null);
   }
 
+  static PREDICT_REACH = 18;            // screen pixels the predicted tail may run ahead of the ink, at most
   static ERASER_MAX_GROWTH = 1.8;      // up to 2.8x the chosen size
   static ERASER_GROWTH_SPAN = 900;     // world units of scrubbing to reach it
   static ON_COVER = 0.85;              // share of a stroke that must lie on a cover to be written ON it
@@ -3321,6 +3467,7 @@ export class Interaction {
     PencilSound.stop();
     if (this.action && this.action.type === 'draw') {
       this.surface.wet = null;
+      this.surface.wetTail = null;
       this.surface.wetPieces = null;
       this.action = null;
     } else if (this.action) this.action = null;

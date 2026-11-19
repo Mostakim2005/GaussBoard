@@ -87,8 +87,9 @@ flowchart LR
 ```
 * **Code Anchors (Grep Targets):**
   * `src/js/core/ink.js` -> `InkEngine`, `fitBezier`, `preserveTime`
-  * `src/js/core/render.js` -> `drawStroke`, `drawShape`, `drawCover`, `drawAudioCard`
-  * `src/js/core/surface.js` -> `drawFrozen`, `drawReplaySession`, `firstPointAfter`
+  * `src/js/core/render.js` -> `drawStroke`, `drawNeon`, `drawShape`, `drawCover`, `drawAudioCard`
+  * `src/js/core/surface.js` -> `drawFrozen`, `drawReplaySession`, `firstPointAfter`, `_drawWet`, `wetTail`
+  * `src/js/core/tools.js` -> `followGlow`, `predictTail`, `eraseSweep`
   * `src/js/core/recognize.js` -> `classifyInk`, `snapToShape`
   * `src/js/core/transform.js` -> `moveObject`, `scaleHandles`, `rotate`
 

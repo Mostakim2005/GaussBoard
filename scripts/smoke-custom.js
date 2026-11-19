@@ -20,6 +20,7 @@ const runs = [
   ['Node set squares & protractor checks', ['--test', 'test/set-squares-protractor.test.mjs']],
   ['Node hold gesture manager & radial ring checks', ['--test', 'test/hold-manager.test.mjs']],
   ['Node smart progressive slicing & zoom LOD checks', ['--test', 'test/sliced-rendering.test.mjs']],
+  ['Node upstream 5.1.x feature checks (neon, erase-shapes, pen-glow, draw-ahead)', ['--test', 'test/upstream-51x-features.test.mjs']],
   ['Electron 4.8.4.1 audit checks', ['scripts/smoke.js', '--features-4.8.4.1']],
   ['Electron 4.8.8 custom-feature checks', ['scripts/smoke.js', '--features-4.8.8']],
   ['Electron 5.0.0 replay-mode checks', ['scripts/smoke.js', '--features-5.0.0']],

@@ -333,3 +333,20 @@ flowchart LR
   * `src/js/export.js` -> `saveBoardFile`
   * `src/js/ui/radial.js` -> `rememberRecentPen`
   * `src/sw.js` -> `PRECACHE_ASSETS`
+
+### [DECISION: Hardened-Upstream-51x-Inking-And-Eraser-Integration] | Aliases: neon pen, eraseShapes, recordPointer, drawAhead, v5.1.0-5.1.3
+> **1-Line Summary:** Integrated upstream GazBoard v5.1.0–v5.1.3 features (Neon pen, Erase shapes toggle, Pen glow for screen recordings, and Draw-ahead prediction) onto `feat/upstream-risk-eval` with full TRAP 2/TRAP 6, Zoom LOD, and Split Workspace isolation guards.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`
+* **Original User Intention:** Port the user-facing inking and eraser enhancements from upstream v5.1.0–v5.1.3 without colliding with any existing GaussBoard feature, invariant, or split-pane boundary.
+* **Hardening Safeguards Applied:**
+  * `inkStyle` treats `'neon'` and `'pencil'` as solid colors so Zoom-Aware LOD (`camZ < 0.35`) never renders zoomed-out neon strokes as galaxy gradients.
+  * Neon strokes are excluded from both `inkToShape` and `holdToShape` so glowing ink never collapses into plain shapes.
+  * `eraseSweep` (`eraseShapes`) preserves TRAP 6 by skipping shapes concealed under unrevealed Answer Covers, protects labelled (`o.text`) and locked shapes, and expands `invalidateBand` to cover full removed shape bounds.
+  * `glowEl` allocates an isolated `.pen-glow` inside split-pane parents (`!opts.penGlow && canvas.id !== 'c'`) so secondary panes never steal `#penGlow` from main `#stage`, and hides on eraser tool, pen tail, side-button erase, blur, and destroy.
+  * `predictTail` skips Study Tape curtains, ruled strokes, and sharp corners, and `_drawWet` renders `surface.wetTail` via a shallow copy without ever mutating `wet.points` or polluting `p.t` timestamps (TRAP 2).
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/render.js` -> `drawNeon`, `NEON_REACH`, `inkStyle`
+  * `src/js/core/hit.js` -> `outlineAlong`, `getScratch`
+  * `src/js/core/tools.js` -> `followGlow`, `predictTail`, `eraseSweep`
+  * `src/js/core/surface.js` -> `_drawWet`, `wetTail`
+  * `test/upstream-51x-features.test.mjs`

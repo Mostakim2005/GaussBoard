@@ -469,7 +469,8 @@ export function boundsOf(o) {
   if (o.type === 'connector') return connectorBox ? connectorBox(o) : { x: o.x || 0, y: o.y || 0, w: o.w || 0, h: o.h || 0 };
   if (o.type === 'stroke' || (o.type === 'curtain' && Array.isArray(o.points))) {
     const b = o.bbox || { x: 0, y: 0, w: 0, h: 0 };
-    const pad = strokeDrawWidth(o) / 2 + 1;
+    // a neon line glows about three widths past its edge (see drawNeon): the glow is part of what you see
+    const pad = strokeDrawWidth(o) / 2 + 1 + (o.type === 'stroke' && o.effect === 'neon' && o.tool !== 'highlighter' ? (o.width || 4) * 3 : 0);
     return { x: b.x - pad, y: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 };
   }
   if (o.type === 'text' && o.cardStyle === 'window' && o.collapsed) {
