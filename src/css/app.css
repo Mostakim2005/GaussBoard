@@ -916,6 +916,13 @@ body.presenting #backPill { top: 12px; }
   background-repeat: no-repeat; background-size: 26px 26px;
   will-change: transform;
 }
+/* the eraser's ring - moved by the compositor, never painted into the board (see placeRing) */
+#eraserRing, .eraser-ring {
+  position: absolute; left: 0; top: 0; box-sizing: border-box;
+  border: 1.5px solid #605e5c; border-radius: 50%; background: rgba(255, 255, 255, 0.6);
+  pointer-events: none; z-index: 14; will-change: transform;
+}
+#eraserRing[hidden], .eraser-ring[hidden] { display: none; }
 /* The pen glow for screen recordings: a faint light centred on the tip (see followGlow in tools.js) */
 #penGlow, .pen-glow {
   position: absolute; left: -24px; top: -24px; width: 48px; height: 48px; border-radius: 50%;
@@ -1548,7 +1555,7 @@ body.presenting.show-tools #toolbar { translate: 0 0; opacity: 1; pointer-events
  *  person put them, and a board made in one language must look the same
  *  opened in another - so the canvas and the text editor stay left to right.
  * =================================================================== */
-[dir="rtl"] #c, [dir="rtl"] #editLayer, [dir="rtl"] #inkNib, [dir="rtl"] #penGlow, [dir="rtl"] .pen-glow { direction: ltr; }
+[dir="rtl"] #c, [dir="rtl"] #editLayer, [dir="rtl"] #inkNib, [dir="rtl"] #eraserRing, [dir="rtl"] .eraser-ring, [dir="rtl"] #penGlow, [dir="rtl"] .pen-glow { direction: ltr; }
 /* My boards: the folder path, folders, and picking rows up to drop on them */
 .crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin: 0 0 10px; font-size: 13px; }
 .crumb { border: 0; background: none; color: var(--accent-2); padding: 6px 8px; border-radius: 6px; cursor: pointer; font: inherit; min-height: 36px; max-width: 14em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1658,7 +1665,7 @@ body.presenting.show-tools #toolbar { translate: 0 0; opacity: 1; pointer-events
 .folder-hits { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .folder-hits .folder-hit { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .folder-hits .folder-hit .rt-text { padding: 7px 14px 7px 6px; }
-.search-hit mark, .board-tile mark, .board-row mark { background: rgba(255, 217, 74, .7); color: inherit; border-radius: 3px; padding: 0 1px; }
+.search-hit mark, .board-tile mark, .board-row mark, .panel mark.set-mark { background: rgba(255, 217, 74, .7); color: inherit; border-radius: 3px; padding: 0 1px; }
 /* Recent boards, at the top of My boards: one row that scrolls sideways */
 .recent { margin: 2px 0 18px; }
 .recent-title { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); margin: 0 0 8px; }
@@ -5997,3 +6004,10 @@ body.presenting #pagestrip { display: none; }
 #radialMenu .rad-label.show { opacity: 1; }
 @keyframes rad-in { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { #radialMenu .rad-ring, #radialMenu .rad-btn { animation: none; } }
+/* Settings search stays at the top while the list scrolls under it */
+.settings-search { position: sticky; top: -14px; z-index: 2; margin: -14px -14px 12px; padding: 14px 14px 10px; background: var(--surface); }
+.panel .section[hidden], .panel .section > [hidden], .settings-none[hidden] { display: none !important; }
+:root[data-theme="dark"] .panel mark.set-mark { background: rgba(255, 217, 74, .88); color: #1b1a19; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .panel mark.set-mark { background: rgba(255, 217, 74, .88); color: #1b1a19; }
+}

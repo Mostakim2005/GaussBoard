@@ -72,9 +72,9 @@ sequenceDiagram
   * `src/js/core/markdown.js` -> `countTags`, `normalizeTextObject`
   * `src/js/core/util.js` -> `uid`, `unionBox`
 
-### [SUBSYSTEM: Inking-Rendering] | Aliases: Canvas 2D, Bezier, DirectInk, pressure, background, culling
-> **1-Line Summary:** Full-speed Canvas 2D with 3-layer progressive composition (Layer 0 background, Layer 1 progressive ink snapshot with dynamic 3.0-8.0ms budgeting, Layer 2 live 60 FPS overlays), midpoint curves that never loop, and single-stroke rasterization with zoom LOD.
-* **How It Works (Plain English):** A stroke is one stroked path down its centerline curved through sample midpoints, staying inside its control triangle. Width is constant like felt pen; pressure sets stroke weight. Ink is stored exactly as captured, never thinned, and points keep p.t.
+### [SUBSYSTEM: Inking-Rendering] | Aliases: Canvas 2D, Bezier, DirectInk, pressure, background, culling, eraserRing, setPaintBand
+> **1-Line Summary:** Full-speed Canvas 2D with 3-layer progressive composition (Layer 0 background, Layer 1 progressive ink snapshot with dynamic 3.0-8.0ms budgeting, Layer 2 live 60 FPS overlays + compositor pointer/eraser layers), midpoint curves that never loop, and single-stroke rasterization with zoom LOD.
+* **How It Works (Plain English):** A stroke is one stroked path down its centerline curved through sample midpoints, staying inside its control triangle. Width is constant like felt pen; pressure sets stroke weight. Ink is stored exactly as captured, never thinned, and points keep p.t. Hover/rub eraser rings move on a dedicated DOM compositor layer (`#eraserRing` / `.eraser-ring`) without dirtying the canvas, while banded erases skip interior PDF drop shadows (`setPaintBand`) and active gestures defer idle freeze rebuilds (`isBusy`).
 * **Data Flow Diagram:**
 ```mermaid
 flowchart LR
@@ -87,9 +87,9 @@ flowchart LR
 ```
 * **Code Anchors (Grep Targets):**
   * `src/js/core/ink.js` -> `InkEngine`, `fitBezier`, `preserveTime`
-  * `src/js/core/render.js` -> `drawStroke`, `drawNeon`, `drawShape`, `drawCover`, `drawAudioCard`
-  * `src/js/core/surface.js` -> `drawFrozen`, `drawReplaySession`, `firstPointAfter`, `_drawWet`, `wetTail`
-  * `src/js/core/tools.js` -> `followGlow`, `predictTail`, `eraseSweep`
+  * `src/js/core/render.js` -> `drawStroke`, `drawNeon`, `drawShape`, `drawCover`, `drawAudioCard`, `setPaintBand`, `drawImage`
+  * `src/js/core/surface.js` -> `drawScene`, `busy`, `warmFreeze`, `drawReplaySession`, `firstPointAfter`, `_drawWet`, `wetTail`
+  * `src/js/core/tools.js` -> `followGlow`, `ringEl`, `placeRing`, `hideRing`, `predictTail`, `eraseSweep`
   * `src/js/core/recognize.js` -> `classifyInk`, `snapToShape`
   * `src/js/core/transform.js` -> `moveObject`, `scaleHandles`, `rotate`
 
@@ -216,8 +216,8 @@ See SUBSYSTEM sections above: Dual-Runtime-Platform, Document-Model-Op-Log, Inki
 > **1-Line Summary:** The active directive suite that must pass 24/24 before any change is called done.
 * **Automated UI / Logic Verification:** `node scripts/smoke.js --new-features`
 
-### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2245 keys, 7 locales, lint
-> **1-Line Summary:** Proves English keys match all 7 locales at 2,245/2,245 with zero missing strings.
+### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2389 keys, 7 locales, lint
+> **1-Line Summary:** Proves English keys match all 7 locales at 2,389/2,389 with zero missing strings.
 * **Type & Lint Check:** `node scripts/i18n-check.js`
 
 ### [VERIFY: Full-Regression-Suite] | Aliases: smoke builtin, 1247 assertions, full suite, test:all

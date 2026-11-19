@@ -350,3 +350,49 @@ flowchart LR
   * `src/js/core/tools.js` -> `followGlow`, `predictTail`, `eraseSweep`
   * `src/js/core/surface.js` -> `_drawWet`, `wetTail`
   * `test/upstream-51x-features.test.mjs`
+
+### [DECISION: Settings-Search-And-PDF-Eraser-Layer-Integration] | Aliases: settings search, eraserRing, setPaintBand, isBusy, v5.1.2-5.1.3
+> **1-Line Summary:** Ported upstream Settings search (word-start matching, `<mark class="set-mark">` highlights, Escape-to-clear) and Smoother PDF Eraser (compositor `#eraserRing`/`.eraser-ring` layer, interior page shadow skip, busy freeze deferral) while preserving `eraseShapes` bounds, Smart Slicing, Split Workspace isolation, and TRAP 1.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`
+* **Original User Intention:** Bring over upstream's settings search UX and smooth PDF eraser cursor/performance upgrades onto `feat/upstream-risk-eval` without regressing any existing GaussBoard feature.
+* **Hardening & Integration Choices:**
+  * Kept `.setting-row` alongside `.set-row` on Settings rows and kept custom `.scribble-config-card` searchable inside `buildSettingsSearch`, re-applying active filters when async Storage/About metadata arrives.
+  * Used high-contrast `#1b1a19` foreground on dark-theme `<mark class="set-mark">` highlights to uphold WCAG contrast requirements.
+  * Preserved `erasedBoxes` in `Interaction.eraseSweep` when removing canvas ring redraw boxes so `eraseShapes: true` still repaints the full bounds of erased bare shapes.
+  * Preserved the 6th `filter` parameter in `Surface.drawScene` (`TRAP 1`), Smart Slicing (`_build`) guards in `warmFreeze`, and per-pane `.eraser-ring` isolation + cleanup in `ringEl()` / `destroy()`.
+  * Excluded upstream `src/js/replay.js` changes because GaussBoard uses audio-synchronized `src/js/core/replay.js`.
+* **Visual Flow & Conflict Guard:**
+```mermaid
+flowchart LR
+    classDef inputNode fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef layerNode fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef guardNode fill:#fef3c7,stroke:#d97706,color:#78350f
+
+    P["Pointer Event (move/raw/tail)"]:::inputNode -->|"hover or rub"| Ring["Compositor Ring (#eraserRing or .eraser-ring)"]:::layerNode
+    P -->|"active erase segment"| Sweep["eraseSweep (stroke split + erasedBoxes)"]:::guardNode
+    Sweep -->|"band clip + filter (TRAP 1)"| Band["Surface.drawScene -> setPaintBand"]:::layerNode
+    Band -->|"band strictly inside page"| Skip["drawImage skips shadowBlur (fast fill)"]:::layerNode
+    Sweep -->|"isBusy (< 1s active press)"| Defer["warmFreeze defers full rebuild until lift"]:::guardNode
+
+    subgraph Legend["Color Legend"]
+        L1["Blue: Pointer Input"]:::inputNode
+        L2["Green: Fast Compositor / Band Path"]:::layerNode
+        L3["Amber: Existing Feature & Trap Guard"]:::guardNode
+    end
+```
+  * *Plain-English Explanation:* Moving the eraser ring onto its own hardware compositor element means hovering or moving the pen never forces the board underneath to repaint just to animate the ring. During erasing, only the narrow strip touched by the eraser (plus any erased shape's outline box) is repainted, page drop-shadow blurs are skipped when the strip is inside a PDF page, and full background snapshots wait until you lift the pen.
+* **Code Anchors (Grep Targets):**
+  * `src/js/ui/panels.js` -> `buildSettingsSearch`, `settings`
+  * `src/js/core/render.js` -> `setPaintBand`, `bandStats`, `drawImage`
+  * `src/js/core/surface.js` -> `drawScene`, `_drawScene`, `busy`, `warmFreeze`
+  * `src/js/core/tools.js` -> `ringEl`, `placeRing`, `hideRing`, `updateHover`, `eraseSweep`
+  * `test/upstream-51x-features.test.mjs` -> Tests 5–6
+
+### [DECISION: Defer-Electron-BrowserWindow-Sandbox] | Aliases: sandbox, preload, node crypto, clipboardSignature, Charlie
+> **1-Line Summary:** Kept `sandbox: false` on Electron renderer windows because `preload.js` uses synchronous `node:crypto` hashing for image paste signatures; `contextIsolation: true` and `nodeIntegration: false` remain enforced.
+* **Decision Maker:** `[DECIDED BY: AGENT - Zero-Conflict Directive]`
+* **Original User Intention:** Audit Electron `BrowserWindow` hardening without interfering or breaking any existing feature.
+* **Why Deferred (Plain English):** `preload.js` imports Node's built-in `crypto` module to synchronously compute SHA-256 hashes of clipboard bitmap images in `clipboardSignature()`, and inspects `process.argv` / `process.env` for smoke-test isolation. Enabling Chromium `sandbox: true` strips `require('node:crypto')` from preload scripts and would break synchronous clipboard image detection unless refactored into asynchronous IPC across callers. All main windows already enforce `contextIsolation: true` and `nodeIntegration: false`, and the splash window already uses `sandbox: true`.
+* **Code Anchors (Grep Targets):**
+  * `preload.js` -> `clipboardSignature`, `crypto`
+  * `main.js` -> `createWindow`

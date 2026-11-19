@@ -1211,6 +1211,10 @@ class App {
     this.tool = tool;
     // a pen nib left behind by the tool it belonged to is just a stray picture
     if (!isInk) this.interaction.hideInkPointer();
+    if (tool !== 'eraser') {
+      this.interaction?.hideRing?.();
+      this.splitWorkspace?.leftInteraction?.hideRing?.();
+    }
     if (tool === 'eraser') {
       this.interaction?.hideGlow?.();
       this.splitWorkspace?.leftInteraction?.hideGlow?.();
@@ -4200,6 +4204,8 @@ class App {
       // Escape in the My boards search clears the words first; only an empty search lets it close the page
       const el = e.target;
       if (el instanceof Element && el.closest('.board-search, .search-results') && document.querySelector('#boardList .board-search-input')?.value) return;
+      // and the Settings search the same way
+      if (el instanceof Element && el.closest('.settings-search') && el.value) return;
       if (this.panels.open) { this.panels.close(); e.preventDefault(); e.stopPropagation(); }
     }, true);
 
