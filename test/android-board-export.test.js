@@ -55,3 +55,39 @@ test('No selection, cancellation and a missing board never write a partial expor
   await assert.rejects(exportBoards(app, ['missing']), /no longer available/);
   assert.equal(writes.length, 0);
 });
+
+test('saveBoardFile bundles audioTracks into a ZIP with assets/<assetId> using recording.readAsset', async () => {
+  const assetId = 'a'.repeat(64) + '.webm';
+  const audioBytes = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x99, 0x88, 0x77]);
+  const writes = [];
+  global.window = {
+    JSZip,
+    board: {
+      saveDialog: async (opts) => opts.defaultPath,
+      writeFile: async (path, buf) => { writes.push({ path, buf }); },
+      recording: {
+        readAsset: async (id) => (id === assetId ? audioBytes.buffer : null)
+      }
+    }
+  };
+  const doc = {
+    id: 'audio-board',
+    name: 'Lecture With Audio',
+    objects: [],
+    audioTracks: [{ id: 'aud_1', assetId, durationMs: 4200 }]
+  };
+  const app = {
+    store: { doc, toJSON: () => doc },
+    toast() {}
+  };
+  const { saveBoardFile } = await import('../src/js/export.js');
+  const outPath = await saveBoardFile(app);
+  assert.equal(outPath, 'Lecture With Audio.gaussboard');
+  assert.equal(writes.length, 1);
+  const zip = await JSZip.loadAsync(writes[0].buf);
+  assert.ok(zip.file('board.json'), 'ZIP must contain board.json');
+  const audioEntry = zip.file('assets/' + assetId);
+  assert.ok(audioEntry, 'ZIP must contain assets/<assetId>');
+  const extracted = await audioEntry.async('uint8array');
+  assert.deepEqual([...extracted], [...audioBytes]);
+});

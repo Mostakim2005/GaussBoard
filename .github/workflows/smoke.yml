@@ -21,6 +21,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Verify i18n parity (7 locales)
+        run: node scripts/i18n-check.js
+      - name: Run pure-Node unit & security tests
+        run: node --test test/*.test.mjs test/path-security.test.cjs test/storage-location.test.js test/android-*.test.js
       - run: npm run smoke:new
       - uses: actions/upload-artifact@v4
         if: always()

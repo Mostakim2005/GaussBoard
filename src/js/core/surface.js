@@ -1,10 +1,10 @@
 // The canvas view: sizing, the draw loop, culling, overlays.
 
 import { Camera } from './camera.js';
-import { drawBackground, drawRuling, drawObject, drawSelection, drawMemberOutline, drawLockBadge, drawGroupHint, drawLockedOutline, FONT, setDarkBoard, isDarkBoard, setPageColor, faceOf, inkPaint } from './render.js';
+import { drawBackground, drawRuling, drawObject, drawSelection, drawMemberOutline, drawLockBadge, drawGroupHint, drawLockedOutline, FONT, setDarkBoard, isDarkBoard, setPageColor, faceOf, inkPaint, setPaintBand } from './render.js';
 import { worldBounds, boundsOf } from './store.js';
 import { pageRects, pageMarginRects, pageIndexForBox, pageIndexForBoxIn, stripBounds } from './pages.js';
-import { boxesIntersect } from './util.js';
+import { boxesIntersect, boxContains } from './util.js';
 import { replayDisplayMode, replayInkEnabled, replaySceneFilter, replayStrokesForTrack } from './replay-clock.js';
 import { currentLanguage } from '../i18n.js';
 import { route as connectorRoute, midPoint } from './connectors.js';
@@ -61,6 +61,10 @@ export class Surface {
     this.hoverId = null;
     this._raf = null;
     this._warming = null;      // handle of a queued idle rebuild, see warmFreeze()
+    this.wetTail = null;       // where the pen is about to be, drawn ahead of the live stroke - see Interaction.predictTail
+    this._build = null;        // Sliced progressive build: { canvas, order, index, total, camX, camY, camZ, rev }
+    this._shownFor = null;     // Stretched snapshot while sharpening: { canvas, cam: { x, y, z }, rev }
+    this._needsRepaintAfterBuild = false;
     this._onFrame = this._onFrame.bind(this);
 
     if (!this._ephemeral) {
@@ -150,7 +154,7 @@ export class Surface {
    * stale. Throwing the copy away first means the next frame really is drawn
    * again.
    */
-  repaintAll() { this._ink = null; this._paper = null; this.invalidate(); }
+  repaintAll() { this._ink = null; this._paper = null; this._build = null; this.invalidate(); }
 
   /*
    * Repaint only this world-space box on the next frame.
@@ -424,8 +428,19 @@ export class Surface {
     ctx.restore();
   }
 
-  /** Background and every object, in world space. No selection chrome. */
+  /**
+   * Paint the board, or only the band `clip` of it. While a band is painted, render.js is told which
+   * part of the board that is (setPaintBand), so an imported page skips its blurred drop shadow when
+   * the band is nowhere near its edge - rubbing out notes on a PDF page no longer repaints the
+   * shadow of the whole page on every move.
+   */
   drawScene(ctx, w = this.width, h = this.height, onload = () => this.invalidate(), clip = null, filter = null) {
+    if (!clip) return this._drawScene(ctx, w, h, onload, null, filter);
+    setPaintBand(clip);
+    try { return this._drawScene(ctx, w, h, onload, clip, filter); } finally { setPaintBand(null); }
+  }
+
+  _drawScene(ctx, w = this.width, h = this.height, onload = () => this.invalidate(), clip = null, filter = null) {
     const cam = this.cam;
     this.screenTransform(ctx);
     setPageColor(this.store.doc.background?.color);
@@ -488,7 +503,12 @@ export class Surface {
       const o = objs[id];
       if (!o) continue;
       if (filter && !filter(o)) continue;
-      const wb = worldBounds(o);
+      let wb = worldBounds(o);
+      if ((!wb.w || !wb.h) && o.points?.length) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const p of o.points) { if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y; if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y; }
+        wb = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+      }
       if (!boxesIntersect(vbox, wb)) continue;
       // Outside the band being repainted: its pixels are already right.
       if (clipHit && !boxesIntersect(clipHit, wb)) continue;
@@ -537,6 +557,255 @@ export class Surface {
     }
     ctx.restore();
     if (clip) ctx.restore();
+  }
+
+  // --- Progressive Sliced Rendering (Smart Slicing & Atomic Bundles) ---
+  static HEAVY = 2500;
+  static HEAVY_VISIBLE = 1200;
+  static HEAVY_SLICE = 300;
+
+  _getSliceBudgetMs() {
+    // Dynamic Frame Budget (Rule 2):
+    // Active MNA Circuit Simulation (charge particles / DMM needles running at 60 FPS)
+    const isCircuitActive = this.app?.circuitWorkbenchModal?.sim?.running || this.app?.circuitWorkbenchModal?.animFrameId;
+    if (isCircuitActive) return 3.0;
+
+    // Active Audio Replay or Recording
+    const isAudioActive = this.app?.replayEngine?.active || this.app?.replayEngine?.isPlaying || this.app?.audioRecorder?.recording;
+    if (isAudioActive) return 3.5;
+
+    // Standard idle or pan/zoom budget
+    return 8.0;
+  }
+
+  _isHeavy(w = this.width, h = this.height) {
+    const total = this.store?.doc?.order?.length || 0;
+    if (total >= Surface.HEAVY) return true;
+    if (this._ephemeral || total < 800) return false;
+    const cam = this.cam;
+    const view = cam.viewport(w, h);
+    const pad = 64 / cam.z;
+    const vbox = { x: view.x - pad, y: view.y - pad, w: view.w + pad * 2, h: view.h + pad * 2 };
+    let count = 0;
+    const objs = this.store.doc.objects;
+    for (const id of this.store.doc.order) {
+      const o = objs[id];
+      if (o && boxesIntersect(vbox, worldBounds(o))) {
+        count++;
+        if (count >= Surface.HEAVY_VISIBLE) return true;
+      }
+    }
+    return false;
+  }
+
+  _paintOrder(w = this.width, h = this.height, filter = null) {
+    const cam = this.cam;
+    const view = cam.viewport(w, h);
+    const pad = 64 / cam.z;
+    const vbox = { x: view.x - pad, y: view.y - pad, w: view.w + pad * 2, h: view.h + pad * 2 };
+
+    // TRAP 1 Filter (Rule 1): Immediately skip active lecture replay session strokes
+    const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
+    const activeTrackId = isReplay ? this.app.replayEngine.track?.id : null;
+    const replayFilter = replaySceneFilter(activeTrackId, this.app?.settings);
+    const effectiveFilter = filter ? (o) => filter(o) && replayFilter(o) : replayFilter;
+
+    const objs = this.store.doc.objects;
+    const order = this.store.doc.order;
+
+    // TRAP 6 Pre-Scan (Rule 1): Collect visible concealed answer covers / study tapes
+    const concealedCovers = [];
+    for (let idx = 0; idx < order.length; idx++) {
+      const o = objs[order[idx]];
+      if (!o || o.revealed) continue;
+      if (o.type === 'curtain' || o.type === 'cover' || o.subtype === 'tape' || o.subtype === 'cover') {
+        const wb = worldBounds(o);
+        if (boxesIntersect(vbox, wb)) {
+          concealedCovers.push({ box: wb, index: idx });
+        }
+      }
+    }
+
+    const queue = [];
+    for (let idx = 0; idx < order.length; idx++) {
+      const o = objs[order[idx]];
+      if (!o) continue;
+      if (effectiveFilter && !effectiveFilter(o)) continue;
+      const wb = worldBounds(o);
+      if (!boxesIntersect(vbox, wb)) continue;
+
+      // TRAP 6 Secret-Flash Prevention & Optimization:
+      // If o is an ink stroke/object underneath a concealed opaque cover in z-order (idx < cover.index)
+      // and completely enclosed by it, skip it from the background queue entirely!
+      if (concealedCovers.length && o.type !== 'curtain' && o.type !== 'cover') {
+        const isCovered = concealedCovers.some(c => idx < c.index && boxContains(c.box, wb));
+        if (isCovered) continue;
+      }
+
+      queue.push(o);
+    }
+    return queue;
+  }
+
+  _paintRun(g, order, from, to, onload) {
+    const cam = this.cam;
+    const pages = this.store.doc.pages;
+    const rects = pages?.length ? pageRects(pages) : [];
+
+    g.setTransform(this.dpr * cam.z, 0, 0, this.dpr * cam.z, this.dpr * cam.x, this.dpr * cam.y);
+
+    if (!rects.length) {
+      for (let i = from; i < to && i < order.length; i++) {
+        drawObject(g, order[i], onload, this.editing);
+      }
+      return;
+    }
+
+    for (let i = from; i < to && i < order.length; i++) {
+      const o = order[i];
+      const pageIdx = pageIndexForBoxIn(rects, boundsOf(o));
+      if (pageIdx >= 0) {
+        const r = rects[pageIdx];
+        g.save();
+        g.beginPath();
+        g.rect(r.x, r.y, r.w, r.h);
+        g.clip();
+        drawObject(g, o, onload, this.editing);
+        g.restore();
+      } else {
+        drawObject(g, o, onload, this.editing);
+      }
+    }
+  }
+
+  _paintHeavy(ctx, w, h) {
+    // Layer 0: Paper / grid background
+    this._paintPaper(ctx, w, h, this.store.doc.pages);
+
+    const key = this.freezeKey();
+
+    // If a completed frozen copy matches current camera & doc revision, blit directly
+    if (this._ink && this._ink.key === key) {
+      this.screenTransform(ctx);
+      ctx.drawImage(this._ink.canvas, 0, 0, w, h);
+    } else {
+      const bw = Math.max(1, Math.round(w * this.dpr));
+      const bh = Math.max(1, Math.round(h * this.dpr));
+
+      // Reset or start a fresh progressive build if camera or revision changed
+      if (!this._build || this._build.camX !== this.cam.x || this._build.camY !== this.cam.y
+          || this._build.camZ !== this.cam.z || this._build.rev !== this.store.rev
+          || this._build.canvas.width !== bw || this._build.canvas.height !== bh) {
+
+        if (!this._buildCanvas || this._buildCanvas.width !== bw || this._buildCanvas.height !== bh) {
+          this._buildCanvas = document.createElement('canvas');
+          this._buildCanvas.width = bw;
+          this._buildCanvas.height = bh;
+        }
+        const bg = this._buildCanvas.getContext('2d');
+        bg.setTransform(1, 0, 0, 1, 0, 0);
+        bg.clearRect(0, 0, bw, bh);
+
+        const queue = this._paintOrder(w, h);
+        this._build = {
+          canvas: this._buildCanvas,
+          order: queue,
+          index: 0,
+          total: queue.length,
+          camX: this.cam.x,
+          camY: this.cam.y,
+          camZ: this.cam.z,
+          rev: this.store.rev
+        };
+      }
+
+      // Execute slices within dynamic budget (Rule 2)
+      const budgetMs = this._getSliceBudgetMs();
+      const t0 = performance.now();
+      const bg = this._build.canvas.getContext('2d');
+
+      const handleOnload = () => {
+        // Rule 5: Dirty-flagging instead of full restart
+        if (this._build && this._build.index / (this._build.total || 1) > 0.5) {
+          this._needsRepaintAfterBuild = true;
+        } else {
+          this._build = null;
+          this._ink = null;
+          this.invalidate();
+        }
+      };
+
+      while (this._build.index < this._build.total && (performance.now() - t0) < budgetMs) {
+        const from = this._build.index;
+        const to = Math.min(from + Surface.HEAVY_SLICE, this._build.total);
+        this._paintRun(bg, this._build.order, from, to, handleOnload);
+        this._build.index = to;
+      }
+
+      if (this._build.index >= this._build.total) {
+        // Build completed: promote to _inkCanvas
+        let c = this._inkCanvas;
+        if (!c || c.width !== bw || c.height !== bh) {
+          c = document.createElement('canvas');
+          c.width = bw; c.height = bh;
+          this._inkCanvas = c;
+        }
+        const cg = c.getContext('2d');
+        cg.setTransform(1, 0, 0, 1, 0, 0);
+        cg.clearRect(0, 0, bw, bh);
+        cg.drawImage(this._build.canvas, 0, 0);
+
+        this._ink = { canvas: c, key, rest: this.freezeRest(), camX: this.cam.x, camY: this.cam.y };
+        this._shownFor = { canvas: c, cam: { x: this.cam.x, y: this.cam.y, z: this.cam.z }, rev: this.store.rev };
+        this._build = null;
+
+        this.screenTransform(ctx);
+        ctx.drawImage(c, 0, 0, w, h);
+
+        if (this._needsRepaintAfterBuild) {
+          this._needsRepaintAfterBuild = false;
+          this._ink = null;
+          this.invalidate();
+        }
+      } else {
+        // Build in-progress: composite transformed _shownFor snapshot (Layer 1)
+        if (this._shownFor && this._shownFor.canvas) {
+          const k = this.cam.z / (this._shownFor.cam.z || 1);
+          const dx = (this.cam.x - this._shownFor.cam.x * k);
+          const dy = (this.cam.y - this._shownFor.cam.y * k);
+          ctx.save();
+          this.screenTransform(ctx);
+          ctx.imageSmoothingEnabled = (k !== 1);
+          ctx.drawImage(this._shownFor.canvas, dx, dy, w * k, h * k);
+          ctx.restore();
+        }
+        this.invalidate();
+      }
+    }
+
+    // Page margins guide
+    const pages = this.store.doc.pages;
+    if (pages?.length) {
+      const marginRects = pageMarginRects(pages);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0,120,212,.52)';
+      ctx.lineWidth = 1 / Math.max(0.05, this.cam.z);
+      ctx.setLineDash([5 / Math.max(0.05, this.cam.z), 4 / Math.max(0.05, this.cam.z)]);
+      for (const margin of marginRects) {
+        if (margin && margin.w > 0 && margin.h > 0) ctx.strokeRect(margin.x, margin.y, margin.w, margin.h);
+      }
+      ctx.restore();
+    }
+
+    // Layer 2: Live Unbaked Overlays (Always 60 FPS)
+    const isReplay = this.app?.replayEngine?.active || (this.app?.audioBar?.visible && this.app?.replayEngine?.track);
+    if (isReplay) this.drawReplaySession(ctx);
+    if (this.wet || this.wetPieces) this._drawWet(ctx);
+    if (this.ghosts.length) this._drawGhosts(ctx);
+    if (this.laser.length) this._drawLaser(ctx);
+
+    this._painted = true;
+    return true;
   }
 
   /** Paint the scene into an offscreen buffer we can blit while inking. */
@@ -668,6 +937,9 @@ export class Surface {
    * second pan mid-wait produces a copy of where the board ended up rather
    * than a stale one nobody wants.
    */
+  /** Is a pointer gesture under way? The interaction layer answers (see Interaction); alone, nothing is. */
+  busy() { return typeof this.isBusy === 'function' ? !!this.isBusy() : false; }
+
   warmFreeze() {
     // A timer handle of 0 is a real handle. `!= null` so a queued rebuild is
     // never mistaken for "nothing queued" and scheduled a second time.
@@ -676,7 +948,17 @@ export class Surface {
       this._warming = null;
       // Something is being drawn: the live path owns the copy and builds its
       // own. Stepping in here would repaint the board underneath a moving pen.
-      if (this.wet || this.laser.length) return;
+      if (this.wet || this.laser.length || this.ghosts.length) return;
+      /*
+       * A hand is still at work - an eraser rubbing, something being dragged. Each move changes the
+       * board, so a copy taken now is stale a frame later, and taking it means painting the WHOLE
+       * board: on a board with a PDF page in view that was a full page repaint in nearly every gap
+       * between eraser moves (78 in a two-second rub), which is what made the eraser drag there.
+       * The copy is taken once, when the hand lifts.
+       */
+      if (this.busy()) return;
+      // A very full board builds its copy a slice a frame; a rebuild here would do it all in one go.
+      if (this._build) return;
       const key = this.freezeKey();
       if (this._ink && this._ink.key === key) return;
       this._ink = this._freezeScene(key);
@@ -751,7 +1033,13 @@ export class Surface {
      * of the line would vanish the moment the pen came out the other side.
      */
     if (this.wetPieces) for (const piece of this.wetPieces) one(piece);
-    one(this.wet);
+    // the predicted tail (see Interaction.predictTail): only while it still belongs to these very points
+    const tail = this.wetTail;
+    if (this.wet && tail && tail.forPts === this.wet.points && tail.len === this.wet.points.length && tail.points.length) {
+      one({ ...this.wet, points: this.wet.points.concat(tail.points) });
+    } else {
+      one(this.wet);
+    }
   }
 
   /**
@@ -869,7 +1157,7 @@ export class Surface {
 
     // The board is drawn and nothing is in flight: a good moment to have the
     // frozen copy ready for whatever comes next. See warmFreeze().
-    if (!this._ephemeral && !this.wet && !this.laser.length
+    if (!this._ephemeral && !this.wet && !this.laser.length && !this.ghosts.length && !this._build && !this.busy()
         && (!this._ink || this._ink.key !== this.freezeKey())) this.warmFreeze();
 
     // ---- screen-space overlays (CSS pixels) ----

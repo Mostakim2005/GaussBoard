@@ -1,5 +1,5 @@
 # System Architecture (`docs/ARCHITECTURE.md`)
-> **1-Line Summary:** Plain-English visual map of how GaussBoard 6.9.2 works, why we chose each tool, and step-by-step recipes for adding new features.
+> **1-Line Summary:** Plain-English visual map of how GaussBoard 6.9.3 works, why we chose each tool, and step-by-step recipes for adding new features.
 
 ## 1. High-Level Visual System Map
 ```mermaid
@@ -20,7 +20,7 @@ flowchart TB
     Surface --> Study[Study Tape + Covers]
     Import[Importers: PDF, PPTX, OOXML, mammoth] --> Store
     ElectronMain[Electron Main: Window, IPC, Conversion, Storage] --> Store
-    Store --> Boards[(Boards Folder: boards/*.gazboard + assets/)]
+    Store --> Boards[(Boards Folder: boards/*.json + assets/)]
     PWA[PWA: Service Worker + Web Adapter] --> Store
 ```
 
@@ -72,9 +72,9 @@ sequenceDiagram
   * `src/js/core/markdown.js` -> `countTags`, `normalizeTextObject`
   * `src/js/core/util.js` -> `uid`, `unionBox`
 
-### [SUBSYSTEM: Inking-Rendering] | Aliases: Canvas 2D, Bezier, DirectInk, pressure, background, culling
-> **1-Line Summary:** Full-speed Canvas 2D with frozen base layer plus dynamic overlay, midpoint curves that never loop, and single-stroke rasterization.
-* **How It Works (Plain English):** A stroke is one stroked path down its centerline curved through sample midpoints, staying inside its control triangle. Width is constant like felt pen; pressure sets stroke weight. Ink is stored exactly as captured, never thinned, and points keep p.t.
+### [SUBSYSTEM: Inking-Rendering] | Aliases: Canvas 2D, Bezier, DirectInk, pressure, background, culling, eraserRing, setPaintBand
+> **1-Line Summary:** Full-speed Canvas 2D with 3-layer progressive composition (Layer 0 background, Layer 1 progressive ink snapshot with dynamic 3.0-8.0ms budgeting, Layer 2 live 60 FPS overlays + compositor pointer/eraser layers), midpoint curves that never loop, and single-stroke rasterization with zoom LOD.
+* **How It Works (Plain English):** A stroke is one stroked path down its centerline curved through sample midpoints, staying inside its control triangle. Width is constant like felt pen; pressure sets stroke weight. Ink is stored exactly as captured, never thinned, and points keep p.t. Hover/rub eraser rings move on a dedicated DOM compositor layer (`#eraserRing` / `.eraser-ring`) without dirtying the canvas, while banded erases skip interior PDF drop shadows (`setPaintBand`) and active gestures defer idle freeze rebuilds (`isBusy`).
 * **Data Flow Diagram:**
 ```mermaid
 flowchart LR
@@ -87,8 +87,9 @@ flowchart LR
 ```
 * **Code Anchors (Grep Targets):**
   * `src/js/core/ink.js` -> `InkEngine`, `fitBezier`, `preserveTime`
-  * `src/js/core/render.js` -> `drawStroke`, `drawShape`, `drawCover`, `drawAudioCard`
-  * `src/js/core/surface.js` -> `drawFrozen`, `drawReplaySession`, `firstPointAfter`
+  * `src/js/core/render.js` -> `drawStroke`, `drawNeon`, `drawShape`, `drawCover`, `drawAudioCard`, `setPaintBand`, `drawImage`
+  * `src/js/core/surface.js` -> `drawScene`, `busy`, `warmFreeze`, `drawReplaySession`, `firstPointAfter`, `_drawWet`, `wetTail`
+  * `src/js/core/tools.js` -> `followGlow`, `ringEl`, `placeRing`, `hideRing`, `predictTail`, `eraseSweep`
   * `src/js/core/recognize.js` -> `classifyInk`, `snapToShape`
   * `src/js/core/transform.js` -> `moveObject`, `scaleHandles`, `rotate`
 
@@ -160,6 +161,36 @@ flowchart LR
   * `src/vendor/libraries.json` -> `manifestVersion`, `bundledPath`
   * `src/js/ui/library-inspector.js` -> `LibraryInspector`, `listVersions`
 
+### [SUBSYSTEM: Gesture-Arbitration-And-Radial-HUD] | Aliases: gesture arbitration, HoldGestureManager, RadialShortcutRing, radial menu, dwell timer
+> **1-Line Summary:** Hardware-differentiated gesture arbitration engine with dual dwell timers, domain priority dispatching, and zero-dot radial shortcut ring.
+* **How It Works (Plain English):** The coordinator replaces fragmented, conflicting setTimeout calls. It splits hold into two distinct dwell phases: a Stationary Dwell Timer (< 18px movement) that opens domain modals (circuit component properties, answer cover toggle) or on empty canvas opens the Radial Menu (stylus) / Context Menu (mouse), and a Post-Stroke Dwell Timer (>= 24px stroke with pause) that triggers holdToShape. On stationary hold triggers, interaction.abortActiveStroke() immediately cleans up the 1-point buffer to prevent phantom ink dots and undo artifacts. Placing a second finger down immediately cancels pending holds to preserve smooth pinch-to-zoom.
+* **Data Flow Diagram:**
+```mermaid
+flowchart TD
+    PD[Pointer Down] --> MT{Pointers >= 2?}
+    MT -->|Yes| Cancel[Cancel Hold & Allow Pinch Zoom]
+    MT -->|No| InitHold[Start Stationary Hold Timer]
+    InitHold --> PM[Pointer Move / Draw]
+    PM --> DistCheck{Travel >= 18px?}
+    DistCheck -->|Yes| AbortStat[Abort Stationary Hold]
+    AbortStat --> PostStroke[Start Post-Stroke Dwell Timer]
+    PostStroke --> PauseCheck{Paused >= 450ms?}
+    PauseCheck -->|Yes| HoldShape[interaction.holdToShape]
+    PauseCheck -->|No| RegularStroke[Regular Ink Stroke]
+    DistCheck -->|No (Stationary)| StatTimer{Held >= 450-700ms?}
+    StatTimer -->|Yes| Discard[interaction.abortActiveStroke]
+    Discard --> DomainHit{Hit Domain Component?}
+    DomainHit -->|Circuit Component| CompModal[Open Component Modal]
+    DomainHit -->|Study Cover| ToggleCover[Toggle Conceal/Reveal]
+    DomainHit -->|Empty Canvas| DevCheck{Pointer Type?}
+    DevCheck -->|Pen / Stylus| RadialHUD[Open RadialShortcutRing]
+    DevCheck -->|Mouse / Touch| ContextHUD[Open Context Menu]
+```
+* **Code Anchors (Grep Targets):**
+  * `src/js/ui/hold-manager.js` -> `HoldGestureManager`
+  * `src/js/ui/radial.js` -> `RadialShortcutRing`
+  * `src/js/core/interaction.js` -> `abortActiveStroke`
+
 ## 2. Tech Stack & Why We Chose It
 
 | Layer | Tool / Library | Plain-English Reason Why |
@@ -185,8 +216,8 @@ See SUBSYSTEM sections above: Dual-Runtime-Platform, Document-Model-Op-Log, Inki
 > **1-Line Summary:** The active directive suite that must pass 24/24 before any change is called done.
 * **Automated UI / Logic Verification:** `node scripts/smoke.js --new-features`
 
-### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2245 keys, 7 locales, lint
-> **1-Line Summary:** Proves English keys match all 7 locales at 2,245/2,245 with zero missing strings.
+### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2389 keys, 7 locales, lint
+> **1-Line Summary:** Proves English keys match all 7 locales at 2,389/2,389 with zero missing strings.
 * **Type & Lint Check:** `node scripts/i18n-check.js`
 
 ### [VERIFY: Full-Regression-Suite] | Aliases: smoke builtin, 1247 assertions, full suite, test:all

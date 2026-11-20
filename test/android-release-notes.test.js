@@ -75,7 +75,7 @@ const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'gb-notes-'));
 
 test('desktop: every platform that attaches files to the release takes its text from release-notes/<version>.md', () => {
   const yml = read('.github/workflows/release.yml');
-  const attaches = yml.split('- name: Attach to the GitHub Release').slice(1).map((s) => s.split('\n      - name:')[0]);
+  const attaches = yml.split(/- name: Attach (?:branch binaries )?to the GitHub Release/).slice(1).map((s) => s.split('\n      - name:')[0]);
   assert.equal(attaches.length, 1, `expected Windows alone to attach to the release, found ${attaches.length}`);
   attaches.forEach((a, i) => {
     assert.match(a, /body_path: \$\{\{ steps\.notes\.outputs\.path \}\}/, `attach step ${i + 1} does not read the notes file:\n${a}`);

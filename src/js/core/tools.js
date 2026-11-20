@@ -3,7 +3,7 @@
 import { uid, bboxOfPoints, clamp, dist, simplify, unionBox } from './util.js';
 import { isScratchGesture } from './scratch.js';
 import { boundsOf, worldBounds, withAttached, withGroups} from './store.js';
-import { pick, pickAll, inBox, inLasso, strokesAlong, normalizeBox, curtainAt, toLocal, taskCheckboxAt, toggleTaskAtPoint, toggleCardCollapseAtPoint } from './hit.js';
+import { pick, pickAll, inBox, inLasso, strokesAlong, normalizeBox, curtainAt, toLocal, outlineAlong, taskCheckboxAt, toggleTaskAtPoint, toggleCardCollapseAtPoint } from './hit.js';
 import { handlePositions, HANDLE, HANDLES, drawShape, inkPaint, linkRectsOf, inQuad } from './render.js';
 import { translateObject, scaleObject, rotateObjectAround, normalizeRect, anchorFor, CURSORS } from './transform.js';
 import { recognize, fitError, MAX_FIT_ERROR } from './recognize.js';
@@ -98,6 +98,8 @@ export class Interaction {
     c.addEventListener('pointermove', (e) => this.onMove(e), { signal });
     c.addEventListener('pointerup', (e) => this.onUp(e), { signal });
     c.addEventListener('pointercancel', (e) => this.onUp(e), { signal });
+    // the pen leaving the screen always takes its glow along, mid-gesture or not
+    c.addEventListener('pointerleave', (e) => { if (e.pointerType === 'pen') this.hideGlow(); }, { signal });
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       window.addEventListener('blur', () => this.finishOnWindowBlur(), { signal });
     }
@@ -109,7 +111,26 @@ export class Interaction {
       // else entirely, is worse than no nib at all
       this.hideInkPointer();
       this.eraserCursor = null;
+      this.hideGlow();
+      this.hideRing();
       this.surface.invalidate();
+    }, { signal });
+    /*
+     * The ring and pen glow ride on raw pointer reports as well. Windows hands
+     * a pen's position to the page several times a frame; pointermove only
+     * passes on one per frame. Moving composited layers costs nothing, so they
+     * can take every report and stay on the nib while the board catches up.
+     */
+    c.addEventListener('pointerrawupdate', (e) => {
+      if (e.pointerType === 'pen') this.followGlow(e);
+      if (e.pointerType === 'touch') return;
+      const a = this.action;
+      // the eraser in hand, or a pen's tail (hovering or rubbing): the ring rides along
+      if (this.tool !== 'eraser' && !(a && a.type === 'erase') && !(e.pointerType === 'pen' && (e.buttons & 32))) return;
+      const el = this._ringEl;
+      if (!el || el.hidden) return;
+      const sp = this.surface.screenPoint(e);
+      this.placeRing(sp, a && a.type === 'erase' ? a.radiusPx : this.app.settings.eraserSize / 2);
     }, { signal });
     c.addEventListener('wheel', (e) => this.onWheel(e), { passive: false, signal });
     c.addEventListener('dblclick', (e) => this.onDoubleClick(e), { signal });
@@ -141,6 +162,22 @@ export class Interaction {
        * menu that turns up just after ours is ignored.
        */
       this.cancelHold();
+      if (this.ruler.visible && this.rulerZone(this.surface.screenPoint(e))) { this.app.openRulerMenu({ x: e.clientX, y: e.clientY }); return; }
+      if (e.pointerType === 'pen' && this.action && this.action.type !== 'radial' && !this.app.viewMode) {
+        const penId = [...this.pointers.entries()].find(([, p]) => p.type === 'pen')?.[0];
+        const sp = this.surface.screenPoint(e), wp = this.surface.cam.toWorld(sp.x, sp.y);
+        const evalHold = this.app.holdManager?.evaluateHold(e, wp, sp);
+        if (evalHold?.type === 'radial' && penId != null && !pick(this.store, wp, 8 / this.surface.cam.z) && !(this.ruler.visible && this.rulerZone(sp))) {
+          this.discardTapMark();
+          this.app.setSelection([]);
+          this._boardMenuAt = Date.now();
+          this.app.showRadial({ clientX: e.clientX, clientY: e.clientY }, wp);
+          this.action = { type: 'radial' };
+          this.actionId = penId;
+          this.surface.invalidate();
+          return;
+        }
+      }
       if (Date.now() - (this._boardMenuAt || 0) < 1200) return;
       if (this._lastDownType === 'touch' || this.action?.holdMenu) return;
       // A right-DRAG panned the canvas, so it is not a right-CLICK: swallow the
@@ -156,6 +193,14 @@ export class Interaction {
 
     this._overlayCb = (ctx, s) => this.drawOverlay(ctx, s);
     this.surface.overlays.push(this._overlayCb);
+    /*
+     * The board's idle copy waits while a hand is at work (see Surface.warmFreeze): a gesture under
+     * way, with a pointer that has PRESSED in the last second. The second half matters: a
+     * lift that never arrives (the window lost focus mid-rub, a pen whisked out of range) would
+     * otherwise leave the board "busy" for good, and the idle copy would never be taken again.
+     */
+    this._heardAt = 0;
+    this.surface.isBusy = () => !!this.action && this.pointers.size > 0 && performance.now() - this._heardAt < 1000;
   }
 
   destroy() {
@@ -169,6 +214,13 @@ export class Interaction {
     this.stopEdgePan();
     PencilSound.stop();
     this.hideInkPointer();
+    this.hideGlow();
+    this.hideRing();
+    if (this._glowOwned && this._glowEl?.parentNode) this._glowEl.remove();
+    this._glowEl = undefined;
+    if (this._ringOwned && this._ringEl?.parentNode) this._ringEl.remove();
+    this._ringEl = undefined;
+    if (this.surface) this.surface.isBusy = null;
     if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
   }
 
@@ -207,6 +259,8 @@ export class Interaction {
     this.pinch = null;
     this.lastMotion = null;
     this.hideInkPointer();
+    this.hideGlow();
+    this.hideRing();
     this.surface?.invalidate?.();
   }
 
@@ -296,6 +350,7 @@ export class Interaction {
 
   /* ------------------------------------------------------------ */
   onDown(e) {
+    this._heardAt = performance.now();             // a hand at work (see isBusy, in the constructor)
     if (e.button === 2) {
       this.app.hideMenus();
       // Right-drag pans, for anyone without a pen, a middle button or a
@@ -315,6 +370,7 @@ export class Interaction {
       return;
     }
     try { this.canvas.setPointerCapture?.(e.pointerId); } catch { /* synthetic or already-released pointer */ }
+    if (this.app.radial?.open) this.app.radial.close();
     this.surface.cam.cancelGlide?.();
     this._lastDownType = e.pointerType;
     if (e.pointerType === 'pen') this._penAt = performance.now();
@@ -352,13 +408,17 @@ export class Interaction {
     if (this.action && this.actionId != null && !this.pointers.has(this.actionId)) {
       PencilSound.stop();
       this.surface.wet = null;
+      this.surface.wetTail = null;
       this.surface.wetPieces = null;
       this.action = null;
       this.actionId = null;
     }
     const sp = this.surface.screenPoint(e);
     const wp = this.surface.cam.toWorld(sp.x, sp.y);
-    if (e.pointerType === 'pen') this.app.notePenSeen();
+    if (e.pointerType === 'pen') {
+      this.app.notePenSeen();
+      this.followGlow(e, sp);
+    }
     if (this.isPalm(e)) {
       try { this.canvas.releasePointerCapture?.(e.pointerId); } catch { /* never captured */ }
       this.palmsIgnored = (this.palmsIgnored || 0) + 1;
@@ -369,6 +429,15 @@ export class Interaction {
     // Where the board was last touched, for anything later that needs a place
     // and was not given one - Ctrl+V, most of all.
     this.app.boardPoint = { x: wp.x, y: wp.y, at: performance.now() };
+
+    if (this.pointers.size >= 2) {
+      const types = [...this.pointers.values()].map((p) => p.type);
+      const isPalmTouchDuringPen = e.pointerType === 'touch' && types.includes('pen') && (this.action || this.lateTouch(e));
+      if (!isPalmTouchDuringPen) {
+        this.cancelHold();
+        this.cancelShapeHold();
+      }
+    }
 
     if (this.pointers.size === 2) {
       // Two fingers pinch. A mouse (or a second pen) arriving while a stroke
@@ -478,6 +547,12 @@ export class Interaction {
       // Whichever pointer grabbed the ruler owns it until it lifts, exactly as
       // for every other gesture. Without that, a palm settling on the glass
       // dragged the ruler, and a palm lifting ended the drag.
+      if (zone === 'arm') {
+        this.action = { type: 'protArm' };
+        this.actionId = e.pointerId;
+        this.surface.invalidate();
+        return;
+      }
       if (zone === 'rotate') {
         const d = Math.atan2(wp.y - this.ruler.y, wp.x - this.ruler.x) - this.ruler.angle;
         const flip = Math.abs(Math.atan2(Math.sin(d), Math.cos(d))) > Math.PI / 2;
@@ -587,7 +662,7 @@ export class Interaction {
         this.startStroke(e, wp, tool);
         if (this.action) this.action.selectionAtDown = selectionAtDown;
         break;
-      case 'eraser': this.startErase(wp); break;
+      case 'eraser': this.startErase(wp); if (this.action) this.placeRing(sp, this.action.radiusPx); break;
       case 'lasso':
         // after a lasso select, dragging inside the selection moves it
         if (this.startMoveOnSelection(wp)) break;
@@ -708,10 +783,13 @@ export class Interaction {
   }
 
   onMove(e) {
+    // Only a pointer that is pressing counts as a hand at work. A mouse merely hovering - or a pen's
+    // tail held over the glass - keeps moving too, and it must not keep a stuck gesture alive.
+    if ((e.buttons & 1) || e.pressure > 0) this._heardAt = performance.now();
     if (this.moveRightPan(e)) return;
     if (e.pointerType === 'pen' && e.buttons) this.app.notePenSeen();
     const sp = this.surface.screenPoint(e);
-    if (e.pointerType === 'pen') { this._penAt = performance.now(); this._penSp = sp; this._mouseSp = null; }
+    if (e.pointerType === 'pen') { this._penAt = performance.now(); this._penSp = sp; this._mouseSp = null; this.followGlow(e, sp); }
     const wp = this.surface.cam.toWorld(sp.x, sp.y);
     if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { sp, wp, type: e.pointerType });
     this.app.boardPoint = { x: wp.x, y: wp.y, at: performance.now() };
@@ -760,7 +838,7 @@ export class Interaction {
         this._penSp = null;
         this._mouseSp = null;
       }
-      this.updateHover(sp, wp, e.pointerType);
+      this.updateHover(sp, wp, e.pointerType, e.pointerType === 'pen' && (e.buttons & 32) !== 0);
       return;
     }
 
@@ -768,6 +846,7 @@ export class Interaction {
     // A palm sliding on the screen therefore dragged the pen's stroke over to
     // the palm - the ink jumped, or looked like it had simply gone missing.
     if (this.actionId != null && e.pointerId !== this.actionId) return;
+    if (this.action && this.action.type === 'radial') { this.app.radial?.track(e.clientX, e.clientY); return; }
     if (e.pointerId === this._firstId && this._firstLast) {
       this._firstTravel = (this._firstTravel || 0) + Math.hypot(sp.x - this._firstLast.x, sp.y - this._firstLast.y);
       this._firstLast = sp;
@@ -787,6 +866,7 @@ export class Interaction {
 
     this.lastMotion = { sp, mods: { shift: e.shiftKey, alt: e.altKey }, pressure: this.pressure(e) };
     this.applyMotion(sp, this.lastMotion.mods, e);
+    if (this.action && this.action.type === 'erase') this.placeRing(sp, this.action.radiusPx);
     this.updateEdgePan();
     /*
      * Every other gesture asks for the whole board here, as it always has.
@@ -838,6 +918,7 @@ export class Interaction {
          * simply never arrived.
          */
         const offer = (raw) => {
+          if (a.edgePending) this.settleRuledEdge(a, raw);
           /*
            * The plastic is in the way.
            *
@@ -908,11 +989,12 @@ export class Interaction {
           if (a.heldShape && a.heldAt && dist(a.heldAt, wp) * this.surface.cam.z > 14) {
             a.heldShape = null;
           }
-          if (this.app?.settings?.holdToShape !== false && a.obj.tool === 'pen' && a.obj.effect !== 'pencil' && !a.ruled) {
+          if (this.app?.settings?.holdToShape !== false && a.obj.tool === 'pen' && a.obj.effect !== 'pencil' && a.obj.effect !== 'neon' && !a.ruled) {
             this.armShapeHold(a, wp);
           }
         }
         this.sendInkTrail(e, a, wp, pressure);
+        this.surface.wetTail = this.predictTail(e, a);
         break;
       }
       case 'erase': {
@@ -1106,6 +1188,7 @@ export class Interaction {
         this.ruler.y = a.y0 + (wp.y - a.start.y);
         break;
       }
+      case 'protArm': this.aimProtArm(wp, mods.shift); break;
       case 'rulerRotate': {
         // Grabbing the far end turns it the same way round, not upside down.
         const ang = Math.atan2(wp.y - this.ruler.y, wp.x - this.ruler.x) + (a.flip ? Math.PI : 0);
@@ -1136,6 +1219,11 @@ export class Interaction {
     if (this.pinch) { if (this.pointers.size < 2) this.pinch = null; return; }
     const a = this.action;
     if (!a || (this.actionId != null && e.pointerId !== this.actionId)) return;
+    if (a.type === 'radial') {
+      this.action = null; this.actionId = null;
+      this.app.radial?.release(e.clientX, e.clientY);
+      return;
+    }
     this.stopEdgePan();
     this.lastMotion = null;
     const sp = this.surface.screenPoint(e);
@@ -1187,7 +1275,13 @@ export class Interaction {
           this.finishStroke(a);
         }
         break;
-      case 'erase': this.finishErase(a); break;
+      case 'erase':
+        this.finishErase(a);
+        // back to the resting size where the pen or mouse still hovers; a finger has no hover, so it goes
+        if (e && e.pointerType === 'touch') this.hideRing();
+        else if (this.tool !== 'eraser' && !(e && e.pointerType === 'pen' && (e.buttons & 32))) this.hideRing();
+        else if (this._ringSp) this.placeRing(this._ringSp, this.app.settings.eraserSize / 2);
+        break;
       case 'marquee': {
         const box = normalizeBox({ x: a.start.x, y: a.start.y, w: a.cur.x - a.start.x, h: a.cur.y - a.start.y });
         const found = (Math.abs(box.w) < 3 && Math.abs(box.h) < 3) ? [] : inBox(this.store, box, false);
@@ -1533,9 +1627,18 @@ export class Interaction {
       // The mark never becomes an object, so there is nothing to undo. A pan
       // has moved nothing either - the slop check above cancels the hold long
       // before the board travels far enough to notice.
-      this.surface.wet = null;
-      this.surface.wetPieces = null;
-      this.action = null;
+      this.abortActiveStroke();
+      const evalHold = this.app.holdManager?.evaluateHold(e, wp, sp);
+      if (evalHold?.type === 'component') {
+        this.app.openCircuitComponentProperties?.(evalHold.target);
+        this.surface.invalidate();
+        return;
+      }
+      if (evalHold?.type === 'cover') {
+        this.app.inspectCover?.(evalHold.target);
+        this.surface.invalidate();
+        return;
+      }
       this.app.setSelection([hit.id]);
       if (hit.locked) this.action = { type: 'holdSelect' };
       else if (!this.startMoveOnSelection(wp)) { this.actionId = null; return; }
@@ -1577,6 +1680,7 @@ export class Interaction {
       if (this.action.snap) this.store.restoreSnapshot(this.action.snap);
     }
     this.surface.wet = null;
+    this.surface.wetTail = null;
     this.surface.wetPieces = null;
     if (this.app.viewMode) {
       for (const piece of [...(a.pieces || []), obj]) if (piece.points.length) this.surface.addGhost(piece);
@@ -1591,6 +1695,45 @@ export class Interaction {
     this.app.syncUI();
     this.surface.invalidate();
     return ['shapeDraw', 'textDraw', 'draw', 'lasso', 'marquee', 'move', 'resize', 'rotate'].includes(kind);
+  }
+
+  /**
+   * Where the pen is about to be: a short tail drawn ahead of the ink, never kept.
+   *
+   * Draws at most three predicted samples from getPredictedEvents(), clamped to
+   * PREDICT_REACH screen pixels and gated against corner overshoot, ruled
+   * strokes, Study Tape curtains, and off-sheet/off-screen coordinates.
+   * Never mutates a.obj.points or stroke timestamps (TRAP 2).
+   */
+  predictTail(e, a) {
+    if (this.app.settings?.drawAhead !== true || !e || typeof e.getPredictedEvents !== 'function') return null;
+    if (!a || a.type !== 'draw' || a.obj?.type !== 'stroke' || a.straight || a.ruled || a.edgePending || a.blocked || a.offView) return null;
+    const pts = a.obj && a.obj.points;
+    if (!pts || pts.length < 2) return null;
+    const last = pts[pts.length - 1];
+    const prev = pts[pts.length - 2];
+    let preds;
+    try { preds = e.getPredictedEvents(); } catch { return null; }
+    if (!preds || !preds.length) return null;
+    const z = this.surface.cam.z, reach = Interaction.PREDICT_REACH / z;
+    const tail = [];
+    for (const pe of preds.slice(0, 3)) {
+      const sp = this.surface.screenPoint(pe);
+      const q = this.surface.cam.toWorld(sp.x, sp.y);
+      const d = Math.hypot(q.x - last.x, q.y - last.y);
+      if (d > reach) {
+        if (d > 0) tail.push({ x: last.x + (q.x - last.x) * reach / d, y: last.y + (q.y - last.y) * reach / d, p: last.p });
+        break;
+      }
+      tail.push({ x: q.x, y: q.y, p: last.p });
+    }
+    if (!tail.length) return null;
+    const ux = last.x - prev.x, uy = last.y - prev.y, vx = tail[tail.length - 1].x - last.x, vy = tail[tail.length - 1].y - last.y;
+    const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+    if (!lu || !lv || (ux * vx + uy * vy) / (lu * lv) < 0.85) return null;
+    if (a.sheet && !tail.every((q) => inRect(a.sheet, q.x, q.y))) return null;
+    if (a.view && !tail.every((q) => this.onScreen(a.view, q))) return null;
+    return { forPts: pts, len: pts.length, points: tail };
   }
 
   /**
@@ -1636,10 +1779,21 @@ export class Interaction {
       // follow, and by now this may be one of two pointers rather than one.
       const only = [...this.pointers.values()];
       if (only.length !== 1 || only[0].type !== e.pointerType) return;
-      this.discardTapMark();
+      this.abortActiveStroke();
       this.app.setSelection([]);
       this._boardMenuAt = Date.now();
-      this.app.showContextMenu(e);
+      const evalHold = this.app.holdManager?.evaluateHold(e, wp, sp) || { type: 'context' };
+      if (evalHold.type === 'radial') {
+        this.app.showRadial({ clientX: e.clientX, clientY: e.clientY }, wp);
+        this.action = { type: 'radial' };
+        this.actionId = e.pointerId;
+      } else if (evalHold.type === 'component') {
+        this.app.openCircuitComponentProperties?.(evalHold.target);
+      } else if (evalHold.type === 'cover') {
+        this.app.inspectCover?.(evalHold.target);
+      } else if (evalHold.type !== 'none') {
+        this.app.showContextMenu(e);
+      }
       this.surface.invalidate();
     }, e.pointerType === 'pen' ? PEN_HOLD_MS : HOLD_MS);
   }
@@ -1701,7 +1855,14 @@ export class Interaction {
   armShapeHold(a, wp) {
     this.cancelShapeHold();
     if (this.app?.settings?.holdToShape === false) return;
-    if (!a?.obj || a.obj.tool !== 'pen' || a.ruled) return;
+    if (!a?.obj || a.obj.tool !== 'pen' || a.obj.effect === 'pencil' || a.obj.effect === 'neon' || a.ruled) return;
+    const pts = a.obj.points;
+    if (!pts || pts.length < 5) return;
+    let travel = 0;
+    for (let i = 1; i < pts.length; i++) {
+      travel += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    }
+    if (travel * (this.surface?.cam?.z || 1) < 24) return;
     this._shapeHoldTimer = setTimeout(() => {
       this._shapeHoldTimer = null;
       if (this.action !== a || a.pieces?.length || (a.obj.points?.length || 0) < 5) return;
@@ -1997,11 +2158,14 @@ export class Interaction {
     // Whether this stroke is a RULED one is decided here, once, by where it
     // starts - and so is which of the ruler's two edges it belongs to. See
     // snapToRuler() for why that cannot be left to the points as they arrive.
-    const startEdge = this.ruler.visible && this.ruler.snap ? this.rulerEdgeAt(wp) : null;
-    const act = { type: 'draw', obj, snapAxis: null, sheet,
-      ruled: startEdge !== null, ruledEdge: startEdge || 0 };
     const clock = audioInkClock(this.app);
     const t0 = clock?.timeMs ?? null;
+    const isMouse = e?.pointerType === 'mouse';
+    const mouseCannotInk = isMouse && this.app.stylusKnown && this.app.settings?.mouseRole !== 'ink';
+    const startEdges = (!mouseCannotInk && this.ruler.visible && this.ruler.snap) ? this.rulerEdgesAt(wp) : [];
+    const act = { type: 'draw', obj, snapAxis: null, sheet,
+      ruled: startEdges.length > 0, ruledEdge: startEdges.length ? startEdges[0] : 0,
+      edgePending: startEdges.length ? { from: { x: wp.x, y: wp.y }, cands: startEdges, raw: [{ ...wp, p: this.pressure(e), ...(t0 != null ? { t: t0 } : {}) }] } : null };
     // Study tape is a mask, not ink: giving it an audioId would make the replay
     // engine treat the cover as a recorded stroke and animate it as one.
     if (clock && !isTape) {
@@ -2019,6 +2183,7 @@ export class Interaction {
       }
     }
     this.surface.wet = obj;
+    this.surface.wetTail = null;
     this.action = act;
     if (this.app?.settings?.autoDimBarsWhileInking !== false && typeof document !== 'undefined') {
       document.body?.classList?.add('inking-active');
@@ -2199,9 +2364,31 @@ export class Interaction {
     PencilSound.stop();
     if (typeof document !== 'undefined') document.body?.classList?.remove('inking-active');
     this.surface.wet = null;
+    this.surface.wetTail = null;
     this.surface.wetPieces = null;
     this.action = null;
     this.actionId = null;
+  }
+
+  abortActiveStroke() {
+    this.discardTapMark();
+  }
+
+  hitCover(wp, tol = 8 / (this.surface?.cam?.z || 1)) {
+    return curtainAt(this.store, wp, tol);
+  }
+
+  hitCircuitComponent(wp) {
+    if (this.app.circuitWorkbench?.isOpen && this.app.circuitWorkbench?.hitComponent) {
+      return this.app.circuitWorkbench.hitComponent(wp);
+    }
+    if (this.app.circuitWorkbenchModal?.isOpen && this.app.circuitWorkbenchModal?.hitComponent) {
+      return this.app.circuitWorkbenchModal.hitComponent(wp);
+    }
+    if (this.app.hitCircuitComponent) {
+      return this.app.hitCircuitComponent(wp);
+    }
+    return null;
   }
 
   offerScratchOut(a, e) {
@@ -2270,6 +2457,7 @@ export class Interaction {
       this.surface.wetPieces = a.pieces;
     }
     a.obj.points = [];
+    this.surface.wetTail = null;
   }
 
   finishStroke(a) {
@@ -2283,6 +2471,7 @@ export class Interaction {
       if (tilt > 0.05) obj.tilt = tilt;
     }
     this.surface.wet = null;
+    this.surface.wetTail = null;
     this.surface.wetPieces = null;
     if (obj.audioId) {
       const clock = audioInkClock(this.app);
@@ -2372,7 +2561,9 @@ export class Interaction {
      */
     this.surface.extendFreeze?.(obj);
 
-    if ((this.app.settings.inkToShape || a.heldShape) && obj.tool === 'pen' && obj.effect !== 'pencil') {
+    // a pencil sketch stays a sketch: guide lines are meant to be rough. A neon line stays a
+    // glowing line too: a shape has no glow, and straightening it would put the light out.
+    if ((this.app.settings.inkToShape || a.heldShape) && obj.tool === 'pen' && obj.effect !== 'pencil' && obj.effect !== 'neon') {
       const r = a.heldShape || recognize(obj.points);
       // classified AND actually shaped like the thing it was classified as
       const fit = r ? fitError(obj.points, r.kind, r) : 1;
@@ -2517,6 +2708,20 @@ export class Interaction {
     const r = (this.app.settings.eraserSize / 2 / this.surface.cam.z) * grow;
     a.radiusPx = r * this.surface.cam.z;
     const hits = strokesAlong(store, from, to, r);
+    const erasedBoxes = [];
+    const covers = store.objects.filter((c) => c && c.type === 'curtain' && !c.revealed);
+    const underConcealedCover = (target) => {
+      if (!covers.length) return false;
+      const at = store.indexOf(target.id);
+      const b = worldBounds(target);
+      for (const c of covers) {
+        if (store.indexOf(c.id) < at) continue;
+        const cb = worldBounds(c);
+        if (b.x >= cb.x - 4 && b.y >= cb.y - 4
+            && b.x + b.w <= cb.x + cb.w + 4 && b.y + b.h <= cb.y + cb.h + 4) return true;
+      }
+      return false;
+    };
     let changed = false;
 
     for (const o of hits) {
@@ -2530,6 +2735,24 @@ export class Interaction {
       //
       // Removing a picture is what Select and Delete are for: deliberate,
       // visible, and aimed at one thing.
+      //
+      // Drawn shapes are the one exception, when "Erase shapes too" is on. A circle that "Straighten shapes"
+      // made out of your ink, a line, an arrow, a box from the shape tray - these
+      // are drawing, and people reach for the eraser to get rid of them. Only
+      // their OUTLINE counts, and only a bare shape (no words in it, nothing
+      // locked, and not concealed under an answer cover): rubbing out ink written inside a box must leave
+      // the box, and a labelled flowchart box is a note, not a scribble. A shape goes whole, in either mode.
+      if (o.type === 'shape') {
+        if (this.app.settings.eraseShapes !== true || o.text || underConcealedCover(o) || !outlineAlong(o, from, to, r)) continue;
+        const wb = worldBounds(o);
+        const pad = (o.lineWidth || 3) + 6;
+        erasedBoxes.push({ x: wb.x - pad, y: wb.y - pad, w: wb.w + pad * 2, h: wb.h + pad * 2 });
+        const index = store.rawRemove(o.id);
+        if (a.fragments.has(o.id)) a.fragments.delete(o.id);
+        else if (!a.originals.has(o.id)) a.originals.set(o.id, { obj: structuredClone(o), index });
+        changed = true;
+        continue;
+      }
       if (o.type !== 'stroke') continue;
       const partial = a.mode === 'partial';
       const isFragment = a.fragments.has(o.id);
@@ -2553,30 +2776,19 @@ export class Interaction {
     /*
      * Repaint the band the eraser just crossed, not the whole board.
      *
-     * Three things have to be inside it, or something stale is left on screen:
-     * the segment itself with the eraser's radius around it; the ring where it
-     * was drawn LAST frame, which must be painted over; and the ring where it
-     * is now. The ring is screen chrome drawn after the scene, so if its old
-     * position falls outside the band it stays there as a ghost.
+     * (The ring is its own compositor layer now - see placeRing - so it leaves
+     * nothing on the canvas to clear, while erasedBoxes still ensures any
+     * deleted bare shape is cleared across its full bounding box.)
      *
      * A generous margin on top, because ink is drawn with a width of its own
      * and round caps that reach past the centreline.
      */
-    const ringWorld = (r) => r / this.surface.cam.z;
-    const ringR = ringWorld(a.radiusPx) + 6 / this.surface.cam.z;
     const boxes = [{
       x: Math.min(from.x, to.x) - r - 4,
       y: Math.min(from.y, to.y) - r - 4,
       w: Math.abs(to.x - from.x) + (r + 4) * 2,
       h: Math.abs(to.y - from.y) + (r + 4) * 2
-    }, {
-      x: to.x - ringR, y: to.y - ringR, w: ringR * 2, h: ringR * 2
-    }];
-    if (a.lastRing) {
-      boxes.push({ x: a.lastRing.x - a.lastRing.r, y: a.lastRing.y - a.lastRing.r,
-        w: a.lastRing.r * 2, h: a.lastRing.r * 2 });
-    }
-    a.lastRing = { x: to.x, y: to.y, r: ringR };
+    }, ...erasedBoxes];
     let band = boxes[0];
     for (const b of boxes.slice(1)) {
       const x = Math.min(band.x, b.x), y = Math.min(band.y, b.y);
@@ -2792,6 +3004,57 @@ export class Interaction {
     if (el && !el.hidden) el.hidden = true;
   }
 
+  /*
+   * The pen glow, for screen recordings.
+   *
+   * Zoom and other recorders capture the screen and the mouse pointer, so a
+   * hovering or writing stylus produces ink with no pointer visible. A soft
+   * yellow halo moves via transform on its own layer (#penGlow on main #stage,
+   * or .pen-glow inside a split pane), stepping aside whenever an eraser is
+   * active or the pointer leaves.
+   */
+  glowEl() {
+    if (this._glowEl === undefined) {
+      if (this.opts?.penGlow) {
+        this._glowEl = this.opts.penGlow;
+        return this._glowEl;
+      }
+      const doc = typeof document !== 'undefined' ? document : null;
+      const parent = this.canvas?.parentElement;
+      let el = parent?.querySelector?.('#penGlow, .pen-glow') || null;
+      if (!el && this.canvas?.id === 'c' && doc && typeof doc.getElementById === 'function') {
+        el = doc.getElementById('penGlow');
+      }
+      if (!el && parent && typeof parent.appendChild === 'function' && doc && typeof doc.createElement === 'function') {
+        el = doc.createElement('div');
+        el.className = 'pen-glow';
+        el.hidden = true;
+        parent.appendChild(el);
+        this._glowOwned = true;
+      }
+      this._glowEl = el || null;
+    }
+    return this._glowEl;
+  }
+
+  followGlow(e, sp = null) {
+    if (this.app.settings?.recordPointer !== true) { this.hideGlow(); return; }
+    if ((e.buttons & 32) || this.tool === 'eraser' || this.action?.type === 'erase' || this.effectiveTool(e) === 'eraser') {
+      this.hideGlow();
+      return;
+    }
+    const el = this.glowEl();
+    if (!el) return;
+    const p = sp || this.surface.screenPoint(e);
+    el.style.transform = 'translate3d(' + Math.round(p.x) + 'px,' + Math.round(p.y) + 'px,0)';
+    if (el.hidden) el.hidden = false;
+  }
+
+  hideGlow() {
+    const el = this._glowEl;
+    if (el && !el.hidden) el.hidden = true;
+  }
+
   /**
    * Hide the nib layer one frame from now, rather than this instant.
    *
@@ -2970,9 +3233,11 @@ export class Interaction {
     return inkCursor(kind, color);
   }
 
-  updateHover(sp, wp, deviceType = 'mouse') {
+  updateHover(sp, wp, deviceType = 'mouse', tail = false) {
     let cursor = 'default';
-    const t = this.tool;
+    // a pen turned over: its tail hovers as the eraser, whatever tool is in hand, ring and all
+    const t = tail ? 'eraser' : this.tool;
+    if (t !== 'eraser') this.hideRing();          // first: several of the hovers below return early
     const inkTool = isInkTool(t);
     const mousePointer = deviceType === 'mouse' && !this.app.mouseInks && inkTool;
     if (this.spaceDown) cursor = 'grab';
@@ -2986,6 +3251,7 @@ export class Interaction {
     const overHandle = this.handleAt(sp);
     if (overHandle) {
       this.surface.hoverId = null;
+      this.hideRing();
       this.setCursor(CURSORS[overHandle] || 'pointer');
       return;
     }
@@ -3039,26 +3305,15 @@ export class Interaction {
       const zone = this.rulerZone(sp);
       // Only the parts that actually do something say so. The body under a pen
       // draws, and a "move" cursor over it would be the same old lie.
-      if (zone === 'rotate') cursor = 'grab';
+      if (zone === 'rotate' || zone === 'arm') cursor = 'grab';
+      else if (zone === 'menu' || zone === 'close') cursor = 'pointer';
       else if (zone === 'move') cursor = 'move';
       else if (zone === 'body' && (deviceType === 'touch' || t === 'select' || t === 'pan')) cursor = 'move';
     }
     if (t === 'eraser') {
-      // The hover ring, when no button is down. Only the ring moved, so only
-      // where it was and where it is now need repainting - on a heavy board
-      // that is the difference between a ring that glides and one that stutters.
-      const prev = this.eraserCursor;
+      // The hover ring is a layer of its own (see placeRing): moving it repaints nothing on the board.
       this.eraserCursor = sp;
-      const rPx = this.app.settings.eraserSize / 2 + 6;
-      const z = this.surface.cam.z;
-      const boxOf = (p) => { const w = this.surface.cam.toWorld(p.x - rPx, p.y - rPx);
-        return { x: w.x, y: w.y, w: (rPx * 2) / z, h: (rPx * 2) / z }; };
-      if (prev && this.surface.invalidateBand) {
-        const a = boxOf(prev), b = boxOf(sp);
-        const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
-        this.surface.invalidateBand({ x, y,
-          w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y });
-      } else this.surface.invalidate();
+      this.placeRing(sp, this.app.settings.eraserSize / 2);
     }
     this.setCursor(cursor);
   }
@@ -3174,6 +3429,7 @@ export class Interaction {
     if (this.action && this.lastMotion) this.applyMotion(this.lastMotion.sp, this.lastMotion.mods, null);
   }
 
+  static PREDICT_REACH = 18;            // screen pixels the predicted tail may run ahead of the ink, at most
   static ERASER_MAX_GROWTH = 1.8;      // up to 2.8x the chosen size
   static ERASER_GROWTH_SPAN = 900;     // world units of scrubbing to reach it
   static ON_COVER = 0.85;              // share of a stroke that must lie on a cover to be written ON it
@@ -3229,6 +3485,7 @@ export class Interaction {
     PencilSound.stop();
     if (this.action && this.action.type === 'draw') {
       this.surface.wet = null;
+      this.surface.wetTail = null;
       this.surface.wetPieces = null;
       this.action = null;
     } else if (this.action) this.action = null;
@@ -3351,7 +3608,200 @@ export class Interaction {
     return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   }
 
+  /*
+   * Triangles (set squares).
+   *
+   * Besides the straight ruler there are two set squares, the plastic
+   * triangles from a geometry box: one with a right angle and two 45° corners,
+   * one with a right angle, a 30° and a 60° corner.
+   */
+  get rulerIsTriangle() { const k = this.ruler.kind; return k === 'set45' || k === 'set60'; }
+
+  /** The triangle's corners in ruler space (along the base, down from it), in world units. */
+  triCorners() {
+    const r = this.ruler, b = r.triBase || r.length * 0.5;
+    const h = r.kind === 'set60' ? b * Math.tan(Math.PI / 6) : b;
+    return [{ u: -b / 2, v: 0 }, { u: b / 2, v: 0 }, { u: -b / 2, v: h }];
+  }
+
+  /** Is (u, v) inside the triangle, and how far inside (negative outside), in world units. */
+  triInside(u, v) {
+    const P = this.triCorners();
+    let inside = Infinity;
+    for (let i = 0; i < 3; i++) {
+      const a = P[i], b = P[(i + 1) % 3], c = P[(i + 2) % 3];
+      const ex = b.u - a.u, ey = b.v - a.v, L = Math.hypot(ex, ey);
+      const side = ((c.u - a.u) * ey - (c.v - a.v) * ex) > 0 ? 1 : -1;
+      const d = side * ((u - a.u) * ey - (v - a.v) * ex) / L;
+      inside = Math.min(inside, d);
+    }
+    return inside;
+  }
+
+  /** The triangle edges a point could belong to ('e0' base, 'e1' long slope, 'e2' upright), with their distances. */
+  triEdgesAt(pt) {
+    const z = this.surface.cam.z, reach = 40 / z;
+    const { along: u, perp: v } = this.rulerOffsets(pt);
+    const P = this.triCorners();
+    const found = [];
+    for (let i = 0; i < 3; i++) {
+      const a = P[i], b = P[(i + 1) % 3];
+      const ex = b.u - a.u, ey = b.v - a.v, L = Math.hypot(ex, ey);
+      const t = ((u - a.u) * ex + (v - a.v) * ey) / (L * L);
+      if (t < -reach / L || t > 1 + reach / L) continue;
+      found.push({ edge: 'e' + i, d: Math.abs((u - a.u) * ey - (v - a.v) * ex) / L });
+    }
+    return { found, inside: this.triInside(u, v) > 0 };
+  }
+
+  /** The point, moved onto the line of one triangle edge (TRAP 2: preserves p.t). */
+  triProject(pt, edge) {
+    const r = this.ruler, P = this.triCorners(), i = Number(String(edge).slice(1)) || 0;
+    const a = P[i], b = P[(i + 1) % 3];
+    const { along: u, perp: v } = this.rulerOffsets(pt);
+    const ex = b.u - a.u, ey = b.v - a.v, L2 = ex * ex + ey * ey;
+    const t = ((u - a.u) * ex + (v - a.v) * ey) / L2;
+    const pu = a.u + ex * t, pv = a.v + ey * t;
+    const cos = Math.cos(r.angle), sin = Math.sin(r.angle);
+    return {
+      x: r.x + cos * pu - sin * pv,
+      y: r.y + sin * pu + cos * pv,
+      p: pt.p,
+      t: pt.t != null ? pt.t : performance.now()
+    };
+  }
+
+  /** Where the triangle's own controls sit, in screen pixels in ruler space. */
+  triControls() {
+    const z = this.surface.cam.z, P = this.triCorners().map((q) => ({ u: q.u * z, v: q.v * z }));
+    const cu = (P[0].u + P[1].u + P[2].u) / 3, cv = (P[0].v + P[1].v + P[2].v) / 3;
+    const h = P[2].v;
+    return {
+      knobs: [{ u: P[1].u - Math.max(46, h * 0.06 + 46), v: 11 }, { u: P[0].u + 16, v: 14 }],
+      grip: { u: cu, v: cv },
+      menu: { u: P[0].u + 22, v: Math.min(h - 18, 54) },
+      readout: { u: cu, v: cv + 30 }
+    };
+  }
+
+  /** The angle the ruler shows: measured from pointing right, or (if chosen) from pointing up. */
+  rulerReadout(angle = this.ruler.angle) {
+    let deg = ((angle * 180) / Math.PI) % 360;
+    if (this.app.settings.rulerZero === 'up') deg += 90;
+    deg = ((deg % 360) + 360) % 360;
+    return Math.round(deg) % 360 + '°';
+  }
+
+  triZone(sp) {
+    const { c, angle } = this.rulerRect();
+    const dx = sp.x - c.x, dy = sp.y - c.y;
+    const u = dx * Math.cos(angle) + dy * Math.sin(angle);
+    const v = -dx * Math.sin(angle) + dy * Math.cos(angle);
+    const C = this.triControls(), reach = this.coarsePointer ? 24 : 15, z = this.surface.cam.z;
+    for (const k of C.knobs) if (Math.hypot(u - k.u, v - k.v) < reach) return 'rotate';
+    if (Math.hypot(u - C.menu.u, v - C.menu.v) < reach) return 'menu';
+    if (Math.abs(u - C.grip.u) < 34 && Math.abs(v - C.grip.v) < 20) return 'move';
+    if (this.triInside(u / z, v / z) > -2 / z) return 'body';
+    return null;
+  }
+
+  /*
+   * The protractor.
+   */
+  get rulerIsProtractor() { return this.ruler.kind === 'protractor'; }
+
+  /** The protractor's radius (world units) and its arm's angle in whole degrees, 0 to 180. */
+  protGeom() {
+    const r = this.ruler;
+    const R = r.protR > 0 ? r.protR : r.length * 0.3;
+    const armDeg = Number.isFinite(r.protArm) ? Math.min(180, Math.max(0, Math.round(r.protArm))) : 60;
+    return { R, armDeg, arm: (armDeg * Math.PI) / 180 };
+  }
+
+  /** The point at angle θ (radians, protractor scale) and distance ρ from the centre, in ruler space. */
+  static protAt(theta, rho) { return { u: Math.cos(theta) * rho, v: -Math.sin(theta) * rho }; }
+
+  /** Is (u, v) on the plastic itself: above the straight edge and inside the curve. */
+  protInside(u, v) {
+    const { R } = this.protGeom();
+    return v < 0 && Math.hypot(u, v) < R;
+  }
+
+  /** The protractor edges a point could belong to ('pb' the straight edge, 'pc' the curve, 'pa' the arm), with their distances. */
+  protEdgesAt(pt) {
+    const z = this.surface.cam.z, band = 26 / z, reach = 40 / z, ext = Interaction.PROT_ARM_EXT / z;
+    const { R, arm } = this.protGeom();
+    const { along: u, perp: v } = this.rulerOffsets(pt);
+    const rho = Math.hypot(u, v);
+    const found = [];
+    if (Math.abs(u) <= R + reach) found.push({ edge: 'pb', d: Math.abs(v) });
+    if (v <= band) found.push({ edge: 'pc', d: Math.abs(rho - R) });
+    const c = Math.cos(arm), s = Math.sin(arm), t = u * c - v * s;
+    if (t > 0 && t <= R + ext + reach) found.push({ edge: 'pa', d: Math.abs(u * s + v * c) });
+    return { found, inside: v < 0 && rho < R };
+  }
+
+  /** The point, moved onto one protractor edge (TRAP 2: preserves p.t). */
+  protProject(pt, edge) {
+    const r = this.ruler, { R, arm } = this.protGeom();
+    const { along: u, perp: v } = this.rulerOffsets(pt);
+    let pu = u, pv = 0;
+    if (edge === 'pc') {
+      const rho = Math.hypot(u, v);
+      if (rho > 1e-9) { pu = (u / rho) * R; pv = (v / rho) * R; } else { pu = R; pv = 0; }
+    } else if (edge === 'pa') {
+      const c = Math.cos(arm), s = Math.sin(arm), t = u * c - v * s;
+      pu = c * t; pv = -s * t;
+    }
+    const cos = Math.cos(r.angle), sin = Math.sin(r.angle);
+    return {
+      x: r.x + cos * pu - sin * pv,
+      y: r.y + sin * pu + cos * pv,
+      p: pt.p,
+      t: pt.t != null ? pt.t : performance.now()
+    };
+  }
+
+  static PROT_ARM_EXT = 40;
+  static PROT_ARM_KNOB = 24;
+
+  protControls() {
+    const z = this.surface.cam.z, { R, arm } = this.protGeom(), Rz = R * z;
+    return {
+      Rz,
+      knobs: [{ u: Rz * 0.6, v: -14 }, { u: -Rz * 0.6, v: -14 }],
+      menu: { u: -Rz * 0.44, v: -14 },
+      grip: { u: 0, v: -Rz * 0.58 },
+      readout: { u: 0, v: -Rz * 0.58 + 30 },
+      armKnob: Interaction.protAt(arm, Rz + Interaction.PROT_ARM_KNOB)
+    };
+  }
+
+  protZone(sp) {
+    const { c, angle } = this.rulerRect();
+    const dx = sp.x - c.x, dy = sp.y - c.y;
+    const u = dx * Math.cos(angle) + dy * Math.sin(angle);
+    const v = -dx * Math.sin(angle) + dy * Math.cos(angle);
+    const C = this.protControls(), reach = this.coarsePointer ? 24 : 15;
+    if (Math.hypot(u - C.armKnob.u, v - C.armKnob.v) < reach) return 'arm';
+    for (const k of C.knobs) if (Math.hypot(u - k.u, v - k.v) < reach) return 'rotate';
+    if (Math.hypot(u - C.menu.u, v - C.menu.v) < reach) return 'menu';
+    if (Math.abs(u - C.grip.u) < 34 && Math.abs(v - C.grip.v) < 20) return 'move';
+    if (v <= 2 && Math.hypot(u, v) <= C.Rz + 2) return 'body';
+    return null;
+  }
+
+  aimProtArm(wp, coarse) {
+    const { along: u, perp: v } = this.rulerOffsets(wp);
+    let deg = (Math.atan2(-v, u) * 180) / Math.PI;
+    if (deg < 0) deg = deg < -90 ? 180 : 0;
+    const step = coarse ? 5 : 1;
+    this.ruler.protArm = Math.min(180, Math.max(0, Math.round(deg / step) * step));
+  }
+
   rulerZone(sp) {
+    if (this.ruler.kind === 'set45' || this.ruler.kind === 'set60') return this.triZone(sp);
+    if (this.rulerIsProtractor) return this.protZone(sp);
     const { c, len, thick, angle } = this.rulerRect();
     const dx = sp.x - c.x, dy = sp.y - c.y;
     const along = dx * Math.cos(angle) + dy * Math.sin(angle);
@@ -3423,73 +3873,102 @@ export class Interaction {
    * side, the full thickness for the far one.
    */
   rulerEdgeAt(pt) {
-    const r = this.ruler;
-    const z = this.surface.cam.z;
-    const band = 26 / z;                     // a little grace beyond the plastic
-    const { along, perp } = this.rulerOffsets(pt);
-    if (Math.abs(along) > r.length / 2 + 40 / z) return null;   // past the ends
-    if (perp < -band || perp > r.thickness + band) return null; // clear of it
-    return perp < r.thickness / 2 ? 0 : r.thickness;
+    const list = this.rulerEdgesAt(pt);
+    return list.length ? list[0] : null;
   }
 
-  /**
-   * Is this point underneath the plastic itself?
-   *
-   * Not the grace band around the edges - the body, where a real nib simply
-   * cannot reach the paper. A line you drag across a ruler stops at the near
-   * edge and starts again at the far one; it does not reappear inside the
-   * plastic, however see-through the plastic is. This is the body exactly,
-   * because the edges themselves are where ruled lines are supposed to land.
-   */
+  /** Every edge a point is close enough to, nearest first. */
+  rulerEdgesAt(pt) {
+    const z = this.surface.cam.z, band = (this.coarsePointer ? Interaction.RULE_TOUCH_FINGER : Interaction.RULE_TOUCH) / z;
+    let found, inside;
+    if (this.rulerIsTriangle) ({ found, inside } = this.triEdgesAt(pt));
+    else if (this.rulerIsProtractor) ({ found, inside } = this.protEdgesAt(pt));
+    else {
+      const r = this.ruler, { along, perp } = this.rulerOffsets(pt);
+      if (Math.abs(along) > r.length / 2 + 40 / z) return [];
+      found = [{ edge: 0, d: Math.abs(perp) }, { edge: r.thickness, d: Math.abs(perp - r.thickness) }];
+      inside = perp > 0 && perp < r.thickness;
+    }
+    found.sort((a, b) => a.d - b.d);
+    const near = found.filter((f) => f.d <= band);
+    return (near.length ? near : inside && found.length ? [found[0]] : []).map((f) => f.edge);
+  }
+
+  /** Which way an edge runs at a point, as a unit vector on the board. */
+  edgeDirection(edge, pt) {
+    const r = this.ruler;
+    let du = 1, dv = 0;
+    if (edge === 'pc') {
+      const { along: u, perp: v } = this.rulerOffsets(pt), rho = Math.hypot(u, v) || 1;
+      du = -v / rho; dv = u / rho;
+    } else if (edge === 'pa') {
+      const { arm } = this.protGeom(); du = Math.cos(arm); dv = -Math.sin(arm);
+    } else if (typeof edge === 'string' && edge[0] === 'e') {
+      const P = this.triCorners(), i = Number(edge.slice(1)) || 0, a = P[i], b = P[(i + 1) % 3], L = Math.hypot(b.u - a.u, b.v - a.v);
+      du = (b.u - a.u) / L; dv = (b.v - a.v) / L;
+    }
+    const cos = Math.cos(r.angle), sin = Math.sin(r.angle);
+    return { x: cos * du - sin * dv, y: sin * du + cos * dv };
+  }
+
+  static RULE_DECIDE = 16;
+  static RULE_TOUCH = 12;
+  static RULE_TOUCH_FINGER = 18;
+  static RULE_TOLERANCE = 35;
+
+  settleRuledEdge(a, raw) {
+    const pend = a.edgePending;
+    pend.raw.push(raw);
+    const mx = raw.x - pend.from.x, my = raw.y - pend.from.y, m = Math.hypot(mx, my);
+    if (m * this.surface.cam.z < Interaction.RULE_DECIDE) return;
+    let best = null, bestCos = Math.cos((Interaction.RULE_TOLERANCE * Math.PI) / 180);
+    for (const edge of pend.cands) {
+      const d = this.edgeDirection(edge, pend.from), c = Math.abs(mx * d.x + my * d.y) / m;
+      if (c >= bestCos) { bestCos = c; best = edge; }
+    }
+    a.edgePending = null;
+    const kept = [];
+    const take = (q) => { const prev = kept[kept.length - 1]; if (!prev || dist(prev, q) * this.surface.cam.z > 1.2) kept.push(q); };
+    if (best !== null) {
+      a.ruledEdge = best;
+      for (const q of pend.raw.slice(0, -1)) take(this.rulerProject(q, best));
+    } else {
+      a.ruled = false; a.released = true;
+      for (const q of pend.raw.slice(0, -1)) if (!this.underThePlastic(q)) take(q);
+    }
+    a.obj.points.length = 0;
+    a.obj.points.push(...kept);
+  }
+
   underThePlastic(pt) {
     const r = this.ruler;
     if (!r.visible) return false;
     const { along, perp } = this.rulerOffsets(pt);
+    if (this.rulerIsTriangle) return this.triInside(along, perp) > 0;
+    if (this.rulerIsProtractor) return this.protInside(along, perp);
     return Math.abs(along) <= r.length / 2 && perp > 0 && perp < r.thickness;
   }
 
-  /** The point, moved sideways onto one of the ruler's edges. */
+  /** The point, moved sideways onto one of the ruler's edges (TRAP 2: preserves p.t). */
   rulerProject(pt, edge = 0) {
+    if (typeof edge === 'string') return edge[0] === 'p' ? this.protProject(pt, edge) : this.triProject(pt, edge);
     const r = this.ruler;
     const { along } = this.rulerOffsets(pt);
     const cos = Math.cos(r.angle), sin = Math.sin(r.angle);
     return {
       x: r.x + cos * along - sin * edge,
       y: r.y + sin * along + cos * edge,
-      p: pt.p
+      p: pt.p,
+      t: pt.t != null ? pt.t : performance.now()
     };
   }
 
-  /**
-   * Hold a stroke against the ruler's edge.
-   *
-   * This used to test every point on its own: within 26 pixels of the edge,
-   * snap; further out, draw wherever the hand went. Which meant the ruler only
-   * held a line as steadily as the hand did - a wobble wide enough took the ink
-   * off the edge mid-stroke and left a straight line with a bulge in it. That
-   * is precisely the wobble a ruler exists to absorb, and the person drawing
-   * has no way to see the 26-pixel boundary they are supposed to stay inside.
-   *
-   * A real ruler does not let go. Once the pen is against the edge it stays
-   * against the edge until it is lifted, however much the hand shakes, because
-   * a piece of plastic is in the way. So a stroke that BEGINS on the ruler is
-   * held to the edge it began on for its whole length, at any distance.
-   * Lifting releases it - `action` is a fresh object per stroke, so the latch
-   * cannot outlive one - and the edge is fixed at the start so a stroke can
-   * never hop from one side of the ruler to the other halfway along.
-   *
-   * A stroke that merely RUNS ACROSS the ruler is a different thing and must
-   * not latch: it is deflected while it is against the plastic and let go on
-   * the far side, exactly as a real pen would be. Latching that one would turn
-   * a circle drawn over the ruler into a straight line for the rest of its
-   * length, which is a far worse bug than the one being fixed.
-   */
   snapToRuler(pt, action) {
     const r = this.ruler;
-    if (!r.visible || !r.snap) return pt;
+    // Connector / wire routing guard: connectors & circuit wires never snap to ruler edges
+    if (!r.visible || !r.snap || action?.type === 'connect' || action?.type === 'wire' || action?.type === 'connector') return pt;
     if (action && action.ruled) return this.rulerProject(pt, action.ruledEdge);
-    const edge = this.rulerEdgeAt(pt);
-    return edge === null ? pt : this.rulerProject(pt, edge);
+    return pt;
   }
 
   /* ------------------------------------------------------------ *
@@ -3631,14 +4110,55 @@ export class Interaction {
       ctx.restore();
     }
 
-    if (this.tool === 'eraser' && this.eraserCursor && !this.pointers.size) {
-      this.drawEraserRing(ctx, this.eraserCursor);
-    }
-    if (a && a.type === 'erase' && a.cursor) {
-      this.drawEraserRing(ctx, cam.toScreen(a.cursor.x, a.cursor.y), a.radiusPx);
-    }
+    // the eraser's ring is not painted here any more: it is its own layer, moved with the pointer (placeRing)
 
     if (this.ruler.visible) this.drawRuler(ctx);
+  }
+
+  /**
+   * The eraser's ring, on a layer of its own above the board (#eraserRing on
+   * main #stage, or .eraser-ring inside a split pane).
+   *
+   * Moved by the compositor straight from the pointer, so it stays on the pen
+   * without waiting for the canvas underneath to repaint.
+   */
+  ringEl() {
+    if (this._ringEl === undefined) {
+      if (this.opts?.eraserRing) {
+        this._ringEl = this.opts.eraserRing;
+        return this._ringEl;
+      }
+      const doc = typeof document !== 'undefined' ? document : null;
+      const parent = this.canvas?.parentElement;
+      let el = parent?.querySelector?.('#eraserRing, .eraser-ring') || null;
+      if (!el && this.canvas?.id === 'c' && doc && typeof doc.getElementById === 'function') {
+        el = doc.getElementById('eraserRing');
+      }
+      if (!el && parent && typeof parent.appendChild === 'function' && doc && typeof doc.createElement === 'function') {
+        el = doc.createElement('div');
+        el.className = 'eraser-ring';
+        el.hidden = true;
+        parent.appendChild(el);
+        this._ringOwned = true;
+      }
+      this._ringEl = el || null;
+    }
+    return this._ringEl;
+  }
+
+  placeRing(sp, radius) {
+    const el = this.ringEl();
+    if (!el || !sp) return;
+    this._ringSp = sp;
+    const d = Math.max(4, Math.round((radius || this.app.settings.eraserSize / 2) * 2));
+    if (this._ringD !== d) { this._ringD = d; el.style.width = d + 'px'; el.style.height = d + 'px'; }
+    el.style.transform = 'translate3d(' + (sp.x - d / 2) + 'px,' + (sp.y - d / 2) + 'px,0)';
+    if (el.hidden) el.hidden = false;
+  }
+
+  hideRing() {
+    const el = this._ringEl;
+    if (el && !el.hidden) el.hidden = true;
   }
 
   drawEraserRing(ctx, sp, radius) {
@@ -3654,7 +4174,10 @@ export class Interaction {
   }
 
   drawRuler(ctx) {
+    if (this.rulerIsTriangle) return this.drawTriangle(ctx);
+    if (this.rulerIsProtractor) return this.drawProtractor(ctx);
     const { c, len, thick, angle } = this.rulerRect();
+    const op = rulerOpacity(this.app.settings);
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.rotate(angle);
@@ -3662,8 +4185,8 @@ export class Interaction {
     // underneath it any more (see underThePlastic), so there is nothing hiding
     // down there that needs covering up.
     const g = ctx.createLinearGradient(0, 0, 0, thick);
-    g.addColorStop(0, 'rgba(255,255,255,0.92)');
-    g.addColorStop(1, 'rgba(233,231,229,0.92)');
+    g.addColorStop(0, `rgba(255,255,255,${op})`);
+    g.addColorStop(1, `rgba(233,231,229,${op})`);
     ctx.fillStyle = g;
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 1;
@@ -3694,10 +4217,11 @@ export class Interaction {
     // The angle readout belongs beside the thing that changes it, not in the
     // middle of the ruler where the move grip now lives - and where it was
     // sitting on top of the centre tick's own label besides.
-    const degv = ((angle * 180) / Math.PI + 360) % 360;
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    ctx.font = '11px system-ui, sans-serif';
-    ctx.fillText(degv.toFixed(0) + '°', len / 2 - 52, thick / 2 + 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    ctx.fillText(this.rulerReadout(angle), 0, thick - 10);
+    this.rulerReadoutAt = { u: 0, v: thick - 10, text: this.rulerReadout(angle) };
+    drawMenuButton(ctx, -len / 2 + Interaction.MENU_AT, thick / 2, this.coarsePointer);
     const kb = Interaction.ROTATE_KNOB;
     const kr = this.coarsePointer ? kb.r + 3 : kb.r;
     for (const end of [1, -1]) {
@@ -3729,6 +4253,174 @@ export class Interaction {
     }
     ctx.restore();
   }
+
+  /** A set square: the plastic, its edges, millimetre-style ticks on both straight sides, its corners' angles, and its controls. */
+  drawTriangle(ctx) {
+    const { c, angle } = this.rulerRect();
+    const z = this.surface.cam.z, op = rulerOpacity(this.app.settings);
+    const P = this.triCorners().map((q) => ({ u: q.u * z, v: q.v * z }));
+    const C = this.triControls();
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(angle);
+    ctx.beginPath(); ctx.moveTo(P[0].u, P[0].v); ctx.lineTo(P[1].u, P[1].v); ctx.lineTo(P[2].u, P[2].v); ctx.closePath();
+    const g = ctx.createLinearGradient(0, 0, 0, P[2].v);
+    g.addColorStop(0, `rgba(255,255,255,${op})`); g.addColorStop(1, `rgba(233,231,229,${op})`);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+    // ticks every 10 world px along the base and down the upright side, from the right angle
+    const stepPx = 10 * z;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.font = '9px system-ui, sans-serif'; ctx.textAlign = 'center';
+    if (stepPx > 3) {
+      const base = P[1].u - P[0].u, up = P[2].v;
+      for (let i = 0; i * stepPx <= base - 8; i++) {
+        const x = P[0].u + i * stepPx, major = i % 10 === 0, mid = i % 5 === 0;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, major ? 13 : mid ? 9 : 5); ctx.stroke();
+        if (major && i && stepPx > 6) ctx.fillText(String(i * 10), x, 24);
+      }
+      ctx.textAlign = 'left';
+      for (let i = 1; i * stepPx <= up - 8; i++) {
+        const y = i * stepPx, major = i % 10 === 0, mid = i % 5 === 0;
+        ctx.beginPath(); ctx.moveTo(P[0].u, y); ctx.lineTo(P[0].u + (major ? 13 : mid ? 9 : 5), y); ctx.stroke();
+        if (major && stepPx > 6) ctx.fillText(String(i * 10), P[0].u + 16, y + 3);
+      }
+    }
+    // each corner's angle, small and grey, just inside it
+    const narrow = this.ruler.kind === 'set60' ? ['30°', '60°'] : ['45°', '45°'];
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.font = '10px system-ui, sans-serif';
+    ctx.textAlign = 'right'; ctx.fillText(narrow[0], P[1].u - 30, 32);
+    ctx.textAlign = 'left'; ctx.fillText(narrow[1], P[0].u + 30, P[2].v - 34);
+    ctx.fillText('90°', P[0].u + 30, 40);
+    // the angle readout under the move grip
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.font = '11px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(this.rulerReadout(angle), C.readout.u, C.readout.v + 4);
+    // the turning knobs, the move grip and the settings button, as on the ruler
+    const kb = Interaction.ROTATE_KNOB, kr = this.coarsePointer ? kb.r + 3 : kb.r;
+    for (const k of C.knobs) {
+      ctx.beginPath(); ctx.arc(k.u, k.v, kr, 0, Math.PI * 2);
+      ctx.fillStyle = '#0078d4'; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.6; ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(C.grip.u - 34, C.grip.v - 16, 68, 32, 3); else ctx.rect(C.grip.u - 34, C.grip.v - 16, 68, 32);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.42)'; ctx.lineWidth = 1.6;
+    for (const dx2 of [-7, 0, 7]) { ctx.beginPath(); ctx.moveTo(C.grip.u + dx2, C.grip.v - 9); ctx.lineTo(C.grip.u + dx2, C.grip.v + 9); ctx.stroke(); }
+    drawMenuButton(ctx, C.menu.u, C.menu.v, this.coarsePointer);
+    ctx.restore();
+  }
+
+  /**
+   * The protractor: the plastic, a tick for every degree, the two printed
+   * scales, the centre crosshair, the measuring arm with the two angles it makes
+   * with the straight edge, and its controls.
+   */
+  drawProtractor(ctx) {
+    const { c, angle } = this.rulerRect();
+    const op = rulerOpacity(this.app.settings);
+    const { armDeg, arm } = this.protGeom();
+    const C = this.protControls(), Rz = C.Rz, at = Interaction.protAt;
+    const BLUE = '#0063b1', DARK = 'rgba(0,0,0,0.78)';
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(angle);
+    // the plastic
+    ctx.beginPath(); ctx.arc(0, 0, Rz, Math.PI, Math.PI * 2); ctx.closePath();
+    const g = ctx.createLinearGradient(0, -Rz, 0, 0);
+    g.addColorStop(0, `rgba(255,255,255,${op})`); g.addColorStop(1, `rgba(233,231,229,${op})`);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+    // a tick for every degree (every 5° when the protractor is too small for that), longer at 5° and 10°
+    const perDeg = (Rz * Math.PI) / 180, every = perDeg >= 2.2 ? 1 : 5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    for (let d = 0; d <= 180; d += every) {
+      const len = d % 10 === 0 ? 15 : d % 5 === 0 ? 10 : 6, th = (d * Math.PI) / 180;
+      const p0 = at(th, Rz), p1 = at(th, Rz - len);
+      ctx.lineWidth = d % 10 === 0 ? 1.2 : 0.9;
+      ctx.beginPath(); ctx.moveTo(p0.u, p0.v); ctx.lineTo(p1.u, p1.v); ctx.stroke();
+    }
+    // the two scales: outer (dark) counts from the left end, inner (blue) from the right end
+    const labels = [];
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const font = (Rz < 230 ? 9 : 10) + 'px system-ui, sans-serif';
+    const ring = (rho, colour, value, name) => {
+      ctx.fillStyle = colour; ctx.font = font;
+      for (let d = 0; d <= 180; d += 10) {
+        const th = (d * Math.PI) / 180, p = at(th, rho), text = String(value(d));
+        if (d === 0 || d === 180) ctx.fillText(text, p.u, -7);
+        else { ctx.save(); ctx.translate(p.u, p.v); ctx.rotate(Math.PI / 2 - th); ctx.fillText(text, 0, 0); ctx.restore(); }
+        labels.push({ ring: name, mark: d, text, u: p.u / Rz, v: (d === 0 || d === 180 ? 0 : p.v) / Rz });
+      }
+    };
+    ring(Rz - 25, DARK, (d) => 180 - d, 'outer');
+    ring(Rz - 41, BLUE, (d) => d, 'inner');
+    this.protLabels = labels;
+    // the measuring arm and the two angles it makes with the straight edge
+    const tip = at(arm, Rz + Interaction.PROT_ARM_EXT);
+    ctx.strokeStyle = '#d13438'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(tip.u, tip.v); ctx.stroke();
+    const wedge = (from, to, colour, value) => {
+      ctx.strokeStyle = colour; ctx.lineWidth = 1.2;
+      if (to > from) { ctx.beginPath(); ctx.arc(0, 0, 26, -to, -from); ctx.stroke(); }
+      const w = to - from, rho = Math.max(46, Math.min(Rz * 0.28, w > 0 ? 12 / Math.sin(w / 2) : Infinity));
+      const lift = Math.asin(Math.min(1, 9 / rho));
+      const th = Math.min(Math.PI - lift, Math.max(lift, (from + to) / 2));
+      const p = at(th, rho);
+      ctx.fillStyle = colour; ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.fillText(value + '°', p.u, p.v);
+    };
+    wedge(0, arm, BLUE, armDeg);
+    wedge(arm, Math.PI, DARK, 180 - armDeg);
+    this.protReading = { inner: armDeg, outer: 180 - armDeg };
+    // the centre: a small ring with a cross through it, on the straight edge
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(10, 0); ctx.moveTo(0, 0); ctx.lineTo(0, -10); ctx.stroke();
+    // the arm's knob, just past the curve
+    const kb = Interaction.ROTATE_KNOB, kr = this.coarsePointer ? kb.r + 3 : kb.r;
+    ctx.beginPath(); ctx.arc(C.armKnob.u, C.armKnob.v, kr, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.strokeStyle = '#d13438'; ctx.lineWidth = 2.4; ctx.stroke();
+    // turning knobs, move grip, the protractor's own tilt and the settings button, as on the ruler
+    for (const k of C.knobs) {
+      ctx.beginPath(); ctx.arc(k.u, k.v, kr, 0, Math.PI * 2);
+      ctx.fillStyle = '#0078d4'; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.6; ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(C.grip.u - 34, C.grip.v - 16, 68, 32, 3); else ctx.rect(C.grip.u - 34, C.grip.v - 16, 68, 32);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.42)'; ctx.lineWidth = 1.6;
+    for (const dx2 of [-7, 0, 7]) { ctx.beginPath(); ctx.moveTo(C.grip.u + dx2, C.grip.v - 9); ctx.lineTo(C.grip.u + dx2, C.grip.v + 9); ctx.stroke(); }
+    if (this.action && this.action.type === 'rulerRotate') {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.font = '11px system-ui, sans-serif';
+      ctx.fillText(this.rulerReadout(angle), C.readout.u, C.readout.v);
+    }
+    ctx.textBaseline = 'alphabetic';
+    drawMenuButton(ctx, C.menu.u, C.menu.v, this.coarsePointer);
+    ctx.restore();
+  }
+}
+
+/** How solid the ruler's plastic is: 0.3 to 1, from Settings; 0.92 default. */
+function rulerOpacity(settings) {
+  const v = Number(settings && settings.rulerOpacity);
+  return Number.isFinite(v) ? Math.min(1, Math.max(0.3, v)) : 0.92;
+}
+
+/** The ruler's settings button: a small round button with three dots. */
+function drawMenuButton(ctx, x, y, coarse) {
+  const r = coarse ? 12 : 9;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  for (const dx of [-r * 0.42, 0, r * 0.42]) { ctx.beginPath(); ctx.arc(x + dx, y, Math.max(1.3, r * 0.13), 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
 }
 
 function drawGhostShape(ctx, o) { drawShape(ctx, o); }

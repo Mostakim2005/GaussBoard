@@ -164,7 +164,10 @@ flowchart LR
     * Commit `30` (`7cb909c` pen-hold part): In-place scribble travel distance tracking (`HOLD_TRAVEL = 18`) preventing small shape fills from triggering the hold menu, plus `penHold` toggle setting.
     * Commit `35` (`24532e8`): Margin inking stability (removes `draw` and `erase` from `EDGE_PANNABLE`, preventing canvas slippage during margin handwriting; bounds drawing to `visibleArea`).
     * Commit `36` (`924109b`): Ergonomic enhancements (direct `[×]` close button on ruler, active tray highlights on phone toolbar, dual-hand touch disambiguation).
+  * **`HARDENED_AND_INTEGRATED` (Integrated on `feat/upstream-risk-eval`):**
+    * Commit `25` (`bd5684d`) & Commit `30` (typed angle): Set squares (30/60/90, 45/45/90), protractor, and ruler settings. Hardened to enforce p.t timestamp preservation on projected points (TRAP 2), restrict drafting edge snapping exclusively to stylus input without trapping mouse pointers, bypass ruler latching during connector/wire routing, and maintain 100% i18n parity across all 7 locales.
   * **`HIGH_RISK` (Quarantined for `feat/upstream-risk-eval`):**
+    * (Set squares & Protractor promoted to Hardened & Integrated above)
     * Commit `25` (`bd5684d`): Set squares (30/60/90, 45/45/90), protractor, and ruler settings. High STEM value, but touches 550+ lines in `tools.js`; must be tested on a side branch to protect circuit wiring and pointer partitioning.
     * Commit `30` (protractor typed angle input part): Dependent on Commit 25.
   * **`MEDIUM_RISK` (Quarantined for `feat/upstream-risk-eval`):**
@@ -211,6 +214,24 @@ flowchart LR
 ---
 
 ## 2. Do-Not-Touch Engineering Landmines (Traps)
+
+### [DECISION: Centralized-Hold-Gesture-Arbitration-And-Dual-Dwell-Timer] | Aliases: hold manager, gesture arbitration, dual dwell, stationary vs post-stroke
+> **1-Line Summary:** Centralize all long-press and dwell interactions into HoldGestureManager with distinct Stationary (<18px) and Post-Stroke (>=24px) timers.
+* **Problem Solved:** Ad-hoc setTimeout calls across interaction.js, circuits, and radial menus collided. Drawing quick strokes across components triggered unwanted property dialogs, tiny dots triggered shape conversions, and stationary holds left stray 1-point ink dots on the canvas before opening menus.
+* **Why This Decision Was Made:** Splitting into two timers cleanly separates stationary modal/radial menu invocation (<18px) from post-stroke shape recognition (>=24px). Adding abortActiveStroke() guarantees zero phantom ink dots and zero spurious undo records. Multi-touch monitoring (pointers.size >= 2) immediately clears timers for fluid pinch zoom.
+* **Protected Code Anchors (Grep Targets):**
+  * `src/js/ui/hold-manager.js` -> `HoldGestureManager`
+  * `src/js/core/interaction.js` -> `abortActiveStroke`
+  * `test/hold-manager.test.mjs`
+
+### [DECISION: Smart-Slicing-Over-Raw-Index-And-Spatial-Tiling] | Aliases: smart slicing, heavy canvas, dynamic frame budget, zoom LOD
+> **1-Line Summary:** Implement progressive canvas rendering via Smart Slicing with atomic cover bundling, dynamic frame budget (3.0-8.0ms), and zoom LOD, explicitly rejecting raw index slicing and spatial tile caching.
+* **Problem Solved:** Upstream raw index slicing (commit 031ad50) broke z-order, caused secret equations to flash through Answer Covers (TRAP 6), and baked active audio replay sessions into static layers (TRAP 1). Spatial tile caching (512x512) risked severe cache-invalidation bugs during lasso moves and erasing.
+* **Why This Decision Was Made:** Smart Slicing preserves store.doc.order z-index, pre-scans opaque Answer Covers to cull hidden strokes underneath, strictly excludes active audio replay tracks, dynamically scales its CPU slice budget based on active audio recording (3.5ms) or MNA circuit simulation (3.0ms), and applies zoom-out LOD downsampling (camZ < 0.35) for massive boards.
+* **Protected Code Anchors (Grep Targets):**
+  * `src/js/core/surface.js` -> `_paintOrder`, `_paintHeavy`, `_getSliceBudgetMs`
+  * `src/js/core/render.js` -> `drawStroke` (LOD)
+  * `test/sliced-rendering.test.mjs`
 
 ### [TRAP: Pt-Timestamp-Stripping] | Aliases: p.t, stroke timestamps, audio sync, eraser fragment, t0 t1
 > **1-Line Summary:** Never rebuild stroke points without preserving p.t, or audio replay loses millisecond sync.
@@ -266,6 +287,20 @@ flowchart LR
   * `src/js/ui/circuit-workbench.js` -> `openWorkbench`
   * `src/js/core/connectors.js` -> `routeOrthogonal`
 
+### [TRAP: Raw-Index-Slicing-Cover-Leak] | Aliases: raw slicing, smart slicing, TRAP 6, secret flash, z-order leak
+> **1-Line Summary:** Never slice board objects by arbitrary array indices without pre-culling strokes enclosed under opaque Answer Covers or checking active audio tracks.
+* **Strict Rule:** **NEVER** render sliced objects in arbitrary batch sizes directly to background layers without `_paintOrder` pre-filtering that culls strokes beneath concealed covers (`idx < cover.index`) and excludes `audioId === activeTrackId`.
+* **Why This Trap Exists (Plain English):** In a heavy board with 8,000 objects, if an Answer Cover sits at index 4,000 and hidden equations sit at index 500, a naive progressive slicer that takes 5 frames will render the secret equations in frame 1 and conceal them in frame 3, creating an obvious "secret flash". Furthermore, slicing into background layers bakes active replay ink into static images, violating TRAP 1.
+* **Protected Code Anchors (Grep Targets):**
+  * `src/js/core/surface.js` -> `_paintOrder`, `_paintHeavy`
+
+### [TRAP: Gesture-Menu-Phantom-Ink] | Aliases: phantom ink dot, abortActiveStroke, radial open, contextmenu hold
+> **1-Line Summary:** Opening a modal or gesture HUD on pointer hold must explicitly discard the active inking buffer and abort undo records.
+* **Strict Rule:** **NEVER** open a stationary hold menu (RadialShortcutRing, context menu, or circuit component modal) while a pointer is down without first calling `interaction.abortActiveStroke()`.
+* **Why This Trap Exists (Plain English):** On pointerdown, the ink engine immediately initializes `currentStroke` with the first contact point. If the user holds still to open a radial menu and lifts their stylus, `pointerup` would commit that 1-point stroke to the document, leaving stray ink dots all over the canvas and pushing phantom entries to the undo stack.
+* **Protected Code Anchors (Grep Targets):**
+  * `src/js/core/interaction.js` -> `abortActiveStroke`
+  * `src/js/ui/hold-manager.js` -> `handlePointerDown`, `_fireStationaryHold`
 ### [DECISION: Multi-Branch-Deduplicated-Electron-Release-Naming] | Aliases: Electron-Chromium naming, branch-aware release, discover-branches, SHA deduplication
 > **1-Line Summary:** Upgraded `.github/workflows/release.yml` to discover all remote branches (`origin/*`), deduplicate identical commit SHAs, build each unique branch in parallel, and name every `.exe` with Engine (`Electron-Chromium`), Version, Branch Slug, and Short Commit SHA.
 * **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`
@@ -285,3 +320,77 @@ flowchart LR
 ```
 * **Code Anchors (Grep Targets):**
   * `.github/workflows/release.yml` -> `discover-branches`, `GaussBoard-Electron-Chromium-v`
+
+### [DECISION: Cross-Platform-Audio-Asset-Export-And-Preload-Disposers] | Aliases: recording:readAsset, saveDialog contract, onChannel disposers, sw.js precache parity
+> **1-Line Summary:** Implemented `recording.readAsset` across Electron/Web/Android so `.gaussboard` ZIP exports never drop audio recordings, unified Obsidian/Markdown exports on `saveDialog` + `writeFile`, added unsubscribe disposers to `preload.js`, and enforced 100% `src/sw.js` module precache parity.
+* **Decision Maker:** `[DECIDED BY: AGENT - Approved by Human]`
+* **Original User Intention:** Close all remaining Rust-port backport gaps (`rememberRecentPen`, `sw.js`, `smoke-custom.js`) and resolve all critical/high/medium audit bugs from Report 1 on `feat/upstream-risk-eval`.
+* **Code Anchors (Grep Targets):**
+  * `main.js` -> `recording:readAsset`
+  * `preload.js` -> `onChannel`, `recording.readAsset`
+  * `src/js/export.js` -> `saveBoardFile`
+  * `src/js/ui/radial.js` -> `rememberRecentPen`
+  * `src/sw.js` -> `PRECACHE_ASSETS`
+
+### [DECISION: Hardened-Upstream-51x-Inking-And-Eraser-Integration] | Aliases: neon pen, eraseShapes, recordPointer, drawAhead, v5.1.0-5.1.3
+> **1-Line Summary:** Integrated upstream GazBoard v5.1.0–v5.1.3 features (Neon pen, Erase shapes toggle, Pen glow for screen recordings, and Draw-ahead prediction) onto `feat/upstream-risk-eval` with full TRAP 2/TRAP 6, Zoom LOD, and Split Workspace isolation guards.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`
+* **Original User Intention:** Port the user-facing inking and eraser enhancements from upstream v5.1.0–v5.1.3 without colliding with any existing GaussBoard feature, invariant, or split-pane boundary.
+* **Hardening Safeguards Applied:**
+  * `inkStyle` treats `'neon'` and `'pencil'` as solid colors so Zoom-Aware LOD (`camZ < 0.35`) never renders zoomed-out neon strokes as galaxy gradients.
+  * Neon strokes are excluded from both `inkToShape` and `holdToShape` so glowing ink never collapses into plain shapes.
+  * `eraseSweep` (`eraseShapes`) preserves TRAP 6 by skipping shapes concealed under unrevealed Answer Covers, protects labelled (`o.text`) and locked shapes, and expands `invalidateBand` to cover full removed shape bounds.
+  * `glowEl` allocates an isolated `.pen-glow` inside split-pane parents (`!opts.penGlow && canvas.id !== 'c'`) so secondary panes never steal `#penGlow` from main `#stage`, and hides on eraser tool, pen tail, side-button erase, blur, and destroy.
+  * `predictTail` skips Study Tape curtains, ruled strokes, and sharp corners, and `_drawWet` renders `surface.wetTail` via a shallow copy without ever mutating `wet.points` or polluting `p.t` timestamps (TRAP 2).
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/render.js` -> `drawNeon`, `NEON_REACH`, `inkStyle`
+  * `src/js/core/hit.js` -> `outlineAlong`, `getScratch`
+  * `src/js/core/tools.js` -> `followGlow`, `predictTail`, `eraseSweep`
+  * `src/js/core/surface.js` -> `_drawWet`, `wetTail`
+  * `test/upstream-51x-features.test.mjs`
+
+### [DECISION: Settings-Search-And-PDF-Eraser-Layer-Integration] | Aliases: settings search, eraserRing, setPaintBand, isBusy, v5.1.2-5.1.3
+> **1-Line Summary:** Ported upstream Settings search (word-start matching, `<mark class="set-mark">` highlights, Escape-to-clear) and Smoother PDF Eraser (compositor `#eraserRing`/`.eraser-ring` layer, interior page shadow skip, busy freeze deferral) while preserving `eraseShapes` bounds, Smart Slicing, Split Workspace isolation, and TRAP 1.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`
+* **Original User Intention:** Bring over upstream's settings search UX and smooth PDF eraser cursor/performance upgrades onto `feat/upstream-risk-eval` without regressing any existing GaussBoard feature.
+* **Hardening & Integration Choices:**
+  * Kept `.setting-row` alongside `.set-row` on Settings rows and kept custom `.scribble-config-card` searchable inside `buildSettingsSearch`, re-applying active filters when async Storage/About metadata arrives.
+  * Used high-contrast `#1b1a19` foreground on dark-theme `<mark class="set-mark">` highlights to uphold WCAG contrast requirements.
+  * Preserved `erasedBoxes` in `Interaction.eraseSweep` when removing canvas ring redraw boxes so `eraseShapes: true` still repaints the full bounds of erased bare shapes.
+  * Preserved the 6th `filter` parameter in `Surface.drawScene` (`TRAP 1`), Smart Slicing (`_build`) guards in `warmFreeze`, and per-pane `.eraser-ring` isolation + cleanup in `ringEl()` / `destroy()`.
+  * Excluded upstream `src/js/replay.js` changes because GaussBoard uses audio-synchronized `src/js/core/replay.js`.
+* **Visual Flow & Conflict Guard:**
+```mermaid
+flowchart LR
+    classDef inputNode fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef layerNode fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef guardNode fill:#fef3c7,stroke:#d97706,color:#78350f
+
+    P["Pointer Event (move/raw/tail)"]:::inputNode -->|"hover or rub"| Ring["Compositor Ring (#eraserRing or .eraser-ring)"]:::layerNode
+    P -->|"active erase segment"| Sweep["eraseSweep (stroke split + erasedBoxes)"]:::guardNode
+    Sweep -->|"band clip + filter (TRAP 1)"| Band["Surface.drawScene -> setPaintBand"]:::layerNode
+    Band -->|"band strictly inside page"| Skip["drawImage skips shadowBlur (fast fill)"]:::layerNode
+    Sweep -->|"isBusy (< 1s active press)"| Defer["warmFreeze defers full rebuild until lift"]:::guardNode
+
+    subgraph Legend["Color Legend"]
+        L1["Blue: Pointer Input"]:::inputNode
+        L2["Green: Fast Compositor / Band Path"]:::layerNode
+        L3["Amber: Existing Feature & Trap Guard"]:::guardNode
+    end
+```
+  * *Plain-English Explanation:* Moving the eraser ring onto its own hardware compositor element means hovering or moving the pen never forces the board underneath to repaint just to animate the ring. During erasing, only the narrow strip touched by the eraser (plus any erased shape's outline box) is repainted, page drop-shadow blurs are skipped when the strip is inside a PDF page, and full background snapshots wait until you lift the pen.
+* **Code Anchors (Grep Targets):**
+  * `src/js/ui/panels.js` -> `buildSettingsSearch`, `settings`
+  * `src/js/core/render.js` -> `setPaintBand`, `bandStats`, `drawImage`
+  * `src/js/core/surface.js` -> `drawScene`, `_drawScene`, `busy`, `warmFreeze`
+  * `src/js/core/tools.js` -> `ringEl`, `placeRing`, `hideRing`, `updateHover`, `eraseSweep`
+  * `test/upstream-51x-features.test.mjs` -> Tests 5–6
+
+### [DECISION: Defer-Electron-BrowserWindow-Sandbox] | Aliases: sandbox, preload, node crypto, clipboardSignature, Charlie
+> **1-Line Summary:** Kept `sandbox: false` on Electron renderer windows because `preload.js` uses synchronous `node:crypto` hashing for image paste signatures; `contextIsolation: true` and `nodeIntegration: false` remain enforced.
+* **Decision Maker:** `[DECIDED BY: AGENT - Zero-Conflict Directive]`
+* **Original User Intention:** Audit Electron `BrowserWindow` hardening without interfering or breaking any existing feature.
+* **Why Deferred (Plain English):** `preload.js` imports Node's built-in `crypto` module to synchronously compute SHA-256 hashes of clipboard bitmap images in `clipboardSignature()`, and inspects `process.argv` / `process.env` for smoke-test isolation. Enabling Chromium `sandbox: true` strips `require('node:crypto')` from preload scripts and would break synchronous clipboard image detection unless refactored into asynchronous IPC across callers. All main windows already enforce `contextIsolation: true` and `nodeIntegration: false`, and the splash window already uses `sandbox: true`.
+* **Code Anchors (Grep Targets):**
+  * `preload.js` -> `clipboardSignature`, `crypto`
+  * `main.js` -> `createWindow`

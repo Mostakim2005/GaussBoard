@@ -160,6 +160,47 @@
   * `src/js/core/store.js` -> `repairTable`, `frozen`
   * `src/js/app.js` -> `toggleViewMode`, `hintViewMode`
 
+### [FEATURE: Set-Squares-And-Protractor-Drafting] | Aliases: set squares, triangles, protractor, drafting, angle input, geometry tools
+> **1-Line Summary:** Geometric set squares (30°/60°/90°, 45°/45°/90°) and protractor with edge snapping, dial/knob adjustment, typed angle aiming, and stylus-isolated drafting.
+* **User Intention (Non-Negotiable):** Engineering students and technical drafters need precise geometric triangles and protractors to construct accurate diagrams, measure angles (0° pointing right or up), and draw edge-guided lines while strictly preserving audio-ink timestamps (`p.t`) and stylus-pointer partitioning.
+* **Visual / UI Behavior:** Ruler menu offers Ruler, Triangle 45°, Triangle 30°/60°, and Protractor; protractor shows dual 0°–180° scales (outer dark, inner blue) with adjustable needle arm; set squares show millimeter ticks and angle readouts; drafting edge snapping engages exclusively for stylus writing without trapping mouse pointers; circuit connector wiring automatically bypasses ruler latching.
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/tools.js` -> `triProject`, `protProject`, `triEdgesAt`, `protEdgesAt`, `aimProtArm`
+  * `src/js/app.js` -> `openRulerMenu`, `fitTriangle`, `toggleRuler`
+  * `test/set-squares-protractor.test.mjs` -> `triCorners`, `protGeom`
+
+
+### [FEATURE: Centralized-Hold-Gesture-Manager] | Aliases: hold manager, radial menu, long press, dual dwell timers, gesture arbitration
+> **1-Line Summary:** Centralized hardware-differentiated hold gesture coordinator with dual dwell timers, domain component priority, pinch abort, and zero-dot radial ring invocation.
+* **User Intention (Non-Negotiable):** Users holding stylus or mouse pointers on the board need intuitive modal inspections and shortcut rings without false triggers during quick sketching, tiny dot writes, or multi-touch zooms, and without leaving phantom 1-point ink dots or orphan undo entries.
+* **Visual / UI Behavior:** Stationary hold (< 18px travel) on empty board opens an 8-item SVG radial menu ring for stylus or contextual menu for mouse; post-stroke dwell (>= 24px travel with pause) converts freehand lines to geometric shapes (`holdToShape`); holding on domain objects (circuit components, answer covers) opens their native properties or toggle action with strict priority over radial HUD; two-finger pinch immediately cancels pending holds.
+* **Code Anchors (Grep Targets):**
+  * `src/js/ui/hold-manager.js` -> `HoldGestureManager`, `handlePointerDown`, `handlePointerMove`, `cancelHold`
+  * `src/js/ui/radial.js` -> `RadialShortcutRing`, `showAt`, `dispatchItem`
+  * `src/js/core/interaction.js` -> `abortActiveStroke`, `onPointerDown`, `onPointerUp`
+  * `test/hold-manager.test.mjs` -> `testHoldManager`
+
+### [FEATURE: Smart-Progressive-Slicing-And-Zoom-LOD] | Aliases: progressive rendering, smart slicing, heavy canvas, zoom LOD, sub-pixel culling
+> **1-Line Summary:** High-capacity progressive canvas slicer with atomic cover bundling, dynamic CPU frame budgeting (3.0–8.0ms), and zoom-aware level-of-detail downsampling.
+* **User Intention (Non-Negotiable):** Heavy boards containing 5,000+ to 20,000+ objects must render smoothly across pan and zoom operations without freezing the UI, leaking concealed answer cover secrets, or dropping frames during audio replay or MNA circuit simulation.
+* **Visual / UI Behavior:** Canvas uses 3-layer progressive composition: Layer 0 (grid/background), Layer 1 (`_inkCanvas` built progressively in background via dynamic time slices), and Layer 2 (live 60 FPS unbaked overlays for wet strokes, audio replay, and circuit electrons); pre-filtering culls hidden strokes below opaque answer covers to prevent secret flash; zoom-out (`camZ < 0.35`) performs sub-pixel culling and stride-based point downsampling.
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/surface.js` -> `_paintHeavy`, `_paintOrder`, `_getSliceBudgetMs`, `_inkCanvas`, `_build`
+  * `src/js/core/render.js` -> `drawStroke` (LOD downsampling & sub-pixel culling)
+  * `test/sliced-rendering.test.mjs` -> `testSlicedRendering`
+
+### [FEATURE: Upstream-51x-Inking-And-Eraser-Suite] | Aliases: neon pen, erase shapes too, pen glow, recordPointer, drawAhead, predictTail, settings search, eraserRing, setPaintBand, smoother PDF eraser
+> **1-Line Summary:** Glowing neon pen effect, optional shape-outline erasing (`eraseShapes`), screen-recording pen halo (`recordPointer`), optional draw-ahead prediction (`drawAhead`), sticky word-start Settings search, and compositor eraser ring with interior PDF shadow skipping.
+* **User Intention (Non-Negotiable):** Teachers and STEM students need high-visibility neon ink for dark/light boards, safe opt-in shape erasing without accidentally deleting labelled diagrams or covered answers, visible pen location in screen recordings, optional latency-masking prediction that never mutates saved timestamps, instant Settings filtering with clean Escape handling, and lag-free erasing over imported PDF pages.
+* **Visual / UI Behavior:** Pen popover offers `Neon` effect with 8 neon swatches and auto-switches plain dark ink to neon purple (`#b026ff`); Eraser popover adds off-by-default `Erase shapes too` switch; Settings adds a sticky word-start search bar (with `<mark class="set-mark">` highlights, section-header matching, query persistence across rerenders, and Escape-to-clear), `Show the pen in screen recordings` (`#penGlow` / `.pen-glow`), and `Draw ahead of the pen` (`surface.wetTail`). Eraser hover/rubbing uses a compositor-moved `#eraserRing` / `.eraser-ring` layer, defers idle background freezes while a gesture is active (`surface.busy`), and skips interior PDF page drop shadows on banded repaints (`setPaintBand`).
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/render.js` -> `drawNeon`, `NEON_REACH`, `inkStyle`, `setPaintBand`, `bandStats`, `drawImage`
+  * `src/js/core/hit.js` -> `outlineAlong`, `getScratch`
+  * `src/js/core/tools.js` -> `followGlow`, `hideGlow`, `ringEl`, `placeRing`, `hideRing`, `predictTail`, `eraseSweep`
+  * `src/js/core/surface.js` -> `drawScene`, `busy`, `warmFreeze`, `_drawWet`, `wetTail`
+  * `src/js/ui/panels.js` -> `buildSettingsSearch`, `settings`
+  * `test/upstream-51x-features.test.mjs` -> Tests 1–6
+
 ## 3. Planned Features & App-Merge Wishlist
 
 ### [WISHLIST: Pane-Aware-Command-Dispatcher] | Aliases: pane commands, Delete routing, Copy routing
@@ -175,7 +216,7 @@
 ## 4. Canonical References & Live Verification
 * **Core Documentation Suite:** `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS_AND_TRAPS.md`, `docs/releases/ANDROID_READINESS.md`
 * **Active Verification Suite:** `node scripts/smoke.js --new-features` (24/24 passing)
-* **Internationalization Suite:** `node scripts/i18n-check.js` (2,367/2,367 across 7 locales)
+* **Internationalization Suite:** `node scripts/i18n-check.js` (2,389/2,389 across 7 locales)
 * **Android Platform Suite:** `node --test test/android-*.test.js` (82/82 passing)
 * **Core Data Schemas & State:** `src/js/core/store.js` (`Store`, `doc.objects`, `doc.pages`, `doc.audioTracks`)
 * **Platform & Packaging:** `main.js`, `preload.js`, `package.json`

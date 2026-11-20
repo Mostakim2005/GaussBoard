@@ -178,6 +178,26 @@ export function createAndroidAdapter(native = window.GazBoardNative) {
       get: (id) => call('assets:get', id),
       have: (ids) => call('assets:have', ids)
     },
+    recording: {
+      readAsset: async (assetId) => {
+        try {
+          const r = await call('recording:readAsset', assetId);
+          if (r?.token) return await file(r.token);
+          if (r instanceof ArrayBuffer) return r;
+          const dataUrl = await call('assets:get', assetId);
+          if (typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
+            const m = /^data:[^;,]*;base64,(.*)$/.exec(dataUrl);
+            if (m) {
+              const bin = atob(m[1]);
+              const bytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              return bytes.buffer;
+            }
+          }
+        } catch {}
+        return null;
+      }
+    },
     sync: {
       state: () => call('sync:state'),
       start: () => call('sync:start'),

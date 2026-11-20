@@ -9,11 +9,15 @@ export const PEN_EFFECTS = [
   { id: 'none', label: t('Solid') },
   { id: 'rainbow', label: t('Rainbow') },
   { id: 'galaxy', label: t('Galaxy') },
+  { id: 'neon', label: t('Neon') },
   { id: 'pencil', label: t('Pencil') }
 ];
 
 /* The pencil's own grey: graphite. On a dark page it is painted light, as default ink is. */
 export const PENCIL_GRAPHITE = '#4b4a48';
+
+/* Inks that glow: the colours of real neon tubes. Purple first - it is the one people ask for. */
+export const NEON_COLORS = ['#b026ff', '#ff2bd6', '#ff3131', '#ff8c00', '#fff200', '#39ff14', '#00e5ff', '#2b6bff'];
 
 export const HIGHLIGHTER_COLORS = ['#fff100', '#b0ff57', '#00e5ff', '#ff8ad8', '#ffa64d', '#c9a0ff'];
 
@@ -203,6 +207,18 @@ export function penIcon(color, effect, kind = 'pen') {
       <path d="M21 9l2 3h-4z" fill="#94a3b8"/>
       <line x1="22" y1="12" x2="23" y2="15" stroke="#f8fafc" stroke-width="1.2"/>
     </svg>`;
+  }
+
+  if (effect === 'neon' && kind === 'pen') {
+    // a glowing tube: the barrel lit from inside, a halo of its own colour round it
+    defs = `<filter id="${uid}" x="-80%" y="-30%" width="260%" height="160%"><feGaussianBlur stdDeviation="1.6"/></filter>`;
+    return `<svg viewBox="0 0 26 44" width="26" height="44" aria-hidden="true">
+    <defs>${defs}</defs>
+    <path d="M6.5 14h13v23a3 3 0 0 1-3 3h-7a3 3 0 0 1-3-3z" fill="${color}" filter="url(#${uid})" opacity=".9"/>
+    <path d="M6.5 14h13v23a3 3 0 0 1-3 3h-7a3 3 0 0 1-3-3z" fill="${color}"/>
+    <path d="M11 16h4v21a1.5 1.5 0 0 1-1.5 1.5h-1A1.5 1.5 0 0 1 11 37z" fill="rgba(255,255,255,.55)"/>
+    <path d="M13 1.5 19.5 14h-13z" fill="#f3f2f1" stroke="#c8c6c4" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M13 4.6 17 12h-8z" fill="${color}"/></svg>`;
   }
 
   return `<svg viewBox="0 0 26 44" width="26" height="44" aria-hidden="true">

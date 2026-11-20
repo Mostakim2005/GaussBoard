@@ -158,6 +158,18 @@ export async function exportMarkdownSidecarFile(app) {
   const content = generateMarkdownSidecar(doc, boardName);
   const defaultFilename = `${boardName.replace(/[^a-zA-Z0-9_\-]/g, '_')}.md`;
 
+  if (window.board?.saveDialog && window.board?.writeFile) {
+    const filePath = await window.board.saveDialog({
+      title: 'Save Markdown Sidecar',
+      defaultPath: defaultFilename,
+      filters: [{ name: 'Markdown (*.md)', extensions: ['md'] }]
+    });
+    if (!filePath) return;
+    await window.board.writeFile(filePath, new TextEncoder().encode(content).buffer);
+    app.toast?.(`Exported ${filePath.split(/[\\/]/).pop() || defaultFilename}`);
+    return;
+  }
+
   if (window.board?.saveFile) {
     const res = await window.board.saveFile({
       defaultName: defaultFilename,

@@ -48,6 +48,8 @@ import { ReplayBar } from './ui/replay-bar.js';
 import { exportVideoFile } from './export-video.js';
 import { SearchDialog } from './ui/search-dialog.js';
 import { NoteOverviewDrawer } from './ui/note-overview.js';
+import { RadialMenu, rememberRecentPen } from './ui/radial.js';
+import { HoldGestureManager } from './core/hold-manager.js';
 import { TabBar } from './ui/tabs.js';
 import { VisualizationDialog } from './ui/visualization-dialog.js';
 import { SidebarRibbon } from './ui/sidebar-ribbon.js';
@@ -90,7 +92,7 @@ export const DEFAULT_SETTINGS = {
   // makes Reset to defaults put every pen back to the colour it shipped with.
   highlighterColor: '#fff100', highlighterWidth: 20, highlighterOpacity: 0.5, highlighterColorPop: true,
   audioInkSync: true, replayDisplayMode: 'reveal', replayOutlineColor: '#00e5ff', replayOutlineEffect: 'neon', replayCameraFollow: true, replayCameraMode: 'viewport',
-  eraserSize: 30, eraserMode: 'partial',
+  eraserSize: 30, eraserMode: 'partial', eraseShapes: false,
   // the pencil's scratch while it draws: on, so the pencil is heard to be a pencil; Settings or its own menu turn it off
   pencilSound: true,
   pdfPaper: 'a4', pdfOrientation: '', pdfMargin: 'narrow', pdfMode: 'fit', pdfQuality: 2,
@@ -104,7 +106,7 @@ export const DEFAULT_SETTINGS = {
   graphPhysics: true, showExcerptTethers: true, autoExportMarkdownSidecar: false,
   showGroupOutlines: true, showTabBar: true,
   sidebarRibbonVisible: false, sidebarRibbonPosition: 'left', sidebarRibbonStyle: 'glassmorphism', sidebarRibbonCategory: 'circuits',
-  edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, pageStrip: false, penHold: true, laserColor: '#ff2d2d',
+  edgePan: true, importQuality: 2, lowLatencyInk: false, inkTrail: false, drawAhead: false, boardsPage: true, mathSize: 36, officeImport: false, slidesFinalLook: true, patternSpacing: 40, pageDate: true, pageStrip: false, penHold: true, laserColor: '#ff2d2d',
   penOpacityEnabled: false, penOpacity: 1, laserTrailDuration: 520, boardLinkThumb: true,
   brushColor: '#201f1e', brushWidth: 8, brushOpacity: 0.9, brushSoftness: 'medium', brushVelocityThinning: true,
   fountainColor: '#002050', fountainWidth: 4, fountainSlant: 45, fountainFlex: 'normal',
@@ -138,6 +140,8 @@ export const DEFAULT_SETTINGS = {
   // and a phone has no hover for it to belong to. On is for a touchscreen PC
   // whose owner wants it anyway. See showInkPointer() in tools.js.
   nibOnTouch: false,
+  // Draw a soft glow under a hovering or writing pen too, so screen recordings show where the pen is.
+  recordPointer: false,
   // A short two-note chime when a board starts arriving. On by default: the
   // thing it prevents is being halfway through a sentence when an "accept
   // this board?" dialog appears out of nowhere. See showReceiving().
@@ -270,7 +274,7 @@ class App {
     this.clipboard = [];
     this.clipStamp = null;
     this.boardPoint = null;
-    this.ruler = { visible: false, x: 0, y: 0, angle: 0, length: 900, thickness: 78, snap: true };
+    this.ruler = { visible: false, x: 0, y: 0, angle: 0, length: 900, thickness: 78, snap: true, kind: 'ruler' };
     this.textEditor = new TextEditor(this);
     this.mathEditor = new MathEditor(this);
     // Maths in text arrives a moment after the words around it: one repaint per frame catches it all up.
@@ -279,6 +283,8 @@ class App {
       if (mathFrame) return;
       mathFrame = requestAnimationFrame(() => { mathFrame = 0; this.surface?.repaintAll?.(); });
     });
+    this.radial = new RadialMenu(this);
+    this.holdManager = new HoldGestureManager(this);
     this.panels = createPanels(this);
     this.interaction = new Interaction(this);
     // Links to other boards show those boards' names and pictures: when the list changes, so do they.
@@ -1205,6 +1211,14 @@ class App {
     this.tool = tool;
     // a pen nib left behind by the tool it belonged to is just a stray picture
     if (!isInk) this.interaction.hideInkPointer();
+    if (tool !== 'eraser') {
+      this.interaction?.hideRing?.();
+      this.splitWorkspace?.leftInteraction?.hideRing?.();
+    }
+    if (tool === 'eraser') {
+      this.interaction?.hideGlow?.();
+      this.splitWorkspace?.leftInteraction?.hideGlow?.();
+    }
     if (tool !== 'laser') this.surface.laser.length = 0;   // no stale dot left behind
     // panning is a view change, not an edit - it must not throw a selection away
     if (tool !== 'select' && tool !== 'lasso' && tool !== 'pan') this.setSelection([]);
@@ -2735,6 +2749,7 @@ class App {
         break;
       }
       case 'ruler': case 'view.ruler': this.toggleRuler(); break;
+      case 'toggleHoldMode': this.toggleHoldGestureMode(); break;
       case 'view.background': this.panels.background(); break;
 
       case 'insert.image': pickAndInsertImage(this); break;
@@ -2848,8 +2863,72 @@ class App {
     for (const id of [...this.surface.selection]) if (!this.store.has(id)) this.surface.selection.delete(id);
   }
 
+  /**
+   * The ruler's own menu, from its ⋯ button or a right-click on it: which ruler
+   * (straight, a 45° set square, a 30°/60° set square, a protractor), which way 0° points
+   * (right, as on a protractor, or up, as on a compass), and how see-through the
+   * plastic is. All three are remembered for next time.
+   */
+  openRulerMenu(at) {
+    const s = this.settings, r = this.ruler;
+    const seg = (items, now, pick) => h('div', { class: 'ruler-seg' }, ...items.map(([v, label]) => {
+      const b = h('button', { type: 'button', class: 'btn' + (now === v ? ' primary' : ''), 'data-value': v }, label);
+      b.addEventListener('click', () => { pick(v); this.saveSettings(); this.surface.invalidate(); closePopover(); this.openRulerMenu(at); });
+      return b;
+    }));
+    const slider = h('input', { type: 'range', min: '30', max: '100', step: '5', value: String(Math.round((Number.isFinite(+s.rulerOpacity) ? +s.rulerOpacity : 0.92) * 100)), 'data-ruler-opacity': '1' });
+    slider.addEventListener('input', () => { s.rulerOpacity = Number(slider.value) / 100; this.surface.invalidate(); });
+    slider.addEventListener('change', () => this.saveSettings());
+    const body = h('div', { class: 'menu ruler-menu' },
+      h('h5', {}, t('Shape')),
+      seg([['ruler', t('Ruler')], ['set45', t('Triangle 45°')], ['set60', t('Triangle 30°/60°')], ['protractor', t('Protractor')]], r.kind || 'ruler', (v) => { r.kind = v; s.rulerKind = v; this.fitTriangle(); }),
+      h('h5', {}, t('0° points')),
+      seg([['right', t('Right →')], ['up', t('Up ↑')]], s.rulerZero === 'up' ? 'up' : 'right', (v) => { s.rulerZero = v; }),
+      h('h5', {}, t('See-through')),
+      slider);
+    openPopover(at, body, { key: 'ruler-menu' });
+  }
+
+  /** A set square or protractor sized to fit the window it is shown in: nothing of it runs off the screen. */
+  fitTriangle() {
+    const r = this.ruler;
+    const v = this.surface.cam.viewport(this.surface.width, this.surface.height);
+    if (r.kind === 'protractor') {
+      // big enough to read a degree on, small enough that the whole half-circle and its arm knob are in view
+      const z = this.surface.cam.z;
+      r.protR = Math.max(160 / z, Math.min(v.h * 0.6 - 70 / z, v.w * 0.42, 420 / z));
+      if (!Number.isFinite(r.protArm)) r.protArm = 60;
+      // stand it on a line a little below the middle, so the dome sits in the middle of the window
+      r.y = Math.min(v.y + v.h - 40 / z, Math.max(v.y + r.protR + 70 / z, v.y + v.h / 2 + r.protR * 0.45));
+      return;
+    }
+    if (r.kind !== 'set45' && r.kind !== 'set60') return;
+    const tall = r.kind === 'set60' ? Math.tan(Math.PI / 6) : 1;
+    r.triBase = Math.max(120 / this.surface.cam.z, Math.min(r.length * 0.55, (v.h * 0.6) / tall, v.w * 0.6));
+    // hang it from a little above the middle, so the whole triangle is in view
+    if (r.y + r.triBase * tall > v.y + v.h * 0.92) r.y = Math.max(v.y + v.h * 0.12, v.y + v.h * 0.92 - r.triBase * tall);
+  }
+
+  showRadial(at, wp) {
+    if (this.viewMode || this.settings.holdGestureMode === 'off') return;
+    if (this.settings.holdGestureMode === 'classic') {
+      this.showContextMenu(at);
+      return;
+    }
+    this.radial.show(at, wp);
+  }
+
+  toggleHoldGestureMode() {
+    const next = this.holdManager.cycleMode();
+    if (next === 'radial') this.toast(t('Hold menu: Radial ring'));
+    else if (next === 'classic') this.toast(t('Hold menu: Classic list'));
+    else this.toast(t('Hold gestures disabled'));
+    this.syncUI();
+  }
+
   toggleRuler() {
     const r = this.ruler;
+    r.kind = ['ruler', 'set45', 'set60', 'protractor'].includes(this.settings.rulerKind) ? this.settings.rulerKind : 'ruler';
     r.visible = !r.visible;
     if (r.visible) {
       const v = this.surface.cam.viewport(this.surface.width, this.surface.height);
@@ -2857,6 +2936,7 @@ class App {
       r.y = v.y + v.h / 2;
       r.length = Math.min(1200, v.w * 0.7);
       r.thickness = 78 / this.surface.cam.z;
+      this.fitTriangle();
       const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
       this.toast(coarse
         ? t('Ruler on — drag the middle to move it, drag a blue knob at either end to turn it')
@@ -2917,6 +2997,21 @@ class App {
     if (preset === 'dol') this.circuitWorkbenchModal.sim.loadPresetDOL();
     else if (preset === 'rev') this.circuitWorkbenchModal.sim.loadPresetForwardReverse();
     this.circuitWorkbenchModal.show();
+  }
+
+  openCircuitComponentProperties(comp) {
+    if (this.circuitWorkbenchModal?.openProperties) {
+      this.circuitWorkbenchModal.openProperties(comp);
+      return;
+    }
+    this.openCircuitWorkbench();
+    this.toast(t('Circuit Simulation Workbench'), 'shapes', 1400);
+  }
+
+  inspectCover(cover) {
+    if (!cover) return;
+    this.toast(t('Study Tape'), 'check', 1400);
+    this.surface?.invalidate?.();
   }
 
   openMoleculeViewer(moleculeId = 'water') {
@@ -3354,6 +3449,18 @@ class App {
     const canvasObj = exportToJsonCanvas(this.store.doc);
     const content = JSON.stringify(canvasObj, null, 2);
     const defaultFilename = `${boardName.replace(/[^a-zA-Z0-9_\-]/g, '_')}.canvas`;
+
+    if (window.board?.saveDialog && window.board?.writeFile) {
+      const filePath = await window.board.saveDialog({
+        title: t('Save a copy'),
+        defaultPath: defaultFilename,
+        filters: [{ name: 'Obsidian Canvas (*.canvas)', extensions: ['canvas'] }]
+      });
+      if (!filePath) return;
+      await window.board.writeFile(filePath, new TextEncoder().encode(content).buffer);
+      this.toast(t('Exported {name}', { name: filePath.split(/[\\/]/).pop() || defaultFilename }));
+      return;
+    }
 
     if (window.board?.saveFile) {
       const res = await window.board.saveFile({
@@ -4097,6 +4204,8 @@ class App {
       // Escape in the My boards search clears the words first; only an empty search lets it close the page
       const el = e.target;
       if (el instanceof Element && el.closest('.board-search, .search-results') && document.querySelector('#boardList .board-search-input')?.value) return;
+      // and the Settings search the same way
+      if (el instanceof Element && el.closest('.settings-search') && el.value) return;
       if (this.panels.open) { this.panels.close(); e.preventDefault(); e.stopPropagation(); }
     }, true);
 
@@ -5867,6 +5976,7 @@ class App {
       if (pen) {
         e.preventDefault();
         this.settings.activePen = pen.id;
+        rememberRecentPen(this.settings, pen.id);
         this.settings.penColor = pen.color;
         this.settings.penEffect = pen.effect;
         this.saveSettings();

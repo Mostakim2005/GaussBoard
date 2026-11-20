@@ -591,7 +591,7 @@ export function boardPaint(color) {
  *  Ink
  * =================================================================== */
 function inkStyle(ctx, o) {
-  if (!o.effect || o.effect === 'none') return inkPaint(o.color);
+  if (!o.effect || o.effect === 'none' || o.effect === 'neon' || o.effect === 'pencil') return inkPaint(o.color);
   const pts = o.points;
   const a = pts[0], b = pts[pts.length - 1];
   const dx = b.x - a.x, dy = b.y - a.y;
@@ -719,10 +719,59 @@ export function pencilDarkness(o) {
 /** A pencil on its side lays down a wider line. */
 export function pencilWidth(o) { return strokeDrawWidth({ ...o, effect: 'pencil' }); }
 
-export function drawStroke(ctx, o) {
+export function drawStroke(ctx, o, camZ = null) {
   const pts = o.points;
   if (!pts || !pts.length) return;
 
+  if (camZ == null) {
+    try {
+      const m = ctx.getTransform ? ctx.getTransform() : null;
+      camZ = m ? Math.hypot(m.a, m.b) || 1 : 1;
+    } catch { camZ = 1; }
+  }
+
+  // Zoom-Aware Level of Detail (Rule 4): Sub-pixel culling at extreme zoom-out
+  if (camZ < 0.35) {
+    const wb = o.bbox || (pts.length > 1 ? {
+      w: Math.abs(pts[pts.length - 1].x - pts[0].x),
+      h: Math.abs(pts[pts.length - 1].y - pts[0].y)
+    } : null);
+    if (wb && wb.w * camZ < 1.5 && wb.h * camZ < 1.5) {
+      if (o.opacity != null && o.opacity < 0.1) return;
+      ctx.save();
+      ctx.fillStyle = inkStyle(ctx, o);
+      const dotW = 1.5 / camZ;
+      ctx.fillRect(pts[0].x - dotW / 2, pts[0].y - dotW / 2, dotW, dotW);
+      ctx.restore();
+      return;
+    }
+  }
+
+  // Zoom-Aware Level of Detail (Rule 4): Stroke downsampling with stride lineTo
+  if (camZ < 0.35 && pts.length > 30 && o.tool !== 'calligraphy' && o.effect !== 'pencil') {
+    const step = camZ < 0.15 ? 4 : 2;
+    ctx.save();
+    if (o.tool === 'highlighter') {
+      ctx.globalAlpha = o.opacity ?? 0.5;
+      ctx.globalCompositeOperation = (o.colorPop !== false && !lightInk()) ? 'multiply' : 'source-over';
+      ctx.lineWidth = o.width || 20;
+    } else {
+      if (o.opacity != null && o.opacity < 1) ctx.globalAlpha = o.opacity;
+      ctx.lineWidth = o.width || 4;
+    }
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = inkStyle(ctx, o);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = step; i < pts.length - 1; i += step) {
+      ctx.lineTo(pts[i].x, pts[i].y);
+    }
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
   if (o.tool === 'calligraphy') {
     const envelope = calligraphyPath(o);
     if (!envelope) return;
@@ -752,6 +801,8 @@ export function drawStroke(ctx, o) {
     ctx.restore();
     return;
   }
+
+  if (o.effect === 'neon' && !highlighter) { drawNeon(ctx, o, path, pts); return; }
 
   ctx.save();
   if (highlighter) {
@@ -792,6 +843,55 @@ export function drawStroke(ctx, o) {
     ctx.stroke(path);
     ctx.restore();
   }
+  ctx.restore();
+}
+
+/* =================================================================== *
+ *  Neon
+ *
+ *  A glowing tube of light: a soft halo in the ink's own colour, and a hot,
+ *  paler core down the middle. On a dark page the halo is laid twice and the
+ *  core runs almost white, so it reads like a sign at night; on a light page
+ *  the core keeps more of its colour, or it would vanish into the paper.
+ *  The halo reaches about three widths past the line - boundsOf() knows that,
+ *  so selecting, culling and repainting take the glow in too.
+ * =================================================================== */
+export const NEON_REACH = 3;
+const neonHex = (c) => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(c || ''));
+  if (!m) return [176, 38, 255];
+  const n = parseInt(m[1], 16);
+  return [n >> 16, (n >> 8) & 255, n & 255];
+};
+function drawNeon(ctx, o, path, pts) {
+  const [r, g, b] = neonHex(inkPaint(o.color));
+  const dark = lightInk();
+  let scale = 1;
+  try {
+    const m = ctx.getTransform ? ctx.getTransform() : null;
+    scale = m ? Math.hypot(m.a, m.b) || 1 : 1;
+  } catch { scale = 1; }
+  const w = strokeWeight(pts, o.width || 4, o.pressure !== false);
+  const blur = Math.min(160, w * scale * NEON_REACH);
+  const base = o.opacity ?? 1;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // the halo: the tube itself, casting its own colour all round it
+  ctx.strokeStyle = `rgb(${r},${g},${b})`;
+  ctx.lineWidth = w;
+  ctx.shadowColor = `rgba(${r},${g},${b},${dark ? 1 : 0.8})`;
+  ctx.globalAlpha = base;
+  ctx.shadowBlur = blur;
+  ctx.stroke(path);
+  if (dark) { ctx.shadowBlur = blur * 0.4; ctx.stroke(path); }
+  // the core: paler, thinner, no glow of its own
+  const k = dark ? 0.7 : 0.45;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent';
+  ctx.strokeStyle = `rgb(${Math.round(r + (255 - r) * k)},${Math.round(g + (255 - g) * k)},${Math.round(b + (255 - b) * k)})`;
+  ctx.lineWidth = Math.max(1 / scale, w * 0.42);
+  ctx.stroke(path);
   ctx.restore();
 }
 
@@ -1156,15 +1256,38 @@ export function clampImageCrop(crop, iw, ih) {
   return { sx, sy, sw, sh };
 }
 
+/*
+ * The part of the board being repainted right now, when it is only a band (an eraser rub), or null
+ * for a whole frame. Set by the surface around a band paint; see Surface.drawScene.
+ */
+let paintBand = null;
+export function setPaintBand(box) { paintBand = box ? { ...box } : null; }
+/** How many page shadows a band paint has skipped - for the tests. */
+export const bandStats = { shadowSkips: 0, off: false };
+
 export function drawImage(ctx, o, onload) {
   const img = getImage(o.src, onload);
+  // the band being repainted, when it lies wholly inside this page: its shadow is nowhere near
+  const band = paintBand && !bandStats.off && o.kind === 'page' && !o.rotation && o.w > 0 && o.h > 0 ? paintBand : null;
+  let inside = false;
+  if (band) {
+    // the band is painted a device pixel or so wider than asked (see drawScene): keep that much inside too
+    let scale = 1;
+    try { const m = ctx.getTransform(); scale = Math.hypot(m.a, m.b) || 1; } catch { scale = 1; }
+    const g = 3 / scale;
+    inside = band.x - g >= o.x && band.y - g >= o.y && band.x + band.w + g <= o.x + o.w && band.y + band.h + g <= o.y + o.h;
+  }
   ctx.save();
   if (o.kind === 'page') {
     ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(0,0,0,0.18)';
-    ctx.shadowBlur = 12;
-    ctx.shadowOffsetY = 3;
-    ctx.fillRect(o.x, o.y, o.w, o.h);
+    // The shadow lives outside the page's edge. A band well inside the page cannot reach it, so
+    // blurring a whole page's shadow for every eraser move over a PDF was work nobody could see.
+    if (!inside) {
+      ctx.shadowColor = 'rgba(0,0,0,0.18)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 3;
+    }
+    if (inside) { bandStats.shadowSkips++; ctx.fillRect(band.x, band.y, band.w, band.h); } else ctx.fillRect(o.x, o.y, o.w, o.h);
     ctx.shadowColor = 'transparent';
   }
   if (img) {

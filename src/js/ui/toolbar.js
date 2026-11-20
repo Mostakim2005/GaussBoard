@@ -3,12 +3,13 @@
 import { icon } from './icons.js';
 import { openPopover, closePopover, h, isOpen } from './popover.js';
 import {
-  PEN_COLORS, PEN_EFFECTS, HIGHLIGHTER_COLORS, NOTE_COLORS, TEXT_COLORS,
+  PEN_COLORS, PEN_EFFECTS, NEON_COLORS, HIGHLIGHTER_COLORS, NOTE_COLORS, TEXT_COLORS,
   SHAPE_STROKES, SHAPE_FILLS, SHAPES, SHAPE_LABELS, shapeIcon,
   PENS, penList, penById, rememberPen, heldPenId, penIcon, FONTS, PENCIL_GRAPHITE
 } from './palettes.js';
 import { EMOJI_GROUPS, searchEmoji } from '../core/emoji.js';
 import { inkPaint, isDarkBoard, isDarkColor } from '../core/render.js';
+import { rememberRecentPen } from './radial.js';
 import { t } from '../i18n.js';
 
 const TOOL_ICON = {
@@ -210,6 +211,7 @@ export function initToolbar(app) {
   sep('2');
 
   iconTool({ ribbonId: 'ruler', cmd: 'ruler', icon: 'ruler', title: t('Ruler (Ctrl+R)'), onClick: () => app.command('ruler') });
+  iconTool({ ribbonId: 'holdMode', cmd: 'toggleHoldMode', icon: 'radial', title: t('Hold gesture mode'), onClick: () => app.command('toggleHoldMode') });
   iconTool({ ribbonId: 'text', tool: 'text', icon: 'text', dot: true, key: 'T',
     title: t('Text Box (T) \u2014 click canvas to write notes or markdown; click again for font & size'),
     onClick: toggleTool('text') });
@@ -1002,8 +1004,8 @@ function emojiPicker(app) {
  */
 export function pickPenInk(app, c) {
   const s = app.settings;
-  // a pencil given a new colour is a coloured pencil, still a pencil
-  const effect = s.penEffect === 'pencil' ? 'pencil' : 'none';
+  // a pencil given a new colour is a coloured pencil, still a pencil; a neon pen stays neon
+  const effect = s.penEffect === 'pencil' || s.penEffect === 'neon' ? s.penEffect : 'none';
   s.penColor = c; s.penEffect = effect;
   const held = heldPenId(s);
   if (held) rememberPen(s, held, { color: c, effect });
@@ -1387,8 +1389,10 @@ export function openToolPopover(app, anchor, tool) {
         b.style.fontSize = '12.5px';
         b.addEventListener('click', () => {
           markActive(effects, b, 'primary');
-          const crossing = (s.penEffect === 'pencil') !== (e.id === 'pencil');
+          const crossing = (s.penEffect === 'pencil') !== (e.id === 'pencil') || (s.penEffect === 'neon') !== (e.id === 'neon');
           s.penEffect = e.id;
+          // turning a pen neon with plain black in it would glow black: it lights up purple instead
+          if (e.id === 'neon' && !NEON_COLORS.includes(s.penColor) && /^#(201f1e|201f1f|4b4a48)$/i.test(s.penColor || '#201f1e')) s.penColor = NEON_COLORS[0];
           const held = heldPenId(s);
           if (held) rememberPen(s, held, { color: s.penColor, effect: e.id });
           app.saveSettings();
@@ -1435,7 +1439,8 @@ export function openToolPopover(app, anchor, tool) {
       penTypeSwitcher('pen'),
       h('h4', {}, t('Ink colour')),
       // a pencil offers its own graphite first, so a coloured pencil can always go back to plain lead
-      swatchRow(s.penEffect === 'pencil' ? [PENCIL_GRAPHITE, ...PEN_COLORS] : PEN_COLORS, s.penEffect === 'none' || s.penEffect === 'pencil' ? s.penColor : null, (c) => {
+      swatchRow(s.penEffect === 'pencil' ? [PENCIL_GRAPHITE, ...PEN_COLORS] : s.penEffect === 'neon' ? NEON_COLORS : PEN_COLORS,
+        s.penEffect === 'none' || s.penEffect === 'pencil' || s.penEffect === 'neon' ? s.penColor : null, (c) => {
         pickInk(c); closePopover();
       }, [customInk]),
       h('div', { class: 'row', style: 'margin-top:12px' }, h('label', {}, t('Effect'))),
@@ -1717,6 +1722,13 @@ export function openToolPopover(app, anchor, tool) {
           });
           return b;
         })()),
+      // off unless asked for: rubbing out ink beside a box must never take the box by accident
+      h('div', { class: 'row', style: 'margin-top:12px' },
+        toggle(t('Erase shapes too'), s.eraseShapes === true, (v) => {
+          s.eraseShapes = v;
+          app.saveSettings();
+          app.toast(v ? t('The eraser now also rubs out lines and shapes it crosses') : t('The eraser leaves shapes alone'), 'eraser');
+        })),
       h('h4', { style: 'margin-top:14px' }, t('Gesture scratch-out')),
       h('div', { style: 'display:flex;align-items:center;justify-content:space-between;padding:4px 0;' },
         h('span', { style: 'font-size:12.5px;' }, t('Scribble over ink to erase')),
@@ -2087,6 +2099,7 @@ export function openInsertPopover(app, anchor) {
     ribbonToolItem(t('Study Tape'), 'curtain', () => { app.setTool('tape'); app.syncUI(); }, 'tape'),
     ribbonToolItem(t('Eraser'), 'eraser', () => { app.setTool('eraser'); app.syncUI(); }, 'eraser', 'E'),
     ribbonToolItem(t('Ruler'), 'ruler', () => app.command('ruler'), 'ruler', 'Ctrl+R'),
+    ribbonToolItem(t('Hold gesture mode'), 'radial', () => app.command('toggleHoldMode'), 'holdMode'),
     ribbonToolItem(t('Text Box'), 'text', () => { app.setTool('text'); app.syncUI(); }, 'text', 'T'),
     ribbonToolItem(t('Sticky Note'), 'note', () => { app.setTool('note'); app.syncUI(); }, 'note', 'N'),
     ribbonToolItem(t('Shapes'), 'shapes', () => { app.setTool('shape'); app.syncUI(); openToolPopover(app, anchor, 'shape'); }, 'shape', 'S'),
@@ -2154,6 +2167,7 @@ export function choosePen(app, id, anchor) {
   if (!pen) return;
   const held = app.tool === 'pen' && heldPenId(s) === id;
   s.activePen = id;
+  rememberRecentPen(s, id);
   s.penColor = pen.color;
   s.penEffect = pen.effect;
   app.saveSettings();
