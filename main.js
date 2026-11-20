@@ -7,6 +7,7 @@ const os = require('node:os');
 const { spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const crypto = require('node:crypto');
+const { Readable } = require('node:stream');
 const StorageLocation = require('./storage-location.js');
 const { isPathWithin } = require('./src/js/platform/path-security.cjs');
 const { safeExternalUrl, isReleaseUrl } = require('./src/js/platform/security.cjs');
@@ -154,18 +155,94 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, bypassCSP: false } }
 ]);
 
+const ASSET_MIME_TYPES = {
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.ogv': 'video/ogg',
+  '.mov': 'video/quicktime',
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.ogg': 'audio/ogg',
+  '.wav': 'audio/wav',
+  '.flac': 'audio/flac',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.pdf': 'application/pdf'
+};
+
+async function serveAssetWithRange(filePath, request) {
+  let stat;
+  try {
+    stat = await fsp.stat(filePath);
+  } catch {
+    return new Response('Not Found', { status: 404 });
+  }
+  const size = stat.size;
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType = ASSET_MIME_TYPES[ext] || 'application/octet-stream';
+  const rangeHeader = request.headers.get('range');
+
+  if (rangeHeader) {
+    const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
+    if (!match) {
+      return new Response('Range Not Satisfiable', {
+        status: 416,
+        headers: { 'Content-Range': `bytes */${size}` }
+      });
+    }
+    let start = match[1] ? Number.parseInt(match[1], 10) : 0;
+    let end = match[2] ? Number.parseInt(match[2], 10) : size - 1;
+    if (!match[1] && match[2]) {
+      const suffix = Number.parseInt(match[2], 10);
+      start = Math.max(0, size - suffix);
+      end = size - 1;
+    }
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start >= size || end < start) {
+      return new Response('Range Not Satisfiable', {
+        status: 416,
+        headers: { 'Content-Range': `bytes */${size}` }
+      });
+    }
+    end = Math.min(end, size - 1);
+    const stream = fs.createReadStream(filePath, { start, end });
+    return new Response(Readable.toWeb(stream), {
+      status: 206,
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': String(end - start + 1),
+        'Content-Range': `bytes ${start}-${end}/${size}`,
+        'Accept-Ranges': 'bytes'
+      }
+    });
+  }
+
+  const stream = fs.createReadStream(filePath);
+  return new Response(Readable.toWeb(stream), {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': String(size),
+      'Accept-Ranges': 'bytes'
+    }
+  });
+}
+
 function registerProtocol() {
   protocol.handle('app', (request) => {
     const url = new URL(request.url);
     let rel;
     try { rel = decodeURIComponent(url.pathname); }
     catch { return new Response('Bad Request', { status: 400 }); }
-    // Asset streaming endpoint: supports HTTP 206 range requests for audio seeking
+    // Asset streaming endpoint: supports HTTP 206 range requests for audio/video seeking
     if (rel.startsWith('/asset/')) {
       const id = rel.slice(7);
       if (!ASSET_NAME.test(id)) return new Response('Bad Request', { status: 400 });
       const filePath = path.join(assetsDir(), id);
-      return net.fetch(pathToFileURL(filePath).toString());
+      return serveAssetWithRange(filePath, request);
     }
     if (rel === '/' || rel === '') rel = '/index.html';
     const target = path.resolve(SRC, `.${rel}`);
@@ -2054,9 +2131,15 @@ if (!singleInstance) {
 
   app.whenReady().then(async () => {
     startupMark('Electron ready');
+    const MEDIA_PERMISSIONS = new Set(['media', 'microphone', 'audioCapture']);
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
       const url = webContents.getURL();
-      callback(url.startsWith('app://board/') && permission === 'media');
+      callback(url.startsWith('app://') && MEDIA_PERMISSIONS.has(permission));
+    });
+    session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin) => {
+      return typeof requestingOrigin === 'string'
+        && requestingOrigin.startsWith('app://')
+        && MEDIA_PERMISSIONS.has(permission);
     });
     registerProtocol();
     showSplash();
