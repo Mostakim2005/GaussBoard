@@ -102,6 +102,7 @@ const PRECACHE_ASSETS = [
   './js/ui/audio-bar.js',
   './js/ui/boardpicker.js',
   './js/ui/chemical-sketcher.js',
+  './js/ui/chrome-manager.js',
   './js/ui/circuit-workbench.js',
   './js/ui/compression-dialog.js',
   './js/ui/contextmenu.js',

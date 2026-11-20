@@ -15,7 +15,7 @@ export class ReplayBar {
     this.el = null;
     this.dock = 'top'; // 'top' | 'bottom' | 'left' | 'right' | 'free'
     this.orientation = 'horizontal'; // 'horizontal' | 'vertical'
-    this.collapsed = false;
+    this.collapsed = true;
     this.pos = { x: 80, y: 16 };
     this.visibleTools = {
       overview: true,

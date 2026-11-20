@@ -45,6 +45,7 @@ import { ReplayEngine } from './core/replay.js';
 import { AudioBar } from './ui/audio-bar.js';
 import { SplitWorkspace } from './ui/split-workspace.js';
 import { ReplayBar } from './ui/replay-bar.js';
+import { ChromeManager } from './ui/chrome-manager.js';
 import { exportVideoFile } from './export-video.js';
 import { SearchDialog } from './ui/search-dialog.js';
 import { NoteOverviewDrawer } from './ui/note-overview.js';
@@ -317,8 +318,18 @@ class App {
     this.tabBar = new TabBar(this);
     if (typeof document !== 'undefined') this.tabBar.init();
     this.visualizationStudio = new VisualizationDialog(this);
+    this.chrome = new ChromeManager(this);
     this.sidebarRibbon = new SidebarRibbon(this);
     if (typeof document !== 'undefined') this.sidebarRibbon.init();
+    this.chrome.registerLeftDrawer('sidebarRibbon', () => {
+      if (this.sidebarRibbon?.expanded && this.sidebarRibbon?.position === 'left') {
+        this.sidebarRibbon.expanded = false;
+        this.sidebarRibbon.syncState?.();
+      }
+    });
+    this.chrome.registerLeftDrawer('pdfSidebar', () => {
+      if (this.pdfSidebar?.isOpen) this.pdfSidebar.close();
+    });
     this.studyRunner = new StudyRunner(this);
     this.periodicTableModal = new PeriodicTableModal(this);
     this.phetRunnerModal = new PhetRunnerModal(this);
@@ -5778,6 +5789,7 @@ class App {
       }
     }
 
+    if (e.key === 'F10' || (mod && e.key === '\\')) { e.preventDefault(); this.chrome?.toggleZenMode?.(); return; }
     if (e.altKey && (e.key === 'g' || e.key === 'G')) { e.preventDefault(); this.openGraphView(); return; }
     if (e.altKey && (e.key === 't' || e.key === 'T')) { e.preventDefault(); this.togglePdfSidebar(); return; }
     if (mod && (e.key === 'b' || e.key === 'B')) {

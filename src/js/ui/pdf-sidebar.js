@@ -24,6 +24,7 @@ export class PdfSidebarDrawer {
   }
 
   open() {
+    this.app?.chrome?.notifyLeftOpen?.('pdfSidebar');
     this.isOpen = true;
     this.render();
   }
@@ -60,36 +61,36 @@ export class PdfSidebarDrawer {
     closeBtn.addEventListener('click', () => this.close());
 
     const header = h('div', {
-      style: 'padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.1);'
+      style: 'padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--stroke);'
     }, titleEl, closeBtn);
 
     // Tab buttons
     const tabToc = h('button', {
       class: `btn btn-ghost ${this.activeTab === 'toc' ? 'active' : ''}`,
-      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'toc' ? '#00e5ff' : 'transparent'};border-radius:0;`
+      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'toc' ? 'var(--accent)' : 'transparent'};border-radius:0;`
     }, t('TOC / Outline'));
     tabToc.addEventListener('click', () => { this.activeTab = 'toc'; this.render(); });
 
     const tabBookmarks = h('button', {
       class: `btn btn-ghost ${this.activeTab === 'bookmarks' ? 'active' : ''}`,
-      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'bookmarks' ? '#00e5ff' : 'transparent'};border-radius:0;`
+      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'bookmarks' ? 'var(--accent)' : 'transparent'};border-radius:0;`
     }, t('Bookmarks'));
     tabBookmarks.addEventListener('click', () => { this.activeTab = 'bookmarks'; this.render(); });
 
     const tabPages = h('button', {
       class: `btn btn-ghost ${this.activeTab === 'pages' ? 'active' : ''}`,
-      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'pages' ? '#00e5ff' : 'transparent'};border-radius:0;`
+      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'pages' ? 'var(--accent)' : 'transparent'};border-radius:0;`
     }, t('Pages'));
     tabPages.addEventListener('click', () => { this.activeTab = 'pages'; this.render(); });
 
     const tabTape = h('button', {
       class: `btn btn-ghost ${this.activeTab === 'tape' ? 'active' : ''}`,
-      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'tape' ? '#00e5ff' : 'transparent'};border-radius:0;`
+      style: `flex:1;padding:6px 4px;font-size:11px;border-bottom:2px solid ${this.activeTab === 'tape' ? 'var(--accent)' : 'transparent'};border-radius:0;`
     }, t('Study Index'));
     tabTape.addEventListener('click', () => { this.activeTab = 'tape'; this.render(); });
 
     const tabNav = h('div', {
-      style: 'display:flex;background:rgba(0,0,0,0.2);border-bottom:1px solid rgba(255,255,255,0.08);'
+      style: 'display:flex;background:var(--surface-2);border-bottom:1px solid var(--stroke);'
     }, tabToc, tabBookmarks, tabPages, tabTape);
 
     // Content container
@@ -109,7 +110,7 @@ export class PdfSidebarDrawer {
 
     this.el = h('div', {
       class: 'pdf-sidebar modal-glass',
-      style: 'position:fixed;top:48px;left:0;bottom:0;width:310px;z-index:900;display:flex;flex-direction:column;background:rgba(18,22,28,0.92);backdrop-filter:blur(16px);border-right:1px solid rgba(255,255,255,0.12);box-shadow:4px 0 24px rgba(0,0,0,0.4);animation:slideRight 0.2s cubic-bezier(0.16,1,0.3,1);'
+      style: 'position:fixed;top:48px;left:0;bottom:0;width:310px;z-index:36;display:flex;flex-direction:column;background:var(--surface);color:var(--text);backdrop-filter:blur(16px);border-right:1px solid var(--stroke);box-shadow:var(--shadow-3);animation:slideRight 0.2s cubic-bezier(0.16,1,0.3,1);'
     }, header, tabNav, body);
 
     document.body.appendChild(this.el);
@@ -148,7 +149,7 @@ export class PdfSidebarDrawer {
 
             if (isMatch || hasChildren) {
               const row = h('div', {
-                style: `padding:6px 8px;padding-left:${depth * 14 + 8}px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);transition:background 0.15s;margin-bottom:2px;`
+                style: `padding:6px 8px;padding-left:${depth * 14 + 8}px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);color:var(--text);transition:background 0.15s;margin-bottom:2px;`
               },
                 h('div', { style: 'display:flex;align-items:center;gap:6px;overflow:hidden;' },
                   h('span', { style: 'font-size:11px;color:rgba(255,255,255,0.5);' }, hasChildren ? '▼' : '•'),
@@ -187,7 +188,7 @@ export class PdfSidebarDrawer {
         const pageTitle = p.title || `${t('Page')} ${idx + 1}`;
         if (query && !pageTitle.toLowerCase().includes(query)) return;
         const row = h('div', {
-          style: 'padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);margin-bottom:2px;'
+          style: 'padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);color:var(--text);margin-bottom:2px;'
         },
           h('span', { style: 'font-size:13px;color:var(--text,#eee);' }, pageTitle),
           h('span', { style: 'font-size:11px;color:#00e5ff;' }, `→`)
@@ -258,7 +259,7 @@ export class PdfSidebarDrawer {
 
     bookmarks.forEach((bm, idx) => {
       const row = h('div', {
-        style: 'padding:8px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.04);margin-bottom:4px;'
+        style: 'padding:8px 10px;border-radius:6px;display:flex;align-items:center;justify-content:space-between;background:var(--surface-2);color:var(--text);margin-bottom:4px;'
       },
         h('div', {
           style: 'flex:1;cursor:pointer;overflow:hidden;',

@@ -263,6 +263,9 @@ export class SidebarRibbon {
 
   toggle() {
     this.expanded = !this.expanded;
+    if (this.expanded && this.position === 'left') {
+      this.app?.chrome?.notifyLeftOpen?.('sidebarRibbon');
+    }
     this.syncState();
   }
 
@@ -1046,7 +1049,7 @@ export class SidebarRibbon {
         linterOutput.innerHTML = `<span style="color:#22c55e;">✔</span> ${t('No style or redundancy issues detected. Clear technical prose!')}`;
       } else {
         linterOutput.innerHTML = issues.map((iss) => `
-          <div style="margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:4px;">
+          <div style="margin-bottom:6px;border-bottom:1px solid var(--stroke);padding-bottom:4px;">
             <span class="deck-stats-pill" style="font-size:10px;padding:1px 4px;margin-right:4px;">${escapeHtml(iss.rule)}</span>
             <span style="font-size:11px;">${iss.message}</span>
           </div>
@@ -1366,7 +1369,7 @@ export class SidebarRibbon {
     });
 
     // Inking Auto-Hide Toggle
-    const autoHideRow = h('label', { style: 'display:flex;align-items:center;gap:8px;font-size:12.5px;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);cursor:pointer;' },
+    const autoHideRow = h('label', { style: 'display:flex;align-items:center;gap:8px;font-size:12.5px;margin-top:10px;padding-top:8px;border-top:1px solid var(--stroke);cursor:pointer;' },
       h('input', {
         type: 'checkbox',
         checked: this.inkingAutoHide,
