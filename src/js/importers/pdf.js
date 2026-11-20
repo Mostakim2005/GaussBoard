@@ -43,8 +43,8 @@ export async function openPdf(data) {
       const page = await pdf.getPage(pageNo);
       const { canvas, width, height } = await renderPageTo(page, scale);
       page.cleanup();
-      const format = scale <= 1.25 ? 'image/jpeg' : (type || 'image/png');
-      const q = scale <= 1.25 ? (quality ?? 0.75) : quality;
+      const format = type || 'image/jpeg';
+      const q = format === 'image/png' ? undefined : (quality ?? (scale <= 1.25 ? 0.75 : 0.84));
       return { dataUrl: canvas.toDataURL(format, q), width, height, page: pageNo };
     },
 

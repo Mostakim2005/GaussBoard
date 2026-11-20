@@ -999,12 +999,32 @@ export function startImageCrop(app, imgObj) {
   document.getElementById('imageCropOverlay')?.remove();
   const snap = app.store.snapshot([imgObj.id]);
   const origCrop = imgObj.crop ? { ...imgObj.crop } : null;
+  const origX = imgObj.x;
+  const origY = imgObj.y;
+  const origW = imgObj.w;
+  const origH = imgObj.h;
 
   let curCrop = origCrop ? { ...origCrop } : { sx: 0, sy: 0, sw: 1, sh: 1 };
   if (typeof curCrop.sx !== 'number') curCrop.sx = 0;
   if (typeof curCrop.sy !== 'number') curCrop.sy = 0;
   if (typeof curCrop.sw !== 'number') curCrop.sw = 1;
   if (typeof curCrop.sh !== 'number') curCrop.sh = 1;
+
+  // Recover the uncropped world bounding box so cropping updates destination
+  // width/height proportionally instead of stretching the cropped region into
+  // the original uncropped frame.
+  const fullW = (origCrop && origCrop.sw > 0) ? (origW / origCrop.sw) : origW;
+  const fullH = (origCrop && origCrop.sh > 0) ? (origH / origCrop.sh) : origH;
+  const fullX = (origCrop && origCrop.sw > 0) ? (origX - origCrop.sx * fullW) : origX;
+  const fullY = (origCrop && origCrop.sh > 0) ? (origY - origCrop.sy * fullH) : origY;
+
+  // Show the full uncropped image behind the dim mask while dragging handles.
+  imgObj.x = fullX;
+  imgObj.y = fullY;
+  imgObj.w = fullW;
+  imgObj.h = fullH;
+  delete imgObj.crop;
+  app.surface.invalidate();
 
   const stage = document.getElementById('stage') || document.body;
 
@@ -1047,8 +1067,8 @@ export function startImageCrop(app, imgObj) {
 
   const getScreenRects = () => {
     const cam = app.surface.cam;
-    const p1 = cam.toScreen(imgObj.x, imgObj.y);
-    const p2 = cam.toScreen(imgObj.x + imgObj.w, imgObj.y + imgObj.h);
+    const p1 = cam.toScreen(fullX, fullY);
+    const p2 = cam.toScreen(fullX + fullW, fullY + fullH);
     const imgLeft = Math.min(p1.x, p2.x);
     const imgTop = Math.min(p1.y, p2.y);
     const imgW = Math.max(10, Math.abs(p2.x - p1.x));
@@ -1093,9 +1113,6 @@ export function startImageCrop(app, imgObj) {
     const pctW = Math.round(curCrop.sw * 100);
     const pctH = Math.round(curCrop.sh * 100);
     dimTag.textContent = `${pctW}% × ${pctH}%`;
-
-    imgObj.crop = { ...curCrop };
-    app.surface.invalidate();
   };
 
   syncUI();
@@ -1199,6 +1216,10 @@ export function startImageCrop(app, imgObj) {
   };
 
   btnCancel.onclick = () => {
+    imgObj.x = origX;
+    imgObj.y = origY;
+    imgObj.w = origW;
+    imgObj.h = origH;
     if (origCrop) imgObj.crop = origCrop;
     else delete imgObj.crop;
     app.surface.invalidate();
@@ -1208,8 +1229,16 @@ export function startImageCrop(app, imgObj) {
   btnApply.onclick = () => {
     if (curCrop.sx === 0 && curCrop.sy === 0 && curCrop.sw === 1 && curCrop.sh === 1) {
       delete imgObj.crop;
+      imgObj.x = fullX;
+      imgObj.y = fullY;
+      imgObj.w = fullW;
+      imgObj.h = fullH;
     } else {
       imgObj.crop = { ...curCrop };
+      imgObj.x = fullX + curCrop.sx * fullW;
+      imgObj.y = fullY + curCrop.sy * fullH;
+      imgObj.w = Math.max(10, curCrop.sw * fullW);
+      imgObj.h = Math.max(10, curCrop.sh * fullH);
     }
     app.store.commitSnapshot('crop image', snap);
     app.surface.invalidate();
