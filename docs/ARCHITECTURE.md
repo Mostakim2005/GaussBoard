@@ -1,5 +1,5 @@
-# System Architecture (`docs/ARCHITECTURE.md`)
-> **1-Line Summary:** Plain-English visual map of how GaussBoard 6.9.3 works, why we chose each tool, and step-by-step recipes for adding new features.
+﻿# System Architecture (`docs/ARCHITECTURE.md`)
+> **1-Line Summary:** Plain-English visual map of how GaussBoard 6.10.0 works, why we chose each tool, and step-by-step recipes for adding new features.
 
 ## 1. High-Level Visual System Map
 ```mermaid
