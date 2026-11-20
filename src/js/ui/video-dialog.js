@@ -491,23 +491,80 @@ export class VideoPlayerDialog {
   }
 
   addTimestampBookmark() {
-    let tSec = Math.floor(this.currentTime);
-    if (this.parsed.type === 'youtube' && tSec === 0) {
-      const ask = prompt(t('Enter timestamp in seconds or mm:ss:'), '01:00');
-      if (ask) tSec = parseTimeString(ask);
+    const initialSec = Math.max(0, Math.floor(this.currentTime || 0));
+    const host = this.bookmarkListEl?.parentElement;
+
+    const commit = (rawTime, rawLabel) => {
+      const parsedSec = parseTimeString(String(rawTime ?? ''));
+      const tSec = Number.isFinite(parsedSec) && parsedSec >= 0 ? Math.floor(parsedSec) : initialSec;
+      const trimmed = String(rawLabel ?? '').trim() || t('Moment at {time}', { time: formatTime(tSec) });
+
+      if (!Array.isArray(this.videoObj.bookmarks)) this.videoObj.bookmarks = [];
+      this.videoObj.bookmarks.push({ time: tSec, label: trimmed });
+      this.videoObj.bookmarks.sort((a, b) => a.time - b.time);
+
+      // Save to store
+      this.app.store.update(this.videoObj.id, { bookmarks: [...this.videoObj.bookmarks] }, 'add bookmark');
+      this.renderBookmarks();
+      this.app.toast(t('Bookmark added: [{time}]', { time: formatTime(tSec) }));
+      this.app.surface?.invalidate?.();
+    };
+
+    if (!host || typeof document === 'undefined') {
+      commit(formatTime(initialSec), t('Moment at {time}', { time: formatTime(initialSec) }));
+      return;
     }
-    const label = prompt(t('Bookmark label:'), t('Moment at {time}', { time: formatTime(tSec) }));
-    if (label == null) return;
 
-    if (!Array.isArray(this.videoObj.bookmarks)) this.videoObj.bookmarks = [];
-    this.videoObj.bookmarks.push({ time: tSec, label: label.trim() });
-    this.videoObj.bookmarks.sort((a, b) => a.time - b.time);
+    host.querySelector('.vid-bm-inline-form')?.remove();
+    const form = document.createElement('div');
+    form.className = 'vid-bm-inline-form';
+    form.style.cssText = 'display:flex;align-items:center;gap:6px;margin:6px 0;flex-wrap:wrap;';
 
-    // Save to store
-    this.app.store.update(this.videoObj.id, { bookmarks: [...this.videoObj.bookmarks] }, 'add bookmark');
-    this.renderBookmarks();
-    this.app.toast(t('Bookmark added: [{time}]', { time: formatTime(tSec) }));
-    this.app.surface?.invalidate?.();
+    const timeInput = document.createElement('input');
+    timeInput.type = 'text';
+    timeInput.value = formatTime(initialSec);
+    timeInput.title = t('Enter timestamp in seconds or mm:ss:');
+    timeInput.placeholder = 'mm:ss';
+    timeInput.style.cssText = 'width:70px;padding:4px 6px;border:1px solid var(--stroke);border-radius:6px;background:var(--surface);color:var(--text);font-size:12px;';
+
+    const labelInput = document.createElement('input');
+    labelInput.type = 'text';
+    labelInput.value = t('Moment at {time}', { time: formatTime(initialSec) });
+    labelInput.title = t('Bookmark label:');
+    labelInput.placeholder = t('Bookmark label:');
+    labelInput.style.cssText = 'flex:1;min-width:140px;padding:4px 8px;border:1px solid var(--stroke);border-radius:6px;background:var(--surface);color:var(--text);font-size:12px;';
+
+    const btnSave = document.createElement('button');
+    btnSave.type = 'button';
+    btnSave.className = 'btn primary';
+    btnSave.textContent = t('Save');
+    btnSave.style.cssText = 'padding:4px 10px;font-size:12px;';
+
+    const btnCancel = document.createElement('button');
+    btnCancel.type = 'button';
+    btnCancel.className = 'btn';
+    btnCancel.textContent = t('Cancel');
+    btnCancel.style.cssText = 'padding:4px 8px;font-size:12px;';
+
+    const submit = () => {
+      commit(timeInput.value, labelInput.value);
+      form.remove();
+    };
+    const cancel = () => form.remove();
+
+    btnSave.addEventListener('click', submit);
+    btnCancel.addEventListener('click', cancel);
+    for (const inp of [timeInput, labelInput]) {
+      inp.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); submit(); }
+        else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); cancel(); }
+      });
+    }
+
+    form.append(timeInput, labelInput, btnSave, btnCancel);
+    host.insertBefore(form, this.bookmarkListEl);
+    labelInput.focus();
+    labelInput.select();
   }
 
   removeBookmark(idx) {

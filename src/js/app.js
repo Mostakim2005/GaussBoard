@@ -3678,9 +3678,13 @@ class App {
     };
     const image = excerptImageObject(payload, center);
     if (!image) return false;
+    image.isExcerpt = true;
     this.clipboard = [image];
     try { await window.board?.clipboardWrite?.({ image: payload.dataUrl }); } catch { /* in-app clipboard remains available */ }
     this.clipStamp = this.clipboardStamp();
+    if (this.clipStamp == null) {
+      this.clipboardNow().then((c) => { if (c?.signature != null) this.clipStamp = c.signature; });
+    }
     this.toast(t('Excerpt copied — paste it into another board'));
     return true;
   }
@@ -3809,6 +3813,9 @@ class App {
       this.clipboard = [image];
       try { await window.board?.clipboardWrite?.({ image: payload.dataUrl }); } catch {}
       this.clipStamp = this.clipboardStamp();
+      if (this.clipStamp == null) {
+        this.clipboardNow().then((c) => { if (c?.signature != null) this.clipStamp = c.signature; });
+      }
 
       this.toast(t('Excerpt captured — copied to clipboard! Paste onto any board.'), 'check');
     };
@@ -5621,7 +5628,9 @@ class App {
        * let a screenshot taken an hour ago beat two notes copied a second ago,
        * because a picture is a picture whenever it arrived.
        */
-      if (this.boardCopyIsNewest()) {
+      const holdingExcerpt = this.clipboard.length === 1
+        && !!(this.clipboard[0]?.isExcerpt || this.clipboard[0]?.excerptSource);
+      if (this.boardCopyIsNewest() || (holdingExcerpt && this.clipStamp == null)) {
         e.preventDefault();
         // Where the pointer is, not where the originals were. preventDefault
         // has already happened, so there is nothing left to race.
@@ -5805,7 +5814,11 @@ class App {
     }
     if (mod && e.shiftKey && (e.key === 'g' || e.key === 'G')) {
       e.preventDefault();
-      this.openFunctionGrapher();
+      if (this.surface?.selection?.size > 0) {
+        this.command('edit.ungroup');
+      } else {
+        this.openFunctionGrapher();
+      }
       return;
     }
     if (mod && e.shiftKey && (e.key === 'd' || e.key === 'D')) {

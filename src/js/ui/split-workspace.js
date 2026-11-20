@@ -112,10 +112,31 @@ export class SplitWorkspace {
     // Split view requires at least two boards. Never split a board with itself.
     if (!leftBoardData && !leftBoardId) {
       if (otherBoards.length === 0) {
-        this.app?.toast?.(t('Split view requires at least two boards to view side by side. Create another board or open one from My boards.'));
-        return;
+        const baseName = this.app?.store?.doc?.name || this.app?.store?.doc?.title || t('Untitled board');
+        const companionId = 'board_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        const companionDoc = {
+          id: companionId,
+          name: `${baseName} - ${t('Notes')}`,
+          objects: [],
+          order: [],
+          pages: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        try {
+          if (typeof window.board?.boards?.save === 'function') {
+            await window.board.boards.save(companionDoc, { setLast: false });
+            await this.refreshBoardList();
+          }
+          leftBoardId = companionId;
+          leftBoardData = companionDoc;
+        } catch {
+          this.app?.toast?.(t('Split view requires at least two boards to view side by side. Create another board or open one from My boards.'));
+          return;
+        }
+      } else {
+        leftBoardId = otherBoards[0].id;
       }
-      leftBoardId = otherBoards[0].id;
     } else if (leftBoardId && leftBoardId === currentMainId) {
       this.app?.toast?.(t('A board cannot be split against itself. Please select a different board.'));
       if (otherBoards.length > 0) {
