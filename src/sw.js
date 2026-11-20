@@ -151,7 +151,6 @@ const PRECACHE_ASSETS = [
   './js/platform/update-manager.js',
   './vendor/3Dmol-min.js',
   './vendor/chart.umd.min.js',
-  './vendor/fontkit.umd.min.js',
   './vendor/function-plot.js',
   './vendor/math.min.js',
   './vendor/mermaid.min.js',

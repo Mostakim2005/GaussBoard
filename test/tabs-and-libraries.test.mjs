@@ -19,10 +19,7 @@ test('libraries.json manifest includes required libraries and versions', () => {
   const ids = manifest.libraries.map(l => l.id);
   assert.ok(ids.includes('katex'), 'KaTeX registered');
   assert.ok(ids.includes('pdfjs'), 'PDF.js registered');
-  assert.ok(ids.includes('pdfjs-viewer'), 'PDF.js Viewer registered');
   assert.ok(ids.includes('pdf-lib'), 'pdf-lib registered');
-  assert.ok(ids.includes('fontkit'), 'fontkit registered');
-  assert.ok(ids.includes('tesseract'), 'Tesseract OCR registered');
   assert.ok(ids.includes('jszip'), 'JSZip registered');
   assert.ok(ids.includes('mammoth'), 'Mammoth registered');
   assert.ok(ids.includes('mermaid'), 'Mermaid registered');

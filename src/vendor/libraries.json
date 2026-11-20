@@ -1,6 +1,6 @@
 {
   "manifestVersion": "1.1.0",
-  "rootPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries",
+  "rootPath": "src/vendor",
   "updatedAt": "2026-10-23T18:25:00.000Z",
   "description": "Central shared offline runtime libraries repository for GazBoard and Antigravity applications",
   "libraries": [
@@ -14,7 +14,6 @@
       "homepage": "https://katex.org/",
       "bundledInApp": true,
       "bundledPath": "src/vendor/katex/katex.min.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\katex\\katex.min.js",
       "status": "ready"
     },
     {
@@ -27,20 +26,6 @@
       "homepage": "https://mozilla.github.io/pdf.js/",
       "bundledInApp": true,
       "bundledPath": "src/vendor/pdf.min.mjs",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdfjs\\pdf.min.mjs",
-      "status": "ready"
-    },
-    {
-      "id": "pdfjs-viewer",
-      "name": "PDF.js Viewer & Annotation Layer",
-      "version": "4.10.38",
-      "category": "PDF Annotation & Viewer UI",
-      "description": "Mozilla PDF.js viewer components, TextLayerBuilder, AnnotationEditorLayer (native highlights, freetext, ink), and PDFFindController.",
-      "license": "Apache-2.0",
-      "homepage": "https://mozilla.github.io/pdf.js/",
-      "bundledInApp": true,
-      "bundledPath": "src/vendor/pdf_viewer.mjs",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdfjs\\pdf_viewer.mjs",
       "status": "ready"
     },
     {
@@ -53,33 +38,6 @@
       "homepage": "https://pdf-lib.js.org/",
       "bundledInApp": true,
       "bundledPath": "src/vendor/pdf-lib.min.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\pdf-lib\\pdf-lib.min.js",
-      "status": "ready"
-    },
-    {
-      "id": "fontkit",
-      "name": "fontkit (@pdf-lib/fontkit)",
-      "version": "1.1.1",
-      "category": "Font Embedding & Typography",
-      "description": "Advanced font engine for pdf-lib allowing custom TTF/OTF/WOFF font embedding for non-Latin and equation annotations in PDFs.",
-      "license": "Apache-2.0",
-      "homepage": "https://github.com/Hopding/fontkit",
-      "bundledInApp": true,
-      "bundledPath": "src/vendor/fontkit.umd.min.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\fontkit\\fontkit.umd.min.js",
-      "status": "ready"
-    },
-    {
-      "id": "tesseract",
-      "name": "Tesseract.js (Offline OCR)",
-      "version": "5.1.1",
-      "category": "Scanned PDF OCR",
-      "description": "Pure WebAssembly offline OCR engine with English trained language data for recognizing text in scanned books and image excerpts.",
-      "license": "Apache-2.0",
-      "homepage": "https://tesseract.projectnaptha.com/",
-      "bundledInApp": true,
-      "bundledPath": "src/vendor/tesseract/tesseract.min.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\tesseract\\tesseract.min.js",
       "status": "ready"
     },
     {
@@ -92,7 +50,6 @@
       "homepage": "https://stuk.github.io/jszip/",
       "bundledInApp": true,
       "bundledPath": "src/vendor/jszip.min.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\jszip\\jszip.min.js",
       "status": "ready"
     },
     {
@@ -105,7 +62,6 @@
       "homepage": "https://github.com/mwilliamson/mammoth.js",
       "bundledInApp": true,
       "bundledPath": "src/vendor/mammoth.browser.min.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\mammoth\\mammoth.browser.min.js",
       "status": "ready"
     },
     {
@@ -118,7 +74,6 @@
       "homepage": "https://mermaid.js.org/",
       "bundledInApp": true,
       "bundledPath": "src/vendor/mermaid.min.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\mermaid\\mermaid.min.js",
       "status": "ready"
     },
     {
@@ -131,7 +86,6 @@
       "homepage": "https://www.chartjs.org/",
       "bundledInApp": true,
       "bundledPath": "src/vendor/chart.umd.min.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\chartjs\\chart.umd.min.js",
       "status": "ready"
     },
     {
@@ -144,7 +98,6 @@
       "homepage": "https://3dmol.org/",
       "bundledInApp": true,
       "bundledPath": "src/vendor/3Dmol-min.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\3dmol\\3Dmol-min.js",
       "status": "ready"
     },
     {
@@ -157,7 +110,6 @@
       "homepage": "https://nerdamer.com/",
       "bundledInApp": true,
       "bundledPath": "src/vendor/nerdamer/nerdamer.core.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\nerdamer\\nerdamer.core.js",
       "status": "ready"
     },
     {
@@ -170,7 +122,6 @@
       "homepage": "https://mauriciopoppe.github.io/function-plot/",
       "bundledInApp": true,
       "bundledPath": "src/vendor/function-plot.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\function-plot\\function-plot.js",
       "status": "ready"
     },
     {
@@ -183,7 +134,6 @@
       "homepage": "https://mathjs.org/",
       "bundledInApp": true,
       "bundledPath": "src/vendor/math.min.js",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\mathjs\\math.min.js",
       "status": "ready"
     },
     {
@@ -196,7 +146,6 @@
       "homepage": "https://github.com/Vanilagy/mp4-muxer",
       "bundledInApp": true,
       "bundledPath": "src/vendor/mp4-muxer.mjs",
-      "sharedPath": "C:\\Users\\kazir\\Documents\\Antigravity\\CommonLibraries\\mp4-muxer\\mp4-muxer.mjs",
       "status": "ready"
     }
   ]

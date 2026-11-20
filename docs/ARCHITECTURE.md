@@ -187,9 +187,9 @@ flowchart TD
     DevCheck -->|Mouse / Touch| ContextHUD[Open Context Menu]
 ```
 * **Code Anchors (Grep Targets):**
-  * `src/js/ui/hold-manager.js` -> `HoldGestureManager`
+  * `src/js/core/hold-manager.js` -> `HoldGestureManager`
   * `src/js/ui/radial.js` -> `RadialShortcutRing`
-  * `src/js/core/interaction.js` -> `abortActiveStroke`
+  * `src/js/core/tools.js` -> `abortActiveStroke`
 
 ## 2. Tech Stack & Why We Chose It
 

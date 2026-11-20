@@ -58,3 +58,35 @@ test('markdown-sidecar.js and library-inspector.js contain no dead saveFile or l
   assert.ok(!sidecar.includes('window.board?.saveFile'));
   assert.doesNotMatch(libInsp, /C:\\Users\\kazir/i);
 });
+
+test('sidebar-ribbon.js and pdf-sidebar.js prefer app.askText over blocking window.prompt()', () => {
+  const ribbon = read('src/js/ui/sidebar-ribbon.js');
+  const pdfSide = read('src/js/ui/pdf-sidebar.js');
+  assert.match(ribbon, /await this\.app\.askText\(/);
+  assert.match(pdfSide, /await this\.app\.askText\(/);
+});
+
+test('dataview.js escapes column headers and sidebar-ribbon.js escapes HTML output', () => {
+  const dv = read('src/js/core/dataview.js');
+  const ribbon = read('src/js/ui/sidebar-ribbon.js');
+  assert.ok(dv.includes('escapeHtml(String(col).toUpperCase())'));
+  assert.match(ribbon, /function escapeHtml\(/);
+});
+
+test('ChromeManager coordinates left drawers and Zen Mode, and PdfSidebarDrawer uses theme tokens', () => {
+  const cm = read('src/js/ui/chrome-manager.js');
+  const pdfSide = read('src/js/ui/pdf-sidebar.js');
+  const sw = read('src/sw.js');
+  assert.match(cm, /toggleZenMode/);
+  assert.match(cm, /notifyLeftOpen/);
+  assert.ok(!pdfSide.includes('rgba(18,22,28,0.92)'));
+  assert.ok(sw.includes('./js/ui/chrome-manager.js'));
+});
+
+test('video-dialog.js wires subtitles.js and anki.js exports valid TSV format', () => {
+  const vid = read('src/js/ui/video-dialog.js');
+  const anki = read('src/js/core/anki.js');
+  assert.ok(vid.includes("from './subtitles.js'"));
+  assert.match(vid, /findActiveCue/);
+  assert.ok(anki.includes("format: 'anki-tsv'"));
+});

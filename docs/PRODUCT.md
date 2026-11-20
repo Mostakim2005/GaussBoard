@@ -175,9 +175,9 @@
 * **User Intention (Non-Negotiable):** Users holding stylus or mouse pointers on the board need intuitive modal inspections and shortcut rings without false triggers during quick sketching, tiny dot writes, or multi-touch zooms, and without leaving phantom 1-point ink dots or orphan undo entries.
 * **Visual / UI Behavior:** Stationary hold (< 18px travel) on empty board opens an 8-item SVG radial menu ring for stylus or contextual menu for mouse; post-stroke dwell (>= 24px travel with pause) converts freehand lines to geometric shapes (`holdToShape`); holding on domain objects (circuit components, answer covers) opens their native properties or toggle action with strict priority over radial HUD; two-finger pinch immediately cancels pending holds.
 * **Code Anchors (Grep Targets):**
-  * `src/js/ui/hold-manager.js` -> `HoldGestureManager`, `handlePointerDown`, `handlePointerMove`, `cancelHold`
+  * `src/js/core/hold-manager.js` -> `HoldGestureManager`, `handlePointerDown`, `handlePointerMove`, `cancelHold`
   * `src/js/ui/radial.js` -> `RadialShortcutRing`, `showAt`, `dispatchItem`
-  * `src/js/core/interaction.js` -> `abortActiveStroke`, `onPointerDown`, `onPointerUp`
+  * `src/js/core/tools.js` -> `abortActiveStroke`, `onPointerDown`, `onPointerUp`
   * `test/hold-manager.test.mjs` -> `testHoldManager`
 
 ### [FEATURE: Smart-Progressive-Slicing-And-Zoom-LOD] | Aliases: progressive rendering, smart slicing, heavy canvas, zoom LOD, sub-pixel culling
