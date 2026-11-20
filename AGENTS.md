@@ -3,7 +3,7 @@
 
 ## 1. Project Tech Stack & Environment
 * **Runtime / Language:** Node.js v20+, Vanilla ES6 JavaScript modules, Electron 43.
-* **Framework / Host:** HTML5 Canvas 2D, Electron Desktop & PWA Web Adapter (zero frontend frameworks, zero C++ native addons).
+* **Framework / Host:** HTML5 Canvas 2D, Electron Desktop & PWA Web Adapter (zero frontend frameworks; native Node/C++ addons and WASM modules permitted on desktop where beneficial, with clean PWA fallbacks).
 * **Target OS / Build Output:** Windows x64 portable `.exe` by default (`dist/`), NSIS installer `.exe`, Linux AppImage/deb, macOS dmg. Every cloud release binary uses the self-identifying naming scheme `GaussBoard-Electron-Chromium-v<Version>-branch-<BranchSlug>-<ShortSHA>-<Type>.exe` across all deduplicated branches.
 
 ## 2. Mandatory Verification & Build Commands
@@ -19,10 +19,9 @@
 * `scripts/` - Automated verification suites, smoke tests, and i18n linter.
 * `test/` - Integration tests, test fixtures, and verification harnesses.
 
-## 4. Repository-Specific Engineering Traps (The 6 Non-Negotiable Invariants)
+## 4. Repository-Specific Engineering Traps (The 5 Non-Negotiable Invariants)
 * **TRAP 1: Scene Partitioning During Audio Replay:** Base canvas drawing passes MUST exclude active audio session strokes: `(o) => o.audioId !== activeTrackId`. Replay strokes render exclusively in the dynamic overlay pass (`Surface.drawReplaySession()`).
 * **TRAP 2: Stroke Point Timestamp Preservation (`p.t`):** Point generators, smoothing passes, and curve fitters in `tools.js` and `ink.js` must preserve `p.t`. Stripping `p.t` breaks audio synchronization.
 * **TRAP 3: Finite Audio Duration Safeguard:** For in-app recordings, never rely on `audio.duration` without checking `isFinite()`; retain elapsed wall-clock `track.durationMs`. For imported audio, use finite metadata when available and leave duration unknown when unavailable.
 * **TRAP 4: 100% Internationalization (i18n) Parity:** Every user-facing UI string must be wrapped in `t('...')` and present across all 7 locale dictionaries (`ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, `zh-Hant.json`).
-* **TRAP 5: Zero Extra Native Dependencies:** Do not introduce npm packages that require C/C++ compilation (`node-gyp`). All algorithms must remain pure portable JavaScript.
 * **TRAP 6: Study Tape and Answer Cover Toggle:** Both study tape (`subtype: 'tape'`) and rectangular answer covers (`subtype !== 'tape'`) persist on the board and toggle concealed/revealed on tap. Revealed covers remain hittable as faint outlines; attached content follows the cover state.
