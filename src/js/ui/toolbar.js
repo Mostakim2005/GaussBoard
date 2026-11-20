@@ -1884,11 +1884,27 @@ export function openToolPopover(app, anchor, tool) {
     const totalReviews = (app.store?.objects || []).filter((o) => o.type === 'curtain' && o.subtype === 'tape')
       .reduce((sum, o) => sum + (o.reviewCount || 0), 0);
 
+    const tapeWidthRow = (() => {
+      const wrap = h('div', { class: 'sizes' });
+      const widths = [16, 24, 34, 48, 64];
+      const barHeights = [5, 9, 13, 18, 23];
+      const swatchColor = inkPaint(curColor);
+      widths.forEach((v, idx) => {
+        const b = h('button', {
+          class: 'size' + (v === curWidth ? ' active' : ''),
+          title: t('{s} px', { s: v }),
+          style: 'width:38px;height:34px;'
+        });
+        b.innerHTML = `<span style="display:block;width:26px;height:${barHeights[idx]}px;border-radius:3px;background:${swatchColor};opacity:0.92;"></span>`;
+        b.addEventListener('click', () => { markActive(wrap, b); s.tapeWidth = v; app.saveSettings(); });
+        wrap.appendChild(b);
+      });
+      return wrap;
+    })();
+
     body = h('div', { style: 'min-width:280px;padding:2px 4px;' },
       h('h4', {}, t('Tape width')),
-      sizeRow([16, 24, 34, 48, 64], curWidth, (v) => {
-        s.tapeWidth = v; app.saveSettings();
-      }, curColor),
+      tapeWidthRow,
       h('h4', { style: 'margin-top:12px' }, t('Tape skin & colour')),
       swatchRow(tapeColors, curColor, (c) => {
         s.tapeColor = c;

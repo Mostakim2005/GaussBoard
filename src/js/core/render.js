@@ -1476,12 +1476,16 @@ export function drawCurtain(ctx, o) {
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      // Keep revealed tape faint enough that underlying handwriting stays legible
+      // while remaining visibly outlined and hittable on tap (TRAP 6).
       ctx.lineWidth = w;
-      ctx.strokeStyle = 'rgba(168, 85, 247, 0.4)';
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.12)';
       ctx.stroke();
-      ctx.lineWidth = w + 2;
-      ctx.strokeStyle = 'rgba(192, 132, 252, 0.55)';
+      ctx.setLineDash([6, 5]);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.55)';
       ctx.stroke();
+      ctx.setLineDash([]);
       ctx.restore();
       return;
     }

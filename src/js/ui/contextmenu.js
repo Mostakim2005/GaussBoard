@@ -662,7 +662,7 @@ function formatBar(app, bar) {
       class: 'fmt-btn fmt-bg-trigger',
       title: t('Highlight & Note background')
     });
-    const hlIcon = h('span', { style: 'display:flex;' }, icon('highlighter', 15));
+    const hlIcon = h('span', { style: 'display:flex;', html: icon('highlighter', 15) });
     const bgBar = h('span', { class: 'fmt-bg-bar', style: 'width:12px;height:2.5px;background:var(--accent-2, #0078d4);border-radius:1px;margin-top:1px;' });
     bgBtn.append(hlIcon, bgBar);
     bgBtn.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;';
