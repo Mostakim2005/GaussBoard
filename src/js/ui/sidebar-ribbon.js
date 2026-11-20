@@ -625,11 +625,11 @@ export class SidebarRibbon {
       h('span', { class: 'btn-icon' }, '🗣️'),
       h('span', {}, t('Natural Math to LaTeX Converter'))
     );
-    btnNaturalMath.addEventListener('click', () => {
-      const ask = prompt(
-        t('Enter natural conversational math (e.g. "integral of x^2 from 0 to 1", "derivative of sin(x)*e^x", "limit of sin(x)/x as x approaches 0"):'),
-        'integral of x^2 from 0 to 1'
-      );
+    btnNaturalMath.addEventListener('click', async () => {
+      const msg = t('Enter natural conversational math (e.g. "integral of x^2 from 0 to 1", "derivative of sin(x)*e^x", "limit of sin(x)/x as x approaches 0"):');
+      const ask = typeof this.app?.askText === 'function'
+        ? await this.app.askText(t('Natural Math to LaTeX Converter'), msg, { value: 'integral of x^2 from 0 to 1', ok: t('Save') })
+        : (typeof prompt === 'function' ? prompt(msg, 'integral of x^2 from 0 to 1') : null);
       if (!ask) return;
       const converted = naturalMathToLaTeX(ask);
       if (converted) {
@@ -642,8 +642,11 @@ export class SidebarRibbon {
       h('span', { class: 'btn-icon' }, '⚡'),
       h('span', {}, t('Symbolic CAS Quadratic & Linear Solver'))
     );
-    btnQuadratic.addEventListener('click', () => {
-      const ask = prompt(t('Enter equation to solve (e.g. x^2 - 5x + 6 = 0):'), 'x^2 - 5x + 6 = 0');
+    btnQuadratic.addEventListener('click', async () => {
+      const msg = t('Enter equation to solve (e.g. x^2 - 5x + 6 = 0):');
+      const ask = typeof this.app?.askText === 'function'
+        ? await this.app.askText(t('Symbolic CAS Quadratic & Linear Solver'), msg, { value: 'x^2 - 5x + 6 = 0', ok: t('Save') })
+        : (typeof prompt === 'function' ? prompt(msg, 'x^2 - 5x + 6 = 0') : null);
       if (!ask) return;
       const sol = SymbolicCAS.solveQuadratic(ask);
       if (sol.ok) {
@@ -1125,7 +1128,10 @@ export class SidebarRibbon {
     );
     btnDataview.addEventListener('click', async () => {
       const { DataviewEngine } = await import('../core/dataview.js');
-      const query = window.prompt(t('Enter Dataview query:'), 'TABLE name, type WHERE type != "" LIMIT 10');
+      const msg = t('Enter Dataview query:');
+      const query = typeof this.app?.askText === 'function'
+        ? await this.app.askText(t('Run Dataview Query Table'), msg, { value: 'TABLE name, type WHERE type != "" LIMIT 10', ok: t('Save') })
+        : (typeof window !== 'undefined' && typeof window.prompt === 'function' ? window.prompt(msg, 'TABLE name, type WHERE type != "" LIMIT 10') : null);
       if (!query) return;
       const res = DataviewEngine.execute(query, this.app.store);
       const view = this.app.surface?.cam ? this.app.surface.cam.viewport(this.app.surface.width, this.app.surface.height) : { x: 0, y: 0, w: 800, h: 600 };

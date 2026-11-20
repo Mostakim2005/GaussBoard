@@ -222,10 +222,13 @@ export class PdfSidebarDrawer {
       style: 'width:100%;margin-bottom:12px;padding:7px;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;'
     }, '+ ', t('Bookmark current view'));
 
-    addBtn.addEventListener('click', () => {
+    addBtn.addEventListener('click', async () => {
       const curPage = this.app.currentPageIndex?.() || 0;
       const defaultName = `${t('Bookmark')} ${bookmarks.length + 1} (${t('Page')} ${curPage + 1})`;
-      const name = window.prompt(t('Enter bookmark title:'), defaultName);
+      const msg = t('Enter bookmark title:');
+      const name = typeof this.app?.askText === 'function'
+        ? await this.app.askText(t('Bookmark current view'), msg, { value: defaultName, ok: t('Save') })
+        : (typeof window !== 'undefined' && typeof window.prompt === 'function' ? window.prompt(msg, defaultName) : null);
       if (!name) return;
 
       const bm = {
