@@ -242,25 +242,27 @@ export async function exportBoardToApkg(app, options = {}) {
   // 3. Media map (compliant with Anki APKG structure)
   zip.file('media', '{}');
 
-  const zipBlob = await zip.generateAsync({ type: 'uint8array' });
-  const filename = `${safeName(boardName)}-Cards.apkg`;
+  // Anki Desktop/AnkiDroid require a SQLite collection.anki2 database inside .apkg files.
+  // Until native SQLite generation is wired, export a directly Anki-importable UTF-8 TSV (.txt)
+  // file (#separator:tab, #html:true, #tags column:3) so File -> Import works cleanly in Anki.
+  const tsvText = tsvLines.join('\n');
+  const tsvBytes = new TextEncoder().encode(tsvText);
+  const filename = `${safeName(boardName)}-Anki-Import.txt`;
 
-  // Save dialog or download blob
   if (window.board?.saveDialog && window.board?.writeFile) {
     const targetPath = options.filePath || await window.board.saveDialog({
       title: t('Export Flashcards (.apkg)'),
       defaultPath: filename,
       filters: [
-        { name: t('Anki Package'), extensions: ['apkg', 'zip'] },
+        { name: t('Anki Package') + ' (TSV .txt)', extensions: ['txt', 'tsv'] },
         { name: t('All Files'), extensions: ['*'] }
       ]
     });
     if (!targetPath) return { ok: false, cancelled: true };
-    await window.board.writeFile(targetPath, zipBlob.buffer);
-    return { ok: true, count: exportCards.length, filePath: targetPath };
+    await window.board.writeFile(targetPath, tsvBytes.buffer);
+    return { ok: true, count: exportCards.length, filePath: targetPath, format: 'anki-tsv' };
   } else {
-    // Browser download fallback
-    const blob = new Blob([zipBlob], { type: 'application/octet-stream' });
+    const blob = new Blob([tsvBytes], { type: 'text/tab-separated-values;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -269,6 +271,6 @@ export async function exportBoardToApkg(app, options = {}) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    return { ok: true, count: exportCards.length, filePath: filename };
+    return { ok: true, count: exportCards.length, filePath: filename, format: 'anki-tsv' };
   }
 }

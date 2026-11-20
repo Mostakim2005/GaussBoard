@@ -4,6 +4,7 @@
 
 import { h } from './popover.js';
 import { t } from '../i18n.js';
+import { parseSubtitles, findActiveCue } from './subtitles.js';
 import { centerOf, boundsOf } from '../core/store.js';
 
 /**
@@ -243,6 +244,8 @@ export class VideoPlayerDialog {
     this.videoEl = null;
     this.parsed = parseVideoUrl(videoObj.url);
     this.currentTime = 0;
+    this.subtitleCues = videoObj.subtitlesText ? parseSubtitles(videoObj.subtitlesText) : [];
+    this.subtitleOverlayEl = null;
   }
 
   open() {
@@ -267,13 +270,19 @@ export class VideoPlayerDialog {
     const titleEl = h('b', { style: 'font-size:14.5px;max-width:600px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' },
       this.videoObj.title || t('Video Player')
     );
+    const btnSubs = h('button', {
+      class: 'btn',
+      title: 'CC (.srt / .vtt)',
+      style: 'padding:2px 8px;font-size:11.5px;margin-right:6px;',
+      onclick: () => this.loadSubtitleFile()
+    }, 'CC');
     const btnClose = h('button', {
       style: 'background:none;border:none;color:inherit;font-size:20px;cursor:pointer;padding:2px 8px;',
       onclick: () => this.close()
     }, '✕');
     const headBar = h('div', {
       style: 'display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--line,rgba(255,255,255,0.08));background:rgba(0,0,0,0.15);'
-    }, titleEl, btnClose);
+    }, titleEl, h('div', { style: 'display:flex;align-items:center;' }, btnSubs, btnClose));
     card.appendChild(headBar);
 
     // 2. Video Player Frame Container
@@ -299,6 +308,7 @@ export class VideoPlayerDialog {
           if (data && data.event === 'infoDelivery' && data.info?.currentTime != null) {
             this.currentTime = data.info.currentTime;
             if (timeDisplay) timeDisplay.textContent = formatTime(this.currentTime);
+            this.updateSubtitleOverlay(this.currentTime);
           }
         } catch (_) {}
       };
@@ -314,6 +324,7 @@ export class VideoPlayerDialog {
       vid.addEventListener('timeupdate', () => {
         this.currentTime = vid.currentTime;
         if (timeDisplay) timeDisplay.textContent = formatTime(vid.currentTime);
+        this.updateSubtitleOverlay(vid.currentTime);
       });
       vid.addEventListener('error', () => {
         playerContainer.innerHTML = '';
@@ -332,6 +343,12 @@ export class VideoPlayerDialog {
         h('span', { style: 'font-size:11.5px;opacity:0.6;' }, this.videoObj.url || '')
       ));
     }
+    const subOverlay = h('div', {
+      class: 'vid-subtitle-overlay',
+      style: 'position:absolute;left:50%;bottom:44px;transform:translateX(-50%);max-width:86%;padding:4px 10px;border-radius:6px;background:rgba(0,0,0,0.78);color:#ffffff;font-size:13.5px;line-height:1.35;text-align:center;pointer-events:none;display:none;z-index:4;'
+    });
+    playerContainer.appendChild(subOverlay);
+    this.subtitleOverlayEl = subOverlay;
     card.appendChild(playerContainer);
 
     // 3. Action Toolbar: Full-Res Screenshot & Timestamp Bookmarking
@@ -465,6 +482,38 @@ export class VideoPlayerDialog {
       pill.appendChild(btnDel);
       this.bookmarkListEl.appendChild(pill);
     }
+  }
+
+  updateSubtitleOverlay(seconds) {
+    if (!this.subtitleOverlayEl) return;
+    if (!this.subtitleCues?.length) {
+      this.subtitleOverlayEl.style.display = 'none';
+      return;
+    }
+    const cue = findActiveCue(this.subtitleCues, seconds);
+    if (cue && cue.text) {
+      this.subtitleOverlayEl.textContent = cue.text;
+      this.subtitleOverlayEl.style.display = 'block';
+    } else {
+      this.subtitleOverlayEl.style.display = 'none';
+    }
+  }
+
+  loadSubtitleFile() {
+    if (typeof document === 'undefined') return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.srt,.vtt,text/vtt,text/plain';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      this.subtitleCues = parseSubtitles(text);
+      this.videoObj.subtitlesText = text;
+      this.app.store?.update?.(this.videoObj.id, { subtitlesText: text }, 'attach subtitles');
+      this.updateSubtitleOverlay(this.currentTime);
+    };
+    input.click();
   }
 
   seekTo(seconds) {
