@@ -3462,18 +3462,6 @@ class App {
       return;
     }
 
-    if (window.board?.saveFile) {
-      const res = await window.board.saveFile({
-        defaultName: defaultFilename,
-        content,
-        filters: [{ name: 'Obsidian Canvas (*.canvas)', extensions: ['canvas'] }]
-      });
-      if (res?.saved) {
-        this.toast(t('Exported {name}', { name: defaultFilename }));
-      }
-      return;
-    }
-
     const blob = new Blob([content], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

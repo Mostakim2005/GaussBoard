@@ -1,8 +1,8 @@
 # Product Intent & Feature Map (`docs/PRODUCT.md`)
-> **1-Line Summary:** The permanent source of truth for what GaussBoard 6.9.2 must do and feel like, independent of how the code is currently organized.
+> **1-Line Summary:** The permanent source of truth for what GaussBoard 6.9.3 must do and feel like, independent of how the code is currently organized.
 
 ## 1. Core Vision & User Experience Intent
-* **What This App Does (Plain English):** GaussBoard (v6.9.2) is an offline-first digital whiteboard and STEM engineering workstation for electrical engineering students, inspired by StarNote, Flexcil, LiquidText, and Microsoft OneNote.
+* **What This App Does (Plain English):** GaussBoard (v6.9.3) is an offline-first digital whiteboard and STEM engineering workstation for electrical engineering students, inspired by StarNote, Flexcil, LiquidText, and Microsoft OneNote.
 * **How It Must Feel to Use:** Pen writes like real ink with pressure and zero smoothing lag, canvas pans and zooms instantly at 5% to 800%, everything works offline with no account and no cloud, boards stay on the device and export cleanly to PNG, SVG, and PDF.
 * **Lineage:** Original heritage from GazBoard by MD. Fakhruddin Gazzali (theBoringCodes), v4.8.1 baseline. This GaussBoard line (maintained by Kazi S. Mostakim) extends it through v4.8.2 to v6.9.2+. Native file format is `.gaussboard` (with full backward-compatibility for `.gazboard` and `.openboard`). Primary target is Windows portable binaries.
 
@@ -134,7 +134,7 @@
   * `src/js/ui/compression-dialog.js` -> `CompressionDialog`, `qualitySlider`
 
 ### [FEATURE: I18n-Offline] | Aliases: translations, 7 locales, offline, vendored, no CDN, service worker
-> **1-Line Summary:** 100% i18n parity across 7 locales (2,245 keys) with every runtime library vendored locally and zero external CDN leaks.
+> **1-Line Summary:** 100% i18n parity across 7 locales (2,389 keys) with every runtime library vendored locally and zero external CDN leaks.
 * **User Intention (Non-Negotiable):** Non-English users must see every UI string translated and work fully offline on desktop and PWA, with board text measured consistently everywhere.
 * **Visual / UI Behavior:** English sentence is the key via t(); missing translations fall back to English; board fonts bundled via @font-face rather than borrowed from the OS.
 * **Code Anchors (Grep Targets):**

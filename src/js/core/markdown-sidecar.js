@@ -170,18 +170,6 @@ export async function exportMarkdownSidecarFile(app) {
     return;
   }
 
-  if (window.board?.saveFile) {
-    const res = await window.board.saveFile({
-      defaultName: defaultFilename,
-      content,
-      filters: [{ name: 'Markdown (*.md)', extensions: ['md'] }]
-    });
-    if (res?.saved) {
-      app.toast?.(`Exported ${defaultFilename}`);
-    }
-    return;
-  }
-
   // Browser fallback
   const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
   const url = URL.createObjectURL(blob);
