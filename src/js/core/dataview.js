@@ -243,7 +243,7 @@ export class DataviewEngine {
     if (!rows.length) {
       return `<div class="dataview-empty">${t('Dataview: No matching records found.')}</div>`;
     }
-    const ths = columns.map((col) => `<th>${col.toUpperCase()}</th>`).join('');
+    const ths = columns.map((col) => `<th>${escapeHtml(String(col).toUpperCase())}</th>`).join('');
     const trs = rows.map((row) => {
       const tds = row.map((cell) => `<td>${escapeHtml(String(cell))}</td>`).join('');
       return `<tr>${tds}</tr>`;

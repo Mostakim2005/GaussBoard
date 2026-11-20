@@ -5,6 +5,15 @@
 import { h } from './popover.js';
 import { icon } from './icons.js';
 import { t } from '../i18n.js';
+
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 import { evalMathExpression, SymbolicCAS, notebookVars, naturalMathToLaTeX } from '../core/scientific-math.js';
 import { TechnicalLinter } from '../core/technical-linter.js';
 import { collectStudyCards, previewNextIntervals, Rating } from '../core/fsrs.js';
@@ -694,7 +703,7 @@ export class SidebarRibbon {
       try {
         const res = balanceChemicalEquation(eq);
         lastChemResult = res;
-        chemOutput.innerHTML = `<strong>${res.balancedString}</strong><br><span style="color:#00e5ff">${res.reactionType.type}</span>: ${res.reactionType.description}`;
+        chemOutput.innerHTML = `<strong>${escapeHtml(res.balancedString)}</strong><br><span style="color:var(--accent,#0078d4)">${escapeHtml(res.reactionType.type)}</span>: ${escapeHtml(res.reactionType.description)}`;
         btnStampReaction.style.display = 'flex';
       } catch (err) {
         chemOutput.textContent = err.message || t('Could not balance equation.');
@@ -1038,7 +1047,7 @@ export class SidebarRibbon {
       } else {
         linterOutput.innerHTML = issues.map((iss) => `
           <div style="margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:4px;">
-            <span class="deck-stats-pill" style="font-size:10px;padding:1px 4px;margin-right:4px;">${iss.rule}</span>
+            <span class="deck-stats-pill" style="font-size:10px;padding:1px 4px;margin-right:4px;">${escapeHtml(iss.rule)}</span>
             <span style="font-size:11px;">${iss.message}</span>
           </div>
         `).join('');
@@ -1058,7 +1067,7 @@ export class SidebarRibbon {
       const res = TechnicalLinter.evaluateAcademicStyle(txt);
       linterOutput.innerHTML = `
         <div style="font-weight:700;color:#3b82f6;font-size:13px;">${t('Academic Style Score')}: ${res.score}% (${res.rating})</div>
-        ${res.deductions.map((d) => `<div style="font-size:11px;margin-top:2px;">• -${d.penalty} pts: ${d.message}</div>`).join('')}
+        ${res.deductions.map((d) => `<div style="font-size:11px;margin-top:2px;">• -${escapeHtml(d.penalty)} pts: ${escapeHtml(d.message)}</div>`).join('')}
         ${!res.deductions.length ? `<div style="color:#22c55e;font-size:11px;margin-top:2px;">✔ ${t('Exemplary scholarly clarity and academic tone!')}</div>` : ''}
       `;
     });
