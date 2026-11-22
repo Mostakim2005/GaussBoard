@@ -252,6 +252,7 @@ export class VisualizationDialog {
 
   close() {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (this._unsubMermaidMgr) { this._unsubMermaidMgr(); this._unsubMermaidMgr = null; }
     if (this._onKeyDown) {
       window.removeEventListener('keydown', this._onKeyDown);
       this._onKeyDown = null;
@@ -378,6 +379,7 @@ export class VisualizationDialog {
           <span class="viz-dim-readout" id="vizDimReadout">${this.renderedW} × ${this.renderedH} px</span>
         </div>
         <div class="viz-footer-actions">
+          ${this.engine === 'mermaid' && typeof window !== 'undefined' && window.board?.openInMermaidManager ? '<button class="viz-btn viz-btn-secondary" id="vizMermaidMgrBtn" type="button">Edit in Mermaid Manager</button>' : ''}
           <button class="viz-btn viz-btn-secondary" id="vizCancelBtn">${t('Cancel')}</button>
           <button class="viz-btn viz-btn-primary" id="vizInsertBtn" ${this.validation.valid ? '' : 'disabled'}>
             ${this.target ? t('Update Diagram') : t('Insert onto Board')}
@@ -394,6 +396,23 @@ export class VisualizationDialog {
     this.dialog.querySelector('#vizCloseBtn').addEventListener('click', () => this.close());
     this.dialog.querySelector('#vizCancelBtn').addEventListener('click', () => this.close());
     this.dialog.querySelector('#vizInsertBtn').addEventListener('click', () => this.finish());
+    const mmBtn = this.dialog.querySelector('#vizMermaidMgrBtn');
+    if (mmBtn && window.board?.openInMermaidManager) {
+      mmBtn.addEventListener('click', async () => {
+        const diagId = this.target?.id || ('mm_' + Date.now());
+        if (!this._unsubMermaidMgr && window.board?.onDiagramUpdated) {
+          this._unsubMermaidMgr = window.board.onDiagramUpdated((msg) => {
+            if (msg && msg.id === diagId && typeof msg.code === 'string') {
+              this.code = msg.code;
+              const ta = this.dialog?.querySelector('#vizCodeInput');
+              if (ta) ta.value = this.code;
+              this.triggerDebouncedUpdate();
+            }
+          });
+        }
+        await window.board.openInMermaidManager({ id: diagId, code: this.code });
+      });
+    }
 
     this.dialog.querySelector('#vizTitleInput').addEventListener('input', (e) => {
       this.title = e.target.value.trim();

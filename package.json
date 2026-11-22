@@ -78,6 +78,7 @@
       "msoffice.js",
       "src/**/*",
       "!src/package.json",
+      "electron/**/*",
       "sync/**/*",
       "package.json",
       "!test/out/**",

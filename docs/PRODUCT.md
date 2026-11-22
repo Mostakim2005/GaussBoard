@@ -201,6 +201,32 @@
   * `src/js/ui/panels.js` -> `buildSettingsSearch`, `settings`
   * `test/upstream-51x-features.test.mjs` -> Tests 1–6
 
+### [FEATURE: Chemistry-Lab-Suite] | Aliases: chemistry, chemical sketcher, SMILES, periodic table, 3D molecule viewer, stoichiometry
+> **1-Line Summary:** Offline chemistry workbench with 118-element periodic table, exact Gaussian chemical equation balancer, 2D SMILES sketcher, and interactive 3D molecular viewer.
+* **User Intention (Non-Negotiable):** STEM students must balance reactions, inspect element properties/Bohr shells, sketch SMILES structures, and stamp publication-ready chemistry cards onto the canvas without internet access.
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/chemistry.js` -> `balanceChemicalEquation`, `calculateMolarMass`, `insertReactionCard`
+  * `src/js/ui/chemical-sketcher.js` -> `ChemicalSketcher`, `openIn3D`
+  * `src/js/ui/molecule-viewer.js` -> `MoleculeViewer`, `loadCustomMolecule`
+  * `src/js/ui/periodic-table.js` -> `PeriodicTableModal`
+
+### [FEATURE: Visualization-Studio-And-Mermaid-Bridge] | Aliases: visualization studio, mermaid, chart.js, flowchart, mindmap, draw.io
+> **1-Line Summary:** Offline Mermaid flowchart/mindmap and Chart.js builder with strict SVG sandboxing and round-trip delegation to external Mermaid Manager (`drawio-desktop`).
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/diagrams.js` -> `renderMermaidSvg`, `renderChartDataUrl`
+  * `src/js/core/diagram-builder.js` -> `buildFlowchart`, `buildMindmap`
+  * `src/js/ui/visualization-dialog.js` -> `VisualizationStudio`
+
+### [FEATURE: Interactive-STEM-Simulations-And-Writing-Tools] | Aliases: PhET runner, physics sim, academic dictionary, technical linter, kanban, dataview, video suite
+> **1-Line Summary:** Offline Canvas 2D physics simulations, offline academic dictionary with TTS, LaTeX-aware technical writing linter, in-canvas Kanban boards, inline Dataview metadata, and video lecture player with `.srt`/`.vtt` subtitles and timestamp bookmarks.
+* **Code Anchors (Grep Targets):**
+  * `src/js/ui/phet-runner.js` -> `PhetRunner`
+  * `src/js/ui/academic-dictionary.js` & `src/js/ui/dictionary-popover.js` -> `AcademicDictionaryModal`
+  * `src/js/core/technical-linter.js` -> `lintTechnicalText`
+  * `src/js/core/kanban.js` & `src/js/core/dataview.js` -> `KanbanManager`, `DataviewEngine`
+  * `src/js/ui/video-dialog.js` & `src/js/ui/subtitles.js` -> `VideoPlayerModal`, `parseSubtitles`
+  * `src/js/core/fsrs.js` & `src/js/core/anki.js` -> `repeat`, `syncBoardToAnki`, `exportBoardToApkg`
+
 ## 3. Planned Features & App-Merge Wishlist
 
 ### [WISHLIST: Pane-Aware-Command-Dispatcher] | Aliases: pane commands, Delete routing, Copy routing

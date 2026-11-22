@@ -305,6 +305,13 @@ contextBridge.exposeInMainWorld('board', {
   startupStep: (text) => ipcRenderer.send('app:startupStep', String(text || '')),
   startupDone: (info) => ipcRenderer.send('app:startupDone', info && typeof info === 'object' ? JSON.parse(JSON.stringify(info)) : {}),
 
+  evalSympy: (payload) => ipcRenderer.invoke('cas:evalSympy', payload),
+  findSiblingSubtitle: (filePath) => ipcRenderer.invoke('media:findSiblingSubtitle', filePath),
+  remuxToMp4: (filePath) => ipcRenderer.invoke('media:remuxToMp4', filePath),
+  syncToObsidian: (payload) => ipcRenderer.invoke('obsidian:syncFile', payload),
+  openInMermaidManager: (payload) => ipcRenderer.invoke('diagram:openInMermaidManager', payload),
+  onDiagramUpdated: (cb) => onChannel('diagram:updated', (msg) => cb(msg)),
+
   // used only by the hidden conversion window
   convertReady: (msg) => ipcRenderer.send('convert:ready', msg),
   convertError: (msg) => ipcRenderer.send('convert:error', msg)

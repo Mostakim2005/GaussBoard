@@ -41,6 +41,11 @@ export function generateMarkdownSidecar(doc, boardName = 'Board', options = {}) 
   if (aliases.length) {
     lines.push(`aliases: [${aliases.map(a => JSON.stringify(a)).join(', ')}]`);
   }
+  lines.push('source_app: gaussboard');
+  if (doc?.id) {
+    lines.push(`board_id: ${JSON.stringify(String(doc.id))}`);
+    lines.push(`deep_link: ${JSON.stringify('gaussboard://open?board=' + encodeURIComponent(String(doc.id)))}`);
+  }
   lines.push('generator: GazBoard v5.9.0');
   lines.push('---');
   lines.push('');

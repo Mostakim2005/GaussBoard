@@ -72,7 +72,13 @@ GaussBoard is built specifically for **electrical engineering students, circuit 
 * **High-Fidelity Page Annotation:** Renders pages as independent movable objects with selectable resolution (Standard 144 dpi, High 216 dpi, Maximum 300 dpi).
 * **Eraser Safety:** Pen eraser only erases ink, never harming or altering the underlying imported document pages.
 
-### 8. 🔒 100% Offline, Zero Cloud, & Local Encrypted LAN Sync
+### 8. 🧪 Chemistry Lab, Physics Sims, Visualization Studio & Video Lecture Suite
+* **Chemistry Suite:** 118-element Periodic Table, exact equation balancer, 2D SMILES sketcher, and 3D Molecule Viewer.
+* **Interactive STEM Sims & Visualization Studio:** Offline Canvas 2D physics simulations, Mermaid flowchart/mindmap studio (with Mermaid Manager round-trip), and Chart.js plots.
+* **Spaced Repetition & Writing Tools:** Built-in FSRS v5 scheduler, AnkiConnect live sync & TSV export, in-canvas Kanban boards, offline Academic Dictionary, and LaTeX-aware Technical Writing Linter.
+* **Video Lecture Suite:** Local/YouTube lecture playback with `.srt`/`.vtt` subtitles, searchable transcripts, timestamp bookmarks, and full-res frame capture.
+
+### 9. 🔒 100% Offline, Zero Cloud, & Local Encrypted LAN Sync
 * **No Account & No Cloud:** Everything runs and saves locally in your chosen boards folder (`.gaussboard` format, with seamless backward compatibility for `.gazboard` and `.openboard`). No telemetry, no cloud subscriptions.
 * **Device-to-Device LAN Handoff:** Securely transfer boards directly over local Wi-Fi using X25519 key exchange and AES-256-GCM encryption with one-time pairing codes.
 
@@ -139,7 +145,7 @@ npm run dist:win     # Windows portable .exe and NSIS installer
 | `Ctrl` + Scroll / Pinch | Zoom in and out |
 | `Ctrl` + `0` / `Ctrl` + `Shift` + `F` | Reset zoom (100%) / Fit board to screen |
 | `Ctrl` + `Z` / `Ctrl` + `Y` | Undo / Redo |
-| `Ctrl` + `Shift` + `G` | 2D/3D Function Grapher & Calculus |
+| `Ctrl` + `Shift` + `G` | Ungroup selected objects |
 | `Ctrl` + `Shift` + `R` | Active Study Session & Recall Runner |
 | `Alt` + `G` | Knowledge Graph View |
 | `Alt` + `T` | Document Navigator & Table of Contents |

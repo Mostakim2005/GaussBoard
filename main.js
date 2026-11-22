@@ -10,6 +10,11 @@ const crypto = require('node:crypto');
 const { Readable } = require('node:stream');
 const StorageLocation = require('./storage-location.js');
 const { isPathWithin } = require('./src/js/platform/path-security.cjs');
+const { resolveCommonLibrariesDir } = require('./electron/global-resources.cjs');
+const mermaidBridge = require('./electron/mermaid-bridge.cjs');
+const casSympy = require('./electron/cas-sympy.cjs');
+const mediaBridge = require('./electron/media-bridge.cjs');
+const triarchyBridge = require('./electron/triarchy-bridge.cjs');
 const { safeExternalUrl, isReleaseUrl } = require('./src/js/platform/security.cjs');
 
 const SRC = path.join(__dirname, 'src');
@@ -1545,15 +1550,27 @@ function ipc() {
     if (err) { shell.showItemInFolder(dir); return false; }
     return true;
   });
+  handleIpc('cas:evalSympy', async (_event, payload) => casSympy.evalSympy(payload || {}));
+  handleIpc('media:findSiblingSubtitle', async (_event, filePath) => mediaBridge.findSiblingSubtitle(filePath));
+  handleIpc('media:remuxToMp4', async (_event, filePath) => mediaBridge.remuxToMp4(filePath));
+  handleIpc('obsidian:syncFile', async (_event, payload) => triarchyBridge.syncToObsidianVault(payload || {}));
+  handleIpc('diagram:openInMermaidManager', async (event, payload) => {
+    return mermaidBridge.openInMermaidManager({
+      id: payload?.id,
+      code: payload?.code,
+      shellOpenPath: (p) => shell.openPath(p),
+      onUpdated: (msg) => { if (!event.sender.isDestroyed()) event.sender.send('diagram:updated', msg); }
+    });
+  });
   handleIpc('shell:openCommonLibraries', async () => {
-    const dir = path.join(os.homedir(), 'Documents', 'Antigravity', 'CommonLibraries');
+    const dir = resolveCommonLibrariesDir();
     try { await fsp.mkdir(dir, { recursive: true }); } catch { /* it is there, or it cannot be */ }
     const err = await shell.openPath(dir);
     if (err) { shell.showItemInFolder(dir); return false; }
     return true;
   });
   handleIpc('libraries:manifest', async () => {
-    const commonPath = path.join(os.homedir(), 'Documents', 'Antigravity', 'CommonLibraries', 'libraries.json');
+    const commonPath = path.join(resolveCommonLibrariesDir(), 'libraries.json');
     const localPath = path.join(SRC, 'vendor', 'libraries.json');
     let manifest = null;
     try {

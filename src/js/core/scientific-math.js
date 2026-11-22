@@ -1133,3 +1133,19 @@ export function naturalMathToLaTeX(text) {
 }
 
 
+
+/**
+ * Tier 2 Desktop Python/SymPy CAS bridge with automatic pure-JS fallback
+ * for PWA, Android, or desktops without Python/SymPy installed.
+ */
+export async function evalSympyOrFallback(texOrExpr, variable = 'x') {
+  const sympyExpr = latexToSymPy(String(texOrExpr || ''));
+  if (typeof window !== 'undefined' && typeof window.board?.evalSympy === 'function') {
+    try {
+      const res = await window.board.evalSympy({ expr: sympyExpr, variable });
+      if (res && res.ok) return { ...res, engine: 'sympy' };
+    } catch {}
+  }
+  const jsRes = evalMathExpression(String(texOrExpr || ''));
+  return { ...jsRes, engine: 'js-fallback' };
+}

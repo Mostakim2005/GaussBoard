@@ -89,7 +89,7 @@ export function extractCardContent(app, item) {
     frontText = obj.label;
   }
 
-  const backlink = `gazboard://board/${encodeURIComponent(boardId)}?obj=${encodeURIComponent(obj.id)}`;
+  const backlink = `gaussboard://open?board=${encodeURIComponent(boardId)}&obj=${encodeURIComponent(obj.id)}`;
 
   const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   return {
@@ -113,7 +113,7 @@ export async function syncBoardToAnki(app, options = {}) {
   }
 
   const boardName = app.store?.doc?.name || 'GazBoard';
-  const deckName = options.deckName || `GazBoard::${safeName(boardName)}`;
+  const deckName = options.deckName || `GaussBoard::${safeName(boardName)}`;
   const cards = collectStudyCards(app.store);
 
   if (!cards.length) {
@@ -127,22 +127,35 @@ export async function syncBoardToAnki(app, options = {}) {
     // 1. Ensure deck exists
     await invokeAnkiConnect('createDeck', { deck: deckName });
 
-    // 2. Prepare notes
-    const notes = cards.map((c) => {
+    // 2. Prepare notes (uploading visual occlusion PNG crops when canvas rasterizer is available)
+    const notes = [];
+    for (const c of cards) {
       const content = extractCardContent(app, c);
-      return {
+      let backHtml = content.back;
+      if (typeof app.surface?.renderRectToDataUrl === 'function' && Number.isFinite(c.x) && Number.isFinite(c.y) && c.w > 0 && c.h > 0) {
+        try {
+          const dataUrl = app.surface.renderRectToDataUrl({ x: c.x - 20, y: c.y - 20, w: c.w + 40, h: c.h + 40 });
+          const b64 = typeof dataUrl === 'string' && dataUrl.includes(',') ? dataUrl.split(',')[1] : null;
+          if (b64) {
+            const mediaName = `gb_${safeName(c.id)}.png`;
+            await invokeAnkiConnect('storeMediaFile', { filename: mediaName, data: b64 });
+            backHtml = `<img src="${mediaName}"><br>` + backHtml;
+          }
+        } catch {}
+      }
+      notes.push({
         deckName,
         modelName: 'Basic',
         fields: {
           Front: content.front,
-          Back: content.back
+          Back: backHtml
         },
         tags: content.tags,
         options: {
           allowDuplicate: true
         }
-      };
-    });
+      });
+    }
 
     // 3. Add notes to Anki
     const noteIds = await invokeAnkiConnect('addNotes', { notes });

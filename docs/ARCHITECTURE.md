@@ -191,6 +191,16 @@ flowchart TD
   * `src/js/ui/radial.js` -> `RadialShortcutRing`
   * `src/js/core/tools.js` -> `abortActiveStroke`
 
+### [SUBSYSTEM: Cross-App-Ecosystem-Bridges] | Aliases: ecosystem bridges, global resources, mermaid bridge, SymPy CAS, video remux, triarchy sync, Anki media
+> **1-Line Summary:** Modular Electron IPC companions for zero-context shared library resolution, Mermaid Manager round-trip editing, desktop Python/SymPy CAS worker, FFmpeg MKV remuxing, and Obsidian/Anki synchronization.
+* **How It Works (Plain English):** Custom integration logic is decoupled from upstream monoliths into isolated CommonJS companion modules under `electron/`. `global-resources.cjs` resolves shared libraries across environment variables, user local paths, and legacy junctions. `mermaid-bridge.cjs` writes temporary UTF-8 `.mmd` files, watches them for user saves, and updates open board diagrams. `cas-sympy.cjs` executes exact symbolic math via local Python with a pure-JS fallback. `media-bridge.cjs` auto-discovers sibling `.srt`/`.vtt` subtitles and remuxes `.mkv` files via FFmpeg stream-copy. `triarchy-bridge.cjs` bridges board Markdown sidecars and `.canvas` files into Obsidian vaults and parses `gaussboard://` deep links.
+* **Code Anchors (Grep Targets):**
+  * `electron/global-resources.cjs` -> `resolveCommonLibrariesDir`, `resolveEcosystemRegistry`
+  * `electron/mermaid-bridge.cjs` -> `openInMermaidManager`, `findMermaidManagerExecutable`
+  * `electron/cas-sympy.cjs` -> `evalSympy`
+  * `electron/media-bridge.cjs` -> `remuxToMp4`, `findSiblingSubtitles`
+  * `electron/triarchy-bridge.cjs` -> `syncToObsidianVault`, `parseGaussboardDeepLink`
+
 ## 2. Tech Stack & Why We Chose It
 
 | Layer | Tool / Library | Plain-English Reason Why |

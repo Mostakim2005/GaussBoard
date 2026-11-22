@@ -394,3 +394,20 @@ flowchart LR
 * **Code Anchors (Grep Targets):**
   * `preload.js` -> `clipboardSignature`, `crypto`
   * `main.js` -> `createWindow`
+
+### [DECISION: Cross-App-Ecosystem-And-Triarchy-Interoperability] | Aliases: ecosystem bridges, global resources, mermaid bridge, SymPy CAS, video remux, triarchy sync, Anki media
+> **1-Line Summary:** Implemented zero-context global shared library resolution, Mermaid Manager round-trip editing, desktop SymPy CAS worker, FFmpeg MKV remuxing, Obsidian/Anki synchronization, and dead vendor SW precache pruning via modular `electron/*.cjs` companions.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`
+* **Original User Intention:** Safely bridge GaussBoard with the broader local desktop ecosystem (Mermaid Manager, Obsidian Nihon vault, Anki Desktop, local Python/SymPy, FFmpeg) while keeping upstream-owned monoliths (`main.js`, `app.js`, `store.js`) minimal-diff and fork-safe.
+* **Hardening & Integration Choices:**
+  * Created isolated companion modules (`electron/global-resources.cjs`, `electron/mermaid-bridge.cjs`, `electron/cas-sympy.cjs`, `electron/media-bridge.cjs`, `electron/triarchy-bridge.cjs`) so `main.js` only adds single-line require and dispatch hooks.
+  * Enforced zero-BOM UTF-8 for temporary `.mmd` files to prevent draw.io/Mermaid Manager JSON/XML parse failures.
+  * Implemented automatic pure-JS fallback for SymPy CAS evaluations whenever Python is unavailable or execution times out (>5s).
+  * Pruned unreferenced dead vendor bundles from `src/sw.js` precache to keep PWA service worker shell under 15 MB.
+* **Code Anchors (Grep Targets):**
+  * `electron/global-resources.cjs` -> `resolveCommonLibrariesDir`, `resolveEcosystemRegistry`
+  * `electron/mermaid-bridge.cjs` -> `openInMermaidManager`
+  * `electron/cas-sympy.cjs` -> `evalSympy`
+  * `electron/media-bridge.cjs` -> `remuxToMp4`, `findSiblingSubtitles`
+  * `electron/triarchy-bridge.cjs` -> `syncToObsidianVault`, `parseGaussboardDeepLink`
+  * `test/ecosystem-bridges.test.mjs`

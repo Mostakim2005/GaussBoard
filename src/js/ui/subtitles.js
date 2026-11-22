@@ -142,3 +142,15 @@ export class SubtitleDisplay {
     }
   }
 }
+
+/**
+ * Filter parsed subtitle cues by keyword (case-insensitive) for the Transcript Drawer.
+ * @param {Array<{start:number,end:number,text:string}>} cues
+ * @param {string} query
+ */
+export function searchSubtitleCues(cues, query) {
+  if (!Array.isArray(cues)) return [];
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return cues;
+  return cues.filter((c) => String(c?.text || '').toLowerCase().includes(q));
+}
