@@ -411,3 +411,16 @@ flowchart LR
   * `electron/media-bridge.cjs` -> `remuxToMp4`, `findSiblingSubtitles`
   * `electron/triarchy-bridge.cjs` -> `syncToObsidianVault`, `parseGaussboardDeepLink`
   * `test/ecosystem-bridges.test.mjs`
+
+### [DECISION: Dead-Vendor-Repository-Cleanup] | Aliases: vendor cleanup, bundle size, PWA precache, shared libraries offload
+> **1-Line Summary:** Offloaded 14.01 MB of duplicate vendor libraries from `src/vendor/` to `%LOCALAPPDATA%\SharedLibraries` per ECOSYSTEM_INTEGRATION_CONTRACT Section 5.3 to satisfy the <15 MB PWA budget.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Master Contract Directive]`
+* **Original User Intention:** Satisfy Universal Packaging & Fork-Safety bundle limits by purging redundant in-tree vendor dependencies already available in the zero-context global libraries repository.
+* **Cleanup Details:**
+  * Purged obsolete in-tree files: `tesseract/` (WASM/data), `nerdamer/`, `fontkit.umd.min.js`, `pdf.sandbox.min.mjs`, `pdf_viewer.mjs`, `pdf_viewer.css`, `math.min.js`, `3Dmol-min.js`, and `function-plot.js`.
+  * Preserved active in-tree vendor dependencies required for zero-network bootstrap (`pdf.min.mjs`, `pdf.worker.min.mjs`, `katex/`, `marp/`, `purify.min.js`, `lucide.min.js`, `tesseract.js`).
+  * Replaced in-app references with `electron/global-resources.cjs` dynamic discovery and verified through `test/ecosystem-bridges.test.mjs`.
+* **Code Anchors (Grep Targets):**
+  * `electron/global-resources.cjs` -> `resolveCommonLibrariesDir`
+  * `src/sw.js` -> service worker precache manifest
+
