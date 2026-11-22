@@ -181,6 +181,7 @@ async function serveAssetWithRange(filePath, request) {
   } catch {
     return new Response('Not Found', { status: 404 });
   }
+  if (!stat.isFile()) return new Response('Not Found', { status: 404 });
   const size = stat.size;
   const ext = path.extname(filePath).toLowerCase();
   const contentType = ASSET_MIME_TYPES[ext] || 'application/octet-stream';
@@ -188,7 +189,7 @@ async function serveAssetWithRange(filePath, request) {
 
   if (rangeHeader) {
     const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
-    if (!match) {
+    if (!match || (!match[1] && !match[2])) {
       return new Response('Range Not Satisfiable', {
         status: 416,
         headers: { 'Content-Range': `bytes */${size}` }
@@ -232,8 +233,9 @@ async function serveAssetWithRange(filePath, request) {
 }
 
 function registerProtocol() {
-  protocol.handle('app', (request) => {
+  protocol.handle('app', async (request) => {
     const url = new URL(request.url);
+    if (url.hostname !== 'board') return new Response('Forbidden', { status: 403 });
     let rel;
     try { rel = decodeURIComponent(url.pathname); }
     catch { return new Response('Bad Request', { status: 400 }); }
@@ -247,7 +249,10 @@ function registerProtocol() {
     if (rel === '/' || rel === '') rel = '/index.html';
     const target = path.resolve(SRC, `.${rel}`);
     if (!isPathWithin(SRC, target)) return new Response('Forbidden', { status: 403 });
-    if (!fs.existsSync(target)) {
+    try {
+      const st = await fsp.stat(target);
+      if (!st.isFile()) return new Response('Not Found', { status: 404 });
+    } catch {
       return new Response('Not Found', { status: 404 });
     }
     return net.fetch(pathToFileURL(target).toString());
@@ -373,13 +378,25 @@ function decodeDataUrl(url) {
 let writeSequence = 0;
 async function writeAtomic(file, text) {
   const tmp = `${file}.${process.pid}.${Date.now()}.${++writeSequence}.tmp`;
-  await fsp.writeFile(tmp, text);
+  const fh = await fsp.open(tmp, 'w');
   try {
-    await fsp.rename(tmp, file);
-  } catch (e) {
-    // rename across a lock (Windows AV, a synced folder) - fall back to a plain write
-    await fsp.writeFile(file, text);
-    await fsp.rm(tmp, { force: true }).catch(() => {});
+    await fh.writeFile(text, 'utf8');
+    await fh.sync();
+  } finally {
+    await fh.close().catch(() => {});
+  }
+  const RETRY_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await fsp.rename(tmp, file);
+      return;
+    } catch (e) {
+      if (!RETRY_CODES.has(e?.code) || attempt === 4) {
+        await fsp.rm(tmp, { force: true }).catch(() => {});
+        throw e;
+      }
+      await new Promise((r) => setTimeout(r, 25 * (attempt + 1)));
+    }
   }
 }
 
@@ -825,7 +842,10 @@ function saveWindowState() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   try {
     const b = mainWindow.isMaximized() || mainWindow.isFullScreen() ? mainWindow.getNormalBounds() : mainWindow.getBounds();
-    fs.writeFileSync(stateFile(), JSON.stringify({ ...b, maximized: mainWindow.isMaximized() }));
+    const dest = stateFile();
+    const tmp = `${dest}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify({ ...b, maximized: mainWindow.isMaximized() }), 'utf8');
+    fs.renameSync(tmp, dest);
   } catch { /* not worth bothering the user about */ }
 }          // .gazboard file passed on the command line
 
@@ -932,7 +952,9 @@ function createWindow() {
   // window geometry change, including the ones that fire no DOM resize event.
   for (const ev of ['resize', 'maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen', 'move'])
     mainWindow.on(ev, () => send('window:resized'));
-  screen.on('display-metrics-changed', () => send('window:resized'));
+  const onDisplayMetrics = () => send('window:resized');
+  screen.on('display-metrics-changed', onDisplayMetrics);
+  mainWindow.once('closed', () => { screen.removeListener('display-metrics-changed', onDisplayMetrics); });
 
   whiteboardWindows.add(mainWindow);
   activeEditorWin = mainWindow;
@@ -1104,7 +1126,8 @@ function T(s) { return menuWords[s] || s; }
 
 // Registered once, at load: a window opened again on macOS must not add a
 // second listener every time.
-ipcMain.on('app:language', (_e, code) => {
+ipcMain.on('app:language', (event, code) => {
+  if (!isTrustedRenderer(event)) return;
   // A language code and nothing else: it is joined into a path below
   if (typeof code !== 'string' || !/^[A-Za-z]{2,3}(-[A-Za-z]{2,4})?$/.test(code)) return;
   menuWords = {};
@@ -1268,9 +1291,10 @@ function convertWithHiddenWindow(filePath, kind, { finalLook = true } = {}) {
     });
     trustedConversionFiles.set(win.webContents, path.resolve(filePath));
     let settled = false;
-    const done = (fn, v) => { if (settled) return; settled = true; trustedConversionFiles.delete(win.webContents); ipcMain.removeListener('convert:ready', onReady); ipcMain.removeListener('convert:error', onError); try { win.destroy(); } catch {} fn(v); };
-    const onReady = async (_e, msg) => {
-      if (msg.token !== token) return;
+    let convTimer = null;
+    const done = (fn, v) => { if (settled) return; settled = true; if (convTimer) { clearTimeout(convTimer); convTimer = null; } trustedConversionFiles.delete(win.webContents); ipcMain.removeListener('convert:ready', onReady); ipcMain.removeListener('convert:error', onError); try { win.destroy(); } catch {} fn(v); };
+    const onReady = async (event, msg) => {
+      if (event.sender !== win.webContents || !msg || msg.token !== token) return;
       try {
         const pdf = await win.webContents.printToPDF({
           printBackground: true, margins: { marginType: 'none' },
@@ -1280,10 +1304,10 @@ function convertWithHiddenWindow(filePath, kind, { finalLook = true } = {}) {
         done(resolve, pdf);
       } catch (e) { done(reject, e); }
     };
-    const onError = (_e, msg) => { if (msg.token === token) done(reject, new Error(msg.message)); };
+    const onError = (event, msg) => { if (event.sender === win.webContents && msg && msg.token === token) done(reject, new Error(msg.message)); };
     ipcMain.on('convert:ready', onReady);
     ipcMain.on('convert:error', onError);
-    setTimeout(() => done(reject, new Error('Conversion timed out')), 120000);
+    convTimer = setTimeout(() => done(reject, new Error('Conversion timed out')), 120000);
     const q = new URLSearchParams({ token, kind, file: filePath, finalLook: finalLook ? '1' : '0' });
     win.loadURL('app://board/convert.html?' + q.toString());
   });
@@ -1311,7 +1335,7 @@ function printHtmlToPdf(html, { widthIn, heightIn, landscape = false }) {
       await fsp.writeFile(file, html, 'utf8');
       win = new BrowserWindow({
         show: false, width: 1200, height: 900,
-        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: false, offscreen: false }
+        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, offscreen: false }
       });
       await win.loadURL(pathToFileURL(file).toString());
       // give the embedded bitmaps a moment to decode before printing
@@ -1407,8 +1431,9 @@ function sync() {
  * ------------------------------------------------------------------ */
 function ipc() {
   // the page, as it starts: what it is opening (shown in the starting-up window), then that it is done
-  ipcMain.on('app:startupStep', (_e, text) => { startupMark('page: ' + String(text || '').slice(0, 120)); splashStatus(text); });
-  ipcMain.on('app:startupDone', (_e, info) => {
+  ipcMain.on('app:startupStep', (event, text) => { if (!isTrustedRenderer(event)) return; startupMark('page: ' + String(text || '').slice(0, 120)); splashStatus(text); });
+  ipcMain.on('app:startupDone', (event, info) => {
+    if (!isTrustedRenderer(event)) return;
     startupMark('board on screen');
     if (revealMainWindow) revealMainWindow();
     const o = info && typeof info === 'object' ? info : {};
@@ -1760,22 +1785,46 @@ function ipc() {
   });
 
   const activeRecordings = new Map();
+  const abortRecording = (safeId) => {
+    const entry = activeRecordings.get(safeId);
+    if (!entry) return;
+    activeRecordings.delete(safeId);
+    try { entry.ws.destroy(); } catch {}
+    fsp.rm(entry.tmpFile, { force: true }).catch(() => {});
+  };
+  app.on('will-quit', () => { for (const id of [...activeRecordings.keys()]) abortRecording(id); });
 
-  handleIpc('recording:start', async (_e, sessionId) => {
+  handleIpc('recording:start', async (event, sessionId) => {
     const safeId = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
     if (!safeId) return false;
+    abortRecording(safeId);
     const tmpFile = path.join(app.getPath('userData'), 'temp', `${safeId}.tmp`);
     await fsp.mkdir(path.dirname(tmpFile), { recursive: true });
     const ws = fs.createWriteStream(tmpFile);
-    activeRecordings.set(safeId, { ws, tmpFile });
+    const entry = { ws, tmpFile, error: null, sender: event.sender };
+    ws.on('error', (err) => {
+      entry.error = err;
+      activeRecordings.delete(safeId);
+      fsp.rm(tmpFile, { force: true }).catch(() => {});
+    });
+    event.sender.once('destroyed', () => abortRecording(safeId));
+    activeRecordings.set(safeId, entry);
     return true;
   });
 
   handleIpc('recording:appendChunk', async (_e, { sessionId, chunk }) => {
     const safeId = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
     const entry = activeRecordings.get(safeId);
-    if (entry && chunk) {
-      entry.ws.write(Buffer.from(chunk));
+    if (!entry || entry.error) return false;
+    if (chunk) {
+      const ok = entry.ws.write(Buffer.from(chunk));
+      if (!ok) {
+        await new Promise((resolve) => {
+          const done = () => { entry.ws.off('drain', done); entry.ws.off('error', done); entry.ws.off('close', done); resolve(); };
+          entry.ws.once('drain', done); entry.ws.once('error', done); entry.ws.once('close', done);
+        });
+      }
+      if (entry.error) return false;
     }
     return true;
   });
@@ -1784,16 +1833,25 @@ function ipc() {
     const safeId = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
     const entry = activeRecordings.get(safeId);
     if (!entry) return null;
-    await new Promise((r) => entry.ws.end(r));
     activeRecordings.delete(safeId);
+    if (entry.error) {
+      await fsp.rm(entry.tmpFile, { force: true }).catch(() => {});
+      return null;
+    }
+    await new Promise((resolve, reject) => {
+      entry.ws.once('error', reject);
+      entry.ws.end(resolve);
+    });
 
     const buf = await fsp.readFile(entry.tmpFile);
     const hash = crypto.createHash('sha256').update(buf).digest('hex') + '.webm';
     const dest = path.join(assetsDir(), hash);
     await fsp.mkdir(assetsDir(), { recursive: true });
     await fsp.rename(entry.tmpFile, dest).catch(async () => {
-      await fsp.copyFile(entry.tmpFile, dest);
-      await fsp.unlink(entry.tmpFile);
+      const stageTmp = `${dest}.${process.pid}.${Date.now()}.tmp`;
+      await fsp.copyFile(entry.tmpFile, stageTmp);
+      await fsp.rename(stageTmp, dest);
+      await fsp.unlink(entry.tmpFile).catch(() => {});
     });
     return { assetId: hash, durationMs };
   }));
@@ -2023,10 +2081,11 @@ function ipc() {
       const viaOffice = await convertWithSoffice(source);
       if (viaOffice) return pack(viaOffice, 'libreoffice', { officeNote });
 
-      const kind = ['.docx', '.doc', '.odt', '.rtf', '.txt'].includes(ext) ? 'word'
+      const kind = ext === '.txt' ? 'txt'
+        : ['.docx', '.doc', '.odt', '.rtf'].includes(ext) ? 'word'
         : ['.pptx', '.ppt', '.odp'].includes(ext) ? 'slides' : null;
       if (!kind) return { ok: false, error: 'Install LibreOffice to import ' + ext + ' files.', officeNote };
-      if (ext === '.doc' || ext === '.ppt' || ext === '.odt' || ext === '.odp')
+      if (ext === '.doc' || ext === '.ppt' || ext === '.odt' || ext === '.odp' || ext === '.rtf')
         return { ok: false, error: 'Legacy/ODF formats need LibreOffice installed. Save as .docx / .pptx and try again.', officeNote };
       try {
         const pdf = await convertWithHiddenWindow(source, kind, { finalLook: opts.finalLook !== false });
@@ -2132,14 +2191,20 @@ if (!singleInstance) {
   app.whenReady().then(async () => {
     startupMark('Electron ready');
     const MEDIA_PERMISSIONS = new Set(['media', 'microphone', 'audioCapture']);
-    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-      const url = webContents.getURL();
-      callback(url.startsWith('app://') && MEDIA_PERMISSIONS.has(permission));
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+      const url = (details && details.requestingOrigin) || webContents.getURL();
+      if (!url.startsWith('app://') || !isTrustedAppUrl(url) || !MEDIA_PERMISSIONS.has(permission)) {
+        callback(false);
+        return;
+      }
+      if (permission === 'media' && Array.isArray(details?.mediaTypes)) {
+        callback(details.mediaTypes.length > 0 && details.mediaTypes.every((t) => t === 'audio'));
+        return;
+      }
+      callback(true);
     });
     session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin) => {
-      return typeof requestingOrigin === 'string'
-        && requestingOrigin.startsWith('app://')
-        && MEDIA_PERMISSIONS.has(permission);
+      return isTrustedAppUrl(requestingOrigin) && MEDIA_PERMISSIONS.has(permission);
     });
     registerProtocol();
     showSplash();

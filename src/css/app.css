@@ -831,10 +831,11 @@ body.presenting #backPill { top: 12px; }
 /* ---------------- selection context bar ---------------- */
 #ctxbar {
   position: absolute; z-index: 25; display: none; align-items: center; gap: 2px; padding: 4px;
+  max-width: calc(100% - 16px); overflow-x: auto;
   background: var(--surface); border: 1px solid var(--stroke); border-radius: 10px; box-shadow: var(--shadow-2);
 }
 #ctxbar.show { display: flex; }
-#ctxbar button { width: 34px; height: 34px; border-radius: 6px; display: grid; place-items: center; color: var(--text-2); }
+#ctxbar button { width: 34px; height: 34px; border-radius: 6px; display: grid; place-items: center; color: var(--text-2); flex-shrink: 0; }
 #ctxbar button:hover { background: var(--surface-2); color: var(--text); }
 #ctxbar button[disabled] { opacity: .35; pointer-events: none; }
 #ctxbar button.on { background: var(--accent-soft); color: var(--accent); }
@@ -5754,7 +5755,7 @@ body.theme-light .dict-word { color: #0f6cbd; }
 /* =================================================================== *
  *  Dedicated Obsidian Markdown Toolbar & Line Numbers
  * =================================================================== */
-#ctxbar.obsidian-toolbar {
+#ctxbar.show.obsidian-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -5768,16 +5769,16 @@ body.theme-light .dict-word { color: #0f6cbd; }
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
   max-width: min(680px, calc(100vw - 24px));
   overflow-x: visible;
-  z-index: 99;
+  z-index: 25;
 }
-:root[data-theme="dark"] #ctxbar.obsidian-toolbar {
+:root[data-theme="dark"] #ctxbar.show.obsidian-toolbar {
   background: var(--surface-glass, rgba(28, 32, 40, 0.95));
   border-color: var(--stroke-glass, rgba(255, 255, 255, 0.12));
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
 }
-#ctxbar.obsidian-toolbar.expanded {
+#ctxbar.show.obsidian-toolbar.expanded {
   flex-wrap: wrap;
-  max-width: 680px;
+  max-width: min(680px, calc(100vw - 24px));
 }
 #ctxbar.obsidian-toolbar button.fmt-btn {
   height: 28px;
@@ -6010,4 +6011,27 @@ body.presenting #pagestrip { display: none; }
 :root[data-theme="dark"] .panel mark.set-mark { background: rgba(255, 217, 74, .88); color: #1b1a19; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .panel mark.set-mark { background: rgba(255, 217, 74, .88); color: #1b1a19; }
+}
+
+/* ===================================================================
+ *  Global Accessibility: Focus-Visible, Forced Colors & Reduced Motion
+ * =================================================================== */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent, #0f6cbd);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -1,3 +1,4 @@
+import { bindModalA11y } from './modal-a11y.js';
 /**
  * @file chemical-sketcher.js
  * @description 2D Chemical Structure Drawing & SMILES 2D/3D Parser Modal (GazBoard Phase 7 / v6.7.0)
@@ -61,12 +62,16 @@ export class ChemicalSketcherModal {
   show() {
     if (!this.modal) this.buildModal();
     this.modal.classList.add('visible');
+    this._releaseA11y?.();
+    this._releaseA11y = bindModalA11y(this.modal, { onClose: () => this.close(), label: 'Chemical Sketcher' });
     this.resizeCanvas();
     this.render();
   }
 
   close() {
     if (this.modal) this.modal.classList.remove('visible');
+    this._releaseA11y?.();
+    this._releaseA11y = null;
   }
 
   buildModal() {

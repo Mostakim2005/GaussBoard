@@ -5,8 +5,8 @@ import { t } from '../i18n.js';
 
 export const EMBED_REF_RE = /@!\[([^\]\n]{1,200})\]\(b:([A-Za-z0-9_-]{1,128})(?:#([^\)\n]{1,200}))?\)/g;
 export const REF_RE = /@\[([^\]\n]{1,200})\]\(b:([A-Za-z0-9_-]{1,128})(?:#([^\)\n]{1,200}))?\)/g;
-export const EMBED_WIKILINK_RE = /!\[\[([^\]|#\n]*)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
-export const WIKILINK_RE = /(?<!!)\[\[([^\]|#\n]*)(?:#([^\]|\n]+))?(?:\|([^\]\n]+))?\]\]/g;
+export const EMBED_WIKILINK_RE = /!\[\[([^\[\]|#\n]{0,512})(?:#([^\[\]|\n]{1,200}))?(?:\|([^\[\]\n]{1,200}))?\]\]/g;
+export const WIKILINK_RE = /(?<!!)\[\[([^\[\]|#\n]{0,512})(?:#([^\[\]|\n]{1,200}))?(?:\|([^\[\]\n]{1,200}))?\]\]/g;
 
 const clean = (s) => String(s ?? '').replace(/[\]\n\r]/g, ' ').trim().slice(0, 200) || '?';
 

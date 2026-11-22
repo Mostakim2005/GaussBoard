@@ -317,10 +317,14 @@ function macAppPath(exe) {
 
 const MAC_FW = '/usr/libexec/ApplicationFirewall/socketfilterfw';
 
+function shSingleQuote(s) {
+  return "'" + String(s || '').replace(/'/g, "'\\''") + "'";
+}
+
 function macScript(app) {
   return `
-FW=${JSON.stringify(MAC_FW)}
-APP=${JSON.stringify(app)}
+FW=${shSingleQuote(MAC_FW)}
+APP=${shSingleQuote(app)}
 if [ ! -x "$FW" ]; then echo "tool=none"; exit 0; fi
 echo "tool=alf"
 echo "global=$("$FW" --getglobalstate 2>/dev/null | tr -d '\\n')"

@@ -78,7 +78,7 @@ export function extractCardContent(app, item) {
     const attached = app.store.objects.filter((o) => o.attachedTo === obj.id);
     const texts = attached
       .filter((o) => o.type === 'text' || o.type === 'note')
-      .map((o) => o.text || o.runs?.map((r) => r.text).join('') || '')
+      .map((o) => o.text || o.runs?.map((r) => r.t ?? r.text ?? '').join('') || '')
       .filter(Boolean);
     if (texts.length) {
       backText = texts.join('\n\n');
@@ -91,10 +91,11 @@ export function extractCardContent(app, item) {
 
   const backlink = `gazboard://board/${encodeURIComponent(boardId)}?obj=${encodeURIComponent(obj.id)}`;
 
+  const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   return {
     id: obj.id,
-    front: frontText,
-    back: backText + `<br><br><small><a href="${backlink}">🔗 Open in GazBoard</a></small>`,
+    front: esc(frontText),
+    back: esc(backText) + `<br><br><small><a href="${esc(backlink)}">Open in GaussBoard</a></small>`,
     tags: ['gazboard', isTape ? 'study-tape' : 'answer-cover', safeName(boardName)]
   };
 }
@@ -175,23 +176,6 @@ export async function exportBoardToApkg(app, options = {}) {
     };
   }
 
-  // Ensure JSZip is loaded
-  let JSZip = window.JSZip;
-  if (!JSZip) {
-    try {
-      const script = document.createElement('script');
-      script.src = new URL('../../vendor/jszip.min.js', import.meta.url).href;
-      await new Promise((resolve, reject) => {
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Failed to load JSZip'));
-        document.head.appendChild(script);
-      });
-      JSZip = window.JSZip;
-    } catch {
-      // Fallback
-    }
-  }
-
   const exportCards = cards.map((c, i) => {
     const content = extractCardContent(app, c);
     const intervals = previewNextIntervals(c.card);
@@ -210,21 +194,7 @@ export async function exportBoardToApkg(app, options = {}) {
     };
   });
 
-  const zip = new JSZip();
-
-  // 1. Deck manifest
-  const manifest = {
-    generator: 'GazBoard Engineering Notebook',
-    version: '6.2.0',
-    boardName,
-    exportedAt: new Date().toISOString(),
-    deckName: `GazBoard::${safeName(boardName)}`,
-    cardCount: exportCards.length,
-    cards: exportCards
-  };
-  zip.file('deck_manifest.json', JSON.stringify(manifest, null, 2));
-
-  // 2. Anki Tab-Separated Values (TSV) Import File for Anki desktop / AnkiDroid / AnkiMobile
+  // Anki Tab-Separated Values (TSV) Import File for Anki desktop / AnkiDroid / AnkiMobile
   // Format: #separator:tab \n #html:true \n #tags column:3 \n Front \t Back \t Tags
   const tsvLines = [
     '#separator:tab',
@@ -237,10 +207,6 @@ export async function exportBoardToApkg(app, options = {}) {
     const tags = c.tags.join(' ');
     tsvLines.push(`${cleanFront}\t${cleanBack}\t${tags}`);
   }
-  zip.file('anki_import.txt', tsvLines.join('\n'));
-
-  // 3. Media map (compliant with Anki APKG structure)
-  zip.file('media', '{}');
 
   // Anki Desktop/AnkiDroid require a SQLite collection.anki2 database inside .apkg files.
   // Until native SQLite generation is wired, export a directly Anki-importable UTF-8 TSV (.txt)

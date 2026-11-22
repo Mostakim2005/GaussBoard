@@ -42,6 +42,7 @@ export function excerptImageObject(value, at, id = uid('img')) {
     rotation: 0,
     src: value.dataUrl,
     name: `Excerpt — ${source.boardName || 'Board'}`,
+    isExcerpt: true,
     excerptSource: source
   };
 }

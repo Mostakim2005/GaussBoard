@@ -88,7 +88,7 @@ async function build() {
   const swContent = await fsp.readFile(path.join(OUT, 'sw.js'), 'utf8');
   const match = /const PRECACHE_ASSETS = (\[[\s\S]*?\]);/.exec(swContent);
   if (match) {
-    const assets = eval(match[1]);
+    const assets = [...match[1].matchAll(/['"]([^'"]+)['"]/g)].map((m) => m[1]);
     let missing = 0;
     for (const rel of assets) {
       if (rel === './' || rel === '.') continue;

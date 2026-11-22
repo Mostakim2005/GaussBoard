@@ -48,7 +48,7 @@ const CALLOUT_ICONS = {
   todo: '☑️'
 };
 
-const MD_HEURISTIC_RE = /(?:^|\n)\s*(?:#{1,6}\s+|>{1}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+\.\s+|\|.+\||`{3,}|~{3,})|^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)|(?:\*\*[^*]+\*\*|\*[^*\n]+\*|~~[^~]+~~|(?<!~)~(?!~)[^~\n]+(?<!~)~(?!~)|\^[^^\n]+\^|==[^=\n]+==|`[^`\n]+`|<u>[\s\S]+?<\/u>|\$\$[\s\S]+?\$\$|(?<=[^\$\\\w])\$[^\s\$\n](?:[^\$\n]*?[^\s\$\n])?\$|!?\[\[[^\]]+\]\]|\[\^[^\]]+\]|%%[\s\S]*?%%|@!?\[[^\]]+\]\(b:|(?:^|[\s(\[{"'])#[a-zA-Z][a-zA-Z0-9_\-/]*)/;
+const MD_HEURISTIC_RE = /(?:^|\n)\s*(?:#{1,6}\s+|>{1}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+\.\s+|\|[^\n]{1,512}\||`{3,}|~{3,})|^---\r?\n[\s\S]{0,4096}?\r?\n---(?:\r?\n|$)|(?:\*\*[^*]{1,512}\*\*|\*[^*\n]{1,512}\*|~~[^~]{1,512}~~|(?<!~)~(?!~)[^~\n]{1,512}(?<!~)~(?!~)|\^[^^\n]{1,256}\^|==[^=\n]{1,512}==|`[^`\n]{1,512}`|<u>[\s\S]{1,1024}?<\/u>|\$\$[\s\S]{1,2048}?\$\$|(?<=[^\$\\\w])\$[^\s\$\n](?:[^\$\n]{0,512}?[^\s\$\n])?\$|!?\[\[[^\[\]\n]{1,512}\]\]|\[\^[^\]\s]{1,128}\]|%%[\s\S]{0,1024}?%%|@!?\[[^\]\n]{1,200}\]\(b:|(?:^|[\s(\[{"'])#[a-zA-Z][a-zA-Z0-9_\-\/]*)/;
 
 /** Remove Obsidian comments while preserving line numbers and fenced code. */
 export function stripObsidianComments(markdownText) {
@@ -319,6 +319,9 @@ function renderEmbedCardXhtml({ boardId = '', target = '', page = '', heading = 
  */
 export function renderInlineMarkdown(text, options = {}) {
   if (!text) return '';
+  const inlineDepth = options._inlineDepth || 0;
+  if (inlineDepth > 16) return escapeXhtml(String(text));
+  const childOpts = { ...options, _inlineDepth: inlineDepth + 1 };
 
   const placeholders = [];
   const stash = (xhtml) => {
@@ -327,7 +330,7 @@ export function renderInlineMarkdown(text, options = {}) {
     return token;
   };
 
-  let src = String(text);
+  let src = String(text).replace(/\u0000/g, '');
 
   // 1. Inline code spans: `code`
   src = src.replace(/`([^`\n]+)`/g, (_, code) =>
@@ -345,9 +348,9 @@ export function renderInlineMarkdown(text, options = {}) {
       ? stash(`<sup class="gb-md-footnote-ref"><a href="#gb-footnote-${footnoteId(id)}">${number}</a></sup>`)
       : whole;
   });
-  src = src.replace(/==([^=\n]+)==/g, (_, value) => stash(`<mark class="gb-md-highlight">${renderInlineMarkdown(value, options)}</mark>`));
-  src = src.replace(/(?<!~)~(?!~)([^~\n]+)(?<!~)~(?!~)/g, (_, value) => stash(`<sub>${renderInlineMarkdown(value, options)}</sub>`));
-  src = src.replace(/(?<!\^)\^([^\^\n]+)\^(?!\^)/g, (_, value) => stash(`<sup>${renderInlineMarkdown(value, options)}</sup>`));
+  src = src.replace(/==([^=\n]+)==/g, (_, value) => stash(`<mark class="gb-md-highlight">${renderInlineMarkdown(value, childOpts)}</mark>`));
+  src = src.replace(/(?<!~)~(?!~)([^~\n]+)(?<!~)~(?!~)/g, (_, value) => stash(`<sub>${renderInlineMarkdown(value, childOpts)}</sub>`));
+  src = src.replace(/(?<!\^)\^([^\^\n]+)\^(?!\^)/g, (_, value) => stash(`<sup>${renderInlineMarkdown(value, childOpts)}</sup>`));
 
   // 2. Display math appearing inline & Inline math: $$...$$ and $...$
   src = src.replace(DISPLAY_MATH_RE, (_, tex) =>
@@ -437,13 +440,13 @@ export function renderInlineMarkdown(text, options = {}) {
     const isObsidianUri = /^obsidian:\/\//i.test(trimmedUrl);
     const cls = isObsidianUri ? 'gb-obsidian-uri' : 'gb-ext-link';
     return stash(
-      `<a class="${cls}" href="${safeHref}">${renderInlineMarkdown(label, options)}</a>`
+      `<a class="${cls}" href="${safeHref}">${renderInlineMarkdown(label, childOpts)}</a>`
     );
   });
 
   // 5. Explicit underline tags: <u>text</u>
   src = src.replace(/<u>([\s\S]+?)<\/u>/gi, (_, inner) =>
-    stash(`<u>${renderInlineMarkdown(inner, options)}</u>`)
+    stash(`<u>${renderInlineMarkdown(inner, childOpts)}</u>`)
   );
 
   // 6. Hashtags: #tag

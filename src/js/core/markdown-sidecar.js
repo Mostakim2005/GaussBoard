@@ -33,7 +33,7 @@ export function generateMarkdownSidecar(doc, boardName = 'Board', options = {}) 
 
   // 1. YAML Frontmatter
   lines.push('---');
-  lines.push(`title: "${boardName.replace(/"/g, '\\"')}"`);
+  lines.push(`title: ${JSON.stringify(String(boardName || 'Board'))}`);
   lines.push(`date: ${now}`);
   if (tags.length) {
     lines.push(`tags: [${tags.map(t => JSON.stringify(t)).join(', ')}]`);
@@ -139,7 +139,7 @@ export function generateMarkdownSidecar(doc, boardName = 'Board', options = {}) 
     for (const ex of excerpts) {
       const src = ex.excerptSource;
       const bName = src?.boardName || 'Source Board';
-      const page = src?.page ? ` (Page ${src.page + 1})` : '';
+      const page = Number.isInteger(src?.page) && src.page > 0 ? ` (Page ${src.page})` : '';
       lines.push(`- Excerpt from **${bName}**${page}`);
       if (ex.name) lines.push(`  - Description: ${ex.name}`);
     }
@@ -153,7 +153,7 @@ export function generateMarkdownSidecar(doc, boardName = 'Board', options = {}) 
  * Prompts user to save or download the generated Markdown sidecar file.
  */
 export async function exportMarkdownSidecarFile(app) {
-  const boardName = app.store?.name || 'Board';
+  const boardName = app.store?.doc?.name || app.store?.name || 'Board';
   const doc = app.store?.doc;
   const content = generateMarkdownSidecar(doc, boardName);
   const defaultFilename = `${boardName.replace(/[^a-zA-Z0-9_\-]/g, '_')}.md`;

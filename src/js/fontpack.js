@@ -141,8 +141,11 @@ export async function download(id, { onProgress, sources = SOURCES, fetchImpl = 
   let lastError = t('No connection');
   for (const src of sources) {
     const url = src(pack.file);
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), 30000) : null;
     try {
-      const res = await fetchImpl(url, { cache: 'no-store', onProgress });
+      const res = await fetchImpl(url, { cache: 'no-store', onProgress, ...(ctl ? { signal: ctl.signal } : {}) });
+      if (timer) clearTimeout(timer);
       if (!res.ok) { lastError = t('Server replied {status}', { status: res.status }); continue; }
       const buf = await readWithProgress(res, pack.bytes, onProgress);
       if (!(await verify(pack, buf))) { lastError = t('The file that arrived was not the right one'); continue; }
@@ -150,6 +153,7 @@ export async function download(id, { onProgress, sources = SOURCES, fetchImpl = 
       await activate(pack, buf);
       return { ok: true, source: url };
     } catch (e) {
+      if (timer) clearTimeout(timer);
       console.warn('[fonts]', url, e);
       lastError = t('No connection');
     }

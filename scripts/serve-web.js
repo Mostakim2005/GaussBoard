@@ -27,6 +27,9 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.ttf': 'font/ttf',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.wasm': 'application/wasm',
   '.pfb': 'application/x-font-type1',
   '.bcmap': 'application/octet-stream',
   '.pdf': 'application/pdf',
@@ -40,8 +43,9 @@ const server = http.createServer(async (req, res) => {
     let pathname = decodeURIComponent(parsed.pathname);
     if (pathname === '/' || pathname === '') pathname = '/index.html';
 
-    let filePath = path.normalize(path.join(SERVE_DIR, pathname));
-    if (!filePath.startsWith(SERVE_DIR)) {
+    let filePath = path.resolve(SERVE_DIR, '.' + pathname);
+    const relCheck = path.relative(SERVE_DIR, filePath);
+    if (relCheck.startsWith('..') || path.isAbsolute(relCheck)) {
       res.writeHead(403);
       res.end('Forbidden');
       return;
@@ -87,7 +91,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '127.0.0.1', () => {
   console.log(`\n======================================================`);
   console.log(`  GazBoard PWA Server running at: http://localhost:${PORT}`);
   console.log(`  Serving files from: ${SERVE_DIR}`);

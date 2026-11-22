@@ -872,9 +872,12 @@ function sizeRow(sizes, current, onPick, color = '#201f1e') {
   const wrap = h('div', { class: 'sizes' });
   // the dots are a preview of the ink, so they follow it onto a dark board
   const dotColor = inkPaint(color);
+  const minS = Math.min(...sizes);
+  const maxS = Math.max(...sizes);
   for (const s of sizes) {
     const b = h('button', { class: 'size' + (s === current ? ' active' : ''), title: t('{s} px', { s }) });
-    const dotSize = Math.max(4, Math.min(22, s));
+    const norm = maxS === minS ? 0.5 : (s - minS) / (maxS - minS);
+    const dotSize = maxS > 22 ? Math.round(6 + norm * 16) : Math.max(4, Math.min(22, s));
     b.innerHTML = `<i style="width:${dotSize}px;height:${dotSize}px;background:${dotColor}"${isDarkBoard() && isDarkColor(dotColor, 0.2) ? ' class="ink-edge"' : ''}></i>`;
     b.addEventListener('click', () => { markActive(wrap, b); onPick(s); });
     wrap.appendChild(b);
@@ -1908,6 +1911,8 @@ export function openToolPopover(app, anchor, tool) {
       h('h4', { style: 'margin-top:12px' }, t('Tape skin & colour')),
       swatchRow(tapeColors, curColor, (c) => {
         s.tapeColor = c;
+        const nextPaint = inkPaint(c);
+        tapeWidthRow.querySelectorAll('span').forEach((bar) => { bar.style.background = nextPaint; });
         app.saveSettings();
         app.syncUI();
       }),

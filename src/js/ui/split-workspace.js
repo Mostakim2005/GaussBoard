@@ -138,12 +138,24 @@ export class SplitWorkspace {
         leftBoardId = otherBoards[0].id;
       }
     } else if (leftBoardId && leftBoardId === currentMainId) {
-      this.app?.toast?.(t('A board cannot be split against itself. Please select a different board.'));
       if (otherBoards.length > 0) {
         leftBoardId = otherBoards[0].id;
         leftBoardData = null;
       } else {
-        return;
+        const baseName = this.app?.store?.doc?.name || this.app?.store?.doc?.title || t('Untitled board');
+        const companionId = 'board_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        const companionDoc = { id: companionId, name: `${baseName} - ${t('Notes')}`, objects: [], order: [], pages: [], createdAt: Date.now(), updatedAt: Date.now() };
+        try {
+          if (typeof window.board?.boards?.save === 'function') {
+            await window.board.boards.save(companionDoc, { setLast: false });
+            await this.refreshBoardList();
+          }
+          leftBoardId = companionId;
+          leftBoardData = companionDoc;
+        } catch {
+          this.app?.toast?.(t('A board cannot be split against itself. Please select a different board.'));
+          return;
+        }
       }
     }
 
@@ -482,8 +494,6 @@ export class SplitWorkspace {
       inkNib: this.leftNib
     });
 
-    // Wire left canvas navigation (fallback if Interaction is not bound and sync hooks)
-    this.wireLeftCanvasNavigation(cLeft);
 
     this._resizeHandler = () => {
       if (this.leftSurface) this.leftSurface.resize();

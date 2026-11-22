@@ -294,8 +294,9 @@ export async function saveBoard(payload) {
     try { doc = JSON.parse(payload); id = id || doc.id; } catch {}
   }
 
+  if (!doc || typeof doc !== 'object') return false;
   if (!id) id = 'board-' + Date.now();
-  if (doc) doc.id = id;
+  doc.id = id;
   const name = doc?.name || payload.name || 'Untitled board';
   const modified = Date.now();
   const objects = Array.isArray(doc?.objects) ? doc.objects.length : 0;
@@ -315,6 +316,7 @@ export async function saveBoard(payload) {
       if (!(payload && typeof payload === 'object' && payload.setLast === false)) metaStore.put({ key: 'last-board', value: { id, at: modified } });
 
       tx.oncomplete = () => resolve(true);
+      tx.onabort = () => reject(tx.error || new Error('Board save transaction aborted'));
       tx.onerror = () => {
         const err = tx.error || new Error('Failed to save board');
         if (err.name === 'QuotaExceededError') {
@@ -571,8 +573,11 @@ export async function migrateLegacyData() {
         try {
           const doc = JSON.parse(raw);
           if (doc && doc.id) {
-            await saveBoard(doc);
-            moved++;
+            const existing = await loadBoard(doc.id);
+            if (!existing) {
+              await saveBoard(doc);
+              moved++;
+            }
           }
         } catch {}
       }

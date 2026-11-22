@@ -111,7 +111,7 @@ class Fraction {
   add(f) { return new Fraction(this.n * f.d + f.n * this.d, this.d * f.d); }
   sub(f) { return new Fraction(this.n * f.d - f.n * this.d, this.d * f.d); }
   mul(f) { return new Fraction(this.n * f.n, this.d * f.d); }
-  div(f) { return new Fraction(this.n * f.d, this.d * f.n); }
+  div(f) { if (!f || f.n === 0) throw new Error('Division by zero in chemical balancer'); return new Fraction(this.n * f.d, this.d * f.n); }
   isZero() { return this.n === 0; }
 }
 
@@ -218,6 +218,15 @@ export function balanceChemicalEquation(equationStr) {
   });
 
   const intCoeffs = coeffs.map((f) => Math.round((f.n * totalLcm) / f.d));
+  if (!intCoeffs.length || intCoeffs.some((c) => !Number.isFinite(c) || c <= 0)) {
+    throw new Error('Cannot balance chemical equation: no positive integer solution');
+  }
+  for (const el of allElements) {
+    let lhs = 0, rhs = 0;
+    reactantCounts.forEach((counts, i) => { lhs += (counts[el] || 0) * intCoeffs[i]; });
+    productCounts.forEach((counts, i) => { rhs += (counts[el] || 0) * intCoeffs[reactants.length + i]; });
+    if (lhs !== rhs) throw new Error(`Cannot balance chemical equation: atom conservation failed for ${el}`);
+  }
 
   // Determine reaction classification
   const reactionType = classifyReaction(reactants, products, intCoeffs);
@@ -324,7 +333,8 @@ export function insertReactionCard(app, result) {
     w: 360,
     h: 220,
     text: cardText,
-    size: 16,
+    fontSize: 16,
+    markdown: true,
     color: '#0f6cbd'
   };
 

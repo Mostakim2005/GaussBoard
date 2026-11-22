@@ -2,7 +2,6 @@
 // Seamlessly activates the appropriate platform runtime (Electron or Web/PWA).
 
 import { createWebAdapter, emitOpenFile } from './web-adapter.js';
-import { registerSessionFile } from './web-files.js';
 import { createAndroidAdapter } from './android-adapter.js';
 
 export function initPlatform() {
@@ -59,7 +58,7 @@ export function initPlatform() {
     const files = Array.from(e.dataTransfer.files);
     for (const f of files) {
       const ext = f.name.split('.').pop().toLowerCase();
-      if (['gazboard', 'openboard', 'json'].includes(ext)) {
+      if (['gaussboard', 'gazboard', 'openboard', 'json'].includes(ext)) {
         try {
           const text = await f.text();
           const doc = JSON.parse(text);

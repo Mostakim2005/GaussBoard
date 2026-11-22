@@ -68,7 +68,9 @@ export function createWebAdapter() {
       console.log('[platform] Data stored in persistent browser IndexedDB');
     },
     openReleases: (url) => {
-      window.open(url || 'https://github.com/Mostakim2005/GaussBoard/releases', '_blank', 'noopener,noreferrer');
+      const fallback = 'https://github.com/Mostakim2005/GaussBoard/releases';
+      const safe = typeof url === 'string' && /^https:\/\/github\.com\/Mostakim2005\/GaussBoard\/releases(\/|$)/i.test(url) ? url : fallback;
+      window.open(safe, '_blank', 'noopener,noreferrer');
       return Promise.resolve(true);
     },
     checkForUpdate: () => updater.checkForUpdate(),

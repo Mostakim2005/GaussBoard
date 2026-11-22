@@ -89,12 +89,13 @@ test('desktop: the notes step points at the file when it exists, and falls back 
   if (!BASH) { t.skip(noBash()); return; }
   const script = runBlocks(read('.github/workflows/release.yml'), 'Find the release notes for this version')[0];
   const dir = scratch();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.mkdirSync(path.join(dir, 'release-notes'));
   fs.writeFileSync(path.join(dir, 'release-notes', '9.9.9.md'), 'Hello.\n');
   const outputs = (tag) => {
     const out = 'out-' + tag;            // relative to the scratch folder, so no Windows path goes through bash
     fs.writeFileSync(path.join(dir, out), '');
-    execFileSync(BASH, ['-c', script], { cwd: dir, env: { ...process.env, GITHUB_REF_NAME: tag, GITHUB_OUTPUT: out }, stdio: 'pipe' });
+    execFileSync(BASH, ['--noprofile', '--norc', '-c', script], { cwd: dir, env: { ...process.env, BASH_ENV: '', ENV: '', GITHUB_REF_NAME: tag, GITHUB_OUTPUT: out }, stdio: 'pipe' });
     return fs.readFileSync(path.join(dir, out), 'utf8').replace(/\r\n/g, '\n');
   };
   const have = outputs('v9.9.9');
@@ -113,10 +114,11 @@ test('android: the release text is the same release-notes file plus install note
   // run the step up to the point where it would publish, then show what it wrote
   const upTo = publish.split('gh release create')[0] + '\ncat "$NOTES"\n';
   const dir = scratch();
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.mkdirSync(path.join(dir, 'release-notes'));
   const ours = '## What\'s Changed\n\n**Something new:** a whole paragraph that is long enough to have been wrapped by hand if anybody had done it.\n';
   fs.writeFileSync(path.join(dir, 'release-notes', '9.9.9.md'), ours);
-  const run = (version) => execFileSync(BASH, ['-c', upTo], { cwd: dir, env: { ...process.env, VERSION: version, BUILD: '1' }, stdio: ['ignore', 'pipe', 'pipe'] }).toString().replace(/\r\n/g, '\n');
+  const run = (version) => execFileSync(BASH, ['--noprofile', '--norc', '-c', upTo], { cwd: dir, env: { ...process.env, BASH_ENV: '', ENV: '', VERSION: version, BUILD: '1' }, stdio: ['ignore', 'pipe', 'pipe'] }).toString().replace(/\r\n/g, '\n');
   const text = run('9.9.9');
   assert.ok(text.startsWith(ours), `the release-notes file should come first, as written. Got:\n${text.slice(0, 400)}`);
   assert.match(text, /## Install/, `the install notes are missing:\n${text}`);

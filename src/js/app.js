@@ -18,7 +18,7 @@ import { uid, debounce, clamp, unionBox } from './core/util.js';
 import { EXCERPT_MIME, excerptImageObject, validateExcerptPayload } from './core/excerpts.js';
 import { pageRects, stripBounds, pageIndexForBox, nearestPageIndex, offsetIntoRect, PAGE_GAP, todayStamp } from './core/pages.js';
 import { isNewer } from './core/version.js';
-import { emojiAspect, forgetEmojiMetrics, setDarkBoard, setPageColor } from './core/render.js';
+import { emojiAspect, forgetEmojiMetrics, setDarkBoard, setPageColor , pruneImageCache } from './core/render.js';
 import { objectRuns, runsToHtml, htmlToRuns, normalizeRuns, AUTO_INK } from './core/richtext.js';
 import { folderOf, folderPath, folderList, createFolder, renameFolder, moveBoard, catalogueOf, mergeCatalogue } from './core/folders.js';
 import * as Recent from './core/recent.js';
@@ -1116,25 +1116,30 @@ class App {
   }
 
   async loadBoard(data, opts = {}) {
+    const loadGen = (this._loadGen = (this._loadGen || 0) + 1);
     // Anything that is not the startup restore is somebody asking for a
     // particular board - from a file dialog, a drag onto the window, or a
     // double-click in Explorer. Whatever the startup restore was about to
     // reopen, it does not get to land on top of that.
     if (!opts.startup) this.boardOpenedExplicitly = true;
     if (!opts.startup) await this.saveBeforeLeaving();
+    if (loadGen !== this._loadGen) return;
     // A board arriving from a file has to be given its own place to live before
     // anything is written, or the first autosave lands on somebody else's board.
     // `claimed` means the caller has already decided which board on this
     // machine this one is - the sync accept dialog does that itself, so that
     // arriving from another computer asks ONE question rather than two.
     if (!opts.startup && !opts.claimed && data && data.origin) data = await this.claimLocalBoard(data);
+    if (loadGen !== this._loadGen) return;
     this.textEditor.cancel();
     this.mathEditor?.close();
     // A board asked for by name is what the person wants to see: the My boards
     // page, if it is up, steps aside for it.
     if (!opts.startup && this.panels?.page) this.panels.close();
     data = await this.resolveAssets(data);
+    if (loadGen !== this._loadGen) return;
     this.store.load(data);
+    pruneImageCache(new Set(this.store.list().filter((o) => o && o.src).map((o) => o.src)));
     if (this.store.repaired) this.toast(this.store.repaired === 1
       ? t('A table in this board had an impossible size and has been mended')
       : t('{n} tables in this board had impossible sizes and have been mended', { n: this.store.repaired }), 'help', 6000);
@@ -2298,6 +2303,7 @@ class App {
    */
   promptTapeAssessment(tapeObj) {
     if (typeof document === 'undefined' || !tapeObj) return;
+    this._closeTapeAssess?.();
     document.querySelector('.tape-assess-popover')?.remove();
 
     const pop = document.createElement('div');
@@ -2339,7 +2345,9 @@ class App {
     const close = () => {
       pop.remove();
       document.removeEventListener('pointerdown', onDocPointer);
+      if (this._closeTapeAssess === close) this._closeTapeAssess = null;
     };
+    this._closeTapeAssess = close;
 
     const onDocPointer = (e) => {
       if (!pop.contains(e.target)) close();
@@ -3680,9 +3688,10 @@ class App {
     image.isExcerpt = true;
     this.clipboard = [image];
     try { await window.board?.clipboardWrite?.({ image: payload.dataUrl }); } catch { /* in-app clipboard remains available */ }
+    const clipGen = (this._clipGen = (this._clipGen || 0) + 1);
     this.clipStamp = this.clipboardStamp();
     if (this.clipStamp == null) {
-      this.clipboardNow().then((c) => { if (c?.signature != null) this.clipStamp = c.signature; });
+      this.clipboardNow().then((c) => { if (clipGen === this._clipGen && c?.signature != null) this.clipStamp = c.signature; });
     }
     this.toast(t('Excerpt copied — paste it into another board'));
     return true;
@@ -3690,6 +3699,7 @@ class App {
 
   /** Interactive Snipping Tool: click-and-drag anywhere on the board to capture a linked excerpt. */
   startSnippingExcerpt() {
+    this._cancelSnip?.();
     document.getElementById('snipOverlay')?.remove();
     const stage = document.getElementById('stage') || document.body;
 
@@ -3811,9 +3821,10 @@ class App {
 
       this.clipboard = [image];
       try { await window.board?.clipboardWrite?.({ image: payload.dataUrl }); } catch {}
+      const clipGen = (this._clipGen = (this._clipGen || 0) + 1);
       this.clipStamp = this.clipboardStamp();
       if (this.clipStamp == null) {
-        this.clipboardNow().then((c) => { if (c?.signature != null) this.clipStamp = c.signature; });
+        this.clipboardNow().then((c) => { if (clipGen === this._clipGen && c?.signature != null) this.clipStamp = c.signature; });
       }
 
       this.toast(t('Excerpt captured — copied to clipboard! Paste onto any board.'), 'check');
@@ -3829,6 +3840,7 @@ class App {
     overlay.addEventListener('pointerdown', onPointerDown);
     overlay.addEventListener('pointermove', onPointerMove);
     overlay.addEventListener('pointerup', onPointerUp);
+    this._cancelSnip = () => { cleanup(); this._cancelSnip = null; };
     window.addEventListener('keydown', onKeyDown);
     stage.appendChild(overlay);
   }

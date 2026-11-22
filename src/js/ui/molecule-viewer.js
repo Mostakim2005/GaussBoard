@@ -1,3 +1,4 @@
+import { bindModalA11y } from './modal-a11y.js';
 /**
  * @file molecule-viewer.js
  * @description Interactive 3D Molecular Structure Viewer & Crystallography Dock (GazBoard Phase 5 / v6.5.0)
@@ -195,7 +196,7 @@ export class MoleculeViewerModal {
     // View state
     this.currentMolecule = MOLECULE_DATABASE[0];
     this.renderMode = 'ball-stick'; // 'ball-stick' | 'space-fill' | 'wireframe'
-    this.autoRotate = true;
+    this.autoRotate = !(typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 
     // 3D Rotation Euler angles
     this.rotX = 0.3;
@@ -219,12 +220,16 @@ export class MoleculeViewerModal {
       if (found) this.setMolecule(found);
     }
     this.modal.classList.add('visible');
+    this._releaseA11y?.();
+    this._releaseA11y = bindModalA11y(this.modal, { onClose: () => this.close(), label: '3D Molecule Viewer' });
     this.resizeCanvas();
     this.startLoop();
   }
 
   close() {
     if (this.modal) this.modal.classList.remove('visible');
+    this._releaseA11y?.();
+    this._releaseA11y = null;
     this.stopLoop();
   }
 
@@ -359,7 +364,7 @@ export class MoleculeViewerModal {
       this.lastMouse = { x: e.clientX, y: e.clientY };
     });
 
-    window.addEventListener('mousemove', (e) => {
+    this._onMouseMove = (e) => {
       if (!this.isDragging) return;
       const dx = e.clientX - this.lastMouse.x;
       const dy = e.clientY - this.lastMouse.y;
@@ -367,11 +372,12 @@ export class MoleculeViewerModal {
       this.rotY += dx * 0.01;
       this.rotX += dy * 0.01;
       this.lastMouse = { x: e.clientX, y: e.clientY };
-    });
-
-    window.addEventListener('mouseup', () => {
+    };
+    this._onMouseUp = () => {
       this.isDragging = false;
-    });
+    };
+    window.addEventListener('mousemove', this._onMouseMove);
+    window.addEventListener('mouseup', this._onMouseUp);
 
     // Canvas click for atom selection and distance/angle measurement
     this.canvas.addEventListener('click', (e) => {
@@ -837,9 +843,8 @@ export class MoleculeViewerModal {
   loadCustomMolecule(customMol) {
     if (!customMol || !Array.isArray(customMol.atoms)) return;
     this.currentMolecule = customMol;
-    this.selectedAtoms = [];
-    this.measureInfo = null;
-    this.updateInfoDisplay();
+    this.selectedAtomIndices = [];
+    this.updateDetails?.();
     this.render();
   }
 
@@ -880,6 +885,8 @@ export class MoleculeViewerModal {
 
   destroy() {
     this.close();
+    if (this._onMouseMove) { window.removeEventListener('mousemove', this._onMouseMove); this._onMouseMove = null; }
+    if (this._onMouseUp) { window.removeEventListener('mouseup', this._onMouseUp); this._onMouseUp = null; }
     if (this.modal) {
       this.modal.remove();
       this.modal = null;

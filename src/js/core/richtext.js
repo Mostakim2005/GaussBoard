@@ -489,9 +489,9 @@ export function runsToHtml(runs, text, base = {}) {
     if (eff.bold) css.push('font-weight:bold');
     if (eff.italic) css.push('font-style:italic');
     if (eff.underline) css.push('text-decoration:underline');
-    if (eff.color) css.push('color:' + eff.color);
+    if (eff.color) css.push('color:' + escHtml(String(eff.color).replace(/[;"'<>]/g, '')));
     const body = escHtml(refsAsWords(r.t)).replace(/\n/g, '<br>');
-    out += css.length ? `<span style="${css.join(';')}">${body}</span>` : body;
+    out += css.length ? `<span style="${escHtml(css.join(';'))}">${body}</span>` : body;
   }
   return out;
 }

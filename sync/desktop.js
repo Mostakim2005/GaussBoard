@@ -28,11 +28,18 @@ function createIdentity(userDataDir) {
   const idFile = path.join(userDataDir, 'sync-identity.json');
   const pairedFile = path.join(userDataDir, 'sync-paired.json');
 
+  const writePrivateAtomic = (file, data) => {
+    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmp, data, { encoding: 'utf8', mode: 0o600 });
+    fs.renameSync(tmp, file);
+    try { fs.chmodSync(file, 0o600); } catch {}
+  };
+
   let identity = null;
   try { identity = JSON.parse(fs.readFileSync(idFile, 'utf8')); } catch { /* first run */ }
   if (!identity || !identity.deviceId) {
     identity = { deviceId: P.newDeviceId(), name: os.hostname() || 'This computer' };
-    try { fs.writeFileSync(idFile, JSON.stringify(identity, null, 2)); } catch { /* read-only home */ }
+    try { writePrivateAtomic(idFile, JSON.stringify(identity, null, 2)); } catch { /* read-only home */ }
   }
 
   let onDisk = [];
@@ -46,7 +53,7 @@ function createIdentity(userDataDir) {
     // Only the remembered ones reach the disk. That single line is what makes
     // "just for this session" true rather than merely intended.
     const keep = [...devices.values()].filter((r) => r.remember);
-    try { fs.writeFileSync(pairedFile, JSON.stringify(keep, null, 2)); } catch { /* not fatal */ }
+    try { writePrivateAtomic(pairedFile, JSON.stringify(keep, null, 2)); } catch { /* not fatal */ }
   };
 
   return {
@@ -54,7 +61,7 @@ function createIdentity(userDataDir) {
     get deviceName() { return identity.name; },
     setDeviceName(name) {
       identity.name = String(name || '').slice(0, 64) || os.hostname() || 'This computer';
-      try { fs.writeFileSync(idFile, JSON.stringify(identity, null, 2)); } catch {}
+      try { writePrivateAtomic(idFile, JSON.stringify(identity, null, 2)); } catch {}
       return identity.name;
     },
     paired: {

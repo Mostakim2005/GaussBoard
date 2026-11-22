@@ -531,13 +531,14 @@ export class VideoExporter {
       if (rec.state !== 'inactive') rec.stop();
     }, 200);
 
+    if (this.cancelled) throw new Error('Export cancelled by user');
     if (videoEncoder && mp4Muxer) {
       try {
         await videoEncoder.flush();
         videoEncoder.close();
         mp4Muxer.finalize();
         const buf = mp4Target.buffer;
-        return { blob: new Blob([buf], { type: 'video/mp4' }), durationMs: cumulativeElapsedMs };
+        return { blob: new Blob([buf], { type: 'video/mp4' }), durationMs: cumulativeElapsedMs, actualFormat: 'mp4' };
       } catch (err) {
         console.warn('MP4 finalization failed, falling back to WebM blob:', err);
       }
@@ -546,6 +547,7 @@ export class VideoExporter {
     const blob = await completionPromise;
     return { blob, durationMs: cumulativeElapsedMs };
     } finally {
+      if (videoEncoder && videoEncoder.state !== 'closed') { try { videoEncoder.close(); } catch {} }
       if (rec && rec.state !== 'inactive') { try { rec.stop(); } catch {} }
       try { activeSource?.disconnect(); } catch {}
       if (activeAudio) {

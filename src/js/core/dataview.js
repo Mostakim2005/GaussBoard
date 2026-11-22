@@ -59,7 +59,8 @@ export class DataviewEngine {
         columns = fieldStr ? [fieldStr] : ['text'];
       }
 
-      // 2. Parse Clauses: WHERE, SORT, LIMIT
+      // 2. Parse Clauses: FROM, WHERE, SORT, LIMIT
+      let fromTag = null;
       let whereClause = null;
       let sortField = null;
       let sortDir = 'ASC';
@@ -67,7 +68,9 @@ export class DataviewEngine {
 
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
-        if (/^WHERE\s+/i.test(line)) {
+        if (/^FROM\s+/i.test(line)) {
+          fromTag = line.replace(/^FROM\s+/i, '').trim().replace(/^["']|["']$/g, '');
+        } else if (/^WHERE\s+/i.test(line)) {
           whereClause = line.replace(/^WHERE\s+/i, '').trim();
         } else if (/^SORT\s+/i.test(line)) {
           const sortParts = line.replace(/^SORT\s+/i, '').trim().split(/\s+/);
@@ -82,6 +85,14 @@ export class DataviewEngine {
       // 3. Extract items from store
       const rawObjects = store?.doc?.objects ? Object.values(store.doc.objects) : (Array.isArray(store) ? store : []);
       let items = rawObjects.filter(Boolean);
+      if (fromTag) {
+        const tagNeedle = fromTag.startsWith('#') ? fromTag.toLowerCase() : '#' + fromTag.toLowerCase();
+        items = items.filter((item) => {
+          const tags = Array.isArray(item.tags) ? item.tags.map((x) => String(x).toLowerCase()) : [];
+          if (tags.some((x) => x === tagNeedle || '#' + x === tagNeedle)) return true;
+          return String(item.text || '').toLowerCase().includes(tagNeedle);
+        });
+      }
 
       // 4. Apply WHERE filtering
       if (whereClause) {
@@ -233,7 +244,7 @@ export class DataviewEngine {
       return !isNaN(val) && val < num;
     }
 
-    return true;
+    throw new Error(`Unsupported WHERE clause: ${s}`);
   }
 
   /**

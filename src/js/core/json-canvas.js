@@ -47,10 +47,14 @@ export function fromCanvasColor(color) {
 export function exportToJsonCanvas(doc, options = {}) {
   const nodes = [];
   const edges = [];
-  const objects = doc?.objects || {};
+  const rawObjects = doc?.objects || {};
+  const entries = Array.isArray(rawObjects)
+    ? rawObjects.filter((o) => o && typeof o === 'object' && o.id).map((o) => [o.id, o])
+    : Object.entries(rawObjects);
+  const objects = Object.fromEntries(entries);
 
   // Process nodes
-  for (const [id, o] of Object.entries(objects)) {
+  for (const [id, o] of entries) {
     if (!o || typeof o !== 'object') continue;
 
     const x = Math.round(o.x ?? 0);
@@ -118,7 +122,7 @@ export function exportToJsonCanvas(doc, options = {}) {
       }
 
       case 'shape': {
-        if (o.shapeKind === 'rect' && !o.toId) {
+        if ((o.kind === 'rect' || o.shapeKind === 'rect') && !o.toId) {
           nodes.push({
             id,
             type: 'group',
@@ -243,11 +247,13 @@ export function importFromJsonCanvas(canvasInput, options = {}) {
       }
 
       case 'link': {
+        const rawUrl = typeof node.url === 'string' ? node.url.trim() : '';
+        const safeUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : '';
         importedObjects[gid] = {
           id: gid,
           type: 'video',
-          url: node.url || '',
-          name: node.url || 'Web Link',
+          url: safeUrl,
+          name: safeUrl || 'Web Link',
           x, y, w, h,
           color
         };
@@ -258,7 +264,7 @@ export function importFromJsonCanvas(canvasInput, options = {}) {
         importedObjects[gid] = {
           id: gid,
           type: 'shape',
-          shapeKind: 'rect',
+          kind: 'rect',
           text: node.label || '',
           x, y, w, h,
           stroke: color || '#201f1e',

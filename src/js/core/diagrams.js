@@ -24,7 +24,7 @@ export function loadMermaid() {
             window.mermaid.initialize({
               startOnLoad: false,
               theme: 'default',
-              securityLevel: 'loose',
+              securityLevel: 'strict',
               suppressErrorRendering: true,
               fontFamily: 'Segoe UI, -apple-system, system-ui, sans-serif'
             });

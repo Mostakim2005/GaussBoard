@@ -427,6 +427,10 @@ function createSyncNode(opts) {
    * attacker gets CODE_MAX_ATTEMPTS online guesses inside that window.
    */
   const halfPaired = new Map();      // initiator deviceId -> { keys, them, at }
+  const MAX_HALF_PAIRED = 64;
+  const MAX_CONCURRENT_SENDS = 2;
+  const MAX_CONTROL_RESPONSE_BYTES = 64 * 1024;
+  let activeSends = 0;
 
   function sweepHalfPaired() {
     const cutoff = Date.now() - P.CODE_TTL_MS;
@@ -443,6 +447,9 @@ function createSyncNode(opts) {
     if (body.v !== P.PROTOCOL) return json(res, 400, { error: 'version mismatch' });
     if (!body.deviceId || !body.publicKey) return json(res, 400, { error: 'bad request' });
 
+    if (halfPaired.size >= MAX_HALF_PAIRED && !halfPaired.has(String(body.deviceId))) {
+      return json(res, 429, { error: 'too many pairing attempts' });
+    }
     const keys = P.createPairingKeys();
     halfPaired.set(String(body.deviceId), {
       keys,
@@ -470,13 +477,16 @@ function createSyncNode(opts) {
 
     const us = { deviceId, publicKey: half.keys.publicKey };
     const who = half.them.deviceId;
+    const rateKey = `${req.socket?.remoteAddress || 'unknown'}|${who}`;
 
-    const barred = guessingRefused(active, who);
+    const barred = guessingRefused(active, rateKey) || guessingRefused(active, who);
     if (barred) return json(res, 429, { error: barred, attemptsLeft: 0 });
 
     if (!P.confirmationMatches(P.confirmation(active.code, half.them, us, 'initiator'), body.confirm)) {
       noteWrongGuess(active, who);
-      const left = Math.max(0, P.CODE_MAX_ATTEMPTS - (active.attemptsBy.get(who) || 0));
+      if (rateKey !== who) active.attemptsBy.set(rateKey, (active.attemptsBy.get(rateKey) || 0) + 1);
+      const used = Math.max(active.attemptsBy.get(who) || 0, active.attemptsBy.get(rateKey) || 0);
+      const left = Math.max(0, P.CODE_MAX_ATTEMPTS - used);
       return json(res, 403, { error: 'wrong code', attemptsLeft: left });
     }
 
@@ -596,20 +606,30 @@ function createSyncNode(opts) {
     if (claimed && !known) {
       return json(res, 401, { error: 'not paired' });
     }
+    if (activeSends >= MAX_CONCURRENT_SENDS) {
+      done('failed');
+      return json(res, 503, { error: 'busy' });
+    }
+    activeSends++;
+    const bodyTimer = setTimeout(() => { try { req.destroy(); } catch {} }, 30000);
 
     let envelope;
     try {
       envelope = JSON.parse((await readBody(req, MAX_BOARD_BYTES, report)).toString());
     } catch (e) {
+      clearTimeout(bodyTimer);
+      activeSends--;
       done('failed');
       return json(res, e.message === 'too large' ? 413 : 400, { error: e.message || 'bad request' });
     }
+    clearTimeout(bodyTimer);
+    activeSends--;
 
     const from = envelope?.aad?.from;
     const rec = from && paired.get(from);
     // An unpaired sender is told nothing beyond "no". Whether a given device id
     // is known here is not something a stranger gets to probe for.
-    if (!rec) { done('failed'); return json(res, 401, { error: 'not paired' }); }
+    if (!rec || envelope?.aad?.kind !== 'board') { done('failed'); return json(res, 401, { error: 'not paired' }); }
 
     const plain = P.open(Buffer.from(rec.key, 'base64'), envelope);
     if (!plain) { done('failed'); return json(res, 401, { error: 'not paired' }); }
@@ -882,7 +902,12 @@ function createSyncNode(opts) {
         timeout: timeoutMs
       }, (res) => {
         const chunks = [];
-        res.on('data', (c) => chunks.push(c));
+        let total = 0;
+        res.on('data', (c) => {
+          total += c.length;
+          if (total > MAX_CONTROL_RESPONSE_BYTES) { req.destroy(new Error('response too large')); return; }
+          chunks.push(c);
+        });
         res.on('end', () => {
           let parsed = null;
           try { parsed = JSON.parse(Buffer.concat(chunks).toString()); } catch { /* not json */ }
@@ -1043,7 +1068,12 @@ function createSyncNode(opts) {
       const req = http.request({ host: address, port: addrPort, path: '/ping', method: 'GET', timeout: 5000 },
         (res) => {
           const chunks = [];
-          res.on('data', (c) => chunks.push(c));
+          let total = 0;
+          res.on('data', (c) => {
+            total += c.length;
+            if (total > MAX_CONTROL_RESPONSE_BYTES) { req.destroy(new Error('response too large')); return; }
+            chunks.push(c);
+          });
           res.on('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString())); } catch { reject(new Error('not a GazBoard')); } });
         });
       req.on('timeout', () => req.destroy(new Error('no answer from that address')));
@@ -1115,7 +1145,7 @@ function createSyncNode(opts) {
     catch { return json(res, 200, { paired: false }); }
     const from = envelope?.aad?.from;
     const rec = from && paired.get(from);
-    if (!rec) return json(res, 200, { paired: false });
+    if (!rec || envelope?.aad?.kind !== 'still-paired') return json(res, 200, { paired: false });
     const plain = P.open(Buffer.from(rec.key, 'base64'), envelope);
     // The envelope opened, so this is them and the pairing is real on this side.
     if (!plain || plain.toString() !== from) return json(res, 200, { paired: false });
@@ -1165,7 +1195,7 @@ function createSyncNode(opts) {
 
     const from = envelope?.aad?.from;
     const rec = from && paired.get(from);
-    if (rec) {
+    if (rec && envelope?.aad?.kind === 'unpair') {
       const plain = P.open(Buffer.from(rec.key, 'base64'), envelope);
       if (plain && plain.toString() === from) {
         paired.remove(from);

@@ -2,7 +2,7 @@
   "name": "gazboard",
   "productName": "GaussBoard",
   "version": "6.10.0",
-  "description": "GaussBoard â€” An offline digital whiteboard & STEM engineering workstation for electrical engineering students, inspired by a combination of StarNote, Flexcil, LiquidText, and Microsoft OneNote.",
+  "description": "GaussBoard — An offline digital whiteboard & STEM engineering workstation for electrical engineering students, inspired by a combination of StarNote, Flexcil, LiquidText, and Microsoft OneNote.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -198,7 +198,6 @@
       ]
     }
   },
-  "desktopName": "gazboard.desktop",
   "dependencies": {
     "electron-updater": "6.8.10"
   }

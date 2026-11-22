@@ -123,6 +123,7 @@ const PRECACHE_ASSETS = [
   './js/ui/pdfdialog.js',
   './js/ui/periodic-table.js',
   './js/ui/phet-runner.js',
+  './js/ui/modal-a11y.js',
   './js/ui/popover.js',
   './js/ui/present.js',
   './js/ui/properties-dialog.js',
@@ -143,6 +144,7 @@ const PRECACHE_ASSETS = [
   './js/platform/platform.js',
   './js/platform/android-adapter.js',
   './js/platform/android-convert.js',
+  './js/platform/desktop-convert.js',
   './js/platform/web-adapter.js',
   './js/platform/web-clipboard.js',
   './js/platform/web-storage.js',
@@ -239,9 +241,10 @@ self.addEventListener('fetch', (event) => {
   if (!url.protocol.startsWith('http')) return;
 
   // Never cache version check manifest or update API
-  if (url.pathname.endsWith('/version.json') || url.searchParams.has('t')) {
+  if (url.pathname.endsWith('/version.json')) {
     event.respondWith(
       fetch(req, { signal: AbortSignal.timeout(5000) }).catch(() => new Response(JSON.stringify({ ok: false, error: 'Offline' }), {
+        status: 503,
         headers: { 'Content-Type': 'application/json' }
       }))
     );
@@ -254,10 +257,8 @@ self.addEventListener('fetch', (event) => {
       (async () => {
         try {
           // Attempt network with a 2500ms timeout so slow mobile connections don't hang
-          const netPromise = fetch(req);
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500));
-          const res = await Promise.race([netPromise, timeoutPromise]);
-          if (res && res.status === 200) {
+          const res = await fetch(req, { signal: AbortSignal.timeout(2500) });
+          if (res && res.status === 200 && res.type === 'basic') {
             const clone = res.clone();
             caches.open(SHELL_CACHE).then((c) => c.put(req, clone)).catch(() => {});
             return res;
@@ -281,10 +282,10 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(req).then(async (cached) => {
       if (cached) {
-        // Asynchronously update in background if online
-        if (navigator.onLine && !url.pathname.includes('/vendor/cmaps/')) {
+        // Asynchronously update in background if online (same-origin basic only)
+        if (navigator.onLine && url.origin === self.location.origin && !url.pathname.includes('/vendor/cmaps/')) {
           fetch(req).then((fresh) => {
-            if (fresh && fresh.status === 200) {
+            if (fresh && fresh.status === 200 && fresh.type === 'basic') {
               caches.open(SHELL_CACHE).then((c) => c.put(req, fresh));
             }
           }).catch(() => {});
@@ -292,10 +293,10 @@ self.addEventListener('fetch', (event) => {
         return cached;
       }
 
-      // Not in cache, fetch from network and cache in runtime cache
+      // Not in cache, fetch from network and cache same-origin basic responses in runtime cache
       try {
         const fresh = await fetch(req);
-        if (fresh && fresh.status === 200) {
+        if (fresh && fresh.status === 200 && url.origin === self.location.origin && fresh.type === 'basic') {
           const clone = fresh.clone();
           caches.open(RUNTIME_CACHE).then((c) => c.put(req, clone));
         }

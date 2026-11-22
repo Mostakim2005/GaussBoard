@@ -5,7 +5,7 @@ import { pageRects } from './core/pages.js';
 import { wrapText, boxesIntersect } from './core/util.js';
 import { objectRuns, layoutRich, effective, needsRich, chipColours, chipPad } from './core/richtext.js';
 import { layoutPages } from './ui/pdfdialog.js';
-import { FONT, faceOf, CURTAIN_COLOR, drawBoardLink, linkRectsOf, getImage, setDarkBoard, isDarkBoard, pencilDarkness, pencilWidth } from './core/render.js';
+import { FONT, faceOf, CURTAIN_COLOR, drawBoardLink, linkRectsOf, getImage, clampImageCrop, setDarkBoard, isDarkBoard, pencilDarkness, pencilWidth } from './core/render.js';
 import { refLabel, refMissing, lookupBoard } from './core/boardrefs.js';
 import { Store } from './core/store.js';
 import { useConnectorStore } from './core/connectors.js';
@@ -328,25 +328,31 @@ function svgObjects(objects, meas) {
     } else if (o.type === 'image') {
       const img = getImage(o.src);
       if (o.crop && o.crop.sw > 0 && o.crop.sh > 0 && img && img.complete && img.naturalWidth > 0 && typeof document !== 'undefined') {
+        const { sx, sy, sw, sh } = clampImageCrop(o.crop, img.naturalWidth, img.naturalHeight);
         const cv = document.createElement('canvas');
-        cv.width = Math.max(1, Math.round(o.crop.sw));
-        cv.height = Math.max(1, Math.round(o.crop.sh));
+        cv.width = Math.max(1, Math.round(sw));
+        cv.height = Math.max(1, Math.round(sh));
         const cx = cv.getContext('2d');
-        cx.drawImage(img, o.crop.sx, o.crop.sy, o.crop.sw, o.crop.sh, 0, 0, cv.width, cv.height);
-        parts.push(`<image x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" href="${cv.toDataURL('image/png')}" preserveAspectRatio="none"${rot}/>`);
+        cx.drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+        parts.push(`<image x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" href="${esc(cv.toDataURL('image/png'))}" preserveAspectRatio="none"${rot}/>`);
       } else {
-        parts.push(`<image x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" href="${o.src}" preserveAspectRatio="none"${rot}/>`);
+        parts.push(`<image x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" href="${esc(o.src || '')}" preserveAspectRatio="none"${rot}/>`);
       }
     } else if (o.type === 'curtain') {
       // a lifted cover is not on the board, so it is not in the picture either
       if (!o.revealed) {
-        parts.push(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="${Math.min(14, Math.abs(o.w) / 6, Math.abs(o.h) / 6)}" fill="${o.color || CURTAIN_COLOR}"${rot}/>`);
+        if (Array.isArray(o.points) && o.points.length >= 2) {
+          const d = o.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ');
+          parts.push(`<path d="${d}" stroke="${esc(o.color || CURTAIN_COLOR)}" stroke-width="${o.width || 34}" stroke-linecap="round" stroke-linejoin="round" fill="none"${rot}/>`);
+        } else {
+          parts.push(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="${Math.min(14, Math.abs(o.w) / 6, Math.abs(o.h) / 6)}" fill="${esc(o.color || CURTAIN_COLOR)}"${rot}/>`);
+        }
       }
     } else if (o.type === 'table') {
       const cols = tableDim(o.cols), rows = tableDim(o.rows), cw = o.w / cols, ch = o.h / rows;
-      parts.push(`<g${rot}><rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="${o.fill || '#fff'}"/>`);
-      for (let c = 0; c <= cols; c++) parts.push(`<line x1="${o.x + c * cw}" y1="${o.y}" x2="${o.x + c * cw}" y2="${o.y + o.h}" stroke="${o.stroke || '#605e5c'}" stroke-width="${o.lineWidth || 2}"/>`);
-      for (let r = 0; r <= rows; r++) parts.push(`<line x1="${o.x}" y1="${o.y + r * ch}" x2="${o.x + o.w}" y2="${o.y + r * ch}" stroke="${o.stroke || '#605e5c'}" stroke-width="${o.lineWidth || 2}"/>`);
+      parts.push(`<g${rot}><rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="${esc(o.fill || '#fff')}"/>`);
+      for (let c = 0; c <= cols; c++) parts.push(`<line x1="${o.x + c * cw}" y1="${o.y}" x2="${o.x + c * cw}" y2="${o.y + o.h}" stroke="${esc(o.stroke || '#605e5c')}" stroke-width="${o.lineWidth || 2}"/>`);
+      for (let r = 0; r <= rows; r++) parts.push(`<line x1="${o.x}" y1="${o.y + r * ch}" x2="${o.x + o.w}" y2="${o.y + r * ch}" stroke="${esc(o.stroke || '#605e5c')}" stroke-width="${o.lineWidth || 2}"/>`);
       for (const [key, val] of Object.entries(o.cells || {})) {
         const [r, c] = key.split(',').map(Number);
         parts.push(textSvg(meas, val, o.x + c * cw + 6, o.y + r * ch + 6, cw - 12, ch - 12, { align: 'center', valign: 'middle', color: '#201f1e', size: 16, runs: objectRuns(o, key) }, ''));

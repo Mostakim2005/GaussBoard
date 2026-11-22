@@ -277,6 +277,8 @@ export class VideoPlayerDialog {
       onclick: () => this.loadSubtitleFile()
     }, 'CC');
     const btnClose = h('button', {
+      type: 'button',
+      'aria-label': t('Close'),
       style: 'background:none;border:none;color:inherit;font-size:20px;cursor:pointer;padding:2px 8px;',
       onclick: () => this.close()
     }, '✕');
@@ -297,12 +299,13 @@ export class VideoPlayerDialog {
         allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
         allowfullscreen: 'true',
         sandbox: 'allow-scripts allow-same-origin allow-presentation allow-forms allow-popups',
-        referrerpolicy: 'no-referrer-when-downgrade'
+        referrerpolicy: 'no-referrer'
       });
       playerContainer.appendChild(iframe);
       this.iframe = iframe;
 
       this._onWindowMessage = (e) => {
+        if (e.origin !== 'https://www.youtube-nocookie.com' || e.source !== this.iframe?.contentWindow) return;
         try {
           const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
           if (data && data.event === 'infoDelivery' && data.info?.currentTime != null) {
@@ -528,7 +531,7 @@ export class VideoPlayerDialog {
             event: 'command',
             func: 'seekTo',
             args: [seconds, true]
-          }), '*');
+          }), 'https://www.youtube-nocookie.com');
           posted = true;
         }
       } catch (_) {}

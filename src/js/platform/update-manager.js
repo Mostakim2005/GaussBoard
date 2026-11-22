@@ -61,16 +61,16 @@ export async function checkForUpdate(opts = {}) {
   }
 
   // 2. Fetch version.json from origin (never cached)
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 8000);
   try {
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 8000);
     const res = await fetch('./version.json?t=' + Date.now(), {
       signal: ctl.signal,
       cache: 'no-store',
       headers: { 'Accept': 'application/json' }
     });
-    clearTimeout(timer);
 
+    clearTimeout(timer);
     if (!res.ok) return { ok: false, error: t('Server replied {status}', { status: res.status }) };
     const meta = await res.json();
     if (!meta || !meta.version) return { ok: false, error: t('Invalid version manifest') };
@@ -125,7 +125,7 @@ export async function applyUpdate() {
           reloaded = true;
           window.location.reload();
         }
-      });
+      }, { once: true });
       worker.postMessage({ type: 'SKIP_WAITING' });
       return;
     }
@@ -148,7 +148,7 @@ export async function applyUpdate() {
             reloaded = true;
             window.location.reload();
           }
-        });
+        }, { once: true });
         targetWorker.postMessage({ type: 'SKIP_WAITING' });
         return;
       }
@@ -187,8 +187,11 @@ export function initUpdateWatcher() {
     setTimeout(() => checkForUpdate().catch(() => {}), 3000);
   });
 
+  let lastAutoCheckAt = 0;
+  const AUTO_CHECK_COOLDOWN_MS = 15 * 60 * 1000;
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && navigator.onLine) {
+    if (document.visibilityState === 'visible' && navigator.onLine && Date.now() - lastAutoCheckAt >= AUTO_CHECK_COOLDOWN_MS) {
+      lastAutoCheckAt = Date.now();
       checkForUpdate().catch(() => {});
     }
   });

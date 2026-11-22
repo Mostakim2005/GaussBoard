@@ -1,4 +1,6 @@
+<!doctype html>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' app:; style-src 'self' app: 'unsafe-inline'; img-src data: blob:; font-src 'self' app: data:; connect-src 'self' app:;">
 <title>Converting…</title>
 <script src="app://board/vendor/jszip.min.js"></script>
 <script src="app://board/vendor/mammoth.browser.min.js"></script>
@@ -25,58 +27,4 @@
   .sh p { margin: 0 0 .28em; }
 </style>
 <div id="root"></div>
-<script type="module">
-  import { pptxToSlides } from './js/importers/pptx.js';
-
-  const q = new URLSearchParams(location.search);
-  const token = q.get('token');
-  const kind = q.get('kind');
-  const file = q.get('file');
-
-  const fail = (e) => window.board.convertError({ token, message: (e && e.message) || String(e) });
-
-  async function waitForAssets() {
-    if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch {} }
-    const imgs = [...document.images].filter((i) => !i.complete);
-    await Promise.all(imgs.map((i) => new Promise((res) => { i.onload = i.onerror = res; })));
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  }
-
-  try {
-    const buf = await window.board.readFile(file);
-
-    if (kind === 'word') {
-      const res = await window.mammoth.convertToHtml(
-        { arrayBuffer: buf },
-        {
-          convertImage: window.mammoth.images.imgElement((image) =>
-            image.read('base64').then((b64) => ({ src: `data:${image.contentType};base64,${b64}` }))
-          )
-        }
-      );
-      document.getElementById('root').innerHTML = `<div class="doc">${res.value || '<p><em>(empty document)</em></p>'}</div>`;
-      const st = document.createElement('style');
-      st.textContent = '@page { size: A4; margin: 0; }';
-      document.head.appendChild(st);
-      await waitForAssets();
-      window.board.convertReady({ token, widthMm: 210, heightMm: 297 });
-    } else {
-      const { widthPx, heightPx, slides } = await pptxToSlides(buf, { finalLook: q.get('finalLook') !== '0' });
-      const root = document.getElementById('root');
-      root.innerHTML = slides.join('');
-      // A slide that is exactly page-height rounds up into a second sheet, so
-      // trim a hair and pin the paper size explicitly.
-      for (const el of root.querySelectorAll('.slide')) {
-        el.style.width = widthPx + 'px';
-        el.style.height = (heightPx - 1) + 'px';
-      }
-      const st = document.createElement('style');
-      st.textContent = `@page { size: ${widthPx / 96}in ${heightPx / 96}in; margin: 0; }`;
-      document.head.appendChild(st);
-      await waitForAssets();
-      window.board.convertReady({ token, widthMm: (widthPx / 96) * 25.4, heightMm: (heightPx / 96) * 25.4 });
-    }
-  } catch (e) {
-    fail(e);
-  }
-</script>
+<script type="module" src="./js/platform/desktop-convert.js"></script>

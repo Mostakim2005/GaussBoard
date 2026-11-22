@@ -21,10 +21,20 @@ export const faceOf = (id) => fontStack(id || 'ui');
 
 /* ---------- image cache ---------- */
 const imgCache = new Map();
+const MAX_IMG_CACHE = 120;
 export function getImage(src, onload) {
   if (!src) return null;
   let rec = imgCache.get(src);
-  if (!rec) {
+  if (rec) {
+    imgCache.delete(src);
+    imgCache.set(src, rec);
+  } else {
+    while (imgCache.size >= MAX_IMG_CACHE) {
+      const oldestKey = imgCache.keys().next().value;
+      const oldest = imgCache.get(oldestKey);
+      if (oldest?.img) { try { oldest.img.src = ''; } catch {} }
+      imgCache.delete(oldestKey);
+    }
     const img = new Image();
     rec = { img, ready: false };
     imgCache.set(src, rec);
@@ -33,6 +43,14 @@ export function getImage(src, onload) {
     img.src = src;
   }
   return rec.ready ? rec.img : null;
+}
+export function pruneImageCache(activeSrcs = new Set()) {
+  for (const [key, rec] of imgCache) {
+    if (!activeSrcs.has(key)) {
+      if (rec?.img) { try { rec.img.src = ''; } catch {} }
+      imgCache.delete(key);
+    }
+  }
 }
 
 /* ---------- Markdown SVG <foreignObject> cache ---------- */
@@ -1334,14 +1352,16 @@ export function drawImage(ctx, o, onload) {
     ctx.save();
     // 1. Distinctive Excerpt Boundary Outline
     ctx.strokeStyle = '#a855f7';
-    ctx.lineWidth = Math.max(2, 2 / (ctx.getTransform ? ctx.getTransform().a : 1));
+    const _tm = ctx.getTransform ? ctx.getTransform() : { a: 1, b: 0 };
+    const _scale = Math.hypot(_tm.a, _tm.b) || 1;
+    ctx.lineWidth = Math.max(2, 2 / _scale);
     ctx.setLineDash([8, 5]);
     ctx.strokeRect(o.x, o.y, o.w, o.h);
     ctx.setLineDash([]);
 
     // 2. Corner bracket notches
     const bLen = Math.min(14, Math.min(o.w, o.h) * 0.16);
-    ctx.lineWidth = Math.max(2.5, 2.5 / (ctx.getTransform ? ctx.getTransform().a : 1));
+    ctx.lineWidth = Math.max(2.5, 2.5 / _scale);
     ctx.beginPath();
     ctx.moveTo(o.x, o.y + bLen); ctx.lineTo(o.x, o.y); ctx.lineTo(o.x + bLen, o.y);
     ctx.moveTo(o.x + o.w - bLen, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w, o.y + bLen);
@@ -1473,68 +1493,61 @@ export function drawCurtain(ctx, o) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     if (o.revealed) {
+      // Keep revealed tape faint so underlying handwriting stays 100% legible
+      // without a dashed centerline striking through text (TRAP 6).
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-      // Keep revealed tape faint enough that underlying handwriting stays legible
-      // while remaining visibly outlined and hittable on tap (TRAP 6).
+      ctx.globalAlpha = isDarkBoard() ? 0.16 : 0.10;
       ctx.lineWidth = w;
-      ctx.strokeStyle = 'rgba(168, 85, 247, 0.12)';
+      ctx.strokeStyle = tapeColor;
       ctx.stroke();
-      ctx.setLineDash([6, 5]);
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = 'rgba(168, 85, 247, 0.55)';
-      ctx.stroke();
-      ctx.setLineDash([]);
+      // Subtle end-cap markers so the revealed tape stays visually locateable without crossing text
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = tapeColor;
+      const p0 = pts[0], p1 = pts[pts.length - 1];
+      ctx.beginPath(); ctx.arc(p0.x, p0.y, Math.min(4, w * 0.18), 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(p1.x, p1.y, Math.min(4, w * 0.18), 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       return;
     }
-    ctx.globalAlpha = opacity;
+    // Draw outer halo/outline FIRST so it never obliterates the tape fill or texture
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.globalAlpha = Math.min(1, opacity * 0.85);
+    ctx.lineWidth = w + 3;
+    ctx.strokeStyle = neonOutline;
+    ctx.stroke();
+    ctx.globalAlpha = opacity;
     ctx.lineWidth = w;
     ctx.strokeStyle = tapeColor;
     ctx.stroke();
-    if (texture !== 'plain') {
-      const b = bboxOfPoints(pts);
-      const pad = w / 2;
-      const minX = b.x - pad, minY = b.y - pad, bw = b.w + pad * 2, bh = b.h + pad * 2;
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.lineWidth = w - 1;
-      ctx.stroke();
-      if (texture === 'dots') {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        for (let px = minX; px < minX + bw; px += 14) {
-          for (let py = minY; py < minY + bh; py += 14) {
-            ctx.beginPath();
-            ctx.arc(px, py, 2, 0, Math.PI * 2);
-            ctx.fill();
-          }
+    if (texture !== 'plain' && typeof document !== 'undefined') {
+      const patCanvas = document.createElement('canvas');
+      patCanvas.width = 16;
+      patCanvas.height = 16;
+      const pctx = patCanvas.getContext('2d');
+      if (pctx) {
+        if (texture === 'dots') {
+          pctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+          pctx.beginPath(); pctx.arc(8, 8, 2, 0, Math.PI * 2); pctx.fill();
+        } else {
+          pctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+          pctx.lineWidth = 3;
+          pctx.beginPath();
+          pctx.moveTo(-4, 16); pctx.lineTo(16, -4);
+          pctx.moveTo(4, 20); pctx.lineTo(20, 4);
+          pctx.stroke();
         }
-      } else {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-        ctx.lineWidth = 3.5;
-        const gap = 12;
-        ctx.beginPath();
-        for (let d = -bh; d < bw; d += gap) {
-          ctx.moveTo(minX + d, minY + bh);
-          ctx.lineTo(minX + d + bh, minY);
+        const pattern = ctx.createPattern(patCanvas, 'repeat');
+        if (pattern) {
+          ctx.lineWidth = Math.max(1, w - 2);
+          ctx.strokeStyle = pattern;
+          ctx.stroke();
         }
-        ctx.stroke();
       }
-      ctx.restore();
     }
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.lineWidth = w + 1.5;
-    ctx.strokeStyle = neonOutline;
-    ctx.globalAlpha = Math.min(1, opacity * 0.9 + 0.1);
-    ctx.stroke();
     ctx.restore();
     return;
   }

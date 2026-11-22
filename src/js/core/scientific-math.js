@@ -263,15 +263,19 @@ export function generateCasesTex(count = 2) {
 export function parseMathExpressionSafely(exprStr, vars = {}) {
   if (!exprStr || typeof exprStr !== 'string') return NaN;
   const tokens = [];
-  const regex = /\s*([0-9]+\.?[0-9]*|(?:Math\.)?[a-zA-Z_][a-zA-Z0-9_]*|\*\*|\+|-|\*|\/|\^|\(|\))\s*/g;
+  const regex = /\s*([0-9]+\.?[0-9]*|(?:Math\.)?[a-zA-Z_][a-zA-Z0-9_]*|\*\*|\+|-|\*|\/|\^|\(|\)|,)\s*/g;
   let match;
   while ((match = regex.exec(exprStr)) !== null) {
     if (match[1]) tokens.push(match[1]);
   }
   let pos = 0;
+  let depth = 0;
+  const MAX_DEPTH = 64;
   function peek() { return tokens[pos]; }
   function consume() { return tokens[pos++]; }
   function parseExpr() {
+    if (++depth > MAX_DEPTH) { depth--; return NaN; }
+    try {
     let val = parseTerm();
     while (peek() === '+' || peek() === '-') {
       const op = consume();
@@ -279,6 +283,7 @@ export function parseMathExpressionSafely(exprStr, vars = {}) {
       val = op === '+' ? val + next : val - next;
     }
     return val;
+    } finally { depth--; }
   }
   function parseTerm() {
     let val = parsePower();
@@ -319,8 +324,13 @@ export function parseMathExpressionSafely(exprStr, vars = {}) {
     if (Object.prototype.hasOwnProperty.call(vars, tok)) return Number(vars[tok]);
     if (peek() === '(') {
       consume();
-      const arg = parseExpr();
+      const args = [parseExpr()];
+      while (peek() === ',') {
+        consume();
+        args.push(parseExpr());
+      }
       if (peek() === ')') consume();
+      const arg = args[0];
       if (low === 'sin') return Math.sin(arg);
       if (low === 'cos') return Math.cos(arg);
       if (low === 'tan') return Math.tan(arg);
@@ -331,7 +341,9 @@ export function parseMathExpressionSafely(exprStr, vars = {}) {
       if (low === 'exp') return Math.exp(arg);
       if (low === 'log' || low === 'ln') return Math.log(arg);
       if (low === 'log10') return Math.log10(arg);
+      if (low === 'log2') return Math.log2(arg);
       if (low === 'abs') return Math.abs(arg);
+      if (low === 'pow' && args.length >= 2) return Math.pow(args[0], args[1]);
     }
     return NaN;
   }
@@ -355,10 +367,14 @@ export function evalMathExpression(tex) {
     s = parts[parts.length - 1].trim();
   }
 
-  // Preprocess LaTeX math into JS Math syntax
-  s = s.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '(($1)/($2))');
-  s = s.replace(/\\sqrt\{([^{}]+)\}/g, 'Math.sqrt($1)');
-  s = s.replace(/\\sqrt\[([^{}]+)\]\{([^{}]+)\}/g, 'Math.pow($2, 1/($1))');
+  // Preprocess LaTeX math into JS Math syntax (iterate for nested expressions)
+  for (let pass = 0; pass < 8; pass++) {
+    const prev = s;
+    s = s.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '(($1)/($2))');
+    s = s.replace(/\\sqrt\{([^{}]+)\}/g, 'Math.sqrt($1)');
+    s = s.replace(/\\sqrt\[([^\]]+)\]\{([^{}]+)\}/g, 'Math.pow($2, 1/($1))');
+    if (s === prev) break;
+  }
   s = s.replace(/\^{([^{}]+)\}/g, '**($1)');
   s = s.replace(/\^([0-9a-zA-Z])/g, '**$1');
   s = s.replace(/\\pi\b/g, 'Math.PI');
@@ -375,8 +391,8 @@ export function evalMathExpression(tex) {
   s = s.replace(/\\atan\b/g, 'Math.atan');
   s = s.replace(/\\exp\b/g, 'Math.exp');
   s = s.replace(/\\ln\b/g, 'Math.log');
-  s = s.replace(/\\log_\{10\}\b/g, 'Math.log10');
-  s = s.replace(/\\log_\{2\}\b/g, 'Math.log2');
+  s = s.replace(/\\log_\{10\}/g, 'Math.log10');
+  s = s.replace(/\\log_\{2\}/g, 'Math.log2');
   s = s.replace(/\\log\b/g, 'Math.log10');
   s = s.replace(/\\abs\{([^{}]+)\}/g, 'Math.abs($1)');
 
@@ -538,20 +554,24 @@ export function evaluateNotebookVariables(varMap) {
 export class NotebookVariables {
   constructor() {
     this.vars = new Map();
+    this.expressions = new Map();
   }
 
   set(name, val) {
     if (!name || typeof name !== 'string') return;
     const cleanName = name.trim();
+    let stored;
     if (typeof val === 'number') {
-      this.vars.set(cleanName, val);
+      stored = val;
     } else if (typeof val === 'string') {
       const trimmed = val.trim();
       const num = Number(trimmed);
-      this.vars.set(cleanName, !isNaN(num) && trimmed !== '' ? num : trimmed);
+      stored = !isNaN(num) && trimmed !== '' ? num : trimmed;
     } else {
-      this.vars.set(cleanName, Number(val));
+      stored = Number(val);
     }
+    this.expressions.set(cleanName, stored);
+    this.vars.set(cleanName, stored);
   }
 
   get(name) {
@@ -564,6 +584,7 @@ export class NotebookVariables {
 
   clear() {
     this.vars.clear();
+    this.expressions.clear();
   }
 
   /**
@@ -571,7 +592,9 @@ export class NotebookVariables {
    * and updating internal state with evaluated numeric values.
    */
   resolveAll() {
-    const res = evaluateNotebookVariables(this.vars);
+    const source = this.expressions.size ? this.expressions : this.vars;
+    const res = evaluateNotebookVariables(source);
+    this.resolved = new Map(Object.entries(res.values || {}));
     if (res.values) {
       for (const [k, v] of Object.entries(res.values)) {
         this.vars.set(k, v);
@@ -584,7 +607,8 @@ export class NotebookVariables {
    * Resolves a single variable name
    */
   resolve(name) {
-    const res = evaluateNotebookVariables(this.vars);
+    const source = this.expressions.size ? this.expressions : this.vars;
+    const res = evaluateNotebookVariables(source);
     const cleanName = name?.trim();
     if (res.values && Object.prototype.hasOwnProperty.call(res.values, cleanName)) {
       return { ok: true, value: res.values[cleanName] };
@@ -839,6 +863,9 @@ export class SymbolicCAS {
         return { ok: false, error: 'Invalid matrix array format' };
       }
       const n = m.length;
+      if (n > 64) {
+        return { ok: false, error: 'Matrix dimension exceeds maximum supported size (64 x 64)' };
+      }
       if (!m.every((row) => Array.isArray(row) && row.length === n)) {
         return { ok: false, error: 'Matrix must be square (n x n)' };
       }
@@ -847,23 +874,27 @@ export class SymbolicCAS {
         const dim = mat.length;
         if (dim === 1) return mat[0][0];
         if (dim === 2) return mat[0][0] * mat[1][1] - mat[0][1] * mat[1][0];
-        if (dim === 3) {
-          return (
-            mat[0][0] * (mat[1][1] * mat[2][2] - mat[1][2] * mat[2][1]) -
-            mat[0][1] * (mat[1][0] * mat[2][2] - mat[1][2] * mat[2][0]) +
-            mat[0][2] * (mat[1][0] * mat[2][1] - mat[1][1] * mat[2][0])
-          );
-        }
-        let total = 0;
-        for (let col = 0; col < dim; col++) {
-          const sub = [];
-          for (let row = 1; row < dim; row++) {
-            sub.push(mat[row].filter((_, cIndex) => cIndex !== col));
+        const A = mat.map((row) => row.map(Number));
+        let sign = 1;
+        let prod = 1;
+        for (let i = 0; i < dim; i++) {
+          let pivot = i;
+          for (let r = i + 1; r < dim; r++) {
+            if (Math.abs(A[r][i]) > Math.abs(A[pivot][i])) pivot = r;
           }
-          const sign = col % 2 === 0 ? 1 : -1;
-          total += sign * mat[0][col] * det(sub);
+          if (Math.abs(A[pivot][i]) < 1e-12) return 0;
+          if (pivot !== i) {
+            const tmp = A[i]; A[i] = A[pivot]; A[pivot] = tmp;
+            sign = -sign;
+          }
+          const diag = A[i][i];
+          prod *= diag;
+          for (let r = i + 1; r < dim; r++) {
+            const factor = A[r][i] / diag;
+            for (let c = i + 1; c < dim; c++) A[r][c] -= factor * A[i][c];
+          }
         }
-        return total;
+        return sign * prod;
       }
 
       const dVal = det(m);

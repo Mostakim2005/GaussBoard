@@ -345,8 +345,9 @@ export class AudioBar {
       a.click();
       a.remove();
       // Give the browser time to start the download before releasing its URL.
-      setTimeout(() => { if (objectUrl) URL.revokeObjectURL(objectUrl); }, 1000);
+      const urlToRevoke = objectUrl;
       objectUrl = null;
+      setTimeout(() => URL.revokeObjectURL(urlToRevoke), 1000);
       this.app.toast(t('Exported audio recording'));
     } catch (e) {
       if (objectUrl) URL.revokeObjectURL(objectUrl);

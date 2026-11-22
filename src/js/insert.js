@@ -227,6 +227,7 @@ export async function insertDocument(app, filePath, opts = {}) {
   const name = filePath.split(/[\\/]/).pop();
   const progress = app.showProgress(t('Importing {name}', { name }), t('Converting document…'));
   let doc = null;
+  let renderProgress = null;
   try {
     const how = {};
     if (window.board.importTakesBytes) {
@@ -272,12 +273,12 @@ export async function insertDocument(app, filePath, opts = {}) {
     }
     layout = layout || (pages.length > 6 ? 'grid' : 'row');
 
-    const render = app.showProgress(t('Importing {name}', { name }), pages.length === 1
+    renderProgress = app.showProgress(t('Importing {name}', { name }), pages.length === 1
       ? t('Rendering {n} page…', { n: pages.length })
       : t('Rendering {n} pages…', { n: pages.length }));
     const rendered = [];
     for (let i = 0; i < pages.length; i++) {
-      render.update((i + 1) / pages.length, t('Rendering page {page} ({n} of {total})…', { page: pages[i], n: i + 1, total: pages.length }));
+      renderProgress.update((i + 1) / pages.length, t('Rendering page {page} ({n} of {total})…', { page: pages[i], n: i + 1, total: pages.length }));
       rendered.push(await doc.render(pages[i], opts.quality ?? app.settings.importQuality ?? 2));
     }
     await doc.destroy();
@@ -295,13 +296,15 @@ export async function insertDocument(app, filePath, opts = {}) {
     app.store.commit('insert document', ops);
     app.setSelection([]);                       // separate objects, not a selected clump
     if (focus >= 0) app.goToPage(focus); else app.frameObjects(objs);
-    render.close();
+    renderProgress.close();
+    renderProgress = null;
     const n = objs.length;
     app.toast(res.engine === 'builtin'
       ? (n === 1 ? t('{name}: {n} page added (built-in converter)', { name, n }) : t('{name}: {n} pages added (built-in converter)', { name, n }))
       : (n === 1 ? t('{name}: {n} page added', { name, n }) : t('{name}: {n} pages added', { name, n })), 'doc');
     return objs;
   } catch (e) {
+    renderProgress?.close();
     progress.close();
     if (doc) await doc.destroy().catch(() => {});
     app.toast(t('Import failed: {error}', { error: e.message }));

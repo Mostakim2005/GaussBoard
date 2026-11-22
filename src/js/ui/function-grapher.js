@@ -1,3 +1,4 @@
+import { bindModalA11y } from './modal-a11y.js';
 /**
  * @file function-grapher.js
  * @description Dynamic 2D Mathematical Function Grapher & Calculus Visualizer (GazBoard Phase 5 / v6.5.0)
@@ -103,12 +104,16 @@ export class FunctionGrapherModal {
       if (p) this.loadPreset(p);
     }
     this.modal.classList.add('visible');
+    this._releaseA11y?.();
+    this._releaseA11y = bindModalA11y(this.modal, { onClose: () => this.close(), label: 'Function Grapher' });
     this.resizeCanvas();
     this.render();
   }
 
   close() {
     if (this.modal) this.modal.classList.remove('visible');
+    this._releaseA11y?.();
+    this._releaseA11y = null;
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
       this.animFrameId = null;
@@ -267,7 +272,7 @@ export class FunctionGrapherModal {
       }
     });
 
-    window.addEventListener('mousemove', (e) => {
+    this._onWindowMouseMove = (e) => {
       if (this.graphMode === '3d' && this.isOrbiting) {
         const dx = e.clientX - this.orbitStart.x;
         const dy = e.clientY - this.orbitStart.y;
@@ -289,12 +294,13 @@ export class FunctionGrapherModal {
       this.yMin = this.viewStart.yMin + dyUnits;
       this.yMax = this.viewStart.yMax + dyUnits;
       this.render();
-    });
-
-    window.addEventListener('mouseup', () => {
+    };
+    this._onWindowMouseUp = () => {
       this.isPanning = false;
       this.isOrbiting = false;
-    });
+    };
+    window.addEventListener('mousemove', this._onWindowMouseMove);
+    window.addEventListener('mouseup', this._onWindowMouseUp);
 
     this.canvas.addEventListener('mousemove', (e) => {
       if (this.isPanning || this.isOrbiting || this.graphMode !== '2d') return;
@@ -1008,6 +1014,8 @@ export class FunctionGrapherModal {
 
   destroy() {
     this.close();
+    if (this._onWindowMouseMove) { window.removeEventListener('mousemove', this._onWindowMouseMove); this._onWindowMouseMove = null; }
+    if (this._onWindowMouseUp) { window.removeEventListener('mouseup', this._onWindowMouseUp); this._onWindowMouseUp = null; }
     if (this.modal && this.modal.parentNode) {
       this.modal.parentNode.removeChild(this.modal);
       this.modal = null;

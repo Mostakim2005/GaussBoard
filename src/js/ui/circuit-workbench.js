@@ -267,11 +267,12 @@ export class CircuitWorkbenchModal {
     backdrop.addEventListener('click', (e) => {
       if (e.target === backdrop) this.close();
     });
-    window.addEventListener('keydown', (e) => {
+    this._onWindowKeyDown = (e) => {
       if (e.key === 'Escape' && this.modal && this.modal.classList.contains('visible')) {
         this.close();
       }
-    });
+    };
+    window.addEventListener('keydown', this._onWindowKeyDown);
 
     document.body.appendChild(backdrop);
     this.modal = backdrop;
@@ -1383,6 +1384,7 @@ export class CircuitWorkbenchModal {
 
   destroy() {
     this.close();
+    if (this._onWindowKeyDown) { window.removeEventListener('keydown', this._onWindowKeyDown); this._onWindowKeyDown = null; }
     if (this.modal && this.modal.parentNode) {
       this.modal.parentNode.removeChild(this.modal);
       this.modal = null;

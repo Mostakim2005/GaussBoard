@@ -152,7 +152,9 @@ export function repeat(card, rating, now = Date.now(), w = DEFAULT_FSRS_WEIGHTS)
     } else {
       newState = State.Review;
       newDifficulty = nextDifficulty(currentCard.difficulty, rating, w);
-      newStability = initStability(rating, w);
+      newStability = currentCard.state === State.Relearning && currentCard.stability > 0
+        ? currentCard.stability
+        : initStability(rating, w);
       scheduledDays = nextInterval(newStability);
     }
   } else {

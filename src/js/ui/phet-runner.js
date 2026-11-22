@@ -153,16 +153,18 @@ export class PhetRunnerModal {
     this.renderSidebar();
     this.switchSim(this.activeSimId);
 
-    const onKey = (e) => {
-      if (e.key === 'Escape') {
-        this.hide();
-        window.removeEventListener('keydown', onKey);
-      }
+    if (this._onKey) window.removeEventListener('keydown', this._onKey);
+    this._onKey = (e) => {
+      if (e.key === 'Escape') this.hide();
     };
-    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', this._onKey);
   }
 
   hide() {
+    if (this._onKey) {
+      window.removeEventListener('keydown', this._onKey);
+      this._onKey = null;
+    }
     if (this.animId) cancelAnimationFrame(this.animId);
     this.animId = null;
     if (this.container) {

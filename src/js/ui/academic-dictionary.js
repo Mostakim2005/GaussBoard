@@ -1,3 +1,4 @@
+import { bindModalA11y } from './modal-a11y.js';
 /**
  * @file academic-dictionary.js
  * @description Offline WordNet Academic Lexicon & Thesaurus Modal (GazBoard Phase 8 / v6.8.0)
@@ -650,6 +651,8 @@ export class AcademicDictionaryModal {
       this.buildModal();
     }
     this.modal.classList.add('visible');
+    this._releaseA11y?.();
+    this._releaseA11y = bindModalA11y(this.modal, { onClose: () => this.close(), label: 'Academic Dictionary' });
     this.render();
     const searchInput = this.modal.querySelector('#dict-search-input');
     if (searchInput) {
@@ -665,6 +668,8 @@ export class AcademicDictionaryModal {
     if (this.modal) {
       this.modal.classList.remove('visible');
     }
+    this._releaseA11y?.();
+    this._releaseA11y = null;
   }
 
   buildModal() {

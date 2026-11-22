@@ -19,13 +19,25 @@ function readConfig(userDataDir) {
 let configWriteSequence = 0;
 function writeConfig(userDataDir, boardsDir) {
   const file = configFile(userDataDir), tmp = `${file}.${process.pid}.${Date.now()}.${++configWriteSequence}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify({ version: 1, boardsDir: path.resolve(boardsDir) }, null, 2));
+  const payload = JSON.stringify({ version: 1, boardsDir: path.resolve(boardsDir) }, null, 2);
+  const fd = fs.openSync(tmp, 'w');
   try {
-    fs.renameSync(tmp, file);
-  } catch {
-    fs.writeFileSync(file, JSON.stringify({ version: 1, boardsDir: path.resolve(boardsDir) }, null, 2));
-    try { fs.unlinkSync(tmp); } catch {}
+    fs.writeFileSync(fd, payload, 'utf8');
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
   }
+  let lastErr = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      fs.renameSync(tmp, file);
+      return;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  try { fs.unlinkSync(tmp); } catch {}
+  throw lastErr;
 }
 
 /*

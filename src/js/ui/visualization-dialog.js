@@ -977,13 +977,23 @@ export class VisualizationDialog {
 
     // Update validation bar
     if (valBar) {
-      valBar.innerHTML = `
-        <div class="viz-val-pill ${vRes.valid ? 'val-ok' : 'val-err'}">
-          <span class="val-icon">${vRes.valid ? '✓' : '✕'}</span>
-          <span class="val-msg">${vRes.valid ? t('Valid diagram syntax') : (vRes.error || t('Syntax error'))}</span>
-          ${vRes.line ? `<code class="val-line">${t('Line {n}', { n: vRes.line })}</code>` : ''}
-        </div>
-      `;
+      valBar.textContent = '';
+      const pill = document.createElement('div');
+      pill.className = `viz-val-pill ${vRes.valid ? 'val-ok' : 'val-err'}`;
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'val-icon';
+      iconSpan.textContent = vRes.valid ? '✓' : '✕';
+      const msgSpan = document.createElement('span');
+      msgSpan.className = 'val-msg';
+      msgSpan.textContent = vRes.valid ? t('Valid diagram syntax') : String(vRes.error || t('Syntax error'));
+      pill.append(iconSpan, msgSpan);
+      if (vRes.line) {
+        const lineEl = document.createElement('code');
+        lineEl.className = 'val-line';
+        lineEl.textContent = t('Line {n}', { n: vRes.line });
+        pill.appendChild(lineEl);
+      }
+      valBar.appendChild(pill);
     }
 
     if (insertBtn) {
@@ -991,14 +1001,23 @@ export class VisualizationDialog {
     }
 
     if (!vRes.valid) {
-      host.innerHTML = `
-        <div class="viz-preview-err">
-          <div class="viz-err-icon">⚠️</div>
-          <div class="viz-err-title">${t('Diagram Compilation Error')}</div>
-          <div class="viz-err-detail">${vRes.error}</div>
-          ${vRes.line ? `<div class="viz-err-hint">${t('Check line {n} in the code editor', { n: vRes.line })}</div>` : ''}
-        </div>
-      `;
+      host.textContent = '';
+      const box = document.createElement('div');
+      box.className = 'viz-preview-err';
+      const titleEl = document.createElement('div');
+      titleEl.className = 'viz-err-title';
+      titleEl.textContent = t('Diagram Compilation Error');
+      const detailEl = document.createElement('div');
+      detailEl.className = 'viz-err-detail';
+      detailEl.textContent = String(vRes.error || '');
+      box.append(titleEl, detailEl);
+      if (vRes.line) {
+        const hintEl = document.createElement('div');
+        hintEl.className = 'viz-err-hint';
+        hintEl.textContent = t('Check line {n} in the code editor', { n: vRes.line });
+        box.appendChild(hintEl);
+      }
+      host.appendChild(box);
       return;
     }
 
@@ -1009,7 +1028,12 @@ export class VisualizationDialog {
         this.renderedDataUrl = renderRes.dataUrl;
         this.renderedW = renderRes.w;
         this.renderedH = renderRes.h;
-        host.innerHTML = renderRes.svg;
+        host.textContent = '';
+        const img = document.createElement('img');
+        img.src = renderRes.dataUrl;
+        img.alt = 'Diagram preview';
+        img.style.cssText = 'max-width:100%;height:auto;display:block;';
+        host.appendChild(img);
       } else {
         const cfg = vRes.config || JSON.parse(this.code);
         const renderRes = await renderChartDataUrl(cfg, 600, 420);
@@ -1023,13 +1047,17 @@ export class VisualizationDialog {
         readout.textContent = `${this.renderedW} × ${this.renderedH} px`;
       }
     } catch (renderErr) {
-      host.innerHTML = `
-        <div class="viz-preview-err">
-          <div class="viz-err-icon">⚠️</div>
-          <div class="viz-err-title">${t('Rendering Failed')}</div>
-          <div class="viz-err-detail">${renderErr.message || String(renderErr)}</div>
-        </div>
-      `;
+      host.textContent = '';
+      const box = document.createElement('div');
+      box.className = 'viz-preview-err';
+      const titleEl = document.createElement('div');
+      titleEl.className = 'viz-err-title';
+      titleEl.textContent = t('Rendering Failed');
+      const detailEl = document.createElement('div');
+      detailEl.className = 'viz-err-detail';
+      detailEl.textContent = String(renderErr?.message || renderErr);
+      box.append(titleEl, detailEl);
+      host.appendChild(box);
     }
   }
 

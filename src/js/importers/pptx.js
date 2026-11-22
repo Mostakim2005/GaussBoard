@@ -26,14 +26,24 @@ const SCHEME = {
   tx1: '#000000', tx2: '#44546a', bg1: '#ffffff', bg2: '#e7e6e6'
 };
 
+function safeHexColor(raw) {
+  const v = String(raw || '').trim();
+  return /^[0-9a-fA-F]{3,8}$/.test(v) ? '#' + v : null;
+}
+
+function safeFontFamily(raw) {
+  const v = String(raw || '').trim();
+  return /^[a-zA-Z0-9\s._-]{1,80}$/.test(v) ? v : null;
+}
+
 function colorOf(node) {
   if (!node) return null;
   const srgb = nsFirst(node, 'srgbClr');
-  if (srgb) return '#' + srgb.getAttribute('val');
+  if (srgb) return safeHexColor(srgb.getAttribute('val'));
   const scheme = nsFirst(node, 'schemeClr');
   if (scheme) return SCHEME[scheme.getAttribute('val')] || '#333333';
   const sys = nsFirst(node, 'sysClr');
-  if (sys) return '#' + (sys.getAttribute('lastClr') || '000000');
+  if (sys) return safeHexColor(sys.getAttribute('lastClr')) || '#000000';
   return null;
 }
 
@@ -77,16 +87,16 @@ function textBodyHtml(txBody, defaultColor) {
         const ital = rPr?.getAttribute('i') === '1';
         const und = rPr?.getAttribute('u') && rPr.getAttribute('u') !== 'none';
         const col = colorOf(nsFirst(rPr, 'solidFill')) || defaultColor || '#000000';
-        const font = nsFirst(rPr, 'latin')?.getAttribute('typeface');
+        const font = safeFontFamily(nsFirst(rPr, 'latin')?.getAttribute('typeface'));
         const style = [
-          size ? `font-size:${size}pt` : '',
+          Number.isFinite(size) && size > 0 ? `font-size:${size}pt` : '',
           bold ? 'font-weight:700' : '',
           ital ? 'font-style:italic' : '',
           und ? 'text-decoration:underline' : '',
           `color:${col}`,
           font ? `font-family:'${font}',Calibri,Segoe UI,sans-serif` : ''
         ].filter(Boolean).join(';');
-        inner += `<span style="${style}">${escapeHtml(t)}</span>`;
+        inner += `<span style="${escapeHtml(style)}">${escapeHtml(t)}</span>`;
       } else if (node.localName === 'br') inner += '<br>';
       else if (node.localName === 'fld') inner += escapeHtml(nsFirst(node, 't')?.textContent ?? '');
     }

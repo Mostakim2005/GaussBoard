@@ -35,8 +35,8 @@ test('Study Tape uses distinct tape width swatches and readable revealed opacity
   const toolbar = read('src/js/ui/toolbar.js');
   const render = read('src/js/core/render.js');
   assert.match(toolbar, /tapeWidthRow/);
-  assert.ok(render.includes('rgba(168, 85, 247, 0.12)'));
-  assert.ok(render.includes('setLineDash([6, 5])'));
+  assert.ok(render.includes('isDarkBoard() ? 0.16 : 0.10'));
+  assert.ok(!render.includes('rgba(168, 85, 247, 0.55)'));
 });
 
 test('video-dialog.js uses single-step inline bookmark form instead of double prompt()', () => {

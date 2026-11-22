@@ -199,7 +199,12 @@ export class Store {
       for (const f of this._opSubs) f(op);
     }
     if (this.log.length > this.maxLog) this.log.splice(0, this.log.length - this.maxLog);
-    this.syncDocumentTags();
+    const touchesTagSource = ops.some((op) => {
+      const obj = op.obj || op.prev || this.doc.objects[op.id];
+      const tp = obj?.type;
+      return !tp || tp === 'text' || tp === 'note' || tp === 'table';
+    });
+    if (touchesTagSource) this.syncDocumentTags();
     this.emit(label);
   }
 
@@ -424,8 +429,12 @@ export class Store {
       : Array.isArray(data.objectList) ? data.objectList
         : Array.isArray(data.elements) ? data.elements
           : data.objects ? Object.values(data.objects) : [];
+    const FORBIDDEN_IDS = new Set(['__proto__', 'constructor', 'prototype']);
+    const seenIds = new Set();
     let repaired = 0;
     for (const o of list) {
+      if (!o || typeof o !== 'object' || typeof o.id !== 'string' || !o.id || FORBIDDEN_IDS.has(o.id) || seenIds.has(o.id)) continue;
+      seenIds.add(o.id);
       normalizeTextObject(o);
       if (repairTable(o)) repaired++;
       d.objects[o.id] = o;

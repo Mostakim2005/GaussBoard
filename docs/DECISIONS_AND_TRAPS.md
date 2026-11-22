@@ -220,8 +220,8 @@ flowchart LR
 * **Problem Solved:** Ad-hoc setTimeout calls across interaction.js, circuits, and radial menus collided. Drawing quick strokes across components triggered unwanted property dialogs, tiny dots triggered shape conversions, and stationary holds left stray 1-point ink dots on the canvas before opening menus.
 * **Why This Decision Was Made:** Splitting into two timers cleanly separates stationary modal/radial menu invocation (<18px) from post-stroke shape recognition (>=24px). Adding abortActiveStroke() guarantees zero phantom ink dots and zero spurious undo records. Multi-touch monitoring (pointers.size >= 2) immediately clears timers for fluid pinch zoom.
 * **Protected Code Anchors (Grep Targets):**
-  * `src/js/ui/hold-manager.js` -> `HoldGestureManager`
-  * `src/js/core/interaction.js` -> `abortActiveStroke`
+  * `src/js/core/hold-manager.js` -> `HoldGestureManager`
+  * `src/js/core/tools.js` -> `abortActiveStroke`
   * `test/hold-manager.test.mjs`
 
 ### [DECISION: Smart-Slicing-Over-Raw-Index-And-Spatial-Tiling] | Aliases: smart slicing, heavy canvas, dynamic frame budget, zoom LOD
@@ -299,8 +299,8 @@ flowchart LR
 * **Strict Rule:** **NEVER** open a stationary hold menu (RadialShortcutRing, context menu, or circuit component modal) while a pointer is down without first calling `interaction.abortActiveStroke()`.
 * **Why This Trap Exists (Plain English):** On pointerdown, the ink engine immediately initializes `currentStroke` with the first contact point. If the user holds still to open a radial menu and lifts their stylus, `pointerup` would commit that 1-point stroke to the document, leaving stray ink dots all over the canvas and pushing phantom entries to the undo stack.
 * **Protected Code Anchors (Grep Targets):**
-  * `src/js/core/interaction.js` -> `abortActiveStroke`
-  * `src/js/ui/hold-manager.js` -> `handlePointerDown`, `_fireStationaryHold`
+  * `src/js/core/tools.js` -> `abortActiveStroke`
+  * `src/js/core/hold-manager.js` -> `handlePointerDown`, `_fireStationaryHold`
 ### [DECISION: Multi-Branch-Deduplicated-Electron-Release-Naming] | Aliases: Electron-Chromium naming, branch-aware release, discover-branches, SHA deduplication
 > **1-Line Summary:** Upgraded `.github/workflows/release.yml` to discover all remote branches (`origin/*`), deduplicate identical commit SHAs, build each unique branch in parallel, and name every `.exe` with Engine (`Electron-Chromium`), Version, Branch Slug, and Short Commit SHA.
 * **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`

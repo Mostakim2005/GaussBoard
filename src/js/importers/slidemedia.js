@@ -228,9 +228,13 @@ export async function fixSlideMedia(zip) {
       const posterFile = posterPath && zip.file(posterPath);
       const posterBytes = posterFile ? await posterFile.async('uint8array') : null;
       const ext = (posterPath || '').split('.').pop().toLowerCase();
+      if (!blip) continue;
       let posterBmp = null;
       try { posterBmp = posterBytes ? await bitmapOf(posterBytes, ext === 'gif' ? 'image/gif' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png') : null; } catch { posterBmp = null; }
       const blank = !posterBmp || busyness(posterBmp) < BLANK;
+      const posterW = posterBmp?.width || 640;
+      const posterH = posterBmp?.height || 360;
+      try { posterBmp?.close?.(); } catch {}
       if (!blank) continue;
 
       let still = null;
@@ -246,7 +250,7 @@ export async function fixSlideMedia(zip) {
         const clipFile = clipPath && zip.file(clipPath);
         const clipExt = (clipPath || '').split('.').pop().toLowerCase();
         const frame = clipFile ? await frameFromClip(await clipFile.async('uint8array'), clipExt) : null;
-        const w = frame?.width || posterBmp?.width || 640, hh = frame?.height || posterBmp?.height || 360;
+        const w = frame?.width || posterW, hh = frame?.height || posterH;
         if (frame) {
           still = frame;
           playBadge(still.getContext('2d'), still.width, still.height);

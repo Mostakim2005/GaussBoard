@@ -161,9 +161,9 @@
   * `src/js/app.js` -> `toggleViewMode`, `hintViewMode`
 
 ### [FEATURE: Set-Squares-And-Protractor-Drafting] | Aliases: set squares, triangles, protractor, drafting, angle input, geometry tools
-> **1-Line Summary:** Geometric set squares (30Â°/60Â°/90Â°, 45Â°/45Â°/90Â°) and protractor with edge snapping, dial/knob adjustment, typed angle aiming, and stylus-isolated drafting.
-* **User Intention (Non-Negotiable):** Engineering students and technical drafters need precise geometric triangles and protractors to construct accurate diagrams, measure angles (0Â° pointing right or up), and draw edge-guided lines while strictly preserving audio-ink timestamps (`p.t`) and stylus-pointer partitioning.
-* **Visual / UI Behavior:** Ruler menu offers Ruler, Triangle 45Â°, Triangle 30Â°/60Â°, and Protractor; protractor shows dual 0Â°â€“180Â° scales (outer dark, inner blue) with adjustable needle arm; set squares show millimeter ticks and angle readouts; drafting edge snapping engages exclusively for stylus writing without trapping mouse pointers; circuit connector wiring automatically bypasses ruler latching.
+> **1-Line Summary:** Geometric set squares (30°/60°/90°, 45°/45°/90°) and protractor with edge snapping, dial/knob adjustment, typed angle aiming, and stylus-isolated drafting.
+* **User Intention (Non-Negotiable):** Engineering students and technical drafters need precise geometric triangles and protractors to construct accurate diagrams, measure angles (0° pointing right or up), and draw edge-guided lines while strictly preserving audio-ink timestamps (`p.t`) and stylus-pointer partitioning.
+* **Visual / UI Behavior:** Ruler menu offers Ruler, Triangle 45°, Triangle 30°/60°, and Protractor; protractor shows dual 0°–180° scales (outer dark, inner blue) with adjustable needle arm; set squares show millimeter ticks and angle readouts; drafting edge snapping engages exclusively for stylus writing without trapping mouse pointers; circuit connector wiring automatically bypasses ruler latching.
 * **Code Anchors (Grep Targets):**
   * `src/js/core/tools.js` -> `triProject`, `protProject`, `triEdgesAt`, `protEdgesAt`, `aimProtArm`
   * `src/js/app.js` -> `openRulerMenu`, `fitTriangle`, `toggleRuler`
@@ -181,7 +181,7 @@
   * `test/hold-manager.test.mjs` -> `testHoldManager`
 
 ### [FEATURE: Smart-Progressive-Slicing-And-Zoom-LOD] | Aliases: progressive rendering, smart slicing, heavy canvas, zoom LOD, sub-pixel culling
-> **1-Line Summary:** High-capacity progressive canvas slicer with atomic cover bundling, dynamic CPU frame budgeting (3.0â€“8.0ms), and zoom-aware level-of-detail downsampling.
+> **1-Line Summary:** High-capacity progressive canvas slicer with atomic cover bundling, dynamic CPU frame budgeting (3.0–8.0ms), and zoom-aware level-of-detail downsampling.
 * **User Intention (Non-Negotiable):** Heavy boards containing 5,000+ to 20,000+ objects must render smoothly across pan and zoom operations without freezing the UI, leaking concealed answer cover secrets, or dropping frames during audio replay or MNA circuit simulation.
 * **Visual / UI Behavior:** Canvas uses 3-layer progressive composition: Layer 0 (grid/background), Layer 1 (`_inkCanvas` built progressively in background via dynamic time slices), and Layer 2 (live 60 FPS unbaked overlays for wet strokes, audio replay, and circuit electrons); pre-filtering culls hidden strokes below opaque answer covers to prevent secret flash; zoom-out (`camZ < 0.35`) performs sub-pixel culling and stride-based point downsampling.
 * **Code Anchors (Grep Targets):**
@@ -199,7 +199,7 @@
   * `src/js/core/tools.js` -> `followGlow`, `hideGlow`, `ringEl`, `placeRing`, `hideRing`, `predictTail`, `eraseSweep`
   * `src/js/core/surface.js` -> `drawScene`, `busy`, `warmFreeze`, `_drawWet`, `wetTail`
   * `src/js/ui/panels.js` -> `buildSettingsSearch`, `settings`
-  * `test/upstream-51x-features.test.mjs` -> Tests 1â€“6
+  * `test/upstream-51x-features.test.mjs` -> Tests 1–6
 
 ## 3. Planned Features & App-Merge Wishlist
 
