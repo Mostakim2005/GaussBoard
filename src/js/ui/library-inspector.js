@@ -87,7 +87,7 @@ export async function showLibraryInspector(app) {
                     ${lib.bundledInApp ? t('Bundled in App') : t('Shared Common')}
                   </span>
                   <div class="lib-path-hint" title="${lib.sharedPath || lib.bundledPath || ''}">
-                    ${lib.sharedPath ? lib.sharedPath.replace(/.*\\\\CommonLibraries\\\\/, 'CommonLibraries\\\\') : (lib.bundledPath || '')}
+                    ${lib.sharedPath ? lib.sharedPath.replace(/.*[\\/](SharedLibraries|CommonLibraries)[\\/]/i, '$1/') : (lib.bundledPath || '')}
                   </div>
                 </td>
                 <td>

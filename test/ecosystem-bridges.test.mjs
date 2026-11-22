@@ -71,3 +71,23 @@ test('Patch 11: triarchy deep-link parser & Obsidian Markdown sidecar frontmatte
   assert.ok(md.includes('board_id: "b_123"'));
   assert.ok(md.includes('deep_link: "gaussboard://open?board=b_123"'));
 });
+
+test('Patch 09: cas-sympy finds Python via ecosystem registry & libraries manifest resolves unbundled engines', () => {
+  const casSympy = require(path.join(ROOT, 'electron', 'cas-sympy.cjs'));
+  const py = casSympy.findPythonExecutable();
+  assert.ok(py, 'Python executable must be resolved');
+  if (process.platform === 'win32' && py.includes('\\')) {
+    assert.ok(fs.existsSync(py), `Resolved Python executable must exist on disk: ${py}`);
+  }
+
+  const manifestPath = path.join(globalResources.resolveCommonLibrariesDir(), 'libraries.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const unbundledIds = ['3dmol', 'nerdamer', 'function-plot', 'mathjs', 'tesseract', 'fontkit'];
+  for (const id of unbundledIds) {
+    const lib = manifest.libraries.find(l => l.id === id);
+    assert.ok(lib, `Library ${id} must exist in manifest`);
+    assert.equal(lib.bundledInApp, false, `Library ${id} must have bundledInApp: false`);
+    assert.ok(lib.sharedPath && fs.existsSync(lib.sharedPath), `Library ${id} sharedPath must exist on disk`);
+  }
+});
+

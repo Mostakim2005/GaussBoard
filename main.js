@@ -1588,6 +1588,7 @@ function ipc() {
       const bundledExists = lib.bundledPath && fs.existsSync(path.join(__dirname, lib.bundledPath));
       lib.sharedExists = !!sharedExists;
       lib.bundledExists = !!bundledExists;
+      lib.bundledInApp = !!bundledExists;
       lib.status = (bundledExists || sharedExists) ? 'ready' : 'available';
     }
     return manifest;

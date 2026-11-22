@@ -4,6 +4,7 @@ const cp = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { resolveEcosystemRegistry } = require('./global-resources.cjs');
 
 const SYMPY_SCRIPT = [
   'import json, sys',
@@ -39,9 +40,18 @@ function findPythonExecutable() {
   if (process.env.GAUSSBOARD_PYTHON && fs.existsSync(process.env.GAUSSBOARD_PYTHON)) {
     return process.env.GAUSSBOARD_PYTHON;
   }
+  const regPy = resolveEcosystemRegistry()?.data?.toolchains?.python;
+  if (regPy && fs.existsSync(regPy)) {
+    return regPy;
+  }
   if (process.platform === 'win32') {
-    const localPy = path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Python', 'Python315', 'python.exe');
-    if (fs.existsSync(localPy)) return localPy;
+    const candidateWin = [
+      path.join(os.homedir(), 'AppData', 'Local', 'Python', 'pythoncore-3.15-64', 'python.exe'),
+      path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Python', 'Python315', 'python.exe')
+    ];
+    for (const pyPath of candidateWin) {
+      if (fs.existsSync(pyPath)) return pyPath;
+    }
     return 'python';
   }
   return 'python3';
