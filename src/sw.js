@@ -55,6 +55,7 @@ const PRECACHE_ASSETS = [
   './js/core/camera.js',
   './js/core/chemistry.js',
   './js/core/circuit-sim.js',
+  './js/core/spice-engine.js',
   './js/core/compression.js',
   './js/core/connectors.js',
   './js/core/cursors.js',

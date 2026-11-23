@@ -16,6 +16,7 @@ const casSympy = require('./electron/cas-sympy.cjs');
 const mediaBridge = require('./electron/media-bridge.cjs');
 const triarchyBridge = require('./electron/triarchy-bridge.cjs');
 const cliExport = require('./electron/cli-export.cjs');
+const spiceBridge = require('./electron/spice-bridge.cjs');
 const { safeExternalUrl, isReleaseUrl } = require('./src/js/platform/security.cjs');
 
 const SRC = path.join(__dirname, 'src');
@@ -1580,6 +1581,9 @@ function ipc() {
   });
   handleIpc('cas:evalSympy', async (_event, payload) => casSympy.evalSympy(payload || {}));
   handleIpc('ecosystem:services', () => getEcosystemServices());
+  handleIpc('spice:status', () => spiceBridge.getSpiceRuntimeStatus());
+  handleIpc('spice:launchTina', async (_event, payload) => spiceBridge.launchTinaTi(payload || {}));
+  handleIpc('ecosystem:health', async () => triarchyBridge.checkEcosystemHealth());
   handleIpc('media:findSiblingSubtitle', async (_event, filePath) => mediaBridge.findSiblingSubtitle(filePath));
   handleIpc('media:remuxToMp4', async (_event, filePath) => mediaBridge.remuxToMp4(filePath));
   handleIpc('obsidian:syncFile', async (_event, payload) => triarchyBridge.syncToObsidianVault(payload || {}));

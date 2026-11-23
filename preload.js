@@ -311,6 +311,9 @@ contextBridge.exposeInMainWorld('board', {
   remuxToMp4: (filePath) => ipcRenderer.invoke('media:remuxToMp4', filePath),
   syncToObsidian: (payload) => ipcRenderer.invoke('obsidian:syncFile', payload),
   getEcosystemServices: () => ipcRenderer.invoke('ecosystem:services'),
+  getSpiceStatus: () => ipcRenderer.invoke('spice:status'),
+  launchTinaTi: (payload) => ipcRenderer.invoke('spice:launchTina', payload),
+  checkEcosystemHealth: () => ipcRenderer.invoke('ecosystem:health'),
   openInMermaidManager: (payload) => ipcRenderer.invoke('diagram:openInMermaidManager', payload),
   onDiagramUpdated: (cb) => onChannel('diagram:updated', (msg) => cb(msg)),
 

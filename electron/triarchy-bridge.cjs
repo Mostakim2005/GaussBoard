@@ -6,7 +6,9 @@ const http = require('http');
 const https = require('https');
 const os = require('os');
 const path = require('path');
-const { resolveEcosystemRegistry, resolveEcosystemSecrets } = require('./global-resources.cjs');
+const { resolveEcosystemRegistry, resolveEcosystemSecrets, getEcosystemServices } = require('./global-resources.cjs');
+const { findMermaidManagerExecutable } = require('./mermaid-bridge.cjs');
+const { getSpiceRuntimeStatus } = require('./spice-bridge.cjs');
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -196,11 +198,89 @@ async function syncToObsidianVault({ filename, content, subfolder, apiUrl, token
   return { ok: true, mode: 'vault-file', path: dest, vaultRel };
 }
 
+function probeLoopbackHttp(rawUrl, { method = 'GET', pathSuffix = '/', body = null, timeoutMs = 1200 } = {}) {
+  return new Promise((resolve) => {
+    let endpoint;
+    try {
+      endpoint = new URL(pathSuffix, `${String(rawUrl || '').replace(/\/+$/, '')}/`);
+    } catch {
+      resolve({ online: false, url: String(rawUrl || '') });
+      return;
+    }
+    const host = endpoint.hostname.toLowerCase();
+    if (host !== '127.0.0.1' && host !== 'localhost' && host !== '::1' && host !== '[::1]') {
+      resolve({ online: false, url: endpoint.origin });
+      return;
+    }
+
+    const transport = endpoint.protocol === 'https:' ? https : http;
+    const headers = {};
+    if (body != null) {
+      headers['Content-Type'] = 'application/json; charset=utf-8';
+      headers['Content-Length'] = Buffer.byteLength(body, 'utf8');
+    }
+    let settled = false;
+    const done = (resObj) => {
+      if (settled) return;
+      settled = true;
+      resolve(resObj);
+    };
+
+    const req = transport.request(
+      endpoint,
+      { method, timeout: timeoutMs, headers },
+      (res) => {
+        res.resume();
+        const online = res.statusCode >= 200 && res.statusCode < 500;
+        done({ online, status: res.statusCode, url: endpoint.origin });
+      }
+    );
+    req.on('timeout', () => {
+      req.destroy();
+      done({ online: false, url: endpoint.origin });
+    });
+    req.on('error', () => done({ online: false, url: endpoint.origin }));
+    if (body != null) req.write(body, 'utf8');
+    req.end();
+  });
+}
+
+async function checkEcosystemHealth({ servicesOverride } = {}) {
+  const services = servicesOverride || getEcosystemServices();
+  const [ragManager, obsidianAgentManager, ankiConnect, deepTutor] = await Promise.all([
+    probeLoopbackHttp(services.ragManager?.url, { method: 'GET', pathSuffix: '/health' }),
+    probeLoopbackHttp(services.obsidianAgentManager?.url, { method: 'GET', pathSuffix: '/' }),
+    probeLoopbackHttp(services.ankiConnect?.url, {
+      method: 'POST',
+      pathSuffix: '/',
+      body: JSON.stringify({ action: 'version', version: 6 })
+    }),
+    probeLoopbackHttp(services.deepTutor?.url, { method: 'GET', pathSuffix: '/health' })
+  ]);
+
+  const mermaidExe = findMermaidManagerExecutable();
+  const spiceStatus = getSpiceRuntimeStatus();
+
+  return {
+    checkedAt: new Date().toISOString(),
+    services: {
+      ragManager,
+      obsidianAgentManager,
+      ankiConnect,
+      deepTutor,
+      mermaidManager: { online: !!mermaidExe, path: mermaidExe || null },
+      ngspiceWasm: { online: !!spiceStatus.ngspice?.available, path: spiceStatus.ngspice?.entryPath || null },
+      tinaTi: { online: !!spiceStatus.tina?.available, path: spiceStatus.tina?.executable || null }
+    }
+  };
+}
+
 module.exports = {
   findObsidianCli,
   resolveObsidianVaultDir,
   resolveObsidianApiConfig,
   parseGaussBoardDeepLink,
   deepLinkFromArgv,
-  syncToObsidianVault
+  syncToObsidianVault,
+  checkEcosystemHealth
 };

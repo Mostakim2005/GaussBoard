@@ -12,6 +12,8 @@ import { generateMarkdownSidecar } from '../src/js/core/markdown-sidecar.js';
 import { searchSubtitleCues } from '../src/js/ui/subtitles.js';
 import { syncBoardToAnki, generatePracticeEngineBank } from '../src/js/core/anki.js';
 import { prepareLocalVideoSource } from '../src/js/insert.js';
+import { IndustrialCircuitSim } from '../src/js/core/circuit-sim.js';
+import { SpiceEngine, SOLVER_MODES, generateSpiceNetlist } from '../src/js/core/spice-engine.js';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -20,6 +22,7 @@ const mermaidBridge = require(path.join(ROOT, 'electron', 'mermaid-bridge.cjs'))
 const mediaBridge = require(path.join(ROOT, 'electron', 'media-bridge.cjs'));
 const triarchyBridge = require(path.join(ROOT, 'electron', 'triarchy-bridge.cjs'));
 const cliExport = require(path.join(ROOT, 'electron', 'cli-export.cjs'));
+const spiceBridge = require(path.join(ROOT, 'electron', 'spice-bridge.cjs'));
 
 test('Patch 07: global shared libraries resolver honors env override and prunes dead vendor SW entries', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-libs-'));
@@ -541,6 +544,127 @@ test('Phase 2 M12-02: headless CLI inspects ZIP/JSON boards and exports Markdown
     assert.equal(missingJson.ok, false);
     assert.equal(missingJson.code, 2);
   } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('Phase 3 M13-01: SpiceEngine compiles .cir netlists, supports tran/ac sweeps + wasmRunner, and preserves MNA Live state', async () => {
+  const sim = new IndustrialCircuitSim();
+  sim.loadPresetDOL();
+  sim.step(0.0166);
+  const compCountBefore = sim.components.size;
+  const wireCountBefore = sim.wires.length;
+
+  const dolNet = generateSpiceNetlist(sim, { analysis: 'tran' });
+  assert.match(dolNet.netlist, /\.tran\s+/);
+  assert.match(dolNet.netlist, /\.end\s*$/);
+  assert.ok(dolNet.nodes.includes('0'));
+
+  const engine = new SpiceEngine();
+  assert.equal(engine.mode, SOLVER_MODES.MNA_LIVE);
+  engine.setMode(SOLVER_MODES.NGSPICE_SPICE);
+  assert.equal(engine.mode, SOLVER_MODES.NGSPICE_SPICE);
+
+  const tranRes = await engine.runAnalysis(sim, { analysis: 'tran' });
+  assert.equal(tranRes.ok, true);
+  assert.equal(tranRes.engine, 'spice-js-fallback');
+  assert.ok(tranRes.xValues.length >= 20);
+  assert.ok(tranRes.traces.length >= 1);
+
+  const acRes = await engine.runAnalysis(sim, { analysis: 'ac' });
+  assert.equal(acRes.ok, true);
+  assert.match(acRes.netlist, /\.ac dec 20/);
+  assert.equal(acRes.traces[0].unit, 'dB');
+
+  const rectSim = new IndustrialCircuitSim();
+  rectSim.loadPresetBridgeRectifier();
+  const rectNet = generateSpiceNetlist(rectSim, { analysis: 'tran' });
+  assert.match(rectNet.netlist, /\.model D1N4148/);
+
+  const wasmRes = await engine.runAnalysis(rectSim, {
+    analysis: 'tran',
+    wasmRunner: async () => ({
+      xLabel: 'Time (ms)',
+      xValues: [0, 1, 2],
+      traces: [{ name: 'V(out)', unit: 'V', color: '#10b981', values: [0, 12, 24] }]
+    })
+  });
+  assert.equal(wasmRes.engine, 'ngspice-wasm');
+  assert.equal(wasmRes.wasmInstalled, true);
+
+  engine.setMode(SOLVER_MODES.MNA_LIVE);
+  sim.step(0.0166);
+  assert.equal(sim.components.size, compCountBefore);
+  assert.equal(sim.wires.length, wireCountBefore);
+
+  const sw = fs.readFileSync(path.join(ROOT, 'src', 'sw.js'), 'utf8');
+  assert.ok(sw.includes('./js/core/spice-engine.js'), 'src/sw.js must precache ./js/core/spice-engine.js');
+});
+
+test('Phase 3 M13-01 & M14-02: spice-bridge resolves SharedLibraries ngspice-wasm / TI TINA and checkEcosystemHealth probes loopback services', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-spice-'));
+  const prevLibs = process.env.LOCAL_COMMON_LIBRARIES;
+  const prevReg = process.env.LOCAL_ECOSYSTEM_REGISTRY;
+  const prevTina = process.env.TINA_TI_EXE;
+  const prevNgspice = process.env.GAUSSBOARD_NGSPICE_WASM;
+
+  const liveServer = http.createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
+  });
+
+  try {
+    await new Promise((resolve) => liveServer.listen(0, '127.0.0.1', resolve));
+    const liveUrl = `http://127.0.0.1:${liveServer.address().port}`;
+
+    const ngDir = path.join(tmp, 'ngspice-wasm');
+    fs.mkdirSync(ngDir, { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'libraries.json'), '{"libraries":[]}');
+    const ngEntry = path.join(ngDir, 'eecircuit-engine.mjs');
+    fs.writeFileSync(ngEntry, 'export const ready = true;\n');
+
+    const fakeTina = path.join(tmp, 'tina.exe');
+    fs.writeFileSync(fakeTina, '');
+    const regFile = path.join(tmp, 'ecosystem-registry.json');
+    fs.writeFileSync(regFile, JSON.stringify({
+      schemaVersion: 2,
+      apps: { tinaTi: { executable: fakeTina } }
+    }), 'utf8');
+
+    delete process.env.GAUSSBOARD_NGSPICE_WASM;
+    delete process.env.TINA_TI_EXE;
+    process.env.LOCAL_COMMON_LIBRARIES = tmp;
+    process.env.LOCAL_ECOSYSTEM_REGISTRY = regFile;
+
+    const ngRes = spiceBridge.resolveNgspiceWasmPath();
+    assert.equal(ngRes.available, true);
+    assert.equal(ngRes.entryPath, ngEntry);
+    assert.equal(spiceBridge.resolveTinaExecutable(), fakeTina);
+
+    const health = await triarchyBridge.checkEcosystemHealth({
+      servicesOverride: {
+        ragManager: { url: liveUrl },
+        obsidianAgentManager: { url: 'http://127.0.0.1:1' },
+        ankiConnect: { url: liveUrl },
+        deepTutor: { url: 'http://127.0.0.1:1' }
+      }
+    });
+    assert.equal(health.services.ragManager.online, true);
+    assert.equal(health.services.ankiConnect.online, true);
+    assert.equal(health.services.obsidianAgentManager.online, false);
+    assert.equal(health.services.deepTutor.online, false);
+    assert.equal(health.services.ngspiceWasm.online, true);
+    assert.equal(health.services.tinaTi.online, true);
+  } finally {
+    await new Promise((resolve) => liveServer.close(resolve));
+    if (prevLibs === undefined) delete process.env.LOCAL_COMMON_LIBRARIES;
+    else process.env.LOCAL_COMMON_LIBRARIES = prevLibs;
+    if (prevReg === undefined) delete process.env.LOCAL_ECOSYSTEM_REGISTRY;
+    else process.env.LOCAL_ECOSYSTEM_REGISTRY = prevReg;
+    if (prevTina === undefined) delete process.env.TINA_TI_EXE;
+    else process.env.TINA_TI_EXE = prevTina;
+    if (prevNgspice === undefined) delete process.env.GAUSSBOARD_NGSPICE_WASM;
+    else process.env.GAUSSBOARD_NGSPICE_WASM = prevNgspice;
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });

@@ -13,6 +13,7 @@
  */
 
 import { IndustrialCircuitSim, circuitAudio } from '../core/circuit-sim.js';
+import { SpiceEngine, SOLVER_MODES, generateSpiceNetlist, exportSpiceNetlistFile } from '../core/spice-engine.js';
 import { LADDER_PRESETS } from '../core/diagram-builder.js';
 import { t } from '../i18n.js';
 
@@ -40,6 +41,12 @@ export class CircuitWorkbenchModal {
     // Oscilloscope tray open state
     this.scopeVisible = false;
 
+    // Dual circuit engine state (MNA Live interactive + switchable ngspice-wasm SPICE)
+    this.spiceEngine = new SpiceEngine();
+    this.solverMode = SOLVER_MODES.MNA_LIVE;
+    this.spiceAnalysis = 'tran';
+    this.spiceDrawerVisible = false;
+
     // Initialize with standard Direct-On-Line (DOL) Starter preset
     this.sim.loadPresetDOL();
   }
@@ -51,6 +58,7 @@ export class CircuitWorkbenchModal {
     this.modal.classList.add('visible');
     this.resizeCanvas();
     this.startSimulationLoop();
+    this.spiceEngine.detectRuntime().then(() => this.updateSpiceRuntimeBadge()).catch(() => {});
   }
 
   close() {
@@ -131,7 +139,27 @@ export class CircuitWorkbenchModal {
       else if (e.target.value === 'rectifier') this.sim.loadPresetBridgeRectifier();
       else if (e.target.value === 'clear') this.sim.clear();
       this.rebuildPortHitboxes();
+      if (this.spiceDrawerVisible) this.runSpiceAnalysis().catch(() => {});
     });
+
+    // Solver Mode Switcher (MNA Live vs. SPICE ngspice-wasm)
+    const solverSelect = document.createElement('select');
+    solverSelect.className = 'workbench-select workbench-solver-select';
+    solverSelect.title = t('Solver Mode');
+    solverSelect.setAttribute('aria-label', t('Solver Mode'));
+    solverSelect.innerHTML = `
+      <option value="${SOLVER_MODES.MNA_LIVE}">${t('MNA Live (Interactive)')}</option>
+      <option value="${SOLVER_MODES.NGSPICE_SPICE}">${t('SPICE (ngspice-wasm)')}</option>
+    `;
+    solverSelect.value = this.solverMode;
+    solverSelect.addEventListener('change', (e) => {
+      this.solverMode = this.spiceEngine.setMode(e.target.value);
+      if (this.solverMode === SOLVER_MODES.NGSPICE_SPICE) {
+        if (!this.spiceDrawerVisible) this.toggleSpiceDrawer(true);
+        this.runSpiceAnalysis().catch(() => {});
+      }
+    });
+    this.solverSelect = solverSelect;
 
     // Wire Color Palette
     const colorGroup = document.createElement('div');
@@ -209,6 +237,7 @@ export class CircuitWorkbenchModal {
 
     header.appendChild(titleArea);
     header.appendChild(presetSelect);
+    header.appendChild(solverSelect);
     header.appendChild(dcControl);
     header.appendChild(colorGroup);
     header.appendChild(btnReset);
@@ -258,9 +287,69 @@ export class CircuitWorkbenchModal {
     this.scopeCanvas = scopeBar.querySelector('.scope-canvas');
     this.scopeCtx = this.scopeCanvas.getContext('2d');
 
+    // 4. Collapsible SPICE Analysis & Netlist Drawer
+    const spiceBar = document.createElement('div');
+    spiceBar.className = 'workbench-spice-bar';
+    spiceBar.style.cssText = 'border-top:1px solid rgba(255,255,255,0.1);background:rgba(15,23,42,0.88);padding:8px 14px;display:flex;flex-direction:column;gap:8px;';
+    spiceBar.innerHTML = `
+      <div class="spice-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button type="button" class="workbench-btn spice-toggle-btn">⚡ ${t('SPICE Analysis & Netlist')}</button>
+          <span class="spice-runtime-pill" style="font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(148,163,184,0.16);color:#cbd5e1;">ngspice-wasm: ${t('Not installed')}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <select class="workbench-select spice-analysis-select" aria-label="${t('SPICE Analysis & Netlist')}">
+            <option value="tran">${t('Transient (.tran)')}</option>
+            <option value="ac">${t('AC Sweep (.ac)')}</option>
+          </select>
+          <button type="button" class="workbench-btn spice-run-btn">▶ ${t('Run SPICE')}</button>
+          <button type="button" class="workbench-btn spice-cir-btn">📄 ${t('Export .cir Netlist')}</button>
+          <button type="button" class="workbench-btn spice-tina-btn">🔌 ${t('Open in TI TINA')}</button>
+        </div>
+      </div>
+      <div class="spice-content" style="display:none;gap:10px;grid-template-columns:1.2fr 1fr;align-items:stretch;">
+        <canvas class="spice-plot-canvas" width="600" height="120" style="width:100%;height:120px;background:#020617;border:1px solid rgba(56,189,248,0.22);border-radius:8px;"></canvas>
+        <textarea class="spice-netlist-view" readonly spellcheck="false" style="width:100%;height:120px;resize:none;font-family:monospace;font-size:11px;line-height:1.4;background:#0b1120;color:#cbd5e1;border:1px solid rgba(148,163,184,0.25);border-radius:8px;padding:8px;box-sizing:border-box;"></textarea>
+      </div>
+    `;
+
+    this.spiceBar = spiceBar;
+    this.spiceContentEl = spiceBar.querySelector('.spice-content');
+    this.spiceRuntimePill = spiceBar.querySelector('.spice-runtime-pill');
+    this.spicePlotCanvas = spiceBar.querySelector('.spice-plot-canvas');
+    this.spiceNetlistEl = spiceBar.querySelector('.spice-netlist-view');
+    const spiceAnalysisSelect = spiceBar.querySelector('.spice-analysis-select');
+
+    spiceBar.querySelector('.spice-toggle-btn').addEventListener('click', () => {
+      this.toggleSpiceDrawer(!this.spiceDrawerVisible);
+    });
+    spiceAnalysisSelect.addEventListener('change', (e) => {
+      this.spiceAnalysis = e.target.value === 'ac' ? 'ac' : 'tran';
+      if (this.spiceDrawerVisible) this.runSpiceAnalysis().catch(() => {});
+    });
+    spiceBar.querySelector('.spice-run-btn').addEventListener('click', () => {
+      if (!this.spiceDrawerVisible) this.toggleSpiceDrawer(true);
+      this.runSpiceAnalysis().catch(() => {});
+    });
+    spiceBar.querySelector('.spice-cir-btn').addEventListener('click', async () => {
+      const res = await exportSpiceNetlistFile(this.sim, { analysis: this.spiceAnalysis });
+      if (res?.ok) this.app.toast?.(t('SPICE netlist exported'));
+    });
+    spiceBar.querySelector('.spice-tina-btn').addEventListener('click', async () => {
+      const { netlist } = generateSpiceNetlist(this.sim, { analysis: this.spiceAnalysis });
+      const res = await window.board?.launchTinaTi?.({ netlist });
+      if (res?.ok) {
+        this.app.toast?.(t('Opened in TI TINA'));
+      } else {
+        await exportSpiceNetlistFile(this.sim, { analysis: this.spiceAnalysis });
+        this.app.toast?.(t('TI TINA not found — exported .cir netlist instead'));
+      }
+    });
+
     container.appendChild(header);
     container.appendChild(body);
     container.appendChild(scopeBar);
+    container.appendChild(spiceBar);
     backdrop.appendChild(container);
 
     // Close on backdrop click or Escape
@@ -1380,6 +1469,83 @@ export class CircuitWorkbenchModal {
     this.app.store?.add(noteObj);
     this.app.saveSoon?.();
     this.app.surface?.render?.();
+  }
+
+  toggleSpiceDrawer(open) {
+    this.spiceDrawerVisible = !!open;
+    if (this.spiceContentEl) {
+      this.spiceContentEl.style.display = this.spiceDrawerVisible ? 'grid' : 'none';
+    }
+    if (this.spiceDrawerVisible && !this.spiceEngine.lastResult) {
+      this.runSpiceAnalysis().catch(() => {});
+    }
+  }
+
+  updateSpiceRuntimeBadge() {
+    if (!this.spiceRuntimePill) return;
+    const ready = !!this.spiceEngine.runtime?.ngspice?.available;
+    this.spiceRuntimePill.textContent = `ngspice-wasm: ${ready ? t('Installed') : t('Not installed')}`;
+    this.spiceRuntimePill.style.background = ready ? 'rgba(16,185,129,0.18)' : 'rgba(148,163,184,0.16)';
+    this.spiceRuntimePill.style.color = ready ? '#6ee7b7' : '#cbd5e1';
+  }
+
+  async runSpiceAnalysis() {
+    const res = await this.spiceEngine.runAnalysis(this.sim, { analysis: this.spiceAnalysis });
+    if (this.spiceNetlistEl && res?.netlist) {
+      this.spiceNetlistEl.value = res.netlist;
+    }
+    this.renderSpicePlot(res);
+    return res;
+  }
+
+  renderSpicePlot(res) {
+    const canvas = this.spicePlotCanvas;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = 'rgba(148,163,184,0.14)';
+    ctx.lineWidth = 1;
+    for (let y = 24; y < h; y += 24) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+
+    const traces = Array.isArray(res?.traces) ? res.traces : [];
+    if (!traces.length) return;
+    const allVals = traces.flatMap((tr) => tr.values || []).filter(Number.isFinite);
+    if (!allVals.length) return;
+    let minV = Math.min(...allVals);
+    let maxV = Math.max(...allVals);
+    if (Math.abs(maxV - minV) < 1e-6) { minV -= 1; maxV += 1; }
+
+    const padX = 12;
+    const padY = 18;
+    traces.forEach((tr, idx) => {
+      const vals = tr.values || [];
+      if (vals.length < 2) return;
+      ctx.strokeStyle = tr.color || '#38bdf8';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      for (let i = 0; i < vals.length; i++) {
+        const px = padX + ((w - padX * 2) * i) / (vals.length - 1);
+        const py = h - padY - ((vals[i] - minV) / (maxV - minV)) * (h - padY * 2);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = tr.color || '#38bdf8';
+      ctx.font = '10px sans-serif';
+      ctx.fillText(`${tr.name} [${minV.toFixed(1)}..${maxV.toFixed(1)} ${tr.unit || ''}]`, 12 + idx * 190, 12);
+    });
   }
 
   destroy() {

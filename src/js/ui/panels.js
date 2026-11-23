@@ -1978,6 +1978,77 @@ export function createPanels(app) {
           h('button', { class: 'btn', style: 'width:100%;margin-bottom:8px', onclick: () => { app.command('board.save'); close(); } }, t('Save a copy…')),
           h('button', { class: 'btn danger', style: 'width:100%', onclick: () => app.command('edit.clear') }, t('Clear this canvas'))
         ),
+        (window.board?.checkEcosystemHealth) ? h('div', { class: 'section' },
+          h('h5', {}, t('Pentagram Ecosystem & Services')),
+          (() => {
+            const list = h('div', { style: 'display:flex;flex-direction:column;gap:6px;margin-top:8px;' });
+            const refreshBtn = h('button', {
+              type: 'button',
+              class: 'btn',
+              style: 'width:100%;margin-top:8px;'
+            }, t('Refresh Status'));
+            let loadedOnce = false;
+
+            const renderHealth = (res) => {
+              const s = res?.services || {};
+              const rows = [
+                { label: 'RAG Manager (:27130)', item: s.ragManager, kind: 'http' },
+                { label: 'Obsidian Agent Manager (:27125)', item: s.obsidianAgentManager, kind: 'http' },
+                { label: 'AnkiConnect (:8765)', item: s.ankiConnect, kind: 'http' },
+                { label: 'DeepTutor (:8001)', item: s.deepTutor, kind: 'http' },
+                { label: 'Mermaid Manager', item: s.mermaidManager, kind: 'bin' },
+                { label: 'ngspice-wasm', item: s.ngspiceWasm, kind: 'bin' },
+                { label: 'TI TINA', item: s.tinaTi, kind: 'bin' }
+              ];
+              list.textContent = '';
+              for (const r of rows) {
+                const ok = !!r.item?.online;
+                const statusLabel = r.kind === 'http'
+                  ? (ok ? t('Online') : t('Offline'))
+                  : (ok ? t('Installed') : t('Not installed'));
+                const pillStyle = ok
+                  ? 'padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:#166534;color:#ffffff;'
+                  : 'padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:#475569;color:#ffffff;';
+                list.appendChild(h('div', {
+                  style: 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:8px;background:var(--surface-2,rgba(128,128,128,0.08));font-size:12px;'
+                },
+                  h('span', { style: 'color:var(--text);font-weight:500;' }, r.label),
+                  h('span', { style: pillStyle }, statusLabel)
+                ));
+              }
+            };
+
+            const probe = async () => {
+              refreshBtn.disabled = true;
+              list.textContent = '';
+              list.appendChild(h('div', { style: 'font-size:12px;color:var(--text-2);padding:4px 0;' }, t('Checking…')));
+              try {
+                const res = await window.board.checkEcosystemHealth();
+                renderHealth(res);
+              } catch {
+                renderHealth({});
+              } finally {
+                refreshBtn.disabled = false;
+              }
+            };
+
+            refreshBtn.addEventListener('click', probe);
+            const details = h('details', {
+              style: 'border:1px solid var(--stroke,rgba(128,128,128,0.2));border-radius:10px;padding:8px 10px;'
+            },
+              h('summary', { style: 'cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text);' }, t('Service Health & Connections')),
+              list,
+              refreshBtn
+            );
+            details.addEventListener('toggle', () => {
+              if (details.open && !loadedOnce) {
+                loadedOnce = true;
+                probe();
+              }
+            });
+            return details;
+          })()
+        ) : null,
         h('div', { class: 'section' },
           h('h5', {}, t('External Libraries & Engines')),
           h('div', { style: 'font-size:12px;color:var(--text-2);line-height:1.6;margin-bottom:10px' },
