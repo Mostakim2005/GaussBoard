@@ -17,6 +17,7 @@ const mediaBridge = require('./electron/media-bridge.cjs');
 const triarchyBridge = require('./electron/triarchy-bridge.cjs');
 const cliExport = require('./electron/cli-export.cjs');
 const spiceBridge = require('./electron/spice-bridge.cjs');
+const ragBridge = require('./electron/rag-bridge.cjs');
 const { safeExternalUrl, isReleaseUrl } = require('./src/js/platform/security.cjs');
 
 const SRC = path.join(__dirname, 'src');
@@ -1584,6 +1585,10 @@ function ipc() {
   handleIpc('spice:status', () => spiceBridge.getSpiceRuntimeStatus());
   handleIpc('spice:launchTina', async (_event, payload) => spiceBridge.launchTinaTi(payload || {}));
   handleIpc('ecosystem:health', async () => triarchyBridge.checkEcosystemHealth());
+  handleIpc('rag:ingestEvent', async (_event, payload) => ragBridge.postRagIngestEvent(payload || {}));
+  handleIpc('rag:search', async (_event, payload) => ragBridge.searchRagEcosystem(payload || {}));
+  handleIpc('rag:transcribe', async (_event, payload) => ragBridge.requestAudioTranscription(payload || {}));
+  handleIpc('deeptutor:send', async (_event, payload) => ragBridge.sendToDeepTutor(payload || {}));
   handleIpc('media:findSiblingSubtitle', async (_event, filePath) => mediaBridge.findSiblingSubtitle(filePath));
   handleIpc('media:remuxToMp4', async (_event, filePath) => mediaBridge.remuxToMp4(filePath));
   handleIpc('obsidian:syncFile', async (_event, payload) => triarchyBridge.syncToObsidianVault(payload || {}));

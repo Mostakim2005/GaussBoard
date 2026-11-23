@@ -2407,5 +2407,20 @@
  "Refresh Status": "Atualizar status",
  "Online": "Online",
  "Installed": "Instalado",
- "Not installed": "Não instalado"
+ "Not installed": "Não instalado",
+ "Pentagram & RAG Manager": "Pentagram e RAG Manager",
+ "Sync Board to Obsidian + RAG Manager": "Sincronizar quadro com Obsidian + RAG Manager",
+ "Syncing to Obsidian & RAG Manager…": "Sincronizando com Obsidian e RAG Manager…",
+ "Board synced to Obsidian & RAG Manager": "Quadro sincronizado com Obsidian e RAG Manager",
+ "Board synced to Obsidian (RAG Manager offline)": "Quadro sincronizado com Obsidian (RAG Manager offline)",
+ "Could not sync board to Obsidian or RAG Manager": "Não foi possível sincronizar o quadro com Obsidian ou RAG Manager",
+ "Search Ecosystem (RAG Manager)": "Pesquisar no ecossistema (RAG Manager)",
+ "Search Books, Obsidian, Mermaid & DeepTutor…": "Pesquisar em Livros, Obsidian, Mermaid e DeepTutor…",
+ "Search": "Pesquisar",
+ "No matching results found": "Nenhum resultado correspondente encontrado",
+ "RAG Manager (:27130) is offline": "RAG Manager (:27130) está offline",
+ "Ask / Quiz in DeepTutor (:8001)": "Perguntar / Testar no DeepTutor (:8001)",
+ "Sent board context to DeepTutor": "Contexto do quadro enviado para o DeepTutor",
+ "DeepTutor (:8001) is offline": "DeepTutor (:8001) está offline",
+ "Auto-sync boards to Obsidian & RAG Manager on save": "Sincronizar quadros automaticamente com Obsidian e RAG Manager ao salvar"
 }

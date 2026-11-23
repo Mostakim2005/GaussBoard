@@ -2407,5 +2407,20 @@
  "Refresh Status": "تحديث الحالة",
  "Online": "متصل",
  "Installed": "مثبّت",
- "Not installed": "غير مثبّت"
+ "Not installed": "غير مثبّت",
+ "Pentagram & RAG Manager": "Pentagram وRAG Manager",
+ "Sync Board to Obsidian + RAG Manager": "مزامنة اللوحة مع Obsidian + RAG Manager",
+ "Syncing to Obsidian & RAG Manager…": "جارٍت المزامنة مع Obsidian وRAG Manager…",
+ "Board synced to Obsidian & RAG Manager": "تمت مزامنة اللوحة مع Obsidian وRAG Manager",
+ "Board synced to Obsidian (RAG Manager offline)": "تمت مزامنة اللوحة مع Obsidian (RAG Manager غير متصل)",
+ "Could not sync board to Obsidian or RAG Manager": "تعذّرت مزامنة اللوحة مع Obsidian أو RAG Manager",
+ "Search Ecosystem (RAG Manager)": "بحث في المنظومة (RAG Manager)",
+ "Search Books, Obsidian, Mermaid & DeepTutor…": "ابحث في الكتب وObsidian وMermaid وDeepTutor…",
+ "Search": "بحث",
+ "No matching results found": "لم يُعثر على نتائج مطابقة",
+ "RAG Manager (:27130) is offline": "RAG Manager (:27130) غير متصل",
+ "Ask / Quiz in DeepTutor (:8001)": "اسأل / اختبر في DeepTutor (:8001)",
+ "Sent board context to DeepTutor": "تم إرسال سياق اللوحة إلى DeepTutor",
+ "DeepTutor (:8001) is offline": "DeepTutor (:8001) غير متصل",
+ "Auto-sync boards to Obsidian & RAG Manager on save": "مزامنة اللوحات تلقائيًا مع Obsidian وRAG Manager عند الحفظ"
 }

@@ -2407,5 +2407,20 @@
  "Refresh Status": "অবস্থা রিফ্রেশ করুন",
  "Online": "অনলাইন",
  "Installed": "ইনস্টল করা আছে",
- "Not installed": "ইনস্টল করা নেই"
+ "Not installed": "ইনস্টল করা নেই",
+ "Pentagram & RAG Manager": "Pentagram ও RAG Manager",
+ "Sync Board to Obsidian + RAG Manager": "বোর্ড Obsidian + RAG Manager-এ সিঙ্ক করুন",
+ "Syncing to Obsidian & RAG Manager…": "Obsidian ও RAG Manager-এ সিঙ্ক হচ্ছে…",
+ "Board synced to Obsidian & RAG Manager": "বোর্ড Obsidian ও RAG Manager-এ সিঙ্ক হয়েছে",
+ "Board synced to Obsidian (RAG Manager offline)": "বোর্ড Obsidian-এ সিঙ্ক হয়েছে (RAG Manager অফলাইন)",
+ "Could not sync board to Obsidian or RAG Manager": "Obsidian বা RAG Manager-এ বোর্ড সিঙ্ক করা যায়নি",
+ "Search Ecosystem (RAG Manager)": "ইকোসিস্টেমে খুঁজুন (RAG Manager)",
+ "Search Books, Obsidian, Mermaid & DeepTutor…": "বই, Obsidian, Mermaid ও DeepTutor খুঁজুন…",
+ "Search": "খুঁজুন",
+ "No matching results found": "কোনো মিল পাওয়া যায়নি",
+ "RAG Manager (:27130) is offline": "RAG Manager (:27130) অফলাইন",
+ "Ask / Quiz in DeepTutor (:8001)": "DeepTutor (:8001)-এ জিজ্ঞাসা / কুইজ করুন",
+ "Sent board context to DeepTutor": "বোর্ডের কনটেক্সট DeepTutor-এ পাঠানো হয়েছে",
+ "DeepTutor (:8001) is offline": "DeepTutor (:8001) অফলাইন",
+ "Auto-sync boards to Obsidian & RAG Manager on save": "সেভের সময় বোর্ড স্বয়ংক্রিয়ভাবে Obsidian ও RAG Manager-এ সিঙ্ক করুন"
 }

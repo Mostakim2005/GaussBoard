@@ -202,10 +202,12 @@ flowchart TD
   * `electron/triarchy-bridge.cjs` -> `resolveObsidianVaultDir`, `syncToObsidianVault`, `parseGaussBoardDeepLink`, `deepLinkFromArgv`, `checkEcosystemHealth`
   * `electron/cli-export.cjs` -> `hasCliFlags`, `readBoardArchive`, `inspectBoard`, `runCli`
   * `electron/spice-bridge.cjs` -> `resolveNgspiceWasmPath`, `resolveTinaExecutable`, `getSpiceRuntimeStatus`, `launchTinaTi`
+  * `electron/rag-bridge.cjs` -> `postRagIngestEvent`, `searchRagEcosystem`, `requestAudioTranscription`, `sendToDeepTutor`
   * `src/js/core/spice-engine.js` -> `SpiceEngine`, `generateSpiceNetlist`, `exportSpiceNetlistFile`
+  * `src/js/core/pentagram-sync.js` -> `buildBoardSyncBundle`, `syncBoardToEcosystem`, `sendBoardContextToDeepTutor`
 
 ### [SUBSYSTEM: Planned-Pentagram-RAG-And-Dual-Spice-Flow] | Aliases: RAG Manager, 27130, ngspice-wasm, gaussboard URI, ankiNoteId
-> **1-Line Summary:** Planned Phase 1–4 upgrades adding `ngspice-wasm` as a switchable SPICE solver alongside `solveMNA`, registering `gaussboard://` URI dispatch, deduplicating AnkiConnect sync, and publishing board/audio updates to `RAG Manager` (`:27130`) (`docs/modules/pentagram-audit-and-upgrades.md`).
+> **1-Line Summary:** Implemented Phase 1–4 upgrades adding `ngspice-wasm` as a switchable SPICE solver alongside `solveMNA`, registering `gaussboard://` URI dispatch, deduplicating AnkiConnect sync, and publishing board/audio updates to `RAG Manager` (`:27130`) (`docs/modules/pentagram-audit-and-upgrades.md`).
 
 ```mermaid
 flowchart LR
@@ -252,8 +254,8 @@ See SUBSYSTEM sections above: Dual-Runtime-Platform, Document-Model-Op-Log, Inki
 > **1-Line Summary:** The active directive suite that must pass 24/24 before any change is called done.
 * **Automated UI / Logic Verification:** `node scripts/smoke.js --new-features`
 
-### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2409 keys, 7 locales, lint
-> **1-Line Summary:** Proves English keys match all 7 locales at 2,409/2,409 with zero missing strings.
+### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2424 keys, 7 locales, lint
+> **1-Line Summary:** Proves English keys match all 7 locales at 2,424/2,424 with zero missing strings.
 * **Type & Lint Check:** `node scripts/i18n-check.js`
 
 ### [VERIFY: Full-Regression-Suite] | Aliases: smoke builtin, 1247 assertions, full suite, test:all

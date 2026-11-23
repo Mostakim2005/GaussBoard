@@ -2407,5 +2407,20 @@
  "Refresh Status": "刷新状态",
  "Online": "在线",
  "Installed": "已安装",
- "Not installed": "未安装"
+ "Not installed": "未安装",
+ "Pentagram & RAG Manager": "Pentagram 与 RAG Manager",
+ "Sync Board to Obsidian + RAG Manager": "同步白板至 Obsidian + RAG Manager",
+ "Syncing to Obsidian & RAG Manager…": "正在同步到 Obsidian 和 RAG Manager…",
+ "Board synced to Obsidian & RAG Manager": "白板已同步至 Obsidian 和 RAG Manager",
+ "Board synced to Obsidian (RAG Manager offline)": "白板已同步至 Obsidian（RAG Manager 离线）",
+ "Could not sync board to Obsidian or RAG Manager": "无法将白板同步到 Obsidian 或 RAG Manager",
+ "Search Ecosystem (RAG Manager)": "搜索生态 (RAG Manager)",
+ "Search Books, Obsidian, Mermaid & DeepTutor…": "搜索书籍、Obsidian、Mermaid 与 DeepTutor…",
+ "Search": "搜索",
+ "No matching results found": "未找到匹配结果",
+ "RAG Manager (:27130) is offline": "RAG Manager (:27130) 离线",
+ "Ask / Quiz in DeepTutor (:8001)": "在 DeepTutor (:8001) 提问/测验",
+ "Sent board context to DeepTutor": "已将白板上下文发送至 DeepTutor",
+ "DeepTutor (:8001) is offline": "DeepTutor (:8001) 离线",
+ "Auto-sync boards to Obsidian & RAG Manager on save": "保存时自动同步白板至 Obsidian 和 RAG Manager"
 }

@@ -56,6 +56,7 @@ import { VisualizationDialog } from './ui/visualization-dialog.js';
 import { SidebarRibbon } from './ui/sidebar-ribbon.js';
 import { StudyRunner } from './ui/study-runner.js';
 import { syncBoardToAnki, exportBoardToApkg, exportBoardToPracticeBank } from './core/anki.js';
+import { syncBoardToEcosystem, sendBoardContextToDeepTutor } from './core/pentagram-sync.js';
 import { PeriodicTableModal } from './ui/periodic-table.js';
 import { PhetRunnerModal } from './ui/phet-runner.js';
 import { DictionaryPopover } from './ui/dictionary-popover.js';
@@ -660,6 +661,27 @@ class App {
     try { localStorage.setItem('gazboard.lastBoard', this.store.doc.id); } catch {}
     const b = document.getElementById('savedBadge');
     b.textContent = t('Saved');
+    if (this.settings?.autoSyncEcosystem) this.scheduleEcosystemSync();
+  }
+
+  scheduleEcosystemSync() {
+    if (this._ecoSyncTimer) clearTimeout(this._ecoSyncTimer);
+    this._ecoSyncTimer = setTimeout(() => {
+      this._ecoSyncTimer = null;
+      this.syncBoardToEcosystem({ event: 'board.autosave' }).catch(() => {});
+    }, 4000);
+  }
+
+  async syncBoardToEcosystem(opts = {}) {
+    return syncBoardToEcosystem(this, opts);
+  }
+
+  async sendBoardToDeepTutor(mode = 'ask', opts = {}) {
+    const res = await sendBoardContextToDeepTutor(this, { ...opts, mode });
+    if (res?.ok && res.sessionUrl && /^https?:\/\//i.test(res.sessionUrl)) {
+      window.board?.openReleases?.(res.sessionUrl);
+    }
+    return res;
   }
 
   /**

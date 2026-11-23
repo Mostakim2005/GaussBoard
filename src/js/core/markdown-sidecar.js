@@ -5,6 +5,80 @@
  */
 
 /**
+ * Collect canonical ECOSYSTEM_INTEGRATION_CONTRACT v2.0.0 metadata from a GazBoard doc.
+ */
+export function collectBoardSidecarMetadata(doc, boardName = 'Board', options = {}) {
+  const rawObjects = doc?.objects || {};
+  const entries = Array.isArray(rawObjects)
+    ? rawObjects.filter(Boolean).map((o, idx) => [o.id || String(idx), o])
+    : Object.entries(rawObjects).filter(([, o]) => o && typeof o === 'object');
+
+  const tags = Array.isArray(doc?.tags) ? [...doc.tags] : [];
+  const ankiNoteIds = [];
+  const diagramPaths = Array.isArray(options.diagramPaths) ? [...options.diagramPaths] : [];
+  const transcripts = [];
+
+  for (const [id, o] of entries) {
+    if (typeof o.text === 'string') {
+      const matches = o.text.match(/(?:^|\s)#([a-zA-Z0-9_\-]+)/g);
+      if (matches) {
+        for (const m of matches) {
+          const tag = m.trim().replace(/^#/, '');
+          if (tag && !tags.includes(tag)) tags.push(tag);
+        }
+      }
+    }
+    if (Number.isInteger(o.ankiNoteId) && o.ankiNoteId > 0 && !ankiNoteIds.includes(o.ankiNoteId)) {
+      ankiNoteIds.push(o.ankiNoteId);
+    }
+    const dPath = o.diagramPath || o.mermaidPath;
+    if (typeof dPath === 'string' && dPath.trim() && !diagramPaths.includes(dPath.trim())) {
+      diagramPaths.push(dPath.trim());
+    }
+    if (o.type === 'video' && typeof o.subtitlesText === 'string' && o.subtitlesText.trim()) {
+      transcripts.push({
+        kind: 'subtitle',
+        id: o.id || id,
+        name: o.title || o.name || 'Video Subtitles',
+        text: o.subtitlesText.trim()
+      });
+    }
+  }
+
+  if (Array.isArray(doc?.audioTracks)) {
+    for (const track of doc.audioTracks) {
+      if (track && typeof track.transcript === 'string' && track.transcript.trim()) {
+        transcripts.push({
+          kind: 'audio',
+          id: track.id || 'audio',
+          name: track.name || 'Audio Transcript',
+          text: track.transcript.trim()
+        });
+      }
+    }
+  }
+
+  const boardId = doc?.id ? String(doc.id) : null;
+  const safeSlug = String(boardId || boardName || 'board').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'board';
+  const xrefId = options.xrefId || doc?.xrefId || `xref_gb_${safeSlug}`;
+  const updatedAt = options.updatedAt || new Date().toISOString();
+  const sourceUri = boardId ? `gaussboard://open?board=${encodeURIComponent(boardId)}` : null;
+
+  return {
+    entries,
+    boardId,
+    safeSlug,
+    xrefId,
+    updatedAt,
+    sourceUri,
+    tags,
+    ankiNoteIds,
+    diagramPaths,
+    transcripts
+  };
+}
+
+/**
  * Extracts YAML frontmatter and markdown sections from GazBoard document state.
  * @param {Object} doc - GazBoard doc state
  * @param {string} [boardName='Board'] - Current board name
@@ -12,39 +86,37 @@
  * @returns {string} Clean Obsidian-compatible Markdown text
  */
 export function generateMarkdownSidecar(doc, boardName = 'Board', options = {}) {
-  const objects = doc?.objects || {};
-  const tags = Array.isArray(doc?.tags) ? [...doc.tags] : [];
   const aliases = Array.isArray(doc?.aliases) ? [...doc.aliases] : [];
+  const meta = collectBoardSidecarMetadata(doc, boardName, options);
 
-  // Scan text and notes for inline #hashtags if not already recorded in doc.tags
-  for (const o of Object.values(objects)) {
-    if (!o || typeof o.text !== 'string') continue;
-    const matches = o.text.match(/(?:^|\s)#([a-zA-Z0-9_\-]+)/g);
-    if (matches) {
-      for (const m of matches) {
-        const tag = m.trim().replace(/^#/, '');
-        if (tag && !tags.includes(tag)) tags.push(tag);
-      }
-    }
-  }
-
-  const now = new Date().toISOString().split('T')[0];
+  const now = meta.updatedAt.split('T')[0];
   const lines = [];
 
   // 1. YAML Frontmatter
   lines.push('---');
   lines.push(`title: ${JSON.stringify(String(boardName || 'Board'))}`);
   lines.push(`date: ${now}`);
-  if (tags.length) {
-    lines.push(`tags: [${tags.map(t => JSON.stringify(t)).join(', ')}]`);
+  lines.push(`updated_at: ${meta.updatedAt}`);
+  lines.push(`xref_id: ${JSON.stringify(meta.xrefId)}`);
+  if (meta.tags.length) {
+    lines.push(`tags: [${meta.tags.map(t => JSON.stringify(t)).join(', ')}]`);
   }
   if (aliases.length) {
     lines.push(`aliases: [${aliases.map(a => JSON.stringify(a)).join(', ')}]`);
   }
   lines.push('source_app: gaussboard');
-  if (doc?.id) {
-    lines.push(`board_id: ${JSON.stringify(String(doc.id))}`);
-    lines.push(`deep_link: ${JSON.stringify('gaussboard://open?board=' + encodeURIComponent(String(doc.id)))}`);
+  if (meta.sourceUri) {
+    lines.push(`source_uri: ${JSON.stringify(meta.sourceUri)}`);
+  }
+  if (meta.boardId) {
+    lines.push(`board_id: ${JSON.stringify(meta.boardId)}`);
+    lines.push(`deep_link: ${JSON.stringify(meta.sourceUri)}`);
+  }
+  if (meta.ankiNoteIds.length) {
+    lines.push(`anki_note_ids: [${meta.ankiNoteIds.join(', ')}]`);
+  }
+  if (meta.diagramPaths.length) {
+    lines.push(`diagram_paths: [${meta.diagramPaths.map((p) => JSON.stringify(p)).join(', ')}]`);
   }
   lines.push('generator: GazBoard v5.9.0');
   lines.push('---');
@@ -60,7 +132,7 @@ export function generateMarkdownSidecar(doc, boardName = 'Board', options = {}) 
   const videos = [];
   const excerpts = [];
 
-  for (const [id, o] of Object.entries(objects)) {
+  for (const [, o] of meta.entries) {
     if (!o || typeof o !== 'object') continue;
     if (o.type === 'note' || o.type === 'text') {
       notes.push(o);
@@ -149,6 +221,17 @@ export function generateMarkdownSidecar(doc, boardName = 'Board', options = {}) 
       if (ex.name) lines.push(`  - Description: ${ex.name}`);
     }
     lines.push('');
+  }
+
+  if (meta.transcripts.length) {
+    lines.push('## Audio & Subtitle Transcripts');
+    lines.push('');
+    for (const tr of meta.transcripts) {
+      lines.push(`### ${tr.name}`);
+      lines.push('');
+      lines.push(tr.text);
+      lines.push('');
+    }
   }
 
   return lines.join('\n');

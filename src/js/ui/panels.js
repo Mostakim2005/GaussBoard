@@ -1980,6 +1980,8 @@ export function createPanels(app) {
         ),
         (window.board?.checkEcosystemHealth) ? h('div', { class: 'section' },
           h('h5', {}, t('Pentagram Ecosystem & Services')),
+          row(t('Auto-sync boards to Obsidian & RAG Manager on save'),
+            mkToggle(() => !!s.autoSyncEcosystem, (v) => { s.autoSyncEcosystem = v; app.saveSettings(); })),
           (() => {
             const list = h('div', { style: 'display:flex;flex-direction:column;gap:6px;margin-top:8px;' });
             const refreshBtn = h('button', {

@@ -134,7 +134,7 @@
   * `src/js/ui/compression-dialog.js` -> `CompressionDialog`, `qualitySlider`
 
 ### [FEATURE: I18n-Offline] | Aliases: translations, 7 locales, offline, vendored, no CDN, service worker
-> **1-Line Summary:** 100% i18n parity across 7 locales (2,409 keys) with every runtime library vendored locally and zero external CDN leaks.
+> **1-Line Summary:** 100% i18n parity across 7 locales (2,424 keys) with every runtime library vendored locally and zero external CDN leaks.
 * **User Intention (Non-Negotiable):** Non-English users must see every UI string translated and work fully offline on desktop and PWA, with board text measured consistently everywhere.
 * **Visual / UI Behavior:** English sentence is the key via t(); missing translations fall back to English; board fonts bundled via @font-face rather than borrowed from the OS.
 * **Code Anchors (Grep Targets):**
@@ -244,15 +244,15 @@
 * **User Intention:** Preserve all existing industrial control simulation while gaining non-linear SPICE `.tran`/`.ac` analysis, `.cir` export, and TI `TINA` interop without bloating the `<15 MB` PWA bundle.
 * **Code Anchors (Grep Targets):** `src/js/core/circuit-sim.js` -> `IndustrialCircuitSim`, `src/js/core/spice-engine.js` -> `SpiceEngine`, `generateSpiceNetlist`, `electron/spice-bridge.cjs` (`[M13-01]`)
 
-### [WISHLIST: Pentagram-And-RAG-Manager-Interoperability] | Aliases: RAG Manager, 27130, xref_id, gaussboard deep link, anki deduplication, headless cli
-> **1-Line Summary:** Connect `GaussBoard` to central `RAG Manager` (`127.0.0.1:27130`), Obsidian (`:27125`), Mermaid Manager, DeepTutor (`:8001`), and Anki (`:8765`) via canonical `xref_id` sidecars, active `gaussboard://` URI handling, idempotent Anki sync, and `--json` headless CLI export.
+### [FEATURE: Pentagram-And-RAG-Manager-Interoperability] | Aliases: RAG Manager, 27130, xref_id, gaussboard deep link, anki deduplication, headless cli
+> **1-Line Summary:** Connects `GaussBoard` to central `RAG Manager` (`127.0.0.1:27130`), Obsidian (`:27125`), Mermaid Manager, DeepTutor (`:8001`), and Anki (`:8765`) via canonical `xref_id` sidecars, active `gaussboard://` URI handling, idempotent Anki sync, Practice Engine banks, and `--json` headless CLI export.
 * **User Intention:** Editing a board, card, diagram, or lecture audio transcript updates cross-references across the entire 5-app Pentagram without duplicate Anki cards, broken deep links, or silent overwrite conflicts.
-* **Target Integration Point:** `electron/triarchy-bridge.cjs`, `src/js/core/anki.js`, `src/js/core/markdown-sidecar.js`, `docs/modules/pentagram-audit-and-upgrades.md`
+* **Code Anchors (Grep Targets):** `electron/triarchy-bridge.cjs`, `electron/rag-bridge.cjs`, `electron/cli-export.cjs`, `src/js/core/pentagram-sync.js`, `src/js/core/anki.js`, `src/js/core/markdown-sidecar.js`, `docs/modules/pentagram-audit-and-upgrades.md`
 
 ## 4. Canonical References & Live Verification
 * **Core Documentation Suite:** `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS_AND_TRAPS.md`, `docs/releases/ANDROID_READINESS.md`
 * **Active Verification Suite:** `node scripts/smoke.js --new-features` (24/24 passing)
-* **Internationalization Suite:** `node scripts/i18n-check.js` (2,409/2,409 across 7 locales)
+* **Internationalization Suite:** `node scripts/i18n-check.js` (2,424/2,424 across 7 locales)
 * **Android Platform Suite:** `node --test test/android-*.test.js` (82/82 passing)
 * **Core Data Schemas & State:** `src/js/core/store.js` (`Store`, `doc.objects`, `doc.pages`, `doc.audioTracks`)
 * **Platform & Packaging:** `main.js`, `preload.js`, `package.json`

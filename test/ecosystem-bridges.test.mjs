@@ -14,6 +14,7 @@ import { syncBoardToAnki, generatePracticeEngineBank } from '../src/js/core/anki
 import { prepareLocalVideoSource } from '../src/js/insert.js';
 import { IndustrialCircuitSim } from '../src/js/core/circuit-sim.js';
 import { SpiceEngine, SOLVER_MODES, generateSpiceNetlist } from '../src/js/core/spice-engine.js';
+import { syncBoardToEcosystem, sendBoardContextToDeepTutor } from '../src/js/core/pentagram-sync.js';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,6 +24,7 @@ const mediaBridge = require(path.join(ROOT, 'electron', 'media-bridge.cjs'));
 const triarchyBridge = require(path.join(ROOT, 'electron', 'triarchy-bridge.cjs'));
 const cliExport = require(path.join(ROOT, 'electron', 'cli-export.cjs'));
 const spiceBridge = require(path.join(ROOT, 'electron', 'spice-bridge.cjs'));
+const ragBridge = require(path.join(ROOT, 'electron', 'rag-bridge.cjs'));
 
 test('Patch 07: global shared libraries resolver honors env override and prunes dead vendor SW entries', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-libs-'));
@@ -666,6 +668,123 @@ test('Phase 3 M13-01 & M14-02: spice-bridge resolves SharedLibraries ngspice-was
     if (prevNgspice === undefined) delete process.env.GAUSSBOARD_NGSPICE_WASM;
     else process.env.GAUSSBOARD_NGSPICE_WASM = prevNgspice;
     fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('Phase 4 M13-02 & M14-01: canonical xref_id sidecar, RAG/DeepTutor loopback bridge, and syncBoardToEcosystem', async () => {
+  const doc = {
+    id: 'b_pentagram_4',
+    name: 'Electromagnetics IV',
+    tags: ['emag'],
+    audioTracks: [{ id: 'aud_9', name: 'Maxwell Curl', transcript: 'Curl of E equals minus dB/dt' }],
+    objects: {
+      n1: { id: 'n1', type: 'note', text: 'Faraday Law #induction', diagramPath: 'Attachments/Diagrams/em.mmd', x: 10, y: 10, w: 200, h: 100 },
+      c1: { id: 'c1', type: 'curtain', subtype: 'tape', label: 'Gauss Law', ankiNoteId: 1732000999, x: 20, y: 150, w: 120, h: 40 },
+      v1: { id: 'v1', type: 'video', title: 'Lecture 4', subtitlesText: '1\n00:00:01,000 --> 00:00:03,000\nDisplacement current\n', x: 300, y: 10, w: 320, h: 180 }
+    }
+  };
+
+  const md = generateMarkdownSidecar(doc, 'Electromagnetics IV');
+  assert.match(md, /xref_id: "xref_gb_b_pentagram_4"/);
+  assert.match(md, /updated_at: \d{4}-\d{2}-\d{2}T/);
+  assert.match(md, /source_uri: "gaussboard:\/\/open\?board=b_pentagram_4"/);
+  assert.match(md, /anki_note_ids: \[1732000999\]/);
+  assert.match(md, /diagram_paths: \["Attachments\/Diagrams\/em\.mmd"\]/);
+  assert.match(md, /## Audio & Subtitle Transcripts/);
+  assert.match(md, /Curl of E equals minus dB\/dt/);
+
+  const requests = [];
+  const server = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8');
+      requests.push({
+        method: req.method,
+        url: req.url,
+        auth: req.headers.authorization,
+        origin: req.headers.origin,
+        body: raw ? JSON.parse(raw) : null
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      if (req.url === '/v1/ingest/event') {
+        res.end(JSON.stringify({ ok: true, indexed: true }));
+      } else if (req.url.startsWith('/v1/search')) {
+        res.end(JSON.stringify({
+          results: [{
+            id: 'hit_1',
+            title: 'Faraday Law',
+            snippet: 'Induced EMF opposes flux change',
+            source_app: 'obsidian',
+            source_uri: 'gaussboard://open?board=b_pentagram_4&obj=n1',
+            score: 0.94,
+            xref_id: 'xref_gb_b_pentagram_4'
+          }]
+        }));
+      } else if (req.url === '/v1/transcribe') {
+        res.end(JSON.stringify({ text: 'Ampere-Maxwell law', cues: [{ start: 0, end: 2000, text: 'Ampere-Maxwell law' }], engine: 'groq-whisper-v3' }));
+      } else if (req.url === '/api/v1/context') {
+        res.end(JSON.stringify({ ok: true, session_url: 'http://127.0.0.1:3782/session/s_42' }));
+      } else {
+        res.end(JSON.stringify({ ok: true }));
+      }
+    });
+  });
+
+  try {
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const apiUrl = `http://127.0.0.1:${server.address().port}`;
+
+    const mockBoardApi = {
+      async syncToObsidian(payload) {
+        return { ok: true, mode: 'obsidian-agent-manager', vaultRel: `Whiteboards/${payload.filename}` };
+      },
+      async ingestToRag(payload) {
+        return ragBridge.postRagIngestEvent(payload, { apiUrl, token: 'rag-secret-1' });
+      },
+      async sendToDeepTutor(payload) {
+        return ragBridge.sendToDeepTutor({ ...payload, apiUrl, token: 'dt-secret-2' });
+      }
+    };
+
+    const mockApp = {
+      store: { doc, name: 'Electromagnetics IV' },
+      boardPictureFor: () => 'data:image/png;base64,iVBORw0KGgo='
+    };
+
+    const synced = await syncBoardToEcosystem(mockApp, { boardApi: mockBoardApi });
+    assert.equal(synced.ok, true);
+    assert.equal(synced.obsidian.md.vaultRel, 'Whiteboards/Electromagnetics_IV.md');
+    assert.equal(synced.obsidian.canvas.vaultRel, 'Whiteboards/Electromagnetics_IV.canvas');
+    assert.equal(synced.rag.ok, true);
+
+    const search = await ragBridge.searchRagEcosystem({ query: 'Faraday', apiUrl, token: 'rag-secret-1' });
+    assert.equal(search.ok, true);
+    assert.equal(search.results.length, 1);
+    assert.equal(search.results[0].sourceApp, 'obsidian');
+
+    const tr = await ragBridge.requestAudioTranscription({ boardId: 'b_pentagram_4', trackId: 'aud_9', apiUrl, token: 'rag-secret-1' });
+    assert.equal(tr.ok, true);
+    assert.equal(tr.text, 'Ampere-Maxwell law');
+
+    const dt = await sendBoardContextToDeepTutor(mockApp, { boardApi: mockBoardApi, mode: 'quiz' });
+    assert.equal(dt.ok, true);
+    assert.equal(dt.sessionUrl, 'http://127.0.0.1:3782/session/s_42');
+
+    assert.equal(requests.every((r) => r.origin === undefined), true, 'Must never send Origin header to loopback servers');
+    assert.equal(requests[0].auth, 'Bearer rag-secret-1');
+    assert.equal(requests[0].body.xref_id, 'xref_gb_b_pentagram_4');
+    assert.deepEqual(requests[0].body.anki_note_ids, [1732000999]);
+    assert.equal(requests[0].body.page_pngs.length, 1);
+
+    const offlineSearch = await ragBridge.searchRagEcosystem({ query: 'Faraday', apiUrl: 'http://127.0.0.1:1', token: 'x' });
+    assert.equal(offlineSearch.ok, false);
+    assert.equal(offlineSearch.offline, true);
+
+    const sw = fs.readFileSync(path.join(ROOT, 'src', 'sw.js'), 'utf8');
+    assert.ok(sw.includes('./js/core/pentagram-sync.js'), 'src/sw.js must precache ./js/core/pentagram-sync.js');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
   }
 });
 

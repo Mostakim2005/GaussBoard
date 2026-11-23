@@ -1247,6 +1247,156 @@ export class SidebarRibbon {
     }
 
     container.appendChild(pdfSection);
+
+    // Pentagram & RAG Manager Interoperability
+    const ecoSection = h('div', { class: 'deck-section' });
+    ecoSection.appendChild(h('h5', { class: 'deck-section-title' }, t('Pentagram & RAG Manager')));
+
+    const btnSyncEco = h('button', { class: 'deck-action-btn primary' },
+      h('span', { class: 'btn-icon' }, '🔄'),
+      h('span', {}, t('Sync Board to Obsidian + RAG Manager'))
+    );
+    btnSyncEco.addEventListener('click', async () => {
+      btnSyncEco.disabled = true;
+      btnSyncEco.textContent = t('Syncing to Obsidian & RAG Manager…');
+      try {
+        const res = await this.app.syncBoardToEcosystem?.();
+        if (res?.obsidian?.md?.ok && res?.rag?.ok) {
+          this.app.toast?.(t('Board synced to Obsidian & RAG Manager'));
+        } else if (res?.obsidian?.md?.ok) {
+          this.app.toast?.(t('Board synced to Obsidian (RAG Manager offline)'));
+        } else {
+          this.app.toast?.(t('Could not sync board to Obsidian or RAG Manager'));
+        }
+      } finally {
+        btnSyncEco.disabled = false;
+        btnSyncEco.textContent = '';
+        btnSyncEco.append(h('span', { class: 'btn-icon' }, '🔄'), h('span', {}, t('Sync Board to Obsidian + RAG Manager')));
+      }
+    });
+
+    const btnSearchEco = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '🔍'),
+      h('span', {}, t('Search Ecosystem (RAG Manager)'))
+    );
+    btnSearchEco.addEventListener('click', () => {
+      this.openEcosystemSearchModal();
+    });
+
+    const btnDeepTutor = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '🎓'),
+      h('span', {}, t('Ask / Quiz in DeepTutor (:8001)'))
+    );
+    btnDeepTutor.addEventListener('click', async () => {
+      btnDeepTutor.disabled = true;
+      try {
+        const res = await this.app.sendBoardToDeepTutor?.('ask');
+        if (res?.ok) {
+          this.app.toast?.(t('Sent board context to DeepTutor'));
+        } else {
+          this.app.toast?.(t('DeepTutor (:8001) is offline'));
+        }
+      } finally {
+        btnDeepTutor.disabled = false;
+      }
+    });
+
+    ecoSection.appendChild(btnSyncEco);
+    ecoSection.appendChild(btnSearchEco);
+    ecoSection.appendChild(btnDeepTutor);
+    container.appendChild(ecoSection);
+  }
+
+  openEcosystemSearchModal() {
+    if (typeof document === 'undefined') return;
+    document.getElementById('ecoRagSearchModal')?.remove();
+
+    const backdrop = h('div', {
+      id: 'ecoRagSearchModal',
+      class: 'modal-backdrop',
+      style: 'position:fixed;inset:0;z-index:9650;background:rgba(0,0,0,0.58);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;'
+    });
+    const card = h('div', {
+      style: 'background:var(--surface,#ffffff);color:var(--text,#111111);border-radius:14px;border:1px solid var(--line,rgba(128,128,128,0.22));width:92%;max-width:560px;max-height:80vh;display:flex;flex-direction:column;gap:12px;padding:18px;box-shadow:0 16px 40px rgba(0,0,0,0.35);'
+    });
+    const header = h('div', { style: 'display:flex;align-items:center;justify-content:space-between;' },
+      h('h4', { style: 'margin:0;font-size:15px;' }, t('Search Ecosystem (RAG Manager)')),
+      h('button', {
+        type: 'button',
+        class: 'btn',
+        'aria-label': t('Close'),
+        onclick: () => backdrop.remove()
+      }, '✕')
+    );
+
+    const queryInput = h('input', {
+      type: 'text',
+      placeholder: t('Search Books, Obsidian, Mermaid & DeepTutor…'),
+      style: 'flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--line,rgba(128,128,128,0.3));background:var(--surface-2,rgba(128,128,128,0.06));color:inherit;font-size:13px;'
+    });
+    const goBtn = h('button', { type: 'button', class: 'btn primary' }, t('Search'));
+    const searchRow = h('div', { style: 'display:flex;gap:8px;' }, queryInput, goBtn);
+    const resultsBox = h('div', { style: 'display:flex;flex-direction:column;gap:8px;overflow-y:auto;max-height:52vh;' });
+
+    const runSearch = async () => {
+      const q = queryInput.value.trim();
+      if (!q) return;
+      goBtn.disabled = true;
+      resultsBox.textContent = '';
+      resultsBox.appendChild(h('div', { style: 'font-size:12.5px;color:var(--text-2);' }, t('Checking…')));
+      try {
+        const res = await window.board?.searchEcosystem?.({ query: q, limit: 12 });
+        resultsBox.textContent = '';
+        if (!res || res.offline || !res.ok) {
+          resultsBox.appendChild(h('div', { style: 'font-size:12.5px;color:var(--text-2);' }, t('RAG Manager (:27130) is offline')));
+          return;
+        }
+        if (!res.results?.length) {
+          resultsBox.appendChild(h('div', { style: 'font-size:12.5px;color:var(--text-2);' }, t('No matching results found')));
+          return;
+        }
+        for (const item of res.results) {
+          const row = h('div', {
+            style: 'padding:10px 12px;border-radius:10px;border:1px solid var(--line,rgba(128,128,128,0.2));background:var(--surface-2,rgba(128,128,128,0.06));cursor:pointer;display:flex;flex-direction:column;gap:4px;'
+          },
+            h('div', { style: 'display:flex;align-items:center;justify-content:space-between;gap:8px;' },
+              h('strong', { style: 'font-size:13px;' }, item.title || 'Result'),
+              h('span', { style: 'font-size:11px;padding:2px 7px;border-radius:999px;background:#1d4ed8;color:#ffffff;' }, item.sourceApp || 'rag')
+            ),
+            item.snippet ? h('div', { style: 'font-size:12px;color:var(--text-2);line-height:1.45;' }, String(item.snippet).slice(0, 220)) : null
+          );
+          row.addEventListener('click', () => {
+            const uri = String(item.sourceUri || '');
+            if (/^(gaussboard|gazboard):\/\//i.test(uri)) {
+              try {
+                const u = new URL(uri);
+                const boardId = u.searchParams.get('board') || (u.hostname === 'board' ? u.pathname.replace(/^\/+/, '').split('/')[0] : '');
+                const objId = u.searchParams.get('obj') || null;
+                const pageRaw = u.searchParams.get('page');
+                const page = pageRaw && /^\d+$/.test(pageRaw) ? Number.parseInt(pageRaw, 10) : null;
+                if (boardId) {
+                  this.app.openBoardRef?.({ id: boardId, name: boardId, objId, page });
+                  backdrop.remove();
+                }
+              } catch {}
+            } else if (/^https?:\/\//i.test(uri)) {
+              window.board?.openReleases?.(uri);
+            }
+          });
+          resultsBox.appendChild(row);
+        }
+      } finally {
+        goBtn.disabled = false;
+      }
+    };
+
+    goBtn.addEventListener('click', runSearch);
+    queryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.remove(); });
+    card.append(header, searchRow, resultsBox);
+    backdrop.appendChild(card);
+    document.body.appendChild(backdrop);
+    setTimeout(() => queryInput.focus(), 40);
   }
 
   // --- 7. Layout & Brand Shelf ---

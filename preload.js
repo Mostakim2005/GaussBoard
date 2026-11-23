@@ -314,6 +314,10 @@ contextBridge.exposeInMainWorld('board', {
   getSpiceStatus: () => ipcRenderer.invoke('spice:status'),
   launchTinaTi: (payload) => ipcRenderer.invoke('spice:launchTina', payload),
   checkEcosystemHealth: () => ipcRenderer.invoke('ecosystem:health'),
+  ingestToRag: (payload) => ipcRenderer.invoke('rag:ingestEvent', payload),
+  searchEcosystem: (payload) => ipcRenderer.invoke('rag:search', payload),
+  transcribeAudio: (payload) => ipcRenderer.invoke('rag:transcribe', payload),
+  sendToDeepTutor: (payload) => ipcRenderer.invoke('deeptutor:send', payload),
   openInMermaidManager: (payload) => ipcRenderer.invoke('diagram:openInMermaidManager', payload),
   onDiagramUpdated: (cb) => onChannel('diagram:updated', (msg) => cb(msg)),
 

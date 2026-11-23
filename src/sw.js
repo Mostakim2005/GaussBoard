@@ -74,6 +74,7 @@ const PRECACHE_ASSETS = [
   './js/core/recent.js',
   './js/core/markdown.js',
   './js/core/markdown-sidecar.js',
+  './js/core/pentagram-sync.js',
   './js/core/maths.js',
   './js/core/pencilsound.js',
   './js/core/scientific-math.js',
