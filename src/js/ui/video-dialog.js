@@ -6,6 +6,7 @@ import { h } from './popover.js';
 import { t } from '../i18n.js';
 import { parseSubtitles, findActiveCue } from './subtitles.js';
 import { centerOf, boundsOf } from '../core/store.js';
+import { prepareLocalVideoSource } from '../insert.js';
 
 /**
  * Parse any video URL into a type, ID, and embed/thumbnail sources.
@@ -53,8 +54,13 @@ export function parseVideoUrl(rawUrl) {
     };
   }
 
-  // Direct video files or blob/file streams
-  if (/\.(mp4|webm|ogv|mov|mkv)(\?.*)?$/i.test(str) || /^blob:|^file:|^data:video\//i.test(str)) {
+  // Direct video files, local video paths, or blob/file streams
+  if (
+    /\.(mp4|webm|ogv|mov|mkv)(\?.*)?$/i.test(str)
+    || /^blob:|^file:|^data:video\//i.test(str)
+    || /^[a-zA-Z]:[\\/].*\.(mp4|webm|ogv|mov|mkv)$/i.test(str)
+    || /^\/.*\.(mp4|webm|ogv|mov|mkv)$/i.test(str)
+  ) {
     return {
       type: 'direct',
       url: str,
@@ -185,12 +191,38 @@ export function openVideoInsertDialog(app) {
   const btnInsert = h('button', {
     class: 'btn primary',
     style: 'padding:6px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;background:var(--accent,#0078d4);color:#ffffff;border:none;',
-    onclick: () => {
-      const parsed = currentParsed || parseVideoUrl(urlInput.value);
-      if (!parsed || parsed.type === 'unknown' || !urlInput.value.trim()) {
+    onclick: async () => {
+      const rawUrl = urlInput.value.trim();
+      const parsed = currentParsed || parseVideoUrl(rawUrl);
+      if (!parsed || parsed.type === 'unknown' || !rawUrl) {
         app.toast?.(t('Enter a valid YouTube or video link'));
         urlInput.focus();
         return;
+      }
+
+      let finalUrl = rawUrl;
+      let sourcePath = null;
+      let remuxed = false;
+      let subtitlesText = '';
+      let subtitlePath = null;
+
+      const isLocalVideo = parsed.type === 'direct' && (
+        /^file:\/\//i.test(rawUrl)
+        || /^[a-zA-Z]:[\\/]/.test(rawUrl)
+        || (rawUrl.startsWith('/') && !rawUrl.startsWith('//'))
+      );
+      if (isLocalVideo) {
+        btnInsert.disabled = true;
+        try {
+          const prepared = await prepareLocalVideoSource(rawUrl);
+          finalUrl = prepared.url;
+          sourcePath = prepared.originalPath;
+          remuxed = prepared.remuxed;
+          subtitlesText = prepared.subtitlesText;
+          subtitlePath = prepared.subtitlePath;
+        } finally {
+          btnInsert.disabled = false;
+        }
       }
 
       const title = titleInput.value.trim() || (parsed.type === 'youtube' ? t('YouTube Video') : t('Video'));
@@ -203,7 +235,9 @@ export function openVideoInsertDialog(app) {
         id: 'v_' + Math.random().toString(36).slice(2, 10),
         type: 'video',
         x, y, w, h,
-        url: urlInput.value.trim(),
+        url: finalUrl,
+        ...(sourcePath ? { sourcePath, remuxed } : {}),
+        ...(subtitlesText ? { subtitlesText, subtitlePath } : {}),
         videoType: parsed.type,
         videoId: parsed.id || null,
         title,
@@ -353,6 +387,27 @@ export class VideoPlayerDialog {
     playerContainer.appendChild(subOverlay);
     this.subtitleOverlayEl = subOverlay;
     card.appendChild(playerContainer);
+
+    if (parsed.type === 'direct' && !this.subtitleCues.length && typeof window !== 'undefined' && typeof window.board?.findSiblingSubtitle === 'function') {
+      const candidatePath = this.videoObj.sourcePath || (() => {
+        if (!/^file:\/\//i.test(String(this.videoObj.url || ''))) return null;
+        try {
+          let p = decodeURIComponent(new URL(this.videoObj.url).pathname || '');
+          if (/^\/[a-zA-Z]:/.test(p)) p = p.slice(1);
+          return p;
+        } catch { return null; }
+      })();
+      if (candidatePath) {
+        Promise.resolve(window.board.findSiblingSubtitle(candidatePath)).then((sub) => {
+          if (!sub?.text || !this.el) return;
+          this.subtitleCues = parseSubtitles(sub.text);
+          this.videoObj.subtitlesText = sub.text;
+          this.videoObj.subtitlePath = sub.path || null;
+          this.app.store?.update?.(this.videoObj.id, { subtitlesText: sub.text, subtitlePath: sub.path || null }, 'attach subtitles');
+          this.updateSubtitleOverlay(this.currentTime);
+        }).catch(() => {});
+      }
+    }
 
     // 3. Action Toolbar: Full-Res Screenshot & Timestamp Bookmarking
     const actionToolbar = h('div', {

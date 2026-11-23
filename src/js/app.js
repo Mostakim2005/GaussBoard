@@ -38,7 +38,7 @@ import { exportPng, exportSvg, exportPdf, saveBoardFile, openBoardFile, exportab
 import { boardThumb, boardPicture } from './ui/thumb.js';
 import {
   pickAndInsertDocument, pickAndInsertImage, pickAndInsertAudio, insertDocument,
-  insertImagesFromPaths, insertImageFiles, clipboardFileName, dropOrigin, isImagePath, isDocPath
+  insertImagesFromPaths, insertImageFiles, insertVideoFromPath, clipboardFileName, dropOrigin, isImagePath, isDocPath, isVideoPath
 } from './insert.js';
 import { AudioRecorder } from './core/audio-recorder.js';
 import { ReplayEngine } from './core/replay.js';
@@ -55,7 +55,7 @@ import { TabBar } from './ui/tabs.js';
 import { VisualizationDialog } from './ui/visualization-dialog.js';
 import { SidebarRibbon } from './ui/sidebar-ribbon.js';
 import { StudyRunner } from './ui/study-runner.js';
-import { syncBoardToAnki, exportBoardToApkg } from './core/anki.js';
+import { syncBoardToAnki, exportBoardToApkg, exportBoardToPracticeBank } from './core/anki.js';
 import { PeriodicTableModal } from './ui/periodic-table.js';
 import { PhetRunnerModal } from './ui/phet-runner.js';
 import { DictionaryPopover } from './ui/dictionary-popover.js';
@@ -3026,6 +3026,10 @@ class App {
     return exportBoardToApkg(this, opts);
   }
 
+  async exportToPracticeBank(opts) {
+    return exportBoardToPracticeBank(this, opts);
+  }
+
   openPeriodicTable() {
     if (!this.periodicTableModal) this.periodicTableModal = new PeriodicTableModal(this);
     this.periodicTableModal.show();
@@ -5809,9 +5813,11 @@ class App {
     const boardFile = paths.find((p) => /\.(gazboard|openboard)$/i.test(p));
     const imgs = paths.filter(isImagePath);
     const docs = paths.filter(isDocPath);
-    const other = paths.filter((p) => !isImagePath(p) && !isDocPath(p) && p !== boardFile);
+    const vids = paths.filter(isVideoPath);
+    const other = paths.filter((p) => !isImagePath(p) && !isDocPath(p) && !isVideoPath(p) && p !== boardFile);
     if (imgs.length) await insertImagesFromPaths(this, imgs, at);
     for (const d of docs) await insertDocument(this, d);
+    for (const v of vids) await insertVideoFromPath(this, v, at);
     if (boardFile) window.dispatchEvent(new CustomEvent('gazboard:import-file', { detail: boardFile }));
     if (other.length) this.toast(t('Could not add {names} - drop a picture, a document or a board', { names: other.map(base).join(', ') }), 'help', 6000);
   }

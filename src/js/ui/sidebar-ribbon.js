@@ -933,9 +933,25 @@ export class SidebarRibbon {
       }
     });
 
+    const btnPracticeBank = h('button', { class: 'deck-action-btn' },
+      h('span', { class: 'btn-icon' }, '📝'),
+      h('span', {}, t('Export Practice Engine Bank (.md)'))
+    );
+    btnPracticeBank.addEventListener('click', async () => {
+      btnPracticeBank.disabled = true;
+      const res = await this.app.exportToPracticeBank?.();
+      btnPracticeBank.disabled = false;
+      if (res?.ok) {
+        this.app.toast?.(t('Exported {count} cards to {name}', { count: res.count, name: res.filePath?.split(/[\\/]/).pop() || '.md' }));
+      } else if (res?.error && !res.cancelled) {
+        this.app.toast?.(res.error);
+      }
+    });
+
     exportSection.appendChild(btnAnkiSync);
     exportSection.appendChild(btnApkgExport);
     exportSection.appendChild(btnExportCloze);
+    exportSection.appendChild(btnPracticeBank);
     container.appendChild(exportSection);
   }
 

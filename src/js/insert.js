@@ -10,6 +10,7 @@ import { t } from './i18n.js';
 
 const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'];
 const DOC_EXT = ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'odt', 'odp', 'rtf', 'txt', 'xlsx', 'xls'];
+const VIDEO_EXT = ['mp4', 'webm', 'ogv', 'mov', 'mkv'];
 
 export const FILTERS = {
   image: [{ name: t('Images'), extensions: IMAGE_EXT }],
@@ -448,6 +449,106 @@ export async function pickAndInsertImage(app) {
 
 export function isImagePath(p) { return IMAGE_EXT.includes(p.split('.').pop().toLowerCase()); }
 export function isDocPath(p) { return DOC_EXT.includes(p.split('.').pop().toLowerCase()); }
+export function isVideoPath(p) { return typeof p === 'string' && VIDEO_EXT.includes(p.split('.').pop().toLowerCase()); }
+
+function fileUrlToLocalPath(raw) {
+  const s = String(raw || '').trim();
+  if (!/^file:\/\//i.test(s)) return s;
+  try {
+    const u = new URL(s);
+    let p = decodeURIComponent(u.pathname || '');
+    if (/^\/[a-zA-Z]:/.test(p)) p = p.slice(1);
+    return p;
+  } catch {
+    return s;
+  }
+}
+
+function localPathToFileUrl(p) {
+  const s = String(p || '').trim();
+  if (!s || /^file:\/\//i.test(s) || /^https?:\/\//i.test(s) || /^blob:|^data:/i.test(s)) return s;
+  const norm = s.replace(/\\/g, '/');
+  if (/^[a-zA-Z]:/.test(norm)) return encodeURI(`file:///${norm}`);
+  if (norm.startsWith('/')) return encodeURI(`file://${norm}`);
+  return s;
+}
+
+/**
+ * Prepare a local video path or file:// URL for playback:
+ * remuxes .mkv containers via FFmpeg stream-copy when available and discovers sibling .srt/.vtt subtitles.
+ */
+export async function prepareLocalVideoSource(rawPathOrUrl, { boardApi = (typeof window !== 'undefined' ? window.board : null) } = {}) {
+  const originalPath = fileUrlToLocalPath(rawPathOrUrl);
+  let playbackUrl = localPathToFileUrl(originalPath);
+  let remuxed = false;
+  let remuxedPath = null;
+  let subtitlesText = '';
+  let subtitlePath = null;
+
+  if (/\.mkv$/i.test(originalPath) && typeof boardApi?.remuxToMp4 === 'function') {
+    try {
+      const res = await boardApi.remuxToMp4(originalPath);
+      if (res?.ok && res.mp4Path) {
+        playbackUrl = localPathToFileUrl(res.mp4Path);
+        remuxed = true;
+        remuxedPath = res.mp4Path;
+      }
+    } catch {}
+  }
+
+  if (typeof boardApi?.findSiblingSubtitle === 'function') {
+    try {
+      const sub = await boardApi.findSiblingSubtitle(originalPath);
+      if (sub?.text) {
+        subtitlesText = sub.text;
+        subtitlePath = sub.path || null;
+      }
+    } catch {}
+  }
+
+  return {
+    url: playbackUrl,
+    originalPath,
+    remuxed,
+    remuxedPath,
+    subtitlesText,
+    subtitlePath
+  };
+}
+
+export async function insertVideoFromPath(app, filePath, at = null) {
+  const prepared = await prepareLocalVideoSource(filePath);
+  const pos = at || dropOrigin(app, 440, 270);
+  const w = 440;
+  const h = 270;
+  const baseName = String(filePath || '').split(/[\\/]/).pop() || 'Video';
+  const title = baseName.replace(/\.[^.]+$/, '') || baseName;
+
+  const videoObj = {
+    id: 'v_' + Math.random().toString(36).slice(2, 10),
+    type: 'video',
+    x: Math.round((pos.x ?? 0) - w / 2),
+    y: Math.round((pos.y ?? 0) - h / 2),
+    w,
+    h,
+    url: prepared.url,
+    sourcePath: prepared.originalPath,
+    remuxed: prepared.remuxed,
+    videoType: 'direct',
+    videoId: null,
+    title,
+    currentTime: 0,
+    bookmarks: [],
+    thumb: null,
+    subtitlesText: prepared.subtitlesText,
+    subtitlePath: prepared.subtitlePath
+  };
+
+  app.store.add(videoObj, 'insert video');
+  app.surface?.invalidate?.();
+  app.toast?.(t('Video added to board'));
+  return videoObj;
+}
 
 export async function insertAudioFromPath(app, p) {
   const ext = (p.split('.').pop() || '').toLowerCase();

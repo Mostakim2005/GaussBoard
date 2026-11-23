@@ -77,9 +77,26 @@ function resolveEcosystemSecrets(registryResult) {
   return null;
 }
 
+function getEcosystemServices() {
+  const reg = resolveEcosystemRegistry()?.data || {};
+  const s = reg.services || {};
+  const apps = reg.apps || {};
+  return {
+    ankiConnect: { url: s.ankiConnect?.url || apps.anki?.url || 'http://127.0.0.1:8765' },
+    obsidianAgentManager: { url: s.obsidianAgentManager?.url || s.obsidianRestApi?.url || 'http://127.0.0.1:27125' },
+    ragManager: { url: s.ragManager?.url || apps.ragManager?.url || 'http://127.0.0.1:27130' },
+    deepTutor: {
+      url: s.deepTutor?.url || apps.deepTutor?.url || 'http://127.0.0.1:8001',
+      webUrl: s.deepTutor?.webUrl || apps.deepTutor?.webUrl || 'http://127.0.0.1:3782'
+    },
+    ollama: { url: s.ollama?.url || 'http://127.0.0.1:11434' }
+  };
+}
+
 module.exports = {
   candidateCommonLibrariesDirs,
   resolveCommonLibrariesDir,
   resolveEcosystemRegistry,
-  resolveEcosystemSecrets
+  resolveEcosystemSecrets,
+  getEcosystemServices
 };

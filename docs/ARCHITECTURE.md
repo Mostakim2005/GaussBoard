@@ -193,13 +193,14 @@ flowchart TD
 
 ### [SUBSYSTEM: Cross-App-Ecosystem-Bridges] | Aliases: ecosystem bridges, global resources, mermaid bridge, SymPy CAS, video remux, triarchy sync, Anki media
 > **1-Line Summary:** Modular Electron IPC companions for zero-context shared library resolution, Mermaid Manager round-trip editing, desktop Python/SymPy CAS worker, FFmpeg MKV remuxing, and Obsidian/Anki synchronization.
-* **How It Works (Plain English):** Custom integration logic is decoupled from upstream monoliths into isolated CommonJS companion modules under `electron/`. `global-resources.cjs` resolves shared libraries, `ecosystem-registry.json`, and `ecosystem-secrets.json` across environment variables, user local paths, and legacy junctions. `mermaid-bridge.cjs` writes temporary UTF-8 `.mmd` files, watches them for user saves, and updates open board diagrams. `cas-sympy.cjs` executes exact symbolic math via local Python with a pure-JS fallback. `media-bridge.cjs` resolves FFmpeg via `toolchains.ffmpeg`, auto-discovers sibling `.srt`/`.vtt` subtitles, and remuxes `.mkv` files via FFmpeg stream-copy. `triarchy-bridge.cjs` syncs board Markdown sidecars via `Obsidian Agent Manager` (`:27125` HTTP `/note/create`) with atomic UTF-8 vault-file fallback (including `.canvas`), and parses `gaussboard://` deep links dispatched from `main.js` through `preload.js -> onDeepLink` to `app.js -> focusObjectById`.
+* **How It Works (Plain English):** Custom integration logic is decoupled from upstream monoliths into isolated CommonJS companion modules under `electron/`. `global-resources.cjs` resolves shared libraries, `ecosystem-registry.json`, `ecosystem-secrets.json`, and sanitized service URLs (`getEcosystemServices`) across environment variables, user local paths, and legacy junctions. `mermaid-bridge.cjs` writes temporary UTF-8 `.mmd` files, watches them for user saves, and updates open board diagrams. `cas-sympy.cjs` executes exact symbolic math via local Python with a pure-JS fallback. `media-bridge.cjs` resolves FFmpeg via `toolchains.ffmpeg`, auto-discovers sibling `.srt`/`.vtt` subtitles, and remuxes `.mkv` files via FFmpeg stream-copy when local videos are inserted or played. `triarchy-bridge.cjs` syncs board Markdown sidecars via `Obsidian Agent Manager` (`:27125` HTTP `/note/create`) with atomic UTF-8 vault-file fallback (including `.canvas`), and parses `gaussboard://` deep links dispatched from `main.js` through `preload.js -> onDeepLink` to `app.js -> focusObjectById`. `cli-export.cjs` provides headless `--inspect`, `--export-md`, and `--export-canvas` with `--json` output before GUI initialization.
 * **Code Anchors (Grep Targets):**
-  * `electron/global-resources.cjs` -> `resolveCommonLibrariesDir`, `resolveEcosystemRegistry`, `resolveEcosystemSecrets`
+  * `electron/global-resources.cjs` -> `resolveCommonLibrariesDir`, `resolveEcosystemRegistry`, `resolveEcosystemSecrets`, `getEcosystemServices`
   * `electron/mermaid-bridge.cjs` -> `openInMermaidManager`, `findMermaidManagerExecutable`
   * `electron/cas-sympy.cjs` -> `evalSympy`
   * `electron/media-bridge.cjs` -> `findFfmpegExecutable`, `remuxToMp4`, `findSiblingSubtitles`
   * `electron/triarchy-bridge.cjs` -> `resolveObsidianVaultDir`, `syncToObsidianVault`, `parseGaussBoardDeepLink`, `deepLinkFromArgv`
+  * `electron/cli-export.cjs` -> `hasCliFlags`, `readBoardArchive`, `inspectBoard`, `runCli`
 
 ### [SUBSYSTEM: Planned-Pentagram-RAG-And-Dual-Spice-Flow] | Aliases: RAG Manager, 27130, ngspice-wasm, gaussboard URI, ankiNoteId
 > **1-Line Summary:** Planned Phase 1–4 upgrades adding `ngspice-wasm` as a switchable SPICE solver alongside `solveMNA`, registering `gaussboard://` URI dispatch, deduplicating AnkiConnect sync, and publishing board/audio updates to `RAG Manager` (`:27130`) (`docs/modules/pentagram-audit-and-upgrades.md`).
@@ -249,8 +250,8 @@ See SUBSYSTEM sections above: Dual-Runtime-Platform, Document-Model-Op-Log, Inki
 > **1-Line Summary:** The active directive suite that must pass 24/24 before any change is called done.
 * **Automated UI / Logic Verification:** `node scripts/smoke.js --new-features`
 
-### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2390 keys, 7 locales, lint
-> **1-Line Summary:** Proves English keys match all 7 locales at 2,390/2,390 with zero missing strings.
+### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2391 keys, 7 locales, lint
+> **1-Line Summary:** Proves English keys match all 7 locales at 2,391/2,391 with zero missing strings.
 * **Type & Lint Check:** `node scripts/i18n-check.js`
 
 ### [VERIFY: Full-Regression-Suite] | Aliases: smoke builtin, 1247 assertions, full suite, test:all

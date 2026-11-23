@@ -6,9 +6,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import zlib from 'node:zlib';
 
 import { generateMarkdownSidecar } from '../src/js/core/markdown-sidecar.js';
 import { searchSubtitleCues } from '../src/js/ui/subtitles.js';
+import { syncBoardToAnki, generatePracticeEngineBank } from '../src/js/core/anki.js';
+import { prepareLocalVideoSource } from '../src/js/insert.js';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -16,6 +19,7 @@ const globalResources = require(path.join(ROOT, 'electron', 'global-resources.cj
 const mermaidBridge = require(path.join(ROOT, 'electron', 'mermaid-bridge.cjs'));
 const mediaBridge = require(path.join(ROOT, 'electron', 'media-bridge.cjs'));
 const triarchyBridge = require(path.join(ROOT, 'electron', 'triarchy-bridge.cjs'));
+const cliExport = require(path.join(ROOT, 'electron', 'cli-export.cjs'));
 
 test('Patch 07: global shared libraries resolver honors env override and prunes dead vendor SW entries', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-libs-'));
@@ -291,5 +295,253 @@ test('Phase 1 M11-03 & M11-02: findFfmpegExecutable reads registry toolchains.ff
   assert.ok(vizSrc.includes('#vizCodeTextarea'), 'visualization-dialog must target #vizCodeTextarea on Mermaid update');
   assert.ok(!vizSrc.includes('#vizCodeInput'), 'visualization-dialog must not reference nonexistent #vizCodeInput');
   assert.ok(vizSrc.includes('this._unsubMermaidMgr()'), 'visualization-dialog must clean up _unsubMermaidMgr listener');
+});
+
+test('Phase 2 M12-01: syncBoardToAnki deduplicates via ankiNoteId/updateNoteFields and generates Practice Engine bank', async () => {
+  const actions = [];
+  const storedNotes = new Map();
+  let nextId = 1700000001;
+
+  const server = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      actions.push(payload.action);
+      let result = null;
+      if (payload.action === 'version') {
+        result = 6;
+      } else if (payload.action === 'createDeck') {
+        result = 1;
+      } else if (payload.action === 'notesInfo') {
+        result = (payload.params?.notes || []).map((id) => (storedNotes.has(id) ? { noteId: id, ...storedNotes.get(id) } : {}));
+      } else if (payload.action === 'findNotes') {
+        result = [];
+      } else if (payload.action === 'addNotes') {
+        assert.equal(payload.params.notes.every((n) => n.options?.allowDuplicate === false), true);
+        result = payload.params.notes.map((n) => {
+          const id = nextId++;
+          storedNotes.set(id, n);
+          return id;
+        });
+      } else if (payload.action === 'updateNoteFields') {
+        const note = payload.params.note;
+        assert.ok(storedNotes.has(note.id));
+        storedNotes.set(note.id, { ...storedNotes.get(note.id), fields: note.fields });
+        result = null;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ result, error: null }));
+    });
+  });
+
+  try {
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const url = `http://127.0.0.1:${server.address().port}`;
+
+    const c1 = { id: 'cov_1', type: 'curtain', subtype: 'tape', label: 'KVL', x: 10, y: 10, w: 100, h: 40 };
+    const c2 = { id: 'cov_2', type: 'curtain', label: 'Thevenin', x: 20, y: 80, w: 120, h: 60 };
+    const t2 = { id: 'txt_2', type: 'text', attachedTo: 'cov_2', text: 'Replace sources with short/open' };
+    const objects = [c1, c2, t2];
+    const app = {
+      store: {
+        doc: { id: 'b_ee_202', name: 'EE 202' },
+        objects,
+        update(id, patch) {
+          const target = objects.find((o) => o.id === id);
+          if (target) Object.assign(target, patch);
+        }
+      }
+    };
+
+    const first = await syncBoardToAnki(app, { url });
+    assert.equal(first.ok, true);
+    assert.equal(first.created, 2);
+    assert.equal(first.updated, 0);
+    assert.equal(first.count, 2);
+    assert.equal(c1.ankiNoteId, 1700000001);
+    assert.equal(c2.ankiNoteId, 1700000002);
+    assert.ok(c1.xrefId && c2.xrefId);
+
+    actions.length = 0;
+    c1.label = 'KVL Updated';
+    const second = await syncBoardToAnki(app, { url });
+    assert.equal(second.ok, true);
+    assert.equal(second.created, 0);
+    assert.equal(second.updated, 2);
+    assert.equal(second.count, 2);
+    assert.ok(!actions.includes('addNotes'), 'Re-sync must not call addNotes when ankiNoteId exists');
+    assert.ok(actions.includes('notesInfo'));
+    assert.ok(actions.includes('updateNoteFields'));
+    assert.equal(storedNotes.get(1700000001).fields.Front, 'KVL Updated');
+
+    const bank = generatePracticeEngineBank(app);
+    assert.equal(bank.count, 2);
+    assert.match(bank.markdown, /source_app: gaussboard/);
+    assert.match(bank.markdown, /anki_note_ids: \[1700000001, 1700000002\]/);
+    assert.match(bank.markdown, /> \[!question\] Type:: Conceptual/);
+    assert.match(bank.markdown, /> > \[!answer\]/);
+    assert.match(bank.markdown, /gaussboard:\/\/open\?board=b_ee_202&obj=cov_1/);
+    assert.match(bank.markdown, /<!--pe-meta: id=gb_cov_1 .* ankiId=1700000001/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('Phase 2 M11-02: prepareLocalVideoSource remuxes .mkv and resolves sibling subtitles from original path', async () => {
+  const calls = [];
+  const mockBoardApi = {
+    async remuxToMp4(p) {
+      calls.push({ fn: 'remuxToMp4', p });
+      return { ok: true, mp4Path: 'C:\\Temp\\gaussboard_remux_abc123.mp4', cached: false };
+    },
+    async findSiblingSubtitle(p) {
+      calls.push({ fn: 'findSiblingSubtitle', p });
+      return { path: 'D:\\Lectures\\L01.srt', ext: '.srt', text: '1\n00:00:00,000 --> 00:00:02,000\nWelcome\n' };
+    }
+  };
+
+  const prepared = await prepareLocalVideoSource('D:\\Lectures\\L01.mkv', { boardApi: mockBoardApi });
+  assert.equal(prepared.remuxed, true);
+  assert.equal(prepared.originalPath, 'D:\\Lectures\\L01.mkv');
+  assert.equal(prepared.url, 'file:///C:/Temp/gaussboard_remux_abc123.mp4');
+  assert.match(prepared.subtitlesText, /Welcome/);
+  assert.deepEqual(calls, [
+    { fn: 'remuxToMp4', p: 'D:\\Lectures\\L01.mkv' },
+    { fn: 'findSiblingSubtitle', p: 'D:\\Lectures\\L01.mkv' }
+  ]);
+});
+
+function buildDeflatedZip(entries) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  for (const { name, data } of entries) {
+    const nameBuf = Buffer.from(name, 'utf8');
+    const raw = Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8');
+    const compressed = zlib.deflateRawSync(raw);
+
+    const local = Buffer.alloc(30 + nameBuf.length);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0, 6);
+    local.writeUInt16LE(8, 8); // deflate
+    local.writeUInt16LE(0, 10);
+    local.writeUInt16LE(0, 12);
+    local.writeUInt32LE(0, 14);
+    local.writeUInt32LE(compressed.length, 18);
+    local.writeUInt32LE(raw.length, 22);
+    local.writeUInt16LE(nameBuf.length, 26);
+    local.writeUInt16LE(0, 28);
+    nameBuf.copy(local, 30);
+
+    const central = Buffer.alloc(46 + nameBuf.length);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0, 8);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt16LE(0, 12);
+    central.writeUInt16LE(0, 14);
+    central.writeUInt32LE(0, 16);
+    central.writeUInt32LE(compressed.length, 20);
+    central.writeUInt32LE(raw.length, 24);
+    central.writeUInt16LE(nameBuf.length, 28);
+    central.writeUInt16LE(0, 30);
+    central.writeUInt16LE(0, 32);
+    central.writeUInt16LE(0, 34);
+    central.writeUInt16LE(0, 36);
+    central.writeUInt32LE(0, 38);
+    central.writeUInt32LE(offset, 42);
+    nameBuf.copy(central, 46);
+
+    localParts.push(local, compressed);
+    centralParts.push(central);
+    offset += local.length + compressed.length;
+  }
+
+  const cdBuf = Buffer.concat(centralParts);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(cdBuf.length, 12);
+  eocd.writeUInt32LE(offset, 16);
+  eocd.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localParts, cdBuf, eocd]);
+}
+
+test('Phase 2 M12-02: headless CLI inspects ZIP/JSON boards and exports Markdown + JSON Canvas with --json contract', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-cli-'));
+  try {
+    const sampleDoc = {
+      id: 'b_cli_7',
+      name: 'Signals & Systems',
+      pages: [{ id: 'p1' }, { id: 'p2' }],
+      tags: ['ee301'],
+      audioTracks: [{ id: 'aud_1', name: 'Lecture 1', durationMs: 45000 }],
+      objects: {
+        n1: { id: 'n1', type: 'note', text: 'Fourier Transform #laplace', x: 10, y: 20, w: 220, h: 120 },
+        c1: { id: 'c1', type: 'curtain', subtype: 'tape', label: 'H(s)', x: 50, y: 180, w: 100, h: 40 }
+      }
+    };
+
+    const zipPath = path.join(tmp, 'signals.gaussboard');
+    fs.writeFileSync(zipPath, buildDeflatedZip([
+      { name: 'board.json', data: JSON.stringify(sampleDoc) },
+      { name: 'assets/img_1.png', data: Buffer.from([137, 80, 78, 71]) }
+    ]));
+
+    const runCapture = async (argv) => {
+      let out = '';
+      let err = '';
+      const code = await cliExport.runCli(argv, {
+        stdout: { write: (s) => { out += s; } },
+        stderr: { write: (s) => { err += s; } }
+      });
+      return { code, out, err };
+    };
+
+    const insp = await runCapture(['node', 'cli-export.cjs', '--inspect', '--input', zipPath, '--json']);
+    assert.equal(insp.code, 0);
+    assert.equal(insp.err, '');
+    const inspJson = JSON.parse(insp.out.trim());
+    assert.equal(inspJson.ok, true);
+    assert.equal(inspJson.data.id, 'b_cli_7');
+    assert.equal(inspJson.data.format, 'zip');
+    assert.equal(inspJson.data.pageCount, 2);
+    assert.equal(inspJson.data.objectCount, 2);
+    assert.equal(inspJson.data.studyCardCount, 1);
+    assert.equal(inspJson.data.audioTrackCount, 1);
+    assert.deepEqual(inspJson.data.assets, ['img_1.png']);
+
+    const mdOut = path.join(tmp, 'signals.md');
+    const mdRes = await runCapture(['node', 'cli-export.cjs', '--export-md', zipPath, '--out', mdOut, '--json']);
+    assert.equal(mdRes.code, 0);
+    const mdJson = JSON.parse(mdRes.out.trim());
+    assert.equal(mdJson.ok, true);
+    const mdBytes = fs.readFileSync(mdOut);
+    assert.notEqual(mdBytes[0], 0xEF);
+    assert.match(mdBytes.toString('utf8'), /Fourier Transform #laplace/);
+
+    const canvasOut = path.join(tmp, 'signals.canvas');
+    const canvasRes = await runCapture(['node', 'cli-export.cjs', '--export-canvas', zipPath, '--out', canvasOut, '--json']);
+    assert.equal(canvasRes.code, 0);
+    const canvasObj = JSON.parse(fs.readFileSync(canvasOut, 'utf8'));
+    assert.equal(canvasObj.nodes.length, 1);
+    assert.equal(canvasObj.nodes[0].text, 'Fourier Transform #laplace');
+
+    const missing = await runCapture(['node', 'cli-export.cjs', '--inspect', path.join(tmp, 'missing.gaussboard'), '--json']);
+    assert.equal(missing.code, 2);
+    const missingJson = JSON.parse(missing.out.trim());
+    assert.equal(missingJson.ok, false);
+    assert.equal(missingJson.code, 2);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 

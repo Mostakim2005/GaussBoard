@@ -310,6 +310,7 @@ contextBridge.exposeInMainWorld('board', {
   findSiblingSubtitle: (filePath) => ipcRenderer.invoke('media:findSiblingSubtitle', filePath),
   remuxToMp4: (filePath) => ipcRenderer.invoke('media:remuxToMp4', filePath),
   syncToObsidian: (payload) => ipcRenderer.invoke('obsidian:syncFile', payload),
+  getEcosystemServices: () => ipcRenderer.invoke('ecosystem:services'),
   openInMermaidManager: (payload) => ipcRenderer.invoke('diagram:openInMermaidManager', payload),
   onDiagramUpdated: (cb) => onChannel('diagram:updated', (msg) => cb(msg)),
 

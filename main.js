@@ -10,11 +10,12 @@ const crypto = require('node:crypto');
 const { Readable } = require('node:stream');
 const StorageLocation = require('./storage-location.js');
 const { isPathWithin } = require('./src/js/platform/path-security.cjs');
-const { resolveCommonLibrariesDir } = require('./electron/global-resources.cjs');
+const { resolveCommonLibrariesDir, getEcosystemServices } = require('./electron/global-resources.cjs');
 const mermaidBridge = require('./electron/mermaid-bridge.cjs');
 const casSympy = require('./electron/cas-sympy.cjs');
 const mediaBridge = require('./electron/media-bridge.cjs');
 const triarchyBridge = require('./electron/triarchy-bridge.cjs');
+const cliExport = require('./electron/cli-export.cjs');
 const { safeExternalUrl, isReleaseUrl } = require('./src/js/platform/security.cjs');
 
 const SRC = path.join(__dirname, 'src');
@@ -1578,6 +1579,7 @@ function ipc() {
     return true;
   });
   handleIpc('cas:evalSympy', async (_event, payload) => casSympy.evalSympy(payload || {}));
+  handleIpc('ecosystem:services', () => getEcosystemServices());
   handleIpc('media:findSiblingSubtitle', async (_event, filePath) => mediaBridge.findSiblingSubtitle(filePath));
   handleIpc('media:remuxToMp4', async (_event, filePath) => mediaBridge.remuxToMp4(filePath));
   handleIpc('obsidian:syncFile', async (_event, payload) => triarchyBridge.syncToObsidianVault(payload || {}));
@@ -2145,9 +2147,19 @@ function ipc() {
 }
 
 /* ------------------------------------------------------------------ */
+// Headless CLI mode (--inspect / --export-md / --export-canvas --json) bypasses GUI & single-instance lock.
+const isHeadlessCli = cliExport.hasCliFlags(process.argv);
+if (isHeadlessCli) {
+  cliExport.runCli(process.argv)
+    .then((code) => app.exit(code))
+    .catch((err) => {
+      process.stderr.write(`${err?.message || err}\n`);
+      app.exit(1);
+    });
+}
 // One window owns the app; a second launch (or a double-clicked .gazboard
 // file) hands its argument to the running instance instead.
-const singleInstance = process.argv.includes('--smoke') ? true : app.requestSingleInstanceLock();
+const singleInstance = isHeadlessCli ? false : (process.argv.includes('--smoke') ? true : app.requestSingleInstanceLock());
 
 async function prepareConfiguredStorage() {
   if (!storedStorageLocation) return;
@@ -2220,7 +2232,9 @@ function writeStartupTimes(extra = {}) {
   fsp.writeFile(path.join(app.getPath('userData'), 'startup-time.txt'), lines.join('\n') + '\n').catch(() => {});
 }
 
-if (!singleInstance) {
+if (isHeadlessCli) {
+  // Handled above without opening a GUI window or acquiring the single-instance lock.
+} else if (!singleInstance) {
   app.quit();
 } else {
   app.on('second-instance', (_e, argv) => {

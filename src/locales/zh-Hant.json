@@ -2388,5 +2388,6 @@
  "Off (default). Zoom and other recorders only capture the mouse pointer, so a pen writes with no pointer in the video and the arrow stays parked wherever the mouse was. On: a faint glow follows the pen whenever it is near the screen, hovering or writing, so recordings show where you are. Your pen and its pointer feel exactly the same.": "預設關閉。Zoom 等錄影工具只擷取滑鼠指標，所以錄影裡筆在寫字卻沒有指標，箭頭還停在滑鼠原本的位置。開啟後：只要筆靠近螢幕，無論懸停還是書寫，都會有一圈淡淡的光跟著筆，錄影裡就看得出你在哪裡。筆和指標的手感完全不變。",
  "Search settings": "搜尋設定",
  "No setting matches that.": "沒有相符的設定。",
- "Edit in Mermaid Manager": "在 Mermaid Manager 中編輯"
+ "Edit in Mermaid Manager": "在 Mermaid Manager 中編輯",
+ "Export Practice Engine Bank (.md)": "匯出 Practice Engine 題庫 (.md)"
 }

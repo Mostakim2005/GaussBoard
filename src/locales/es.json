@@ -2388,5 +2388,6 @@
  "Off (default). Zoom and other recorders only capture the mouse pointer, so a pen writes with no pointer in the video and the arrow stays parked wherever the mouse was. On: a faint glow follows the pen whenever it is near the screen, hovering or writing, so recordings show where you are. Your pen and its pointer feel exactly the same.": "Desactivado por defecto. Zoom y otras grabadoras solo capturan el puntero del ratón, así que en el vídeo el lápiz escribe sin puntero y la flecha se queda donde estaba el ratón. Activado: un brillo suave sigue al lápiz cada vez que está cerca de la pantalla, flotando o escribiendo, para que las grabaciones muestren dónde estás. El lápiz y su puntero se sienten exactamente igual.",
  "Search settings": "Buscar en ajustes",
  "No setting matches that.": "Ningún ajuste coincide.",
- "Edit in Mermaid Manager": "Editar en Mermaid Manager"
+ "Edit in Mermaid Manager": "Editar en Mermaid Manager",
+ "Export Practice Engine Bank (.md)": "Exportar banco de Practice Engine (.md)"
 }
