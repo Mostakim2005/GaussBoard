@@ -424,3 +424,26 @@ flowchart LR
   * `electron/global-resources.cjs` -> `resolveCommonLibrariesDir`
   * `src/sw.js` -> service worker precache manifest
 
+### [DECISION: Upstream-Minimal-MainJS-With-Dual-Circuit-And-Hybrid-CAS] | Aliases: main.js split, ngspice-wasm, solveMNA, SymPy CAS, Pentagram standard
+> **1-Line Summary:** Keep upstream-shared core lines in `main.js` minimal-diff for `fahim9778/GazBoard` cherry-picks while isolating all custom/Pentagram features in `electron/*.cjs` and `src/js/core/*`, keeping hybrid SymPy CAS, and pairing `solveMNA` with switchable `ngspice-wasm`.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`
+* **Original User Intention:** Retain full upstream pull compatibility (`upstream/main`), keep existing MNA circuit and desktop Python SymPy capabilities, and standardize interoperability across the 5-app Pentagram + `RAG Manager` (`:27130`).
+* **Options Considered:**
+  * **Option A (Rejected):** Aggressively splitting upstream lines in `main.js` into separate files (creates merge conflicts on every `upstream/main` pull) or deleting desktop Python SymPy / JS MNA simulation.
+  * **Option B (Chosen):** Minimal-diff `main.js` hook points + isolated `electron/*.cjs` companions + `MNA Live` / `ngspice-wasm` dual circuit toggle + `ECOSYSTEM_INTEGRATION_CONTRACT.md` v2.0.0 (`docs/modules/pentagram-audit-and-upgrades.md`).
+* **Code Anchors (Grep Targets):**
+  * `main.js` -> `electron/*.cjs` bridge dispatch
+  * `src/js/core/circuit-sim.js` -> `solveMNA`
+  * `electron/cas-sympy.cjs` -> `evalSympy`
+
+---
+
+## 2. Do-Not-Touch Engineering Landmines (Traps)
+
+### [TRAP: Registry-Schema-Apps-Path-And-32K-CLI-Limit] | Aliases: apps.obsidian.vaultPath, triarchy-bridge, 32K argv limit, ankiconnect duplicate
+> **1-Line Summary:** Never read `reg.data.obsidian.vaultPath` (schema uses `apps.obsidian.vaultPath`) and never pass full Markdown sidecar bodies on Windows `cli-anything-obsidian` CLI argv (`>32 KB CreateProcess` limit).
+* **Strict Rule:** **ALWAYS** read `reg?.data?.apps?.obsidian?.vaultPath` from `ecosystem-registry.json`, send large Obsidian notes over HTTP (`127.0.0.1:27125` with `ecosystem-secrets.json` Bearer auth) or atomic temp-rename disk fallback, and store `ankiNoteId` before calling `addNotes` again.
+* **Protected Code Anchors (Grep Targets):**
+  * `electron/triarchy-bridge.cjs` -> `resolveObsidianVaultDir`, `syncToObsidianVault`
+  * `src/js/core/anki.js` -> `syncBoardToAnki`
+

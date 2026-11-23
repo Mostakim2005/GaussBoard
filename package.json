@@ -176,6 +176,15 @@
         "icon": "src/assets/icon.ico"
       }
     ],
+    "protocols": [
+      {
+        "name": "GaussBoard",
+        "schemes": [
+          "gaussboard",
+          "gazboard"
+        ]
+      }
+    ],
     "publish": {
       "provider": "github",
       "owner": "Mostakim2005",

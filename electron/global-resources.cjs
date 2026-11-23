@@ -59,8 +59,27 @@ function resolveEcosystemRegistry() {
   return null;
 }
 
+function resolveEcosystemSecrets(registryResult) {
+  const reg = registryResult || resolveEcosystemRegistry();
+  const candidates = [
+    process.env.LOCAL_ECOSYSTEM_SECRETS,
+    reg?.data?.paths?.secretsFile,
+    path.join(os.homedir(), '.local', 'share', 'ecosystem-secrets.json')
+  ].filter(Boolean);
+
+  for (const file of candidates) {
+    try {
+      if (fs.existsSync(file)) {
+        return { path: file, data: JSON.parse(fs.readFileSync(file, 'utf8')) };
+      }
+    } catch {}
+  }
+  return null;
+}
+
 module.exports = {
   candidateCommonLibrariesDirs,
   resolveCommonLibrariesDir,
-  resolveEcosystemRegistry
+  resolveEcosystemRegistry,
+  resolveEcosystemSecrets
 };

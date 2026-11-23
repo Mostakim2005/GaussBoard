@@ -193,13 +193,36 @@ flowchart TD
 
 ### [SUBSYSTEM: Cross-App-Ecosystem-Bridges] | Aliases: ecosystem bridges, global resources, mermaid bridge, SymPy CAS, video remux, triarchy sync, Anki media
 > **1-Line Summary:** Modular Electron IPC companions for zero-context shared library resolution, Mermaid Manager round-trip editing, desktop Python/SymPy CAS worker, FFmpeg MKV remuxing, and Obsidian/Anki synchronization.
-* **How It Works (Plain English):** Custom integration logic is decoupled from upstream monoliths into isolated CommonJS companion modules under `electron/`. `global-resources.cjs` resolves shared libraries across environment variables, user local paths, and legacy junctions. `mermaid-bridge.cjs` writes temporary UTF-8 `.mmd` files, watches them for user saves, and updates open board diagrams. `cas-sympy.cjs` executes exact symbolic math via local Python with a pure-JS fallback. `media-bridge.cjs` auto-discovers sibling `.srt`/`.vtt` subtitles and remuxes `.mkv` files via FFmpeg stream-copy. `triarchy-bridge.cjs` bridges board Markdown sidecars and `.canvas` files into Obsidian vaults and parses `gaussboard://` deep links.
+* **How It Works (Plain English):** Custom integration logic is decoupled from upstream monoliths into isolated CommonJS companion modules under `electron/`. `global-resources.cjs` resolves shared libraries, `ecosystem-registry.json`, and `ecosystem-secrets.json` across environment variables, user local paths, and legacy junctions. `mermaid-bridge.cjs` writes temporary UTF-8 `.mmd` files, watches them for user saves, and updates open board diagrams. `cas-sympy.cjs` executes exact symbolic math via local Python with a pure-JS fallback. `media-bridge.cjs` resolves FFmpeg via `toolchains.ffmpeg`, auto-discovers sibling `.srt`/`.vtt` subtitles, and remuxes `.mkv` files via FFmpeg stream-copy. `triarchy-bridge.cjs` syncs board Markdown sidecars via `Obsidian Agent Manager` (`:27125` HTTP `/note/create`) with atomic UTF-8 vault-file fallback (including `.canvas`), and parses `gaussboard://` deep links dispatched from `main.js` through `preload.js -> onDeepLink` to `app.js -> focusObjectById`.
 * **Code Anchors (Grep Targets):**
-  * `electron/global-resources.cjs` -> `resolveCommonLibrariesDir`, `resolveEcosystemRegistry`
+  * `electron/global-resources.cjs` -> `resolveCommonLibrariesDir`, `resolveEcosystemRegistry`, `resolveEcosystemSecrets`
   * `electron/mermaid-bridge.cjs` -> `openInMermaidManager`, `findMermaidManagerExecutable`
   * `electron/cas-sympy.cjs` -> `evalSympy`
-  * `electron/media-bridge.cjs` -> `remuxToMp4`, `findSiblingSubtitles`
-  * `electron/triarchy-bridge.cjs` -> `syncToObsidianVault`, `parseGaussboardDeepLink`
+  * `electron/media-bridge.cjs` -> `findFfmpegExecutable`, `remuxToMp4`, `findSiblingSubtitles`
+  * `electron/triarchy-bridge.cjs` -> `resolveObsidianVaultDir`, `syncToObsidianVault`, `parseGaussBoardDeepLink`, `deepLinkFromArgv`
+
+### [SUBSYSTEM: Planned-Pentagram-RAG-And-Dual-Spice-Flow] | Aliases: RAG Manager, 27130, ngspice-wasm, gaussboard URI, ankiNoteId
+> **1-Line Summary:** Planned Phase 1–4 upgrades adding `ngspice-wasm` as a switchable SPICE solver alongside `solveMNA`, registering `gaussboard://` URI dispatch, deduplicating AnkiConnect sync, and publishing board/audio updates to `RAG Manager` (`:27130`) (`docs/modules/pentagram-audit-and-upgrades.md`).
+
+```mermaid
+flowchart LR
+    classDef startNode fill:#1d4ed8,stroke:#1e3a8a,color:#ffffff
+    classDef processNode fill:#0f766e,stroke:#115e59,color:#ffffff
+    classDef hubNode fill:#7c3aed,stroke:#4c1d95,color:#ffffff
+
+    GB["GaussBoard Store<br/>Boards + Audio + Circuits"]:::startNode -->|"MNA Live / ngspice-wasm"| SIM["Dual Circuit Engine"]:::processNode
+    GB -->|".md + .canvas + PNG + .srt"| OBS["Obsidian Nihon :27125"]:::processNode
+    GB -->|"ankiNoteId + updateNoteFields"| ANKI["AnkiConnect :8765"]:::processNode
+    GB -->|"UTF-8 .mmd round-trip"| MERM["Mermaid Manager"]:::processNode
+    GB -->|"POST /v1/ingest/event (xref_id)"| RAG[("RAG Manager :27130<br/>embeddinggemma-2:440m + Whisper")]:::hubNode
+    RAG -->|"Search & Context"| DT["DeepTutor :8001"]:::startNode
+
+    subgraph Legend["Legend (Color Guide)"]
+        L1["Blue = GaussBoard & DeepTutor"]:::startNode
+        L2["Teal = Dual Circuit & Sibling Bridges"]:::processNode
+        L3[("Purple = Central RAG Manager")]:::hubNode
+    end
+```
 
 ## 2. Tech Stack & Why We Chose It
 
@@ -226,8 +249,8 @@ See SUBSYSTEM sections above: Dual-Runtime-Platform, Document-Model-Op-Log, Inki
 > **1-Line Summary:** The active directive suite that must pass 24/24 before any change is called done.
 * **Automated UI / Logic Verification:** `node scripts/smoke.js --new-features`
 
-### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2389 keys, 7 locales, lint
-> **1-Line Summary:** Proves English keys match all 7 locales at 2,389/2,389 with zero missing strings.
+### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2390 keys, 7 locales, lint
+> **1-Line Summary:** Proves English keys match all 7 locales at 2,390/2,390 with zero missing strings.
 * **Type & Lint Check:** `node scripts/i18n-check.js`
 
 ### [VERIFY: Full-Regression-Suite] | Aliases: smoke builtin, 1247 assertions, full suite, test:all

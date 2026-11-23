@@ -2387,5 +2387,6 @@
  "Show the pen in screen recordings": "স্ক্রিন রেকর্ডিংয়ে পেন দেখান",
  "Off (default). Zoom and other recorders only capture the mouse pointer, so a pen writes with no pointer in the video and the arrow stays parked wherever the mouse was. On: a faint glow follows the pen whenever it is near the screen, hovering or writing, so recordings show where you are. Your pen and its pointer feel exactly the same.": "ডিফল্টভাবে বন্ধ। Zoom আর অন্য রেকর্ডাররা শুধু মাউস পয়েন্টার ধরে, তাই ভিডিওতে পেন কোনো পয়েন্টার ছাড়াই লেখে আর তীরটা মাউস যেখানে ছিল সেখানেই পড়ে থাকে। চালু করলে: পেন স্ক্রিনের কাছে এলেই — ভেসে থাকুক বা লিখুক — একটা হালকা আলো পেনের সাথে সাথে চলে, তাই রেকর্ডিংয়ে বোঝা যায় আপনি কোথায়। পেন আর তার পয়েন্টারের অনুভূতি একদম আগের মতোই থাকে।",
  "Search settings": "সেটিংসে খুঁজুন",
- "No setting matches that.": "এর সাথে মেলে এমন কোনো সেটিং নেই।"
+ "No setting matches that.": "এর সাথে মেলে এমন কোনো সেটিং নেই।",
+ "Edit in Mermaid Manager": "Mermaid Manager-এ সম্পাদনা করুন"
 }

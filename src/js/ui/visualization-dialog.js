@@ -379,7 +379,7 @@ export class VisualizationDialog {
           <span class="viz-dim-readout" id="vizDimReadout">${this.renderedW} × ${this.renderedH} px</span>
         </div>
         <div class="viz-footer-actions">
-          ${this.engine === 'mermaid' && typeof window !== 'undefined' && window.board?.openInMermaidManager ? '<button class="viz-btn viz-btn-secondary" id="vizMermaidMgrBtn" type="button">Edit in Mermaid Manager</button>' : ''}
+          ${this.engine === 'mermaid' && typeof window !== 'undefined' && window.board?.openInMermaidManager ? `<button class="viz-btn viz-btn-secondary" id="vizMermaidMgrBtn" type="button">${t('Edit in Mermaid Manager')}</button>` : ''}
           <button class="viz-btn viz-btn-secondary" id="vizCancelBtn">${t('Cancel')}</button>
           <button class="viz-btn viz-btn-primary" id="vizInsertBtn" ${this.validation.valid ? '' : 'disabled'}>
             ${this.target ? t('Update Diagram') : t('Insert onto Board')}
@@ -400,11 +400,15 @@ export class VisualizationDialog {
     if (mmBtn && window.board?.openInMermaidManager) {
       mmBtn.addEventListener('click', async () => {
         const diagId = this.target?.id || ('mm_' + Date.now());
-        if (!this._unsubMermaidMgr && window.board?.onDiagramUpdated) {
+        if (this._unsubMermaidMgr) {
+          this._unsubMermaidMgr();
+          this._unsubMermaidMgr = null;
+        }
+        if (window.board?.onDiagramUpdated) {
           this._unsubMermaidMgr = window.board.onDiagramUpdated((msg) => {
             if (msg && msg.id === diagId && typeof msg.code === 'string') {
               this.code = msg.code;
-              const ta = this.dialog?.querySelector('#vizCodeInput');
+              const ta = this.dialog?.querySelector('#vizCodeTextarea');
               if (ta) ta.value = this.code;
               this.triggerDebouncedUpdate();
             }

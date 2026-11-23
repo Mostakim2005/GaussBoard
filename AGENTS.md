@@ -14,7 +14,8 @@
 
 ## 3. Repository Directory Structure & Conventions
 * `src/` - Modular vanilla JavaScript source files (single-responsibility modules only).
-* `docs/` - Core documentation suite (`PRODUCT.md`, `ARCHITECTURE.md`, `DECISIONS_AND_TRAPS.md`).
+* `electron/` - Isolated CommonJS bridge companions (`global-resources.cjs`, `mermaid-bridge.cjs`, `cas-sympy.cjs`, `media-bridge.cjs`, `triarchy-bridge.cjs`) keeping `main.js` minimal-diff for `upstream/main` pulls.
+* `docs/` - Core documentation suite (`PRODUCT.md`, `ARCHITECTURE.md`, `DECISIONS_AND_TRAPS.md`, and Pentagram roadmap `docs/modules/pentagram-audit-and-upgrades.md`).
 * `sync/` - Offline LAN handoff protocol (UDP 53319 discovery + TCP 53318 X25519 / AES-256-GCM transport).
 * `scripts/` - Automated verification suites, smoke tests, and i18n linter.
 * `test/` - Integration tests, test fixtures, and verification harnesses.
@@ -25,3 +26,4 @@
 * **TRAP 3: Finite Audio Duration Safeguard:** For in-app recordings, never rely on `audio.duration` without checking `isFinite()`; retain elapsed wall-clock `track.durationMs`. For imported audio, use finite metadata when available and leave duration unknown when unavailable.
 * **TRAP 4: 100% Internationalization (i18n) Parity:** Every user-facing UI string must be wrapped in `t('...')` and present across all 7 locale dictionaries (`ar.json`, `bn.json`, `de.json`, `es.json`, `pt-BR.json`, `zh-Hans.json`, `zh-Hant.json`).
 * **TRAP 6: Study Tape and Answer Cover Toggle:** Both study tape (`subtype: 'tape'`) and rectangular answer covers (`subtype !== 'tape'`) persist on the board and toggle concealed/revealed on tap. Revealed covers remain hittable as faint outlines; attached content follows the cover state.
+* **TRAP 7: Ecosystem Registry Key & Windows 32K Argv Limit:** Always resolve Obsidian vault via `reg.data.apps.obsidian.vaultPath` (not `reg.data.obsidian`), never pass full Markdown notes on Windows CLI argv (`>32 KB`), and preserve `t('...')` on all bridge UI buttons — see `docs/DECISIONS_AND_TRAPS.md` -> `[TRAP: Registry-Schema-Apps-Path-And-32K-CLI-Limit]`.

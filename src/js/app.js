@@ -1943,6 +1943,7 @@ class App {
     if (target.id === this.store.doc.id) {
       if (ref.page > 0 && this.pageCount) this.goToPage(ref.page - 1);
       if (ref.heading) this.focusMarkdownHeading(ref.heading);
+      else if (ref.objId) this.focusObjectById(ref.objId);
       else if (ref.box && this.surface?.cam) {
         this.surface.cam.glideTo(ref.box, this.surface.width, this.surface.height, { duration: 400 });
       }
@@ -1961,6 +1962,7 @@ class App {
     requestAnimationFrame(() => {
       if (ref.page > 0 && this.pageCount) this.goToPage(ref.page - 1);
       if (ref.heading) this.focusMarkdownHeading(ref.heading);
+      else if (ref.objId) this.focusObjectById(ref.objId);
       else if (ref.box && this.surface?.cam) {
         this.surface.cam.glideTo(ref.box, this.surface.width, this.surface.height, { duration: 400 });
       }
@@ -1994,6 +1996,24 @@ class App {
       return true;
     }
     return false;
+  }
+
+  focusObjectById(objId) {
+    const id = String(objId || '').trim();
+    if (!id || !this.surface?.cam) return false;
+    const obj = this.store.get(id);
+    if (!obj) return false;
+    const b = boundsOf(obj);
+    const pad = 40;
+    this.surface.cam.glideTo(
+      { x: b.x - pad, y: b.y - pad, w: Math.max(80, b.w) + pad * 2, h: Math.max(80, b.h) + pad * 2 },
+      this.surface.width,
+      this.surface.height,
+      { duration: 400 }
+    );
+    this.setSelection([obj.id]);
+    this.surface.invalidate();
+    return true;
   }
 
   openBoard(id) {
@@ -5588,6 +5608,16 @@ class App {
       // fire-and-forget from the main process: nothing is waiting on it, so a
       // failure has to be reported here rather than escaping as a rejection
       this.loadBoard(data).catch(() => this.toast(t('Could not open that board')));
+    });
+    window.board.onDeepLink?.((link) => {
+      if (!link || !link.boardId) return;
+      this.boardOpenedExplicitly = true;
+      this.openBoardRef({
+        id: link.boardId,
+        name: link.boardId,
+        objId: link.objId || null,
+        page: link.page || null
+      }).catch(() => this.toast(t('Could not open that board')));
     });
     window.board.onWindowResized(() => {
       // the window changed shape - re-measure now and again after layout settles

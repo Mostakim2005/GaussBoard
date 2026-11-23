@@ -1,11 +1,12 @@
 'use strict';
 
-const cp = require('child_process');
 const fs = require('fs');
 const fsp = fs.promises;
+const http = require('http');
+const https = require('https');
 const os = require('os');
 const path = require('path');
-const { resolveEcosystemRegistry } = require('./global-resources.cjs');
+const { resolveEcosystemRegistry, resolveEcosystemSecrets } = require('./global-resources.cjs');
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -23,12 +24,27 @@ function resolveObsidianVaultDir() {
     return process.env.OBSIDIAN_VAULT_DIR;
   }
   const reg = resolveEcosystemRegistry();
-  const regVault = reg?.data?.obsidian?.vaultPath;
+  const regVault = reg?.data?.apps?.obsidian?.vaultPath || reg?.data?.obsidian?.vaultPath;
   if (regVault && fs.existsSync(regVault)) return regVault;
 
   const nihon = path.join(os.homedir(), 'Documents', 'Obsidian Vaults', 'Nihon');
   if (fs.existsSync(nihon)) return nihon;
   return null;
+}
+
+function resolveObsidianApiConfig() {
+  const reg = resolveEcosystemRegistry();
+  const secrets = resolveEcosystemSecrets(reg);
+  const rawUrl = process.env.OBSIDIAN_AGENT_MANAGER_URL
+    || reg?.data?.services?.obsidianAgentManager?.url
+    || reg?.data?.services?.obsidianRestApi?.url
+    || 'http://127.0.0.1:27125';
+  const url = String(rawUrl).replace(/\/+$/, '');
+  const token = process.env.OBSIDIAN_AGENT_MANAGER_TOKEN
+    || secrets?.data?.tokens?.obsidianAgentManager
+    || secrets?.data?.tokens?.obsidianRestApi
+    || null;
+  return { url, token };
 }
 
 /**
@@ -56,24 +72,116 @@ function parseGaussBoardDeepLink(rawUrl) {
   }
 }
 
+function deepLinkFromArgv(argv) {
+  if (!Array.isArray(argv)) return null;
+  for (const arg of argv) {
+    if (typeof arg !== 'string') continue;
+    if (/^(gaussboard|gazboard):\/\//i.test(arg)) {
+      const parsed = parseGaussBoardDeepLink(arg);
+      if (parsed) return parsed;
+    }
+  }
+  return null;
+}
+
+function postObsidianAgentManagerNote({ vaultRel, content, apiUrl, token, timeoutMs = 4000 }) {
+  return new Promise((resolve) => {
+    if (!apiUrl || !token) {
+      resolve({ ok: false });
+      return;
+    }
+    let endpoint;
+    try {
+      endpoint = new URL('/note/create', `${String(apiUrl).replace(/\/+$/, '')}/`);
+    } catch {
+      resolve({ ok: false });
+      return;
+    }
+    const host = endpoint.hostname.toLowerCase();
+    if (host !== '127.0.0.1' && host !== 'localhost' && host !== '::1' && host !== '[::1]') {
+      resolve({ ok: false });
+      return;
+    }
+
+    const payload = JSON.stringify({
+      path: vaultRel,
+      content: String(content || ''),
+      overwrite: true
+    });
+    const transport = endpoint.protocol === 'https:' ? https : http;
+    let settled = false;
+    const done = (val) => {
+      if (settled) return;
+      settled = true;
+      resolve(val);
+    };
+
+    const req = transport.request(
+      endpoint,
+      {
+        method: 'POST',
+        timeout: timeoutMs,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Length': Buffer.byteLength(payload, 'utf8'),
+          Authorization: `Bearer ${token}`
+        }
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            done({ ok: false });
+            return;
+          }
+          let parsed = null;
+          try {
+            const raw = Buffer.concat(chunks).toString('utf8');
+            parsed = raw ? JSON.parse(raw) : {};
+          } catch {
+            done({ ok: false });
+            return;
+          }
+          if (parsed?.ok === false || parsed?.error) {
+            done({ ok: false });
+            return;
+          }
+          done({ ok: true, mode: 'obsidian-agent-manager', vaultRel, response: parsed });
+        });
+      }
+    );
+    req.on('timeout', () => {
+      req.destroy();
+      done({ ok: false });
+    });
+    req.on('error', () => done({ ok: false }));
+    req.write(payload, 'utf8');
+    req.end();
+  });
+}
+
 /**
  * Sync an interoperable Markdown sidecar or .canvas file into the Obsidian vault
- * (Whiteboards/<filename>), preferring cli-anything-obsidian with atomic disk fallback.
+ * (Whiteboards/<filename>), preferring Obsidian Agent Manager HTTP (:27125) for .md
+ * with atomic UTF-8 disk write fallback (never passing full content on CLI argv).
  */
-async function syncToObsidianVault({ filename, content, subfolder = 'Whiteboards' }) {
+async function syncToObsidianVault({ filename, content, subfolder, apiUrl, token } = {}) {
+  const reg = resolveEcosystemRegistry();
+  const defaultSub = reg?.data?.apps?.obsidian?.whiteboardsSubfolder || 'Whiteboards';
   const safeName = path.basename(String(filename || 'Board.md')).replace(/[<>:"/\\|?*]/g, '_');
-  const safeSub = String(subfolder || 'Whiteboards').replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'Whiteboards';
+  const safeSub = String(subfolder || defaultSub).replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'Whiteboards';
   const vaultRel = `${safeSub}/${safeName}`;
-  const cli = findObsidianCli();
 
-  if (cli && safeName.endsWith('.md')) {
-    const viaCli = await new Promise((resolve) => {
-      const child = cp.execFile(cli, ['vault', 'update', vaultRel, '--content', String(content || '')], { timeout: 10000 }, (err) => {
-        resolve(!err);
-      });
-      child.on('error', () => resolve(false));
+  if (safeName.endsWith('.md')) {
+    const api = resolveObsidianApiConfig();
+    const res = await postObsidianAgentManagerNote({
+      vaultRel,
+      content,
+      apiUrl: apiUrl || api.url,
+      token: token || api.token
     });
-    if (viaCli) return { ok: true, mode: 'cli-anything-obsidian', vaultRel };
+    if (res.ok) return { ok: true, mode: 'obsidian-agent-manager', vaultRel };
   }
 
   const vaultDir = resolveObsidianVaultDir();
@@ -91,6 +199,8 @@ async function syncToObsidianVault({ filename, content, subfolder = 'Whiteboards
 module.exports = {
   findObsidianCli,
   resolveObsidianVaultDir,
+  resolveObsidianApiConfig,
   parseGaussBoardDeepLink,
+  deepLinkFromArgv,
   syncToObsidianVault
 };

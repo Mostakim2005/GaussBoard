@@ -2387,5 +2387,6 @@
  "Show the pen in screen recordings": "在屏幕录制中显示笔",
  "Off (default). Zoom and other recorders only capture the mouse pointer, so a pen writes with no pointer in the video and the arrow stays parked wherever the mouse was. On: a faint glow follows the pen whenever it is near the screen, hovering or writing, so recordings show where you are. Your pen and its pointer feel exactly the same.": "默认关闭。Zoom 等录制工具只捕获鼠标指针，所以录像里笔在写字却没有指针，箭头还停在鼠标原来的位置。开启后：只要笔靠近屏幕，无论悬停还是书写，都会有一圈淡淡的光跟着笔，录像里就能看出你在哪儿。笔和指针的手感完全不变。",
  "Search settings": "搜索设置",
- "No setting matches that.": "没有匹配的设置。"
+ "No setting matches that.": "没有匹配的设置。",
+ "Edit in Mermaid Manager": "在 Mermaid Manager 中编辑"
 }

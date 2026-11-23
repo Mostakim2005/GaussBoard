@@ -299,6 +299,7 @@ contextBridge.exposeInMainWorld('board', {
   // language to rebuild itself in.
   setLanguage: (code) => ipcRenderer.send('app:language', code),
   onOpenFile: (cb) => onChannel('board:open', (data) => cb(data)),
+  onDeepLink: (cb) => onChannel('board:deepLink', (link) => cb(link)),
   onWindowResized: (cb) => onChannel('window:resized', () => cb()),
   onFlush: (cb) => onChannel('app:flush', async () => { await cb(); ipcRenderer.send('app:flushed'); }),
   // starting up: what is being opened (for the starting-up window), and that the board is on screen

@@ -823,6 +823,7 @@ function setEditorLease(targetWin) {
 }
 const trustedConversionFiles = new WeakMap();
 let pendingOpen = null;
+let pendingDeepLink = null;
 /*
  * Sticky, unlike pendingOpen, which is cleared the moment the file is handed to
  * the window. The renderer asks whether a file was double-clicked so it knows
@@ -856,6 +857,31 @@ function saveWindowState() {
 
 function boardFileFromArgv(argv) {
   return argv.slice(1).find((a) => /\.(gaussboard|gazboard|openboard|json)$/i.test(a) && fs.existsSync(a)) || null;
+}
+
+function registerDeepLinkSchemes() {
+  if (process.argv.includes('--smoke')) return;
+  for (const scheme of ['gaussboard', 'gazboard']) {
+    try {
+      if (process.defaultApp && process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient(scheme, process.execPath, [path.resolve(process.argv[1])]);
+      } else {
+        app.setAsDefaultProtocolClient(scheme);
+      }
+    } catch { /* ignore protocol registration failure in restricted environments */ }
+  }
+}
+
+function openDeepLink(input) {
+  const parsed = typeof input === 'string' ? triarchyBridge.parseGaussBoardDeepLink(input) : input;
+  if (!parsed || !parsed.boardId) return false;
+  openedFromFile = true;
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isLoadingMainFrame()) {
+    send('board:deepLink', parsed);
+  } else {
+    pendingDeepLink = parsed;
+  }
+  return true;
 }
 
 async function openBoardPath(filePath) {
@@ -950,6 +976,7 @@ function createWindow() {
   });
   mainWindow.webContents.once('did-finish-load', () => {
     if (pendingOpen) { send('board:open', pendingOpen); pendingOpen = null; }
+    if (pendingDeepLink) { send('board:deepLink', pendingDeepLink); pendingDeepLink = null; }
     send('window:resized');
   });
 
@@ -2201,10 +2228,13 @@ if (!singleInstance) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
-    openBoardPath(boardFileFromArgv(argv));
+    const dl = triarchyBridge.deepLinkFromArgv(argv);
+    if (dl) openDeepLink(dl);
+    else openBoardPath(boardFileFromArgv(argv));
   });
 
   app.on('open-file', (e, filePath) => { e.preventDefault(); openBoardPath(filePath); });   // macOS
+  app.on('open-url', (e, url) => { e.preventDefault(); openDeepLink(url); });
 
   app.whenReady().then(async () => {
     startupMark('Electron ready');
@@ -2225,14 +2255,17 @@ if (!singleInstance) {
       return isTrustedAppUrl(requestingOrigin) && MEDIA_PERMISSIONS.has(permission);
     });
     registerProtocol();
+    registerDeepLinkSchemes();
     showSplash();
     ipc();
     if (storedStorageLocation && activeDataDir) splashStatus(activeDataDir);
     await prepareConfiguredStorage();
     startupMark('boards folder checked');
     if (!storedStorageLocation) await migrateLegacyData();
-    await openBoardPath(boardFileFromArgv(process.argv));
-    if (!pendingOpen) readLastBoardEarly();
+    const initialDeepLink = triarchyBridge.deepLinkFromArgv(process.argv);
+    if (initialDeepLink) openDeepLink(initialDeepLink);
+    else await openBoardPath(boardFileFromArgv(process.argv));
+    if (!pendingOpen && !pendingDeepLink) readLastBoardEarly();
     createWindow();
     startupMark('window created');
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

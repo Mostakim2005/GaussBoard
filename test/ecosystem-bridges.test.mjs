@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -94,5 +95,201 @@ test('Patch 09: cas-sympy finds Python via ecosystem registry & libraries manife
       assert.ok(lib.sharedPath && fs.existsSync(lib.sharedPath), `Library ${id} sharedPath must exist on disk`);
     }
   }
+});
+
+test('Phase 1 M11-01/M11-03: resolveObsidianVaultDir reads apps.obsidian.vaultPath and deepLinkFromArgv extracts valid links', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-reg-vault-'));
+  const prevReg = process.env.LOCAL_ECOSYSTEM_REGISTRY;
+  const prevVault = process.env.OBSIDIAN_VAULT_DIR;
+  try {
+    const vaultDir = path.join(tmp, 'NihonVault');
+    fs.mkdirSync(vaultDir, { recursive: true });
+    const regFile = path.join(tmp, 'ecosystem-registry.json');
+    fs.writeFileSync(regFile, JSON.stringify({
+      schemaVersion: 2,
+      apps: { obsidian: { vaultPath: vaultDir, whiteboardsSubfolder: 'Whiteboards' } }
+    }), 'utf8');
+
+    delete process.env.OBSIDIAN_VAULT_DIR;
+    process.env.LOCAL_ECOSYSTEM_REGISTRY = regFile;
+    assert.equal(triarchyBridge.resolveObsidianVaultDir(), vaultDir);
+
+    assert.deepEqual(
+      triarchyBridge.deepLinkFromArgv(['GaussBoard.exe', '--flag', 'gaussboard://open?board=b_99&obj=o_7&page=3']),
+      { boardId: 'b_99', objId: 'o_7', page: 3 }
+    );
+    assert.deepEqual(
+      triarchyBridge.deepLinkFromArgv(['GaussBoard.exe', 'gazboard://board/legacy_5?obj=x2']),
+      { boardId: 'legacy_5', objId: 'x2', page: null }
+    );
+    assert.equal(triarchyBridge.deepLinkFromArgv(['GaussBoard.exe', 'gaussboard://open?board=../bad']), null);
+  } finally {
+    if (prevReg === undefined) delete process.env.LOCAL_ECOSYSTEM_REGISTRY;
+    else process.env.LOCAL_ECOSYSTEM_REGISTRY = prevReg;
+    if (prevVault === undefined) delete process.env.OBSIDIAN_VAULT_DIR;
+    else process.env.OBSIDIAN_VAULT_DIR = prevVault;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('Phase 1 M11-03: syncToObsidianVault sends >40KB Markdown over HTTP (:27125 contract) without Origin header', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-obs-http-'));
+  const prevReg = process.env.LOCAL_ECOSYSTEM_REGISTRY;
+  const prevSecrets = process.env.LOCAL_ECOSYSTEM_SECRETS;
+  const prevUrl = process.env.OBSIDIAN_AGENT_MANAGER_URL;
+  const prevToken = process.env.OBSIDIAN_AGENT_MANAGER_TOKEN;
+  const prevVault = process.env.OBSIDIAN_VAULT_DIR;
+
+  let received = null;
+  const server = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      received = {
+        method: req.method,
+        url: req.url,
+        auth: req.headers.authorization,
+        origin: req.headers.origin,
+        body: JSON.parse(Buffer.concat(chunks).toString('utf8'))
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, vaultPath: received.body.path, created: true }));
+    });
+  });
+
+  try {
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const addr = server.address();
+    const apiUrl = `http://127.0.0.1:${addr.port}`;
+
+    const regFile = path.join(tmp, 'ecosystem-registry.json');
+    const secFile = path.join(tmp, 'ecosystem-secrets.json');
+    fs.writeFileSync(regFile, JSON.stringify({
+      schemaVersion: 2,
+      paths: { secretsFile: secFile },
+      services: { obsidianAgentManager: { url: apiUrl } },
+      apps: { obsidian: { vaultPath: tmp, whiteboardsSubfolder: 'Whiteboards' } }
+    }), 'utf8');
+    fs.writeFileSync(secFile, JSON.stringify({
+      tokens: { obsidianAgentManager: 'test-token-123' }
+    }), 'utf8');
+
+    delete process.env.OBSIDIAN_AGENT_MANAGER_URL;
+    delete process.env.OBSIDIAN_AGENT_MANAGER_TOKEN;
+    delete process.env.OBSIDIAN_VAULT_DIR;
+    process.env.LOCAL_ECOSYSTEM_REGISTRY = regFile;
+    process.env.LOCAL_ECOSYSTEM_SECRETS = secFile;
+
+    const largeContent = '# Large Board\n' + 'A'.repeat(42 * 1024);
+    const res = await triarchyBridge.syncToObsidianVault({
+      filename: 'LargeBoard.md',
+      content: largeContent
+    });
+
+    assert.equal(res.ok, true);
+    assert.equal(res.mode, 'obsidian-agent-manager');
+    assert.equal(res.vaultRel, 'Whiteboards/LargeBoard.md');
+    assert.ok(received);
+    assert.equal(received.method, 'POST');
+    assert.equal(received.url, '/note/create');
+    assert.equal(received.auth, 'Bearer test-token-123');
+    assert.equal(received.origin, undefined);
+    assert.equal(received.body.path, 'Whiteboards/LargeBoard.md');
+    assert.equal(received.body.overwrite, true);
+    assert.equal(received.body.content, largeContent);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    if (prevReg === undefined) delete process.env.LOCAL_ECOSYSTEM_REGISTRY;
+    else process.env.LOCAL_ECOSYSTEM_REGISTRY = prevReg;
+    if (prevSecrets === undefined) delete process.env.LOCAL_ECOSYSTEM_SECRETS;
+    else process.env.LOCAL_ECOSYSTEM_SECRETS = prevSecrets;
+    if (prevUrl === undefined) delete process.env.OBSIDIAN_AGENT_MANAGER_URL;
+    else process.env.OBSIDIAN_AGENT_MANAGER_URL = prevUrl;
+    if (prevToken === undefined) delete process.env.OBSIDIAN_AGENT_MANAGER_TOKEN;
+    else process.env.OBSIDIAN_AGENT_MANAGER_TOKEN = prevToken;
+    if (prevVault === undefined) delete process.env.OBSIDIAN_VAULT_DIR;
+    else process.env.OBSIDIAN_VAULT_DIR = prevVault;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('Phase 1 M11-03: syncToObsidianVault falls back to atomic UTF-8 (no BOM) vault write when HTTP is offline or for .canvas', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-obs-disk-'));
+  const prevReg = process.env.LOCAL_ECOSYSTEM_REGISTRY;
+  const prevSecrets = process.env.LOCAL_ECOSYSTEM_SECRETS;
+  const prevUrl = process.env.OBSIDIAN_AGENT_MANAGER_URL;
+  const prevToken = process.env.OBSIDIAN_AGENT_MANAGER_TOKEN;
+  const prevVault = process.env.OBSIDIAN_VAULT_DIR;
+
+  try {
+    const regFile = path.join(tmp, 'ecosystem-registry.json');
+    fs.writeFileSync(regFile, JSON.stringify({
+      schemaVersion: 2,
+      services: { obsidianAgentManager: { url: 'http://127.0.0.1:1' } },
+      apps: { obsidian: { vaultPath: tmp, whiteboardsSubfolder: 'Whiteboards' } }
+    }), 'utf8');
+
+    delete process.env.OBSIDIAN_VAULT_DIR;
+    process.env.LOCAL_ECOSYSTEM_REGISTRY = regFile;
+    process.env.OBSIDIAN_AGENT_MANAGER_URL = 'http://127.0.0.1:1';
+    process.env.OBSIDIAN_AGENT_MANAGER_TOKEN = 'offline-token';
+
+    const largeMd = '# Offline Fallback\n' + 'B'.repeat(42 * 1024);
+    const mdRes = await triarchyBridge.syncToObsidianVault({ filename: 'OfflineLarge.md', content: largeMd });
+    assert.equal(mdRes.ok, true);
+    assert.equal(mdRes.mode, 'vault-file');
+    const mdRaw = fs.readFileSync(mdRes.path);
+    assert.notEqual(mdRaw[0], 0xEF, 'Vault fallback file must not contain UTF-8 BOM');
+    assert.equal(mdRaw.toString('utf8'), largeMd);
+
+    const canvasBody = JSON.stringify({ nodes: [], edges: [] });
+    const canvasRes = await triarchyBridge.syncToObsidianVault({ filename: 'Board.canvas', content: canvasBody });
+    assert.equal(canvasRes.ok, true);
+    assert.equal(canvasRes.mode, 'vault-file');
+    assert.equal(fs.readFileSync(canvasRes.path, 'utf8'), canvasBody);
+  } finally {
+    if (prevReg === undefined) delete process.env.LOCAL_ECOSYSTEM_REGISTRY;
+    else process.env.LOCAL_ECOSYSTEM_REGISTRY = prevReg;
+    if (prevSecrets === undefined) delete process.env.LOCAL_ECOSYSTEM_SECRETS;
+    else process.env.LOCAL_ECOSYSTEM_SECRETS = prevSecrets;
+    if (prevUrl === undefined) delete process.env.OBSIDIAN_AGENT_MANAGER_URL;
+    else process.env.OBSIDIAN_AGENT_MANAGER_URL = prevUrl;
+    if (prevToken === undefined) delete process.env.OBSIDIAN_AGENT_MANAGER_TOKEN;
+    else process.env.OBSIDIAN_AGENT_MANAGER_TOKEN = prevToken;
+    if (prevVault === undefined) delete process.env.OBSIDIAN_VAULT_DIR;
+    else process.env.OBSIDIAN_VAULT_DIR = prevVault;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('Phase 1 M11-03 & M11-02: findFfmpegExecutable reads registry toolchains.ffmpeg and visualization-dialog enforces i18n/cleanup', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-ffmpeg-'));
+  const prevReg = process.env.LOCAL_ECOSYSTEM_REGISTRY;
+  const prevFfmpeg = process.env.GAUSSBOARD_FFMPEG;
+  try {
+    const fakeFfmpeg = path.join(tmp, 'ffmpeg-custom.exe');
+    fs.writeFileSync(fakeFfmpeg, '');
+    const regFile = path.join(tmp, 'ecosystem-registry.json');
+    fs.writeFileSync(regFile, JSON.stringify({
+      schemaVersion: 2,
+      toolchains: { ffmpeg: fakeFfmpeg }
+    }), 'utf8');
+
+    delete process.env.GAUSSBOARD_FFMPEG;
+    process.env.LOCAL_ECOSYSTEM_REGISTRY = regFile;
+    assert.equal(mediaBridge.findFfmpegExecutable(), fakeFfmpeg);
+  } finally {
+    if (prevReg === undefined) delete process.env.LOCAL_ECOSYSTEM_REGISTRY;
+    else process.env.LOCAL_ECOSYSTEM_REGISTRY = prevReg;
+    if (prevFfmpeg === undefined) delete process.env.GAUSSBOARD_FFMPEG;
+    else process.env.GAUSSBOARD_FFMPEG = prevFfmpeg;
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+
+  const vizSrc = fs.readFileSync(path.join(ROOT, 'src', 'js', 'ui', 'visualization-dialog.js'), 'utf8');
+  assert.ok(vizSrc.includes("t('Edit in Mermaid Manager')"), 'visualization-dialog must translate Edit in Mermaid Manager');
+  assert.ok(vizSrc.includes('#vizCodeTextarea'), 'visualization-dialog must target #vizCodeTextarea on Mermaid update');
+  assert.ok(!vizSrc.includes('#vizCodeInput'), 'visualization-dialog must not reference nonexistent #vizCodeInput');
+  assert.ok(vizSrc.includes('this._unsubMermaidMgr()'), 'visualization-dialog must clean up _unsubMermaidMgr listener');
 });
 

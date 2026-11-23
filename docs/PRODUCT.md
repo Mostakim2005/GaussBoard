@@ -134,7 +134,7 @@
   * `src/js/ui/compression-dialog.js` -> `CompressionDialog`, `qualitySlider`
 
 ### [FEATURE: I18n-Offline] | Aliases: translations, 7 locales, offline, vendored, no CDN, service worker
-> **1-Line Summary:** 100% i18n parity across 7 locales (2,389 keys) with every runtime library vendored locally and zero external CDN leaks.
+> **1-Line Summary:** 100% i18n parity across 7 locales (2,390 keys) with every runtime library vendored locally and zero external CDN leaks.
 * **User Intention (Non-Negotiable):** Non-English users must see every UI string translated and work fully offline on desktop and PWA, with board text measured consistently everywhere.
 * **Visual / UI Behavior:** English sentence is the key via t(); missing translations fall back to English; board fonts bundled via @font-face rather than borrowed from the OS.
 * **Code Anchors (Grep Targets):**
@@ -239,10 +239,20 @@
 * **User Intention:** Presence and shared editing if ever requested, while keeping offline-first handoff as the default.
 * **Target Integration Point:** `src/js/core/store.js` -> `checkpoint`, `applyRemote`, `onOp`
 
+### [WISHLIST: Dual-Circuit-Simulation-With-Ngspice] | Aliases: ngspice-wasm, spice netlist, MNA Live, EEcircuit, TINA
+> **1-Line Summary:** Keep the built-in pure-JS MNA circuit simulator (`solveMNA`) for instant interactive relays/motors and add switchable `ngspice-wasm` full SPICE simulation loaded from `%LOCALAPPDATA%\SharedLibraries`.
+* **User Intention:** Preserve all existing industrial control simulation while gaining accurate non-linear analog SPICE analysis, `.cir` export, and TI `TINA` interop without bloating the `<15 MB` PWA bundle.
+* **Target Integration Point:** `src/js/core/circuit-sim.js` -> `solveMNA` + `docs/modules/pentagram-audit-and-upgrades.md` (`[M13-01]`)
+
+### [WISHLIST: Pentagram-And-RAG-Manager-Interoperability] | Aliases: RAG Manager, 27130, xref_id, gaussboard deep link, anki deduplication, headless cli
+> **1-Line Summary:** Connect `GaussBoard` to central `RAG Manager` (`127.0.0.1:27130`), Obsidian (`:27125`), Mermaid Manager, DeepTutor (`:8001`), and Anki (`:8765`) via canonical `xref_id` sidecars, active `gaussboard://` URI handling, idempotent Anki sync, and `--json` headless CLI export.
+* **User Intention:** Editing a board, card, diagram, or lecture audio transcript updates cross-references across the entire 5-app Pentagram without duplicate Anki cards, broken deep links, or silent overwrite conflicts.
+* **Target Integration Point:** `electron/triarchy-bridge.cjs`, `src/js/core/anki.js`, `src/js/core/markdown-sidecar.js`, `docs/modules/pentagram-audit-and-upgrades.md`
+
 ## 4. Canonical References & Live Verification
 * **Core Documentation Suite:** `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS_AND_TRAPS.md`, `docs/releases/ANDROID_READINESS.md`
 * **Active Verification Suite:** `node scripts/smoke.js --new-features` (24/24 passing)
-* **Internationalization Suite:** `node scripts/i18n-check.js` (2,389/2,389 across 7 locales)
+* **Internationalization Suite:** `node scripts/i18n-check.js` (2,390/2,390 across 7 locales)
 * **Android Platform Suite:** `node --test test/android-*.test.js` (82/82 passing)
 * **Core Data Schemas & State:** `src/js/core/store.js` (`Store`, `doc.objects`, `doc.pages`, `doc.audioTracks`)
 * **Platform & Packaging:** `main.js`, `preload.js`, `package.json`

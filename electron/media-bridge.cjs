@@ -6,10 +6,15 @@ const fs = require('fs');
 const fsp = fs.promises;
 const os = require('os');
 const path = require('path');
+const { resolveEcosystemRegistry } = require('./global-resources.cjs');
 
 function findFfmpegExecutable() {
   if (process.env.GAUSSBOARD_FFMPEG && fs.existsSync(process.env.GAUSSBOARD_FFMPEG)) {
     return process.env.GAUSSBOARD_FFMPEG;
+  }
+  const regFfmpeg = resolveEcosystemRegistry()?.data?.toolchains?.ffmpeg;
+  if (typeof regFfmpeg === 'string' && regFfmpeg && fs.existsSync(regFfmpeg)) {
+    return regFfmpeg;
   }
   const localBin = path.join(os.homedir(), '.local', 'bin', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
   if (fs.existsSync(localBin)) return localBin;

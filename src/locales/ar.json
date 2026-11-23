@@ -2387,5 +2387,6 @@
  "Show the pen in screen recordings": "إظهار القلم في تسجيلات الشاشة",
  "Off (default). Zoom and other recorders only capture the mouse pointer, so a pen writes with no pointer in the video and the arrow stays parked wherever the mouse was. On: a faint glow follows the pen whenever it is near the screen, hovering or writing, so recordings show where you are. Your pen and its pointer feel exactly the same.": "معطّل افتراضيًا. يلتقط Zoom وبرامج التسجيل الأخرى مؤشر الفأرة فقط، فيكتب القلم في الفيديو دون أي مؤشر ويبقى السهم ثابتًا حيث كانت الفأرة. عند التشغيل: يتبع توهّج خفيف القلم كلما اقترب من الشاشة، أثناء التحويم أو الكتابة، فتُظهر التسجيلات مكانك. يبقى إحساس القلم ومؤشره كما هو تمامًا.",
  "Search settings": "البحث في الإعدادات",
- "No setting matches that.": "لا يوجد إعداد مطابق."
+ "No setting matches that.": "لا يوجد إعداد مطابق.",
+ "Edit in Mermaid Manager": "التحرير في Mermaid Manager"
 }
