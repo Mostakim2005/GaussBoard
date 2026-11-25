@@ -478,6 +478,27 @@ export function createPanels(app) {
       const spacingSection = (bg.pattern && bg.pattern !== 'none')
         ? h('div', { class: 'section' }, h('h5', {}, t('Spacing')), spacingRow, spacingNote, dateRow) : null;
 
+      const snapGridBox = h('input', { type: 'checkbox' });
+      snapGridBox.checked = app.settings.snapToGrid === true;
+      snapGridBox.addEventListener('change', () => {
+        app.settings.snapToGrid = snapGridBox.checked;
+        app.saveSettings();
+      });
+      const snapRotBox = h('input', { type: 'checkbox' });
+      snapRotBox.checked = app.settings.snapRotationAlways === true;
+      snapRotBox.addEventListener('change', () => {
+        app.settings.snapRotationAlways = snapRotBox.checked;
+        app.saveSettings();
+      });
+      const snapSection = h('div', { class: 'section' },
+        h('h5', {}, t('Snapping')),
+        h('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:8px' },
+          h('label', { class: 'toggle' }, snapGridBox),
+          h('span', { style: 'cursor:pointer', onclick: () => { snapGridBox.checked = !snapGridBox.checked; app.settings.snapToGrid = snapGridBox.checked; app.saveSettings(); } }, t('Snap move & resize to grid'))),
+        h('div', { style: 'display:flex;align-items:center;gap:10px' },
+          h('label', { class: 'toggle' }, snapRotBox),
+          h('span', { style: 'cursor:pointer', onclick: () => { snapRotBox.checked = !snapRotBox.checked; app.settings.snapRotationAlways = snapRotBox.checked; app.saveSettings(); } }, t('Always snap rotation to 15° (hold Alt to bypass)'))));
+
       const custom = h('input', { type: 'color', value: bg.color });
       custom.addEventListener('input', () => app.store.setBackground({ color: custom.value }));
       // one write when the picker is let go, not one per drag of the slider
@@ -600,6 +621,7 @@ export function createPanels(app) {
 
       return h('div', {},
         h('div', { class: 'section' }, h('h5', {}, t('Canvas size')), sizeRow, orientRow, btnMarginAdjust, fitRow, sizeNote),
+        snapSection,
         h('div', { class: 'section' }, h('h5', {}, t('Colour')), colors),
         h('div', { class: 'section' }, h('h5', {}, t('Custom colour')), custom),
         h('div', { class: 'section' }, h('h5', {}, t('Pattern')), pats),
@@ -1753,7 +1775,23 @@ export function createPanels(app) {
             t('How long the laser pointer trail lingers on screen before melting away.')),
           row(t('Hold the pen still for menus'), mkToggle(() => s.penHold !== false, (v) => { s.penHold = v; app.interaction.cancelHold(); }),
             t("On (default): holding the pen still on the board opens the menu, and on an object picks it up. Off: the pen only ever writes, so filling in small shapes never opens a menu. Use the pen's side button or the selection bar for menus instead. A finger keeps press-and-hold either way.")),
-          row(t('Ruler snapping'), mkToggle(() => app.ruler.snap, (v) => (app.ruler.snap = v)))
+          row(t('Ruler snapping'), mkToggle(() => app.ruler.snap, (v) => (app.ruler.snap = v))),
+          row(t('Snap move & resize to grid'), mkToggle(() => s.snapToGrid === true, (v) => (s.snapToGrid = v)),
+            t('Align dragged and resized items onto canvas grid intervals (hold Alt to bypass).')),
+          row(t('Always snap rotation to 15°'), mkToggle(() => s.snapRotationAlways === true, (v) => (s.snapRotationAlways = v)),
+            t('Snap object rotation to 15° increments without holding Shift (hold Alt to rotate freely).')),
+          row(t('Spline finish mode (Tablet / Mouse)'), mkChoice([
+            ['auto', t('Auto (Smart Tablet)')],
+            ['both', t('Double-Click + Pill')],
+            ['pill', t('Floating Pill Only')]
+          ], () => s.splineFinishMode || 'auto', (v) => {
+            s.splineFinishMode = v;
+            app.interaction?.syncSplineHud?.();
+          }), t('In Auto mode, graphics tablets (e.g. Huion H950P) use the floating Finish pill safely while mice can also double-click.')),
+          row(t('Sketchy lines (Rough.js)'), mkToggle(() => s.shapeRough === true, (v) => (s.shapeRough = v)),
+            t('Draw new shapes with hand-drawn sketchy lines (uses Rough.js from SharedLibraries when available).')),
+          row(t('Check missing shared libraries on startup'), mkToggle(() => s.suppressLibraryPrompt !== true, (v) => (s.suppressLibraryPrompt = !v)),
+            t('Offer one-click downloads when optional offline libraries are missing from SharedLibraries.'))
         ),
         storage ? h('div', { class: 'section' }, h('h5', {}, t('Storage')), storage) : null,
         backup ? h('div', { class: 'section' }, h('h5', {}, t('Storage')), backup) : null,

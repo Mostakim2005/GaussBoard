@@ -3,6 +3,7 @@
 import { uid, unionBox } from './util.js';
 import { pagesFrom, pageRects, cleanPage, DATE_RE } from './pages.js';
 import { countTags } from './markdown.js';
+import { splineBounds } from './splines.js';
 import { t } from '../i18n.js';
 
 export const CLIENT_ID = uid('c');
@@ -476,6 +477,7 @@ export function strokeDrawWidth(o) {
 export function boundsOf(o) {
   if (!o) return { x: 0, y: 0, w: 0, h: 0 };
   if (o.type === 'connector') return connectorBox ? connectorBox(o) : { x: o.x || 0, y: o.y || 0, w: o.w || 0, h: o.h || 0 };
+  if (o.type === 'spline') return splineBounds(o);
   if (o.type === 'stroke' || (o.type === 'curtain' && Array.isArray(o.points))) {
     const b = o.bbox || { x: 0, y: 0, w: 0, h: 0 };
     // a neon line glows about three widths past its edge (see drawNeon): the glow is part of what you see

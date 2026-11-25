@@ -1,6 +1,6 @@
 // Pointer interaction: one small state machine covering every tool.
 
-import { uid, bboxOfPoints, clamp, dist, simplify, unionBox } from './util.js';
+import { uid, bboxOfPoints, clamp, dist, simplify, unionBox, rotatePoint } from './util.js';
 import { isScratchGesture } from './scratch.js';
 import { boundsOf, worldBounds, withAttached, withGroups} from './store.js';
 import { pick, pickAll, inBox, inLasso, strokesAlong, normalizeBox, curtainAt, toLocal, outlineAlong, taskCheckboxAt, toggleTaskAtPoint, toggleCardCollapseAtPoint } from './hit.js';
@@ -14,6 +14,8 @@ import { Surface } from './surface.js';
 import { t, currentLanguage } from '../i18n.js';
 import { SHAPE_LABELS } from '../ui/palettes.js';
 import { route as connectorRoute, midPoint, bendThrough, targetAt, sameTarget, dotsFor, drawConnector, endBox } from './connectors.js';
+import { normalizeKnot, splineBounds, splineHandleScreenMap, drawSpline } from './splines.js';
+import { ensureRoughLoaded } from './sketchy.js';
 import * as PencilSound from './pencilsound.js';
 import { audioInkClock } from './replay-clock.js';
 import { handleWikilinkDoubleClick } from './boardrefs.js';
@@ -64,7 +66,7 @@ const EDGE_PANNABLE = new Set(['lasso', 'marquee', 'move', 'resize', 'rotate', '
 // 'laser' is deliberately absent: pointing near the edge of the window should
 // not drag the board out from under what you are pointing at.
 
-export const INK_TOOLS = new Set(['pen', 'highlighter', 'brush', 'fountain', 'calligraphy']);
+export const INK_TOOLS = new Set(['pen', 'highlighter', 'brush', 'fountain', 'calligraphy', 'whiteout']);
 export const isInkTool = (t) => INK_TOOLS.has(t);
 
 export class Interaction {
@@ -216,6 +218,9 @@ export class Interaction {
     this.hideInkPointer();
     this.hideGlow();
     this.hideRing();
+    if (this._splineHudEl?.parentNode) this._splineHudEl.remove();
+    this._splineHudEl = null;
+    this.splineDraft = null;
     if (this._glowOwned && this._glowEl?.parentNode) this._glowEl.remove();
     this._glowEl = undefined;
     if (this._ringOwned && this._ringEl?.parentNode) this._ringEl.remove();
@@ -261,6 +266,9 @@ export class Interaction {
     this.hideInkPointer();
     this.hideGlow();
     this.hideRing();
+    if (this._splineHudEl?.parentNode) this._splineHudEl.remove();
+    this._splineHudEl = null;
+    this.splineDraft = null;
     this.surface?.invalidate?.();
   }
 
@@ -548,7 +556,7 @@ export class Interaction {
       // for every other gesture. Without that, a palm settling on the glass
       // dragged the ruler, and a palm lifting ended the drag.
       if (zone === 'arm') {
-        this.action = { type: 'protArm' };
+        this.action = { type: this.rulerIsCompass ? 'compArm' : 'protArm' };
         this.actionId = e.pointerId;
         this.surface.invalidate();
         return;
@@ -658,9 +666,12 @@ export class Interaction {
         this.surface.laser = [{ x: wp.x, y: wp.y, t: performance.now() }];
         this.action = { type: 'laser' };
         break;
-      case 'pen': case 'highlighter': case 'tape': case 'brush': case 'fountain': case 'calligraphy':
+      case 'pen': case 'highlighter': case 'tape': case 'brush': case 'fountain': case 'calligraphy': case 'whiteout':
         this.startStroke(e, wp, tool);
         if (this.action) this.action.selectionAtDown = selectionAtDown;
+        break;
+      case 'spline':
+        this.startSplinePress(e, sp, wp);
         break;
       case 'eraser': this.startErase(wp); if (this.action) this.placeRing(sp, this.action.radiusPx); break;
       case 'lasso':
@@ -668,6 +679,7 @@ export class Interaction {
         if (this.startMoveOnSelection(wp)) break;
         this.action = { type: 'lasso', pts: [wp] };
         break;
+      case 'verticalSpace': this.startVerticalSpace(wp); break;
       case 'shape': this.action = { type: 'shapeDraw', start: wp, cur: wp, shift: e.shiftKey, dismissedMenu }; break;
       case 'emoji': {
         // Landing on something that is already there should pick it up rather
@@ -1071,6 +1083,15 @@ export class Interaction {
           a.holdMenu = false;
         }
         if (mods.shift) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+        if (this.app.settings.snapToGrid && !mods.alt && a.objs.length) {
+          const lead = a.objs.find((o) => o.type !== 'connector') || a.objs[0];
+          const ob = a.origin.get(lead.id);
+          if (ob) {
+            const st = this.snapStep();
+            dx = Math.round((ob.x + dx) / st) * st - ob.x;
+            dy = Math.round((ob.y + dy) / st) * st - ob.y;
+          }
+        }
         for (const o of a.objs) {
           if (o.type === 'connector') {
             // An arrow's box also depends on what it holds, which may be moving
@@ -1095,10 +1116,15 @@ export class Interaction {
         const anchor = a.anchor;
         let sx = 1, sy = 1;
         const h = a.handle;
-        if (h.includes('e')) sx = (wp.x - anchor.x) / (box.x + box.w - anchor.x || 1);
-        if (h.includes('w')) sx = (wp.x - anchor.x) / (box.x - anchor.x || 1);
-        if (h.includes('s')) sy = (wp.y - anchor.y) / (box.y + box.h - anchor.y || 1);
-        if (h.includes('n')) sy = (wp.y - anchor.y) / (box.y - anchor.y || 1);
+        let rwp = wp;
+        if (this.app.settings.snapToGrid && !mods.alt) {
+          const st = this.snapStep();
+          rwp = { x: Math.round(wp.x / st) * st, y: Math.round(wp.y / st) * st };
+        }
+        if (h.includes('e')) sx = (rwp.x - anchor.x) / (box.x + box.w - anchor.x || 1);
+        if (h.includes('w')) sx = (rwp.x - anchor.x) / (box.x - anchor.x || 1);
+        if (h.includes('s')) sy = (rwp.y - anchor.y) / (box.y + box.h - anchor.y || 1);
+        if (h.includes('n')) sy = (rwp.y - anchor.y) / (box.y - anchor.y || 1);
         if (h === 'n' || h === 's') sx = 1;
         if (h === 'e' || h === 'w') sy = 1;
         const hasCard = a.objs.some((o) => (o.type === 'text' || o.type === 'note') && (o.markdown !== false || o.cardStyle || o.autoSize === false));
@@ -1140,7 +1166,8 @@ export class Interaction {
       case 'rotate': {
         const c = a.center;
         let ang = Math.atan2(wp.y - c.y, wp.x - c.x) - a.a0;
-        if (mods.shift) ang = Math.round(ang / (Math.PI / 12)) * (Math.PI / 12);
+        const snapped = (mods.shift || this.app.settings.snapRotationAlways === true) && !mods.alt;
+        if (snapped) ang = Math.round(ang / (Math.PI / 12)) * (Math.PI / 12);
         for (const o of a.objs) {
           Object.assign(o, structuredClone(a.origin.get(o.id)));
           rotateObjectAround(o, ang, c.x, c.y);
@@ -1148,6 +1175,11 @@ export class Interaction {
         this.clampGroupToPaper(a.objs);
         this.surface.touch?.();
         a.angle = ang;
+        a.snapped = snapped;
+        break;
+      }
+      case 'verticalSpace': {
+        this.updateVerticalSpace(a, wp, mods);
         break;
       }
       case 'shapeDraw': {
@@ -1189,6 +1221,9 @@ export class Interaction {
         break;
       }
       case 'protArm': this.aimProtArm(wp, mods.shift); break;
+      case 'compArm': this.aimCompArm(wp, mods.shift); break;
+      case 'splineDrag': this.dragSplineKnot(a, sp, wp, mods); break;
+      case 'splineHandle': this.dragSplineHandle(a, wp, mods); break;
       case 'rulerRotate': {
         // Grabbing the far end turns it the same way round, not upside down.
         const ang = Math.atan2(wp.y - this.ruler.y, wp.x - this.ruler.x) + (a.flip ? Math.PI : 0);
@@ -1312,10 +1347,13 @@ export class Interaction {
       }
       case 'resize': this.store.commitSnapshot('resize', a.snap); break;
       case 'rotate': this.store.commitSnapshot('rotate', a.snap); break;
+      case 'verticalSpace': this.finishVerticalSpace(a); break;
       case 'shapeDraw': this.finishShape(a); break;
       case 'textDraw': this.finishTextBox(a); break;
       case 'connEnd': this.store.commitSnapshot('arrow end', a.snap); break;
       case 'connBend': this.store.commitSnapshot('bend arrow', a.snap); break;
+      case 'splineHandle': this.store.commitSnapshot('edit spline', a.snap); break;
+      case 'splineDrag': this.finishSplineKnotPress(e, sp); break;
       case 'connectDraw': {
         // a tap on a dot is not an arrow
         if (Math.hypot(sp.x - a.downSp.x, sp.y - a.downSp.y) < 8) break;
@@ -1370,6 +1408,14 @@ export class Interaction {
         if (Math.hypot(p.x - sp.x, p.y - sp.y) <= grab) return k;
       }
       return null;
+    }
+    const spline = this.selectedSpline();
+    if (spline) {
+      const grab = this._lastDownType === 'touch' ? 22 : HANDLE_GRAB;
+      const sh = splineHandleScreenMap(spline, this.surface.cam);
+      for (const [k, p] of Object.entries(sh)) {
+        if (Math.hypot(p.x - sp.x, p.y - sp.y) <= grab) return k;
+      }
     }
     const box = this.surface.selectionScreenBox();
     if (!box) return null;
@@ -1567,6 +1613,13 @@ export class Interaction {
       this.action = k === 'connMid'
         ? { type: 'connBend', obj: o, snap }
         : { type: 'connEnd', obj: o, snap, which: k === 'connA' ? 'a' : 'b', target: null };
+      return true;
+    }
+    if (typeof k === 'string' && (k.startsWith('sk:') || k.startsWith('si:') || k.startsWith('so:'))) {
+      const o = this.selectedSpline();
+      if (!o) return false;
+      const snap = this.store.snapshot([o.id]);
+      this.action = { type: 'splineHandle', obj: o, part: k.slice(0, 2), idx: Number(k.slice(3)), snap };
       return true;
     }
     const sel = this.surface.selection;
@@ -2097,6 +2150,7 @@ export class Interaction {
     const isBrush = tool === 'brush';
     const isFountain = tool === 'fountain';
     const isCalligraphy = tool === 'calligraphy';
+    const isWhiteout = tool === 'whiteout';
 
     let strokeColor = s.penColor;
     let strokeWidth = s.penWidth;
@@ -2123,6 +2177,11 @@ export class Interaction {
       strokeWidth = s.calligraphyWidth || 12;
       strokeOpacity = s.calligraphyOpacity ?? 1;
       strokeEffect = 'none';
+    } else if (isWhiteout) {
+      strokeColor = 'paper';
+      strokeWidth = s.whiteoutWidth || 28;
+      strokeOpacity = 1;
+      strokeEffect = 'whiteout';
     }
 
     const obj = isTape ? {
@@ -2880,8 +2939,10 @@ export class Interaction {
     const obj = {
       id: uid('sh'), type: 'shape', kind, ...geo, rotation: 0,
       ...(['line', 'arrow', 'doubleArrow'].includes(kind) ? { headStyle: s.arrowHeadStyle || 'filled' } : {}),
+      ...(s.shapeRough ? { rough: true, roughSeed: Math.floor(Math.random() * 1e9) + 1, roughness: s.shapeRoughness ?? 1.4 } : {}),
       stroke: s.shapeStroke, fill: s.shapeFill, lineWidth: s.shapeLineWidth, dash: s.shapeDash, text: ''
     };
+    if (s.shapeRough) ensureRoughLoaded(this.app, false);
     this.store.add(this.placeOnPaper(obj), 'shape');
     /*
      * Stay on the shape tool.
@@ -3211,6 +3272,7 @@ export class Interaction {
     const hl = t === 'highlighter';
     const kind = hl ? 'highlighter' : (t === 'pen' ? this.penKind() : 'pen');
     const color = hl ? s.highlighterColor :
+                  t === 'whiteout' ? '#e8e6e3' :
                   t === 'brush' ? (s.brushColor || s.penColor) :
                   t === 'fountain' ? (s.fountainColor || s.penColor) :
                   t === 'calligraphy' ? (s.calligraphyColor || s.penColor) : inkPaint(s.penColor);
@@ -3227,6 +3289,7 @@ export class Interaction {
     const hl = tool === 'highlighter';
     const kind = hl ? 'highlighter' : (tool === 'pen' ? this.penKind() : 'pen');
     const color = hl ? s.highlighterColor :
+                  tool === 'whiteout' ? '#e8e6e3' :
                   tool === 'brush' ? (s.brushColor || s.penColor) :
                   tool === 'fountain' ? (s.fountainColor || s.penColor) :
                   tool === 'calligraphy' ? (s.calligraphyColor || s.penColor) : inkPaint(s.penColor);
@@ -3244,9 +3307,18 @@ export class Interaction {
     else if (mousePointer) cursor = 'grab';
     else if (inkTool) cursor = deviceType === 'mouse' ? this.inkCursor(t) : this.inkPointerCursor(t);
     else if (t === 'eraser') cursor = 'none';
-    else if (t === 'shape' || t === 'text' || t === 'lasso') cursor = 'crosshair';
+    else if (t === 'shape' || t === 'text' || t === 'lasso' || t === 'spline') cursor = 'crosshair';
+    else if (t === 'verticalSpace') cursor = 'ns-resize';
     else if (t === 'note') cursor = 'copy';
     else if (t === 'pan') cursor = 'grab';
+    if (t === 'spline' && this.splineDraft) {
+      this.splineDraft.hoverPt = wp;
+      this.surface.invalidate();
+    }
+    if (t === 'verticalSpace') {
+      this._hoverWorldY = wp.y;
+      this.surface.invalidate();
+    }
 
     const overHandle = this.handleAt(sp);
     if (overHandle) {
@@ -3525,6 +3597,11 @@ export class Interaction {
 
   onDoubleClick(e) {
     if (this.app.readingMode) { e.preventDefault(); return; }
+    if (this.tool === 'spline' && this.splineDraft && this.canDoubleClickFinishSpline(e.pointerType)) {
+      e.preventDefault();
+      this.finishSplineDraft({ closed: false });
+      return;
+    }
     if (this.fitTextToWords(this.surface.screenPoint(e))) return;
     const wp = this.surface.toWorld(e);
     const link = this.linkAt(wp);
@@ -3802,6 +3879,7 @@ export class Interaction {
   rulerZone(sp) {
     if (this.ruler.kind === 'set45' || this.ruler.kind === 'set60') return this.triZone(sp);
     if (this.rulerIsProtractor) return this.protZone(sp);
+    if (this.rulerIsCompass) return this.compZone(sp);
     const { c, len, thick, angle } = this.rulerRect();
     const dx = sp.x - c.x, dy = sp.y - c.y;
     const along = dx * Math.cos(angle) + dy * Math.sin(angle);
@@ -3883,6 +3961,7 @@ export class Interaction {
     let found, inside;
     if (this.rulerIsTriangle) ({ found, inside } = this.triEdgesAt(pt));
     else if (this.rulerIsProtractor) ({ found, inside } = this.protEdgesAt(pt));
+    else if (this.rulerIsCompass) ({ found, inside } = this.compEdgesAt(pt));
     else {
       const r = this.ruler, { along, perp } = this.rulerOffsets(pt);
       if (Math.abs(along) > r.length / 2 + 40 / z) return [];
@@ -3898,11 +3977,13 @@ export class Interaction {
   edgeDirection(edge, pt) {
     const r = this.ruler;
     let du = 1, dv = 0;
-    if (edge === 'pc') {
+    if (edge === 'pc' || edge === 'cc') {
       const { along: u, perp: v } = this.rulerOffsets(pt), rho = Math.hypot(u, v) || 1;
       du = -v / rho; dv = u / rho;
     } else if (edge === 'pa') {
       const { arm } = this.protGeom(); du = Math.cos(arm); dv = -Math.sin(arm);
+    } else if (edge === 'ca') {
+      const { arm } = this.compGeom(); du = Math.cos(arm); dv = Math.sin(arm);
     } else if (typeof edge === 'string' && edge[0] === 'e') {
       const P = this.triCorners(), i = Number(edge.slice(1)) || 0, a = P[i], b = P[(i + 1) % 3], L = Math.hypot(b.u - a.u, b.v - a.v);
       du = (b.u - a.u) / L; dv = (b.v - a.v) / L;
@@ -3946,12 +4027,16 @@ export class Interaction {
     const { along, perp } = this.rulerOffsets(pt);
     if (this.rulerIsTriangle) return this.triInside(along, perp) > 0;
     if (this.rulerIsProtractor) return this.protInside(along, perp);
+    if (this.rulerIsCompass) return this.compInside(along, perp);
     return Math.abs(along) <= r.length / 2 && perp > 0 && perp < r.thickness;
   }
 
   /** The point, moved sideways onto one of the ruler's edges (TRAP 2: preserves p.t). */
   rulerProject(pt, edge = 0) {
-    if (typeof edge === 'string') return edge[0] === 'p' ? this.protProject(pt, edge) : this.triProject(pt, edge);
+    if (typeof edge === 'string') {
+      if (edge[0] === 'c') return this.compProject(pt, edge);
+      return edge[0] === 'p' ? this.protProject(pt, edge) : this.triProject(pt, edge);
+    }
     const r = this.ruler;
     const { along } = this.rulerOffsets(pt);
     const cos = Math.cos(r.angle), sin = Math.sin(r.angle);
@@ -4086,7 +4171,11 @@ export class Interaction {
         kind === 'line' ? 'none' : kind === 'doubleArrow' ? 'both' : 'end');
     } else if (a && a.type === 'shapeDraw') {
       const st = this.app.settings;
-      const ghost = { type: 'shape', kind: st.shapeKind, stroke: st.shapeStroke, fill: st.shapeFill, lineWidth: st.shapeLineWidth, dash: st.shapeDash };
+      const ghost = {
+        type: 'shape', kind: st.shapeKind, stroke: st.shapeStroke, fill: st.shapeFill,
+        lineWidth: st.shapeLineWidth, dash: st.shapeDash,
+        rough: st.shapeRough === true, roughSeed: 1337, roughness: st.shapeRoughness ?? 1.4
+      };
       const isLinear = ['line', 'arrow', 'doubleArrow'].includes(st.shapeKind);
       let g;
       if (isLinear) g = { x: a.start.x, y: a.start.y, w: a.cur.x - a.start.x, h: a.cur.y - a.start.y };
@@ -4107,6 +4196,105 @@ export class Interaction {
       ctx.strokeStyle = '#0078d4';
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(Math.min(p0.x, p1.x), Math.min(p0.y, p1.y), Math.abs(p1.x - p0.x), Math.abs(p1.y - p0.y));
+      ctx.restore();
+    }
+
+    if (a && a.type === 'rotate' && a.angle != null) {
+      const box = this.surface.selectionScreenBox();
+      if (box) {
+        const degText = `${Math.round((a.angle * 180) / Math.PI)}°`;
+        ctx.save();
+        ctx.font = '600 12px system-ui, sans-serif';
+        const tw = ctx.measureText(degText).width + 14;
+        const bx = box.x + box.w / 2 - tw / 2, by = box.y - 54;
+        ctx.fillStyle = a.snapped ? '#0078d4' : 'rgba(20, 20, 20, 0.85)';
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(bx, by, tw, 22, 6); else ctx.rect(bx, by, tw, 22);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(degText, box.x + box.w / 2, by + 11);
+        ctx.restore();
+      }
+    }
+
+    if (this.tool === 'verticalSpace' || (a && a.type === 'verticalSpace')) {
+      const wy = a?.type === 'verticalSpace' ? a.curY : (this.lastMotion?.wp?.y ?? this._hoverWorldY);
+      if (Number.isFinite(wy)) {
+        const sy = cam.toScreen(0, wy).y;
+        const w = this.surface.width || 1200;
+        ctx.save();
+        ctx.strokeStyle = '#0078d4';
+        ctx.lineWidth = a?.type === 'verticalSpace' ? 2 : 1.5;
+        ctx.setLineDash(a?.type === 'verticalSpace' ? [] : [8, 5]);
+        ctx.beginPath();
+        ctx.moveTo(0, sy);
+        ctx.lineTo(w, sy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const label = a?.type === 'verticalSpace'
+          ? `${a.dy >= 0 ? '+' : ''}${Math.round(a.dy)} px`
+          : t('Drag down/up to add or remove vertical space');
+        ctx.font = '600 11.5px system-ui, sans-serif';
+        const pw = ctx.measureText(label).width + 18;
+        const px = Math.max(12, Math.min(w - pw - 12, (w - pw) / 2));
+        ctx.fillStyle = '#0078d4';
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(px, sy - 26, pw, 22, 11); else ctx.rect(px, sy - 26, pw, 22);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, px + pw / 2, sy - 15);
+        ctx.restore();
+      }
+    }
+
+    if (this.splineDraft && this.splineDraft.knots.length) {
+      const d = this.splineDraft;
+      const previewObj = {
+        type: 'spline',
+        knots: d.hoverPt && (!a || a.type !== 'splineDrag')
+          ? [...d.knots, { x: d.hoverPt.x, y: d.hoverPt.y, smooth: true }]
+          : d.knots,
+        closed: false,
+        stroke: '#0078d4',
+        lineWidth: this.app.settings.shapeLineWidth || 3
+      };
+      ctx.save();
+      ctx.translate(cam.x, cam.y);
+      ctx.scale(cam.z, cam.z);
+      ctx.globalAlpha = 0.85;
+      drawSpline(ctx, previewObj);
+      ctx.restore();
+
+      ctx.save();
+      for (let i = 0; i < d.knots.length; i++) {
+        const k = d.knots[i];
+        const ks = cam.toScreen(k.x, k.y);
+        for (const hk of ['hIn', 'hOut']) {
+          if (!k[hk]) continue;
+          const hs = cam.toScreen(k[hk].x, k[hk].y);
+          ctx.strokeStyle = 'rgba(0,120,212,0.75)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.moveTo(ks.x, ks.y); ctx.lineTo(hs.x, hs.y); ctx.stroke();
+          ctx.beginPath(); ctx.arc(hs.x, hs.y, 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#0078d4'; ctx.fill();
+        }
+        ctx.fillStyle = i === 0 ? '#0078d4' : '#ffffff';
+        ctx.strokeStyle = '#0078d4';
+        ctx.lineWidth = 2;
+        if (i === 0 && d.knots.length >= 3 && d.hoverPt) {
+          const hs = cam.toScreen(d.hoverPt.x, d.hoverPt.y);
+          if (Math.hypot(hs.x - ks.x, hs.y - ks.y) < 16) {
+            ctx.beginPath(); ctx.arc(ks.x, ks.y, 10, 0, Math.PI * 2);
+            ctx.strokeStyle = '#107c10'; ctx.stroke();
+          }
+        }
+        ctx.fillRect(ks.x - 4.5, ks.y - 4.5, 9, 9);
+        ctx.strokeRect(ks.x - 4.5, ks.y - 4.5, 9, 9);
+      }
       ctx.restore();
     }
 
@@ -4176,6 +4364,7 @@ export class Interaction {
   drawRuler(ctx) {
     if (this.rulerIsTriangle) return this.drawTriangle(ctx);
     if (this.rulerIsProtractor) return this.drawProtractor(ctx);
+    if (this.rulerIsCompass) return this.drawCompass(ctx);
     const { c, len, thick, angle } = this.rulerRect();
     const op = rulerOpacity(this.app.settings);
     ctx.save();
@@ -4402,6 +4591,433 @@ export class Interaction {
     ctx.textBaseline = 'alphabetic';
     drawMenuButton(ctx, C.menu.u, C.menu.v, this.coarsePointer);
     ctx.restore();
+  }
+
+  /* ---------------- Compass Drafting Tool ---------------- */
+  get rulerIsCompass() { return this.ruler.kind === 'compass'; }
+
+  compGeom() {
+    const r = this.ruler;
+    const R = Number.isFinite(r.compR) && r.compR > 40 ? r.compR : 180;
+    const armDeg = Number.isFinite(r.compArm) ? ((Math.round(r.compArm) % 360) + 360) % 360 : 35;
+    return { R, armDeg, arm: (armDeg * Math.PI) / 180 };
+  }
+
+  compInside(u, v) {
+    const { R } = this.compGeom();
+    return Math.hypot(u, v) < R;
+  }
+
+  compEdgesAt(pt) {
+    const z = this.surface.cam.z, band = 26 / z, reach = 40 / z;
+    const { R, arm } = this.compGeom();
+    const { along: u, perp: v } = this.rulerOffsets(pt);
+    const rho = Math.hypot(u, v);
+    const found = [];
+    found.push({ edge: 'cc', d: Math.abs(rho - R) });
+    const c = Math.cos(arm), s = Math.sin(arm), t = u * c + v * s;
+    if (t > 0 && t <= R + reach) found.push({ edge: 'ca', d: Math.abs(-u * s + v * c) });
+    return { found, inside: rho < R && Math.abs(rho - R) > band * 0.5 };
+  }
+
+  /** Project point onto Compass rim ('cc') or radial spoke ('ca'), preserving p.t (TRAP 2). */
+  compProject(pt, edge) {
+    const r = this.ruler, { R, arm } = this.compGeom();
+    const { along: u, perp: v } = this.rulerOffsets(pt);
+    let pu = u, pv = v;
+    if (edge === 'cc') {
+      const rho = Math.hypot(u, v);
+      if (rho > 1e-9) { pu = (u / rho) * R; pv = (v / rho) * R; }
+      else { pu = R; pv = 0; }
+    } else if (edge === 'ca') {
+      const c = Math.cos(arm), s = Math.sin(arm), t = Math.max(0, Math.min(R, u * c + v * s));
+      pu = c * t; pv = s * t;
+    }
+    const cos = Math.cos(r.angle), sin = Math.sin(r.angle);
+    return {
+      x: r.x + cos * pu - sin * pv,
+      y: r.y + sin * pu + cos * pv,
+      p: pt.p,
+      t: pt.t != null ? pt.t : performance.now()
+    };
+  }
+
+  compControls() {
+    const z = this.surface.cam.z, { R, arm } = this.compGeom(), Rz = R * z;
+    return {
+      Rz,
+      armKnob: { u: Math.cos(arm) * Rz, v: Math.sin(arm) * Rz },
+      menu: { u: 0, v: Math.min(-26, -Rz + 20) },
+      grip: { u: 0, v: 0 }
+    };
+  }
+
+  compZone(sp) {
+    const { c, angle } = this.rulerRect();
+    const dx = sp.x - c.x, dy = sp.y - c.y;
+    const u = dx * Math.cos(angle) + dy * Math.sin(angle);
+    const v = -dx * Math.sin(angle) + dy * Math.cos(angle);
+    const C = this.compControls(), reach = this.coarsePointer ? 24 : 15;
+    if (Math.hypot(u - C.armKnob.u, v - C.armKnob.v) < reach) return 'arm';
+    if (Math.hypot(u - C.menu.u, v - C.menu.v) < reach) return 'menu';
+    if (Math.hypot(u, v) < 28) return 'move';
+    if (Math.hypot(u, v) <= C.Rz + 4) return 'body';
+    return null;
+  }
+
+  aimCompArm(wp, coarse) {
+    const { along: u, perp: v } = this.rulerOffsets(wp);
+    let rWorld = clamp(Math.hypot(u, v), 50, 900);
+    let deg = ((Math.atan2(v, u) * 180) / Math.PI + 360) % 360;
+    if (coarse) {
+      rWorld = Math.round(rWorld / 10) * 10;
+      deg = Math.round(deg / 15) * 15;
+    } else {
+      deg = Math.round(deg);
+    }
+    this.ruler.compR = rWorld;
+    this.ruler.compArm = deg % 360;
+  }
+
+  drawCompass(ctx) {
+    const { c, angle } = this.rulerRect();
+    const op = rulerOpacity(this.app.settings);
+    const { R, armDeg, arm } = this.compGeom();
+    const C = this.compControls(), Rz = C.Rz;
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(angle);
+    // Translucent circular template disc + crisp outer circumference guide
+    ctx.beginPath();
+    ctx.arc(0, 0, Rz, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(245,244,242,${Math.min(0.42, op * 0.45)})`;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0, 120, 212, 0.72)';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // Degree tick marks around outer circumference
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    for (let d = 0; d < 360; d += 15) {
+      const th = (d * Math.PI) / 180;
+      const major = d % 45 === 0;
+      const len = major ? 12 : 6;
+      ctx.lineWidth = major ? 1.3 : 0.9;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(th) * Rz, Math.sin(th) * Rz);
+      ctx.lineTo(Math.cos(th) * (Rz - len), Math.sin(th) * (Rz - len));
+      ctx.stroke();
+    }
+
+    // Radial measuring arm + angle & radius readout
+    ctx.strokeStyle = '#d13438';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(C.armKnob.u, C.armKnob.v);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.font = 'bold 11.5px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const readout = `r=${Math.round(R)} · ${armDeg}°`;
+    ctx.fillText(readout, 0, Math.min(34, Rz * 0.48));
+
+    // Center pivot pin / move handle
+    ctx.strokeStyle = '#0078d4';
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-6, 0); ctx.lineTo(6, 0);
+    ctx.moveTo(0, -6); ctx.lineTo(0, 6);
+    ctx.stroke();
+
+    // Radius / angle drag knob on rim
+    const kb = Interaction.ROTATE_KNOB, kr = this.coarsePointer ? kb.r + 3 : kb.r;
+    ctx.beginPath();
+    ctx.arc(C.armKnob.u, C.armKnob.v, kr + 1, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.strokeStyle = '#d13438'; ctx.lineWidth = 2.4; ctx.stroke();
+
+    drawMenuButton(ctx, C.menu.u, C.menu.v, this.coarsePointer);
+    ctx.restore();
+  }
+
+  /* ---------------- Snapping & Vertical Space Tool ---------------- */
+  snapStep() {
+    const sp = this.store?.doc?.background?.spacing;
+    return Number.isFinite(sp) && sp >= 8 ? sp : 40;
+  }
+
+  startVerticalSpace(wp) {
+    let origPages = null, pIdx = -1;
+    let objs = [];
+    if (this.pages?.length) {
+      pIdx = pageIndexAt(this.pages, wp.x, wp.y);
+      if (pIdx < 0) return;
+      const rects = pageRects(this.pages);
+      const sheet = rects[pIdx];
+      const hasLockedPdf = sheet && this.store.objects.some((o) =>
+        o && o.locked && (o.type === 'image' || o.type === 'pdf') &&
+        o.w >= sheet.w * 0.78 && o.h >= sheet.h * 0.78 &&
+        Math.abs(o.x - sheet.x) < sheet.w * 0.25 && Math.abs(o.y - sheet.y) < sheet.h * 0.25
+      );
+      if (hasLockedPdf) {
+        this.app.toast(t('Locked document pages cannot stretch vertically — use an infinite or notebook board.'), 'verticalSpace');
+        return;
+      }
+      origPages = this.pages.map((p) => ({ ...p }));
+      objs = this.store.objects.filter((o) => {
+        if (!o || o.locked) return false;
+        const b = boundsOf(o);
+        return pageIndexForBox(this.pages, b) === pIdx && b.y >= wp.y;
+      });
+    } else {
+      objs = this.store.objects.filter((o) => {
+        if (!o || o.locked) return false;
+        if (o.type === 'connector') {
+          return (o.a && o.a.y >= wp.y) || (o.b && o.b.y >= wp.y);
+        }
+        return boundsOf(o).y >= wp.y;
+      });
+    }
+    const snap = this.store.snapshot(objs.map((o) => o.id));
+    const origin = new Map(objs.map((o) => [o.id, structuredClone(o)]));
+    this.action = { type: 'verticalSpace', startY: wp.y, curY: wp.y, dy: 0, objs, snap, origin, origPages, pIdx };
+  }
+
+  updateVerticalSpace(a, wp, mods = {}) {
+    let dy = wp.y - a.startY;
+    if ((mods.shift || this.app.settings.snapToGrid) && !mods.alt) {
+      const st = this.snapStep();
+      dy = Math.round(dy / st) * st;
+    }
+    for (const o of a.objs) {
+      const orig = a.origin.get(o.id);
+      if (!orig) continue;
+      Object.assign(o, structuredClone(orig));
+      if (o.type === 'connector') {
+        if (o.a && orig.a && orig.a.y >= a.startY) o.a.y = orig.a.y + dy;
+        if (o.b && orig.b && orig.b.y >= a.startY) o.b.y = orig.b.y + dy;
+        o.y = Math.min(o.a?.y ?? o.y, o.b?.y ?? o.y);
+      } else {
+        translateObject(o, 0, dy);
+      }
+    }
+    if (a.origPages && a.pIdx >= 0 && this.store.doc.pages?.[a.pIdx]) {
+      this.store.doc.pages[a.pIdx].h = Math.max(240, Math.round(a.origPages[a.pIdx].h + dy));
+    }
+    a.curY = a.startY + dy;
+    a.dy = dy;
+    this.surface.touch?.();
+  }
+
+  finishVerticalSpace(a) {
+    if (!a) return;
+    if (!a.dy) {
+      this.store.restoreSnapshot(a.snap);
+      if (a.origPages && this.store.doc.pages) this.store.doc.pages = a.origPages;
+      return;
+    }
+    if (a.origPages && a.pIdx >= 0) {
+      const nextPages = this.store.doc.pages.map((p) => ({ ...p }));
+      const nextObjs = new Map(a.objs.map((o) => [o.id, structuredClone(o)]));
+      this.store.restoreSnapshot(a.snap);
+      this.store.doc.pages = a.origPages;
+      const ops = [this.store.pagesOp(nextPages)];
+      for (const [id, before] of a.snap.entries()) {
+        const after = nextObjs.get(id);
+        if (after) ops.push({ t: 'set', id, before: structuredClone(before), after });
+      }
+      this.store.commit('vertical space', ops);
+      return;
+    }
+    this.store.commitSnapshot('vertical space', a.snap);
+  }
+
+  /* ---------------- Editable Bezier Splines ---------------- */
+  selectedSpline() {
+    if (this.surface.selection.size !== 1) return null;
+    const o = this.store.get([...this.surface.selection][0]);
+    return o && o.type === 'spline' && !o.locked ? o : null;
+  }
+
+  canDoubleClickFinishSpline(pointerType = null) {
+    const mode = this.app?.settings?.splineFinishMode || 'auto';
+    if (mode === 'pill') return false;
+    if (mode === 'both') return true;
+    const pType = pointerType || this._lastSplinePointerType || (this.app.stylusKnown ? 'pen' : 'mouse');
+    return pType !== 'pen';
+  }
+
+  startSplinePress(e, sp, wp) {
+    this._lastSplinePointerType = e.pointerType || 'mouse';
+    if (!this.splineDraft) {
+      this.splineDraft = { knots: [{ x: wp.x, y: wp.y, smooth: true }], hoverPt: wp };
+      this.action = { type: 'splineDrag', idx: 0, downSp: sp, dragged: false };
+      this.syncSplineHud();
+      return;
+    }
+    const knots = this.splineDraft.knots;
+    if (knots.length >= 3) {
+      const firstSp = this.surface.cam.toScreen(knots[0].x, knots[0].y);
+      if (Math.hypot(sp.x - firstSp.x, sp.y - firstSp.y) <= (this.coarsePointer ? 22 : 14)) {
+        this.finishSplineDraft({ closed: true });
+        return;
+      }
+    }
+    if (e.detail >= 2 && this.canDoubleClickFinishSpline(e.pointerType)) {
+      this.finishSplineDraft({ closed: false });
+      return;
+    }
+    const idx = knots.length;
+    knots.push({ x: wp.x, y: wp.y, smooth: true });
+    this.splineDraft.hoverPt = wp;
+    this.action = { type: 'splineDrag', idx, downSp: sp, dragged: false };
+    this.syncSplineHud();
+  }
+
+  dragSplineKnot(a, sp, wp, mods = {}) {
+    const k = this.splineDraft?.knots?.[a.idx];
+    if (!k) return;
+    if (!a.dragged && Math.hypot(sp.x - a.downSp.x, sp.y - a.downSp.y) < 4) return;
+    a.dragged = true;
+    k.hOut = { x: wp.x, y: wp.y };
+    if (!mods.alt) {
+      k.hIn = { x: k.x * 2 - wp.x, y: k.y * 2 - wp.y };
+      k.smooth = true;
+    } else {
+      k.smooth = false;
+    }
+  }
+
+  finishSplineKnotPress(_e, _sp) {
+    this.syncSplineHud();
+    this.surface.invalidate();
+  }
+
+  dragSplineHandle(a, wp, mods = {}) {
+    const o = a.obj;
+    const k = o?.knots?.[a.idx];
+    if (!k) return;
+    const lp = toLocal(o, wp);
+    if (a.part === 'sk') {
+      const dx = lp.x - k.x, dy = lp.y - k.y;
+      k.x = lp.x; k.y = lp.y;
+      if (k.hIn) { k.hIn.x += dx; k.hIn.y += dy; }
+      if (k.hOut) { k.hOut.x += dx; k.hOut.y += dy; }
+    } else if (a.part === 'si') {
+      k.hIn = { x: lp.x, y: lp.y };
+      if (!mods.alt && k.smooth !== false) k.hOut = { x: k.x * 2 - lp.x, y: k.y * 2 - lp.y };
+    } else if (a.part === 'so') {
+      k.hOut = { x: lp.x, y: lp.y };
+      if (!mods.alt && k.smooth !== false) k.hIn = { x: k.x * 2 - lp.x, y: k.y * 2 - lp.y };
+    }
+    this.surface.touch?.();
+  }
+
+  finishSplineDraft({ closed = false } = {}) {
+    const d = this.splineDraft;
+    this.splineDraft = null;
+    this.action = null;
+    this.syncSplineHud();
+    if (!d || d.knots.length < 2) {
+      this.surface.invalidate();
+      return false;
+    }
+    const s = this.app.settings;
+    const obj = {
+      id: uid('sp'),
+      type: 'spline',
+      knots: d.knots.map(normalizeKnot),
+      closed: !!closed,
+      stroke: s.shapeStroke || s.penColor || '#201f1e',
+      fill: closed ? (s.shapeFill || 'none') : 'none',
+      lineWidth: s.shapeLineWidth || 3,
+      dash: s.shapeDash || null,
+      rotation: 0
+    };
+    this.store.add(this.placeOnPaper(obj), 'spline');
+    this.app.setSelection([obj.id]);
+    if (s.returnToSelect !== false) this.app.setTool('select');
+    this.surface.invalidate();
+    return true;
+  }
+
+  undoSplineKnot() {
+    if (!this.splineDraft?.knots?.length) return false;
+    this.splineDraft.knots.pop();
+    if (!this.splineDraft.knots.length) this.splineDraft = null;
+    this.syncSplineHud();
+    this.surface.invalidate();
+    return true;
+  }
+
+  cancelSplineDraft() {
+    this.splineDraft = null;
+    if (this.action?.type === 'splineDrag') this.action = null;
+    this.syncSplineHud();
+    this.surface.invalidate();
+  }
+
+  syncSplineHud() {
+    if (typeof document === 'undefined') return;
+    const show = this.tool === 'spline';
+    if (!show) {
+      if (this._splineHudEl) this._splineHudEl.hidden = true;
+      return;
+    }
+    const parent = this.canvas?.parentElement || document.getElementById('stage');
+    if (!parent) return;
+    if (!this._splineHudEl) {
+      const hud = document.createElement('div');
+      hud.className = 'spline-hud';
+      hud.innerHTML = `
+        <span class="spline-hud-info"></span>
+        <button type="button" class="btn spline-hud-mode"></button>
+        <button type="button" class="btn spline-hud-undo">${t('Undo Knot')}</button>
+        <button type="button" class="btn spline-hud-close">${t('Close Loop')}</button>
+        <button type="button" class="btn primary spline-hud-finish">${t('Finish')}</button>
+        <button type="button" class="btn spline-hud-cancel">${t('Cancel')}</button>
+      `;
+      hud.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+      hud.querySelector('.spline-hud-mode').addEventListener('click', () => {
+        const order = ['auto', 'both', 'pill'];
+        const cur = this.app.settings.splineFinishMode || 'auto';
+        this.app.settings.splineFinishMode = order[(order.indexOf(cur) + 1) % order.length];
+        this.app.saveSettings();
+        this.syncSplineHud();
+      });
+      hud.querySelector('.spline-hud-undo').addEventListener('click', () => this.undoSplineKnot());
+      hud.querySelector('.spline-hud-close').addEventListener('click', () => this.finishSplineDraft({ closed: true }));
+      hud.querySelector('.spline-hud-finish').addEventListener('click', () => this.finishSplineDraft({ closed: false }));
+      hud.querySelector('.spline-hud-cancel').addEventListener('click', () => {
+        this.cancelSplineDraft();
+        this.app.setTool('select');
+      });
+      parent.appendChild(hud);
+      this._splineHudEl = hud;
+    }
+
+    const hud = this._splineHudEl;
+    hud.hidden = false;
+    const count = this.splineDraft?.knots?.length || 0;
+    const isPen = (this._lastSplinePointerType || (this.app.stylusKnown ? 'pen' : 'mouse')) === 'pen';
+    const mode = this.app.settings.splineFinishMode || 'auto';
+    const modeLabel = mode === 'auto'
+      ? (isPen ? t('Mode: Auto (Tablet Pill)') : t('Mode: Auto (Dbl-Click + Pill)'))
+      : mode === 'both' ? t('Mode: Dbl-Click + Pill') : t('Mode: Pill Only');
+    hud.querySelector('.spline-hud-info').textContent = count
+      ? t('Spline: {n} knot(s)', { n: count })
+      : t('Spline: tap canvas to place knots, drag to curve');
+    hud.querySelector('.spline-hud-mode').textContent = modeLabel;
+    hud.querySelector('.spline-hud-undo').disabled = count < 1;
+    hud.querySelector('.spline-hud-close').disabled = count < 3;
+    hud.querySelector('.spline-hud-finish').disabled = count < 2;
   }
 }
 

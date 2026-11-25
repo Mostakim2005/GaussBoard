@@ -9,18 +9,19 @@
 ## 2. Mandatory Verification & Build Commands
 * **Active Features Smoke Test (24/24):** `node scripts/smoke.js` (or `node scripts/smoke.js --new-features`)
 * **Strict 100% i18n Parity Check (7 Locales):** `node scripts/i18n-check.js`
+* **Wishlist, PWA & Android Pure-Node Suites:** `node --test test/wishlist-features.test.mjs`, `node test/web-pwa.test.js`, `npm run build:web`
 * **Base Feature Regression Suite (Temporarily Optional):** `node scripts/smoke.js --base`
 * **Build / Package (Windows Portable):** `npm run dist:win`
 
 ## 3. Repository Directory Structure & Conventions
 * `src/` - Modular vanilla JavaScript source files (single-responsibility modules only).
-* `electron/` - Isolated CommonJS bridge companions (`global-resources.cjs`, `mermaid-bridge.cjs`, `cas-sympy.cjs`, `media-bridge.cjs`, `triarchy-bridge.cjs`) keeping `main.js` minimal-diff for `upstream/main` pulls.
+* `electron/` - Isolated CommonJS bridge companions (`global-resources.cjs`, `library-manager.cjs`, `mermaid-bridge.cjs`, `cas-sympy.cjs`, `media-bridge.cjs`, `triarchy-bridge.cjs`) keeping `main.js` minimal-diff for `upstream/main` pulls.
 * `docs/` - Core documentation suite (`PRODUCT.md`, `ARCHITECTURE.md`, `DECISIONS_AND_TRAPS.md`, and Pentagram roadmap `docs/modules/pentagram-audit-and-upgrades.md`).
 * `sync/` - Offline LAN handoff protocol (UDP 53319 discovery + TCP 53318 X25519 / AES-256-GCM transport).
 * `scripts/` - Automated verification suites, smoke tests, and i18n linter.
 * `test/` - Integration tests, test fixtures, and verification harnesses.
 
-## 4. Repository-Specific Engineering Traps (The 5 Non-Negotiable Invariants)
+## 4. Repository-Specific Engineering Traps (The 6 Non-Negotiable Invariants)
 * **TRAP 1: Scene Partitioning During Audio Replay:** Base canvas drawing passes MUST exclude active audio session strokes: `(o) => o.audioId !== activeTrackId`. Replay strokes render exclusively in the dynamic overlay pass (`Surface.drawReplaySession()`).
 * **TRAP 2: Stroke Point Timestamp Preservation (`p.t`):** Point generators, smoothing passes, and curve fitters in `tools.js` and `ink.js` must preserve `p.t`. Stripping `p.t` breaks audio synchronization.
 * **TRAP 3: Finite Audio Duration Safeguard:** For in-app recordings, never rely on `audio.duration` without checking `isFinite()`; retain elapsed wall-clock `track.durationMs`. For imported audio, use finite metadata when available and leave duration unknown when unavailable.

@@ -86,12 +86,14 @@ flowchart LR
     Surface --> Canvas[Canvas 2D Buffer]
 ```
 * **Code Anchors (Grep Targets):**
-  * `src/js/core/ink.js` -> `InkEngine`, `fitBezier`, `preserveTime`
-  * `src/js/core/render.js` -> `drawStroke`, `drawNeon`, `drawShape`, `drawCover`, `drawAudioCard`, `setPaintBand`, `drawImage`
-  * `src/js/core/surface.js` -> `drawScene`, `busy`, `warmFreeze`, `drawReplaySession`, `firstPointAfter`, `_drawWet`, `wetTail`
-  * `src/js/core/tools.js` -> `followGlow`, `ringEl`, `placeRing`, `hideRing`, `predictTail`, `eraseSweep`
+  * `src/js/core/ink.js` -> `inkPath`, `inkRuns`, `calligraphyPath`
+  * `src/js/core/splines.js` -> `drawSpline`, `splineBounds`, `hitSpline`, `splineSvg`
+  * `src/js/core/sketchy.js` -> `drawSketchyShapeCanvas`, `shapeRoughSvg`, `ensureRoughLoaded`
+  * `src/js/core/render.js` -> `drawStroke`, `drawNeon`, `inkStyle`, `boardPaint`, `drawShape`, `drawCover`, `drawAudioCard`, `setPaintBand`, `drawImage`
+  * `src/js/core/surface.js` -> `drawScene`, `busy`, `warmFreeze`, `drawReplaySession`, `firstPointAfter`, `_drawWet`, `wetTail`, `setTransparentExport`
+  * `src/js/core/tools.js` -> `followGlow`, `ringEl`, `placeRing`, `hideRing`, `predictTail`, `eraseSweep`, `compProject`, `startVerticalSpace`, `startSplinePress`
   * `src/js/core/recognize.js` -> `classifyInk`, `snapToShape`
-  * `src/js/core/transform.js` -> `moveObject`, `scaleHandles`, `rotate`
+  * `src/js/core/transform.js` -> `moveObject`, `scaleHandles`, `rotate`, `translateObject`
 
 ### [SUBSYSTEM: Importers-Conversion] | Aliases: PDF.js, LibreOffice, mammoth, OOXML, pdf-lib, conversion hidden window
 > **1-Line Summary:** Desktop conversion uses LibreOffice when installed and a hidden-window built-in fallback, while the browser renders PDFs offline with vendored PDF.js.
@@ -139,27 +141,38 @@ flowchart TB
   * `sync/firewall.js` -> `checkFirewall`, `repairWindowsRules`
   * `sync/desktop.js` -> `transferState`, `progress`
 
-### [SUBSYSTEM: Five-Domain-Engines] | Aliases: circuit sim, grapher, 3Dmol, FSRS, WASM, vendor offline
-> **1-Line Summary:** Pure-JS-first STEM engines (plus optional desktop/SharedLibraries WASM such as `ngspice-wasm`) and vendored offline libraries resolved via `libraries.json`.
-* **How It Works (Plain English):** Circuit MNA solves nodal equations with up to 12 propagation passes, driver nodes mutate in place, and DOL latch uses one contactor delay. Grapher guards domain/asymptote/zoom. FSRS schedules reviews. 3Dmol, function-plot, math.js, nerdamer, tesseract, pdfjs, mermaid, chart.js all load from src/vendor with no CDN.
+### [SUBSYSTEM: Five-Domain-Engines] | Aliases: circuit sim, grapher, 3Dmol, FSRS, WASM, vendor offline, SharedLibraries, lib-loader
+> **1-Line Summary:** Pure-JS-first STEM engines plus optional `SharedLibraries` / on-demand CacheStorage bundles (`Mermaid`, `Chart.js`, `pdf-lib`, `Rough.js`, `3Dmol`, `function-plot`, `Math.js`, `Nerdamer`, `Tesseract`) resolved via `libraries.json` and `electron/library-manager.cjs`.
+* **How It Works (Plain English):** Core zero-network dependencies (`KaTeX`, `PDF.js` core, `JSZip`, `Mammoth`, `mp4-muxer`) remain bundled directly inside `src/vendor/`. Heavy optional libraries (`Mermaid`, `Chart.js`, `pdf-lib`, `Rough.js`, `3Dmol`, `function-plot`, `math.js`, `nerdamer`, `tesseract`, `fontkit`) resolve dynamically from `%LOCALAPPDATA%\SharedLibraries` on desktop (`electron/library-manager.cjs` + `app://` protocol fallback) or browser `CacheStorage` (`gazboard-libs-v1`) on PWA. If any optional library is missing at startup or first use, `library-inspector.js` surfaces an interactive download modal rather than silently failing. Circuit MNA (`solveMNA`), Function Grapher, and FSRS run cleanly offline in pure JS.
 * **Data Flow Diagram:**
 ```mermaid
 flowchart LR
-    Lib[libraries.json manifest] --> Vendors[src/vendor bundled offline files]
-    Vendors --> Circuit[Circuit Sim Engine]
-    Vendors --> Grapher[Function Grapher]
-    Vendors --> Mol[3Dmol Viewer]
-    Vendors --> Math[Math Studio]
-    Vendors --> PDF[PDF Engine]
-    Vendors --> Diagrams[Mermaid + Chart.js]
+    classDef startNode fill:#1d4ed8,stroke:#1e3a8a,color:#ffffff
+    classDef cacheNode fill:#0f766e,stroke:#115e59,color:#ffffff
+    classDef dlNode fill:#b45309,stroke:#78350f,color:#ffffff
+
+    Manifest["libraries.json Manifest"]:::startNode --> CoreVendor["src/vendor/ Core (KaTeX, PDF.js, JSZip)"]:::cacheNode
+    Manifest --> Resolver{"Local Check<br/>SharedLibraries / CacheStorage"}:::startNode
+    Resolver -->|"Found"| Loader["lib-loader.js / app:// Fallback"]:::cacheNode
+    Resolver -->|"Missing"| Modal["Download Modal (HTTPS Allowlist)"]:::dlNode
+    Modal -->|"Atomic Write / Cache"| Loader
+    Loader --> Engines["Diagrams, pdf-lib, Rough.js, STEM"]:::cacheNode
+
+    subgraph Legend["Legend (Color Guide)"]
+        L1["Blue = Manifest & Discovery"]:::startNode
+        L2["Teal = Ready Local Engines"]:::cacheNode
+        L3["Amber = Optional User Download"]:::dlNode
+    end
 ```
 * **Code Anchors (Grep Targets):**
+  * `electron/library-manager.cjs` -> `loadMergedManifest`, `resolveSharedLibraryFile`, `checkLibraryAvailability`, `downloadLibraries`
+  * `src/js/core/lib-loader.js` -> `loadScriptLibrary`
+  * `src/js/ui/library-inspector.js` -> `checkLibrariesOnStartup`, `promptMissingLibraries`, `showLibraryInspector`
   * `src/js/core/circuit-sim.js` -> `solveMNA`, `stepSim`, `armatureLatch`
   * `src/js/core/formula-graph.js` -> `parseFormula`, `tangentAt`, `riemannSum`
   * `src/js/core/scientific-math.js` -> `CAS`, `matrixDet`, `naturalMathToLaTeX`
   * `src/js/core/fsrs.js` -> `scheduleReview`, `exportClozeDeck`
-  * `src/vendor/libraries.json` -> `manifestVersion`, `bundledPath`
-  * `src/js/ui/library-inspector.js` -> `LibraryInspector`, `listVersions`
+  * `src/vendor/libraries.json` -> `manifestVersion`, `sharedRelPath`
 
 ### [SUBSYSTEM: Gesture-Arbitration-And-Radial-HUD] | Aliases: gesture arbitration, HoldGestureManager, RadialShortcutRing, radial menu, dwell timer
 > **1-Line Summary:** Hardware-differentiated gesture arbitration engine with dual dwell timers, domain priority dispatching, and zero-dot radial shortcut ring.
@@ -254,13 +267,13 @@ See SUBSYSTEM sections above: Dual-Runtime-Platform, Document-Model-Op-Log, Inki
 > **1-Line Summary:** The active directive suite that must pass 24/24 before any change is called done.
 * **Automated UI / Logic Verification:** `node scripts/smoke.js --new-features`
 
-### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2424 keys, 7 locales, lint
-> **1-Line Summary:** Proves English keys match all 7 locales at 2,424/2,424 with zero missing strings.
+### [VERIFY: I18n-Parity-Check] | Aliases: i18n-check, translations, 2480 keys, 7 locales, lint
+> **1-Line Summary:** Proves English keys match all 7 locales at 2,480/2,480 with zero missing strings.
 * **Type & Lint Check:** `node scripts/i18n-check.js`
 
 ### [VERIFY: Full-Regression-Suite] | Aliases: smoke builtin, 1247 assertions, full suite, test:all
-> **1-Line Summary:** Optional full base regression with 1,247 assertions, a known dynamic-t() scan failure in technical-linter, and a DOM requirement for video-framing.
-* **Automated UI / Logic Verification:** `node scripts/smoke.js`
+> **1-Line Summary:** Optional full base regression plus pure-Node unit suites (`wishlist-features.test.mjs`, `web-pwa.test.js`, `android-*.test.js`).
+* **Automated UI / Logic Verification:** `node scripts/smoke.js`, `node --test test/wishlist-features.test.mjs`, `node test/web-pwa.test.js`
 * **Focused Checks:** `node scripts/smoke.js --builtin`, `node scripts/smoke-custom.js`, `node --test test/p1-hardening.test.mjs`, `node --test test/video-framing.test.mjs`, `node scripts/smoke.js --features-4.8.4.1`
 
 ### [VERIFY: Portable-Exe-Packaging] | Aliases: electron-builder, portable exe, dist win, NSIS, cloud build
@@ -270,15 +283,15 @@ See SUBSYSTEM sections above: Dual-Runtime-Platform, Document-Model-Op-Log, Inki
 
 ## 5. Recipes: How to Add New Things Safely
 * **To add a new canvas tool:**
-  1. Edit `src/js/core/tools.js` -> `toolStateMachine`
-  2. Register palette in `src/js/ui/toolbar.js` -> `ribbon`
-  3. Add render case in `src/js/core/render.js` -> `renderObject`
-  4. Verify with `node scripts/smoke.js --new-features` and `node scripts/i18n-check.js`
-* **To add a new STEM engine:**
-  1. Prefer pure JS / vendored WASM (or pair any optional desktop native/WASM addon with a clean PWA fallback per `Pure-JS-First-With-Optional-Desktop-Native-WASM`) and check `src/js/core/ink.js` -> `preserveTime` style purity
-  2. Vendor the library under `src/vendor/` and register it in `src/vendor/libraries.json` -> `bundledPath`
-  3. Wire the card in `src/js/ui/sidebar-ribbon.js` -> `InsertMenu` with 1-click ribbon pinning
-  4. Verify with `node scripts/smoke.js --new-features` and `node scripts/i18n-check.js`
+  1. Edit `src/js/core/tools.js` -> `Tools` state handlers (preserving `p.t` timestamps on stroke points per `TRAP 2`)
+  2. Register tool button/shortcut in `src/js/ui/toolbar.js` and `src/js/app.js`
+  3. Add render case in `src/js/core/render.js` (or modular helper in `src/js/core/`) and `src/js/export.js`
+  4. Verify with `node scripts/i18n-check.js` and `node test/web-pwa.test.js`
+* **To add a new STEM engine or optional library:**
+  1. Prefer pure JS / vendored WASM (or pair optional desktop native/WASM with a clean PWA fallback per `Pure-JS-First-With-Optional-Desktop-Native-WASM`) and verify ink timestamps (`p.t`) remain untouched
+  2. Offload heavy optional bundles into `%LOCALAPPDATA%\SharedLibraries` (`electron/library-manager.cjs`) with `sharedRelPath` + allowlisted `downloadUrl` in `src/vendor/libraries.json` (`loadScriptLibrary` handles both desktop and PWA `CacheStorage`)
+  3. Wire ribbon metadata / pins in `src/js/ui/toolbar.js` -> `getPinMetadata`
+  4. Verify with `node scripts/i18n-check.js`, `node --test test/wishlist-features.test.mjs`, and `node test/web-pwa.test.js`
 * **To add a new locale:**
   1. Create `src/locales/<code>.json` with the English sentence as key
   2. Register in `src/js/i18n.js` -> `LANGUAGES`

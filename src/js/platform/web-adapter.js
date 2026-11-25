@@ -67,6 +67,64 @@ export function createWebAdapter() {
     showItem: (_p) => {
       console.log('[platform] Data stored in persistent browser IndexedDB');
     },
+    loadLibrariesManifest: async () => {
+      const res = await fetch('./vendor/libraries.json');
+      if (!res.ok) return null;
+      const manifest = await res.json();
+      const cache = typeof caches !== 'undefined' ? await caches.open('gazboard-libs-v1') : null;
+      for (const lib of manifest.libraries || []) {
+        const bundledOk = !!(lib.bundledInApp);
+        let cachedOk = false;
+        if (!bundledOk && cache && lib.downloadUrl) {
+          cachedOk = !!(await cache.match(lib.downloadUrl));
+        }
+        lib.bundledExists = bundledOk;
+        lib.sharedExists = cachedOk;
+        lib.available = bundledOk || cachedOk;
+        lib.canDownload = typeof lib.downloadUrl === 'string' && lib.downloadUrl.startsWith('https://');
+        lib.status = lib.available ? 'ready' : 'missing';
+      }
+      manifest.rootPath = t('Browser Offline Cache');
+      return manifest;
+    },
+    checkLibraries: async () => {
+      const res = await fetch('./vendor/libraries.json');
+      if (!res.ok) return { ok: false, missingIds: [], missing: [], ready: [], libraries: [] };
+      const manifest = await res.json();
+      const cache = typeof caches !== 'undefined' ? await caches.open('gazboard-libs-v1') : null;
+      for (const lib of manifest.libraries || []) {
+        const bundledOk = !!(lib.bundledInApp);
+        const cachedOk = (!bundledOk && cache && lib.downloadUrl) ? !!(await cache.match(lib.downloadUrl)) : false;
+        lib.bundledExists = bundledOk;
+        lib.sharedExists = cachedOk;
+        lib.available = bundledOk || cachedOk;
+        lib.canDownload = typeof lib.downloadUrl === 'string' && lib.downloadUrl.startsWith('https://');
+        lib.status = lib.available ? 'ready' : 'missing';
+      }
+      const missing = (manifest.libraries || []).filter((l) => !l.available && l.canDownload);
+      const ready = (manifest.libraries || []).filter((l) => l.available);
+      return { ok: true, rootPath: t('Browser Offline Cache'), missingIds: missing.map((l) => l.id), missing, ready, libraries: manifest.libraries || [] };
+    },
+    downloadLibraries: async (ids = []) => {
+      const res = await fetch('./vendor/libraries.json');
+      if (!res.ok) return { ok: false, results: [] };
+      const manifest = await res.json();
+      const cache = typeof caches !== 'undefined' ? await caches.open('gazboard-libs-v1') : null;
+      const wanted = new Set(Array.isArray(ids) && ids.length ? ids : (manifest.libraries || []).filter((l) => !l.bundledInApp && l.downloadUrl).map((l) => l.id));
+      const results = [];
+      for (const lib of manifest.libraries || []) {
+        if (!wanted.has(lib.id) || !lib.downloadUrl) continue;
+        try {
+          const r = await fetch(lib.downloadUrl);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          if (cache) await cache.put(lib.downloadUrl, r.clone());
+          results.push({ id: lib.id, ok: true });
+        } catch (err) {
+          results.push({ id: lib.id, ok: false, error: err?.message || 'Download failed' });
+        }
+      }
+      return { ok: results.every((r) => r.ok), results };
+    },
     openReleases: (url) => {
       const fallback = 'https://github.com/Mostakim2005/GaussBoard/releases';
       const safe = typeof url === 'string' && /^https:\/\/github\.com\/Mostakim2005\/GaussBoard\/releases(\/|$)/i.test(url) ? url : fallback;

@@ -1,70 +1,67 @@
 // diagrams.js — Offline Mermaid & Chart.js engine for GazBoard Visualization Studio
-// Invariant: Pure portable JavaScript, offline-first, zero native node-gyp dependencies.
+// Invariant: Pure portable JavaScript, offline-first, SharedLibraries-first with on-demand download prompt.
+import { loadScriptLibrary } from './lib-loader.js';
 
 let mermaidPromise = null;
 let chartJsPromise = null;
 
 /**
- * Lazy loads Mermaid.js from the vendored bundle.
- * Configures offline rendering with sanitized loose security.
+ * Lazy loads Mermaid.js from SharedLibraries / vendor / browser cache.
+ * Configures offline rendering with sanitized strict security.
  */
-export function loadMermaid() {
+export function loadMermaid(app = null) {
   if (typeof window !== 'undefined' && window.mermaid) {
     return Promise.resolve(window.mermaid);
   }
   if (typeof document === 'undefined') return Promise.resolve(null);
 
   if (!mermaidPromise) {
-    mermaidPromise = new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = './vendor/mermaid.min.js';
-      s.onload = () => {
-        try {
-          if (window.mermaid) {
-            window.mermaid.initialize({
-              startOnLoad: false,
-              theme: 'default',
-              securityLevel: 'strict',
-              suppressErrorRendering: true,
-              fontFamily: 'Segoe UI, -apple-system, system-ui, sans-serif'
-            });
-          }
-          resolve(window.mermaid);
-        } catch (err) {
-          reject(err);
-        }
-      };
-      s.onerror = (e) => {
-        mermaidPromise = null;
-        reject(new Error('Mermaid.js failed to load from ./vendor/mermaid.min.js'));
-      };
-      document.head.appendChild(s);
+    mermaidPromise = loadScriptLibrary({
+      id: 'mermaid',
+      globalName: 'mermaid',
+      vendorPath: './vendor/mermaid.min.js',
+      sharedPath: './shared-lib/mermaid/mermaid.min.js',
+      downloadUrl: 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js',
+      app: app || (typeof window !== 'undefined' ? window.app : null)
+    }).then((m) => {
+      if (m) {
+        m.initialize({
+          startOnLoad: false,
+          theme: 'default',
+          securityLevel: 'strict',
+          suppressErrorRendering: true,
+          fontFamily: 'Segoe UI, -apple-system, system-ui, sans-serif'
+        });
+      }
+      return m;
+    }).catch((err) => {
+      mermaidPromise = null;
+      throw err;
     });
   }
   return mermaidPromise;
 }
 
 /**
- * Lazy loads Chart.js from the vendored bundle.
+ * Lazy loads Chart.js from SharedLibraries / vendor / browser cache.
  */
-export function loadChartJs() {
+export function loadChartJs(app = null) {
   if (typeof window !== 'undefined' && window.Chart) {
     return Promise.resolve(window.Chart);
   }
   if (typeof document === 'undefined') return Promise.resolve(null);
 
   if (!chartJsPromise) {
-    chartJsPromise = new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = './vendor/chart.umd.min.js';
-      s.onload = () => {
-        resolve(window.Chart);
-      };
-      s.onerror = (e) => {
-        chartJsPromise = null;
-        reject(new Error('Chart.js failed to load from ./vendor/chart.umd.min.js'));
-      };
-      document.head.appendChild(s);
+    chartJsPromise = loadScriptLibrary({
+      id: 'chartjs',
+      globalName: 'Chart',
+      vendorPath: './vendor/chart.umd.min.js',
+      sharedPath: './shared-lib/chartjs/chart.umd.min.js',
+      downloadUrl: 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js',
+      app: app || (typeof window !== 'undefined' ? window.app : null)
+    }).catch((err) => {
+      chartJsPromise = null;
+      throw err;
     });
   }
   return chartJsPromise;

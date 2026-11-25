@@ -9,13 +9,15 @@ import {
 } from './palettes.js';
 import { EMOJI_GROUPS, searchEmoji } from '../core/emoji.js';
 import { inkPaint, isDarkBoard, isDarkColor } from '../core/render.js';
+import { ensureRoughLoaded } from '../core/sketchy.js';
 import { rememberRecentPen } from './radial.js';
 import { t } from '../i18n.js';
 
 const TOOL_ICON = {
   select: 'select', lasso: 'lasso', pen: 'pen', highlighter: 'highlighter',
   brush: 'brush', fountain: 'fountain', calligraphy: 'calligraphy',
-  eraser: 'eraser', note: 'note', text: 'text', shape: 'shapes', emoji: 'emoji'
+  eraser: 'eraser', whiteout: 'whiteout', spline: 'spline', verticalSpace: 'verticalSpace',
+  note: 'note', text: 'text', shape: 'shapes', emoji: 'emoji'
 };
 const CMD_ICON = { undo: 'undo', redo: 'redo', insert: 'insert', ruler: 'ruler', more: 'more' };
 
@@ -267,7 +269,11 @@ export function getPinMetadata(app) {
     'esl.dictionary': { icon: 'doc', title: t('Academic Dictionary & Thesaurus'), onClick: () => app.openAcademicDictionary?.() },
     'study.session': { icon: 'curtain', title: t('Study Session & FSRS Review'), onClick: () => app.startStudySession?.() },
     'insert.kanban': { icon: 'table', title: t('Insert Kanban Board'), onClick: () => app.command('insert.kanban') },
-    'insert.dataview': { icon: 'table', title: t('Run Dataview Query Table'), onClick: () => app.command('insert.dataview') }
+    'insert.dataview': { icon: 'table', title: t('Run Dataview Query Table'), onClick: () => app.command('insert.dataview') },
+    'tools.whiteout': { icon: 'whiteout', title: t('Whiteout mask eraser (W)'), onClick: () => { app.setTool('whiteout'); app.syncUI(); } },
+    'tools.spline': { icon: 'spline', title: t('Editable Bezier Spline (Q)'), onClick: () => { app.setTool('spline'); app.syncUI(); } },
+    'tools.verticalSpace': { icon: 'verticalSpace', title: t('Vertical space tool (K)'), onClick: () => { app.setTool('verticalSpace'); app.syncUI(); } },
+    'tools.compass': { icon: 'compass', title: t('Compass drafting tool'), onClick: () => { app.ruler.kind = 'compass'; app.settings.rulerKind = 'compass'; if (!app.ruler.visible) app.command('ruler'); else { app.fitTriangle(); app.saveSettings(); app.surface.invalidate(); } } }
   };
 }
 
@@ -1691,28 +1697,44 @@ export function openToolPopover(app, anchor, tool) {
     };
 
     const mkMode = (id, label, hint) => {
-      const b = h('button', { class: 'menu-item' + (s.eraserMode === id ? ' active-mode' : '') },
+      const active = id === 'whiteout' ? app.tool === 'whiteout' : (app.tool !== 'whiteout' && s.eraserMode === id);
+      const b = h('button', { class: 'menu-item' + (active ? ' active-mode' : '') },
         h('span', { style: 'display:flex;flex-direction:column;gap:2px;text-align:left' },
           h('span', {}, label),
           h('small', { style: 'color:var(--text-2);font-size:11.5px' }, hint)),
-        s.eraserMode === id ? h('span', { class: 'k', html: '&#10003;' }) : null);
+        active ? h('span', { class: 'k', html: '&#10003;' }) : null);
       b.style.alignItems = 'flex-start';
       b.addEventListener('click', () => {
         if (id === 'all') { app.command('edit.clear'); closePopover(); return; }
+        if (id === 'whiteout') {
+          app.setTool('whiteout');
+          app.saveSettings();
+          updateModeUI('whiteout');
+          app.syncUI();
+          closePopover();
+          return;
+        }
         s.eraserMode = id;
+        if (app.tool === 'whiteout') app.setTool('eraser');
         app.saveSettings();
         updateModeUI(id);
+        app.syncUI();
       }, { once: false });
       modeButtons.set(id, b);
       return b;
     };
     body = h('div', { style: 'min-width:270px' },
       h('h4', {}, t('Eraser size')),
-      sizeRow([10, 16, 30, 60], s.eraserSize, (v) => { s.eraserSize = v; app.saveSettings(); app.syncUI(); }),
+      sizeRow([10, 16, 30, 60], app.tool === 'whiteout' ? (s.whiteoutWidth || 28) : s.eraserSize, (v) => {
+        if (app.tool === 'whiteout') s.whiteoutWidth = v;
+        else s.eraserSize = v;
+        app.saveSettings(); app.syncUI();
+      }),
       h('h4', { style: 'margin-top:14px' }, t('Mode')),
       h('div', { class: 'menu', style: 'padding:0' },
         mkMode('partial', t('Erase parts of ink'), t('Rubs strokes out where you drag')),
         mkMode('object', t('Erase whole strokes'), t('Removes a whole stroke in one touch')),
+        mkMode('whiteout', t('Whiteout mask'), t('Covers ink or PDF markings cleanly in paper color (W)')),
         mkMode('all', t('Erase everything'), t('Clears the canvas')),
         (() => {
           const b = h('button', { class: 'menu-item', 'data-erase-pencil': '' },
@@ -1813,13 +1835,30 @@ export function openToolPopover(app, anchor, tool) {
       b.addEventListener('click', () => { markActive(fills, b); s.shapeFill = c; app.saveSettings(); app.applyToSelection({ fill: c }, 'shape'); });
       fills.appendChild(b);
     }
+    const roughToggle = toggle(t('Sketchy lines (Rough.js)'), s.shapeRough === true, (v) => {
+      s.shapeRough = v;
+      if (v) ensureRoughLoaded(app, true);
+      app.saveSettings();
+      app.applyToSelection({ rough: v, roughSeed: Math.floor(Math.random() * 1e9) + 1, roughness: s.shapeRoughness ?? 1.4 }, 'shape');
+      app.surface?.invalidate();
+    });
+    const splineBtn = h('button', {
+      class: 'btn' + (app.tool === 'spline' ? ' primary' : ''),
+      style: 'width:100%;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;'
+    }, h('span', { html: icon('spline', 15) }), h('span', {}, t('Draw Editable Bezier Spline (Q)')));
+    splineBtn.addEventListener('click', () => {
+      app.setTool('spline');
+      app.syncUI();
+      closePopover();
+    });
     body = h('div', {},
-      h('h4', {}, t('Shape')), grid,
+      h('h4', {}, t('Shape')), grid, splineBtn,
+      h('div', { class: 'row', style: 'margin-top:10px' }, roughToggle),
       h('h4', { style: 'margin-top:12px' }, t('Outline')),
-      swatchRow(SHAPE_STROKES, s.shapeStroke, (c) => { s.shapeStroke = c; app.saveSettings(); app.applyToSelection({ stroke: c }, 'shape'); }),
+      swatchRow(SHAPE_STROKES, s.shapeStroke, (c) => { s.shapeStroke = c; app.saveSettings(); app.applyToSelection({ stroke: c }, 'shape'); app.applyToSelection({ stroke: c }, 'spline'); }),
       h('h4', { style: 'margin-top:12px' }, t('Fill')), fills,
       h('h4', { style: 'margin-top:12px' }, t('Line width')),
-      sizeRow([1, 2, 3, 5, 8], s.shapeLineWidth, (v) => { s.shapeLineWidth = v; app.saveSettings(); app.applyToSelection({ lineWidth: v }, 'shape'); }, s.shapeStroke)
+      sizeRow([1, 2, 3, 5, 8], s.shapeLineWidth, (v) => { s.shapeLineWidth = v; app.saveSettings(); app.applyToSelection({ lineWidth: v }, 'shape'); app.applyToSelection({ lineWidth: v }, 'spline'); }, s.shapeStroke)
     );
   } else if (tool === 'laser') {
     const curDur = Number(s.laserTrailDuration ?? 500);
@@ -2095,6 +2134,10 @@ export function openInsertPopover(app, anchor) {
     insertItem(t('Study Session & FSRS Review…'), 'curtain', () => app.startStudySession?.(), 'study.session', 'Ctrl+Shift+R'),
     insertItem(t('Insert Kanban Board'), 'table', () => app.command('insert.kanban'), 'insert.kanban'),
     insertItem(t('Run Dataview Query Table'), 'table', () => app.command('insert.dataview'), 'insert.dataview'),
+    insertItem(t('Vertical Space Tool'), 'verticalSpace', () => { app.setTool('verticalSpace'); app.syncUI(); }, 'tools.verticalSpace', 'K'),
+    insertItem(t('Editable Bezier Spline'), 'spline', () => { app.setTool('spline'); app.syncUI(); }, 'tools.spline', 'Q'),
+    insertItem(t('Whiteout Mask Eraser'), 'whiteout', () => { app.setTool('whiteout'); app.syncUI(); }, 'tools.whiteout', 'W'),
+    insertItem(t('Compass Drafting Tool'), 'compass', () => { app.ruler.kind = 'compass'; app.settings.rulerKind = 'compass'; if (!app.ruler.visible) app.command('ruler'); else { app.fitTriangle(); app.saveSettings(); app.surface.invalidate(); } }, 'tools.compass'),
     h('div', { class: 'menu-sep' }),
     menuItem(t('Paste from clipboard'), 'copy', () => app.command('edit.paste'), { key: 'Ctrl+V' }),
     h('div', { class: 'menu-sep' }),
@@ -2134,6 +2177,9 @@ export function openMorePopover(app, anchor) {
     menuItem(t('Templates…'), 'template', () => app.panels.templates()),
     menuItem(t('Canvas…'), 'palette', () => app.panels.background()),
     menuItem(app.ruler.visible ? t('Hide ruler') : t('Show ruler'), 'ruler', () => app.command('ruler'), { key: 'Ctrl+R' }),
+    menuItem(t('Vertical Space Bar'), 'verticalSpace', () => { app.setTool('verticalSpace'); app.syncUI(); }, { key: 'K' }),
+    menuItem(t('Editable Bezier Spline'), 'spline', () => { app.setTool('spline'); app.syncUI(); }, { key: 'Q' }),
+    menuItem(t('Whiteout Mask Eraser'), 'whiteout', () => { app.setTool('whiteout'); app.syncUI(); }, { key: 'W' }),
     h('div', { class: 'menu-sep' }),
     ...teachingItems(app),
     h('div', { class: 'menu-sep' }),
@@ -2262,7 +2308,7 @@ export function syncToolbar(app) {
     if (tapeBtn.dataset.paint !== tColor) { tapeBtn.innerHTML = want; tapeBtn.dataset.paint = tColor; }
   }
   const er = bar.querySelector('.pen[data-tool="eraser"]');
-  if (er) er.classList.toggle('active', app.tool === 'eraser');
+  if (er) er.classList.toggle('active', app.tool === 'eraser' || app.tool === 'whiteout');
 
   /*
    * The finger button says which way round things are RIGHT NOW, and appears

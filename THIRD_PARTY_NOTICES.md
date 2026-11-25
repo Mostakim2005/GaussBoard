@@ -22,27 +22,37 @@ split into what actually ships inside the installed app and what is only used on
 
 ---
 
-## Ships inside the app
+## Ships inside the core app (`src/vendor/`)
 
-Runtime JavaScript and WASM bundled in `src/vendor/` and loaded by the renderer.
+Core runtime JavaScript and WASM bundled directly in `src/vendor/` so GaussBoard launches offline with zero network connection.
 
 | Library | Version | Licence | Upstream licence text | What it does |
 | :--- | :--- | :--- | :--- | :--- |
 | KaTeX | 0.16.21 | MIT | <https://github.com/KaTeX/KaTeX/blob/main/LICENSE> | Math typesetting for formulas and equations. |
-| PDF.js | 4.10.38 | Apache-2.0 | <https://github.com/mozilla/pdf.js/blob/master/LICENSE> | PDF parsing, page rendering, text layer and annotation layer. |
-| pdf-lib | 1.17.1 | MIT | <https://github.com/Hopding/pdf-lib/blob/master/LICENSE.md> | Editing existing PDFs, page margins, metadata and annotations. |
-| @pdf-lib/fontkit | 1.1.1 | Apache-2.0 | <https://github.com/Hopding/fontkit/blob/master/LICENSE.txt> | Custom font embedding for non-Latin and equation text in PDFs. |
-| Tesseract.js | 5.1.1 | Apache-2.0 | <https://github.com/naptha/tesseract.js/blob/master/LICENSE> | Offline OCR engine (WASM) for scanned pages. **Bundled but not currently wired into the UI — see note below.** |
-| JSZip | 3.10.1 | MIT *or* GPLv3 | <https://github.com/Stuk/jszip/blob/main/LICENSE.markdown> | ZIP containers for `.gazboard` single-file boards. See dual-licence note. |
+| PDF.js (Core + Worker) | 4.10.38 | Apache-2.0 | <https://github.com/mozilla/pdf.js/blob/master/LICENSE> | Core PDF parsing and page canvas rendering (`pdf.min.mjs`). |
+| JSZip | 3.10.1 | MIT *or* GPLv3 | <https://github.com/Stuk/jszip/blob/main/LICENSE.markdown> | ZIP containers for `.gaussboard` / `.gazboard` single-file boards. See dual-licence note. |
 | Mammoth.js | 1.8.0 | BSD-2-Clause | <https://github.com/mwilliamson/mammoth.js/blob/master/LICENSE> | Converts imported `.docx` documents to HTML. |
+| mp4-muxer | 5.2.2 | MIT | <https://github.com/Vanilagy/mp4-muxer/blob/main/LICENSE> | Pure-JavaScript MP4 container writing for video export. |
+| electron-updater | 6.8.10 | MIT | <https://github.com/electron-userland/electron-builder/blob/master/LICENSE> | In-app update checks and downloads (Desktop). |
+
+---
+
+## Optional libraries via `%LOCALAPPDATA%\SharedLibraries` / On-Demand Cache
+
+To keep the core bundle and PWA precache lean without duplicating engines across apps, these optional libraries resolve automatically from `%LOCALAPPDATA%\SharedLibraries` on Windows desktop (or download once on user confirmation into `SharedLibraries` / browser `CacheStorage` via HTTPS allowlist).
+
+| Library | Version | Licence | Upstream licence text | What it does |
+| :--- | :--- | :--- | :--- | :--- |
 | Mermaid | 10.9.1 | MIT | <https://github.com/mermaid-js/mermaid/blob/develop/LICENSE> | Flowcharts, sequence and state diagrams, mind maps. |
 | Chart.js | 4.4.7 | MIT | <https://github.com/chartjs/Chart.js/blob/master/LICENSE.md> | Canvas charts (radar, bar, line, doughnut, scatter). |
+| pdf-lib | 1.17.1 | MIT | <https://github.com/Hopding/pdf-lib/blob/master/LICENSE.md> | Editing and compressing existing PDFs (`compression.js`). |
+| @pdf-lib/fontkit | 1.1.1 | Apache-2.0 | <https://github.com/Hopding/fontkit/blob/master/LICENSE.txt> | Custom font embedding in PDFs. |
+| Rough.js | 4.6.6 | MIT | <https://github.com/rough-stuff/rough/blob/master/LICENSE> | Deterministic sketchy hand-drawn shape generator (with pure-JS fallback when absent). |
 | 3Dmol.js | 2.0.4 | BSD-2-Clause | <https://github.com/3dmol/3Dmol.js/blob/master/LICENSE> | WebGL 3D molecular viewer for PDB and SDF files. |
 | Nerdamer | 1.1.13 | MIT | <https://github.com/jiggzson/nerdamer/blob/master/LICENSE> | Symbolic algebra: differentiation, factoring, solving, matrices. |
 | function-plot | 1.24.0 | MIT | <https://github.com/mauriciopoppe/function-plot/blob/master/LICENSE> | 2D function graphing with derivatives and integrals. |
 | Math.js | 12.4.1 | Apache-2.0 | <https://github.com/josdejong/mathjs/blob/develop/LICENSE> | Arbitrary-precision arithmetic, complex numbers, matrices, units. |
-| mp4-muxer | 5.2.2 | MIT | <https://github.com/Vanilagy/mp4-muxer/blob/main/LICENSE> | Pure-JavaScript MP4 container writing for video export. |
-| electron-updater | 6.8.10 | MIT | <https://github.com/electron-userland/electron-builder/blob/master/LICENSE> | In-app update checks and downloads. |
+| Tesseract.js | 5.1.1 | Apache-2.0 | <https://github.com/naptha/tesseract.js/blob/master/LICENSE> | Optional offline OCR WASM engine (offloaded to SharedLibraries). |
 
 ### Fonts
 
@@ -77,11 +87,7 @@ not tracked in this repository.
 **JSZip is dual-licensed MIT or GPLv3.** GaussBoard is distributed under MIT, so it is used here
 under the MIT option. Anyone redistributing this code under GPLv3 terms should re-check that choice.
 
-**Tesseract.js is bundled but currently unreachable.** `src/vendor/tesseract/` (about 9.9 MB) ships
-inside the app, but no source file in `src/` references it, so the offline OCR feature is not
-reachable from the interface today. It is listed here because it does ship in the binaries. Either
-wire it into a UI path or remove the vendor folder before the next public release; until then the
-documentation should not claim OCR works.
+**Tesseract.js is offloaded to SharedLibraries.** The heavy WASM/traineddata payloads (`~9.9 MB`) were moved out of `src/vendor/` into `%LOCALAPPDATA%\SharedLibraries` (`tesseract`), keeping the core app bundle lean while still surfacing status and download options in Library Inspector (`src/js/ui/library-inspector.js`).
 
 **Upstream heritage.** GaussBoard is not affiliated with Microsoft, StarNote, Flexcil, LiquidText or
 OneNote. Those names appear only to describe design inspiration.

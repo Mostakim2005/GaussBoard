@@ -5,6 +5,7 @@ import { boundsOf, worldBounds, WINDOW_HEADER_H, strokeDrawWidth } from './store
 import { distToSegment, pointInBox, pointInPolygon, rotatePoint, boxesIntersect, boxContains } from './util.js';
 import { shapePath, noteTypeRange } from './render.js';
 import { hitConnector } from './connectors.js';
+import { hitSpline } from './splines.js';
 import { TASK_LINE_RE, toggleTaskAtLine } from './markdown.js';
 
 let scratch = null;
@@ -33,6 +34,11 @@ export function hitObject(o, p, tol = 6) {
   if (o.type === 'connector') {
     if (!pointInBox(p, { x: b.x - tol, y: b.y - tol, w: b.w + tol * 2, h: b.h + tol * 2 })) return false;
     return hitConnector(o, p, tol);
+  }
+
+  if (o.type === 'spline') {
+    if (!pointInBox(lp, { x: b.x - tol, y: b.y - tol, w: b.w + tol * 2, h: b.h + tol * 2 })) return false;
+    return hitSpline(o, lp, tol);
   }
 
   if (o.type === 'stroke' || (o.type === 'curtain' && Array.isArray(o.points))) {

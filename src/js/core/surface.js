@@ -1,13 +1,15 @@
 // The canvas view: sizing, the draw loop, culling, overlays.
 
 import { Camera } from './camera.js';
-import { drawBackground, drawRuling, drawObject, drawSelection, drawMemberOutline, drawLockBadge, drawGroupHint, drawLockedOutline, FONT, setDarkBoard, isDarkBoard, setPageColor, faceOf, inkPaint, setPaintBand } from './render.js';
+import { drawBackground, drawRuling, drawObject, drawSelection, drawMemberOutline, drawLockBadge, drawGroupHint, drawLockedOutline, FONT, setDarkBoard, isDarkBoard, setPageColor, setTransparentExport, faceOf, inkPaint, setPaintBand } from './render.js';
 import { worldBounds, boundsOf } from './store.js';
 import { pageRects, pageMarginRects, pageIndexForBox, pageIndexForBoxIn, stripBounds } from './pages.js';
 import { boxesIntersect, boxContains } from './util.js';
 import { replayDisplayMode, replayInkEnabled, replaySceneFilter, replayStrokesForTrack } from './replay-clock.js';
 import { currentLanguage } from '../i18n.js';
 import { route as connectorRoute, midPoint } from './connectors.js';
+import { splineHandleScreenMap, splineBounds } from './splines.js';
+import { rotatePoint } from './util.js';
 
 export class Surface {
   /**
@@ -1263,6 +1265,9 @@ export class Surface {
       if (this.selection.size > 1) for (const id of this.selection) { const o = this.store.get(id); if (o) drawMemberOutline(ctx, cam, o); }
       const box = this.selectionScreenBox();
       if (box) drawSelection(ctx, box, locked ? { handles: false, dashed: true } : { rotate: true });
+      if (lone && lone.type === 'spline' && !lone.locked) {
+        this.drawSplineChrome(ctx, lone);
+      }
     }
 
     this.drawFades(ctx);
@@ -1443,6 +1448,49 @@ export class Surface {
         ctx.fillStyle = '#ffffff';
         ctx.fill(); ctx.stroke();
       }
+    }
+    ctx.restore();
+  }
+
+  /** Draw editable Bezier anchor knots and tangent handles for a selected spline. */
+  drawSplineChrome(ctx, o) {
+    const cam = this.cam;
+    const handles = splineHandleScreenMap(o, cam);
+    const knots = o.knots || [];
+    const b = splineBounds(o);
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    const toScreenPt = (pt) => {
+      const w = o.rotation ? rotatePoint(pt.x, pt.y, cx, cy, o.rotation) : pt;
+      return cam.toScreen(w.x, w.y);
+    };
+    ctx.save();
+    for (let i = 0; i < knots.length; i++) {
+      const k = knots[i];
+      const ks = toScreenPt(k);
+      ctx.strokeStyle = 'rgba(0, 120, 212, 0.72)';
+      ctx.lineWidth = 1.25;
+      for (const hKey of ['hIn', 'hOut']) {
+        if (!k[hKey]) continue;
+        const hs = toScreenPt(k[hKey]);
+        ctx.beginPath();
+        ctx.moveTo(ks.x, ks.y);
+        ctx.lineTo(hs.x, hs.y);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(hs.x, hs.y, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#0078d4';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(0, 120, 212, 0.72)';
+        ctx.lineWidth = 1.25;
+      }
+      ctx.fillStyle = i === 0 ? '#0078d4' : '#ffffff';
+      ctx.strokeStyle = '#0078d4';
+      ctx.lineWidth = 1.8;
+      ctx.fillRect(ks.x - 4.5, ks.y - 4.5, 9, 9);
+      ctx.strokeRect(ks.x - 4.5, ks.y - 4.5, 9, 9);
     }
     ctx.restore();
   }
@@ -1664,8 +1712,10 @@ export class Surface {
   renderTo(box, scale = 2, background = true, ruling = background) {
     const wasDark = isDarkBoard();
     setDarkBoard(false);
+    setPageColor(this.store?.doc?.background?.color);
+    setTransparentExport(!background);
     try { return this._renderTo(box, scale, background, ruling); }
-    finally { setDarkBoard(wasDark); }
+    finally { setTransparentExport(false); setDarkBoard(wasDark); }
   }
 
   _renderTo(box, scale = 2, background = true, ruling = background) {

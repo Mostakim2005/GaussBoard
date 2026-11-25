@@ -9,13 +9,14 @@
 * **Primary Origin Repository:** `https://github.com/Mostakim2005/GaussBoard.git`
 * **Upstream Tracking Remote:** `https://github.com/fahim9778/GazBoard.git` (v5.1.4)
 * **Master Branch Status:** Branch `main` (`1ffd549`) is **strictly preserved, isolated, and untouched** per Bravo 1 guidelines. No direct merges, no git release tags (`vX.Y.Z`), and no version bumps have been applied.
-* **Non-Negotiable Invariants (`AGENTS.md`):** All 6 invariants remain 100% intact:
+* **Non-Negotiable Invariants (`AGENTS.md`):** Active invariants remain intact (2,480/2,480 i18n keys on current `main` across 7 locales):
   1. *TRAP 1 (Replay Scene Partitioning):* Audio replay strokes isolated to dynamic overlay pass (`Surface.drawReplaySession()`).
   2. *TRAP 2 (Point Timestamp Preservation):* All point generators preserve `p.t` for timestamped stroke replay.
   3. *TRAP 3 (Finite Audio Duration):* Elapsed wall-clock `track.durationMs` retained; finite duration guards applied.
-  4. *TRAP 4 (Strict 100% i18n Parity):* 2,389/2,389 keys translated across all 7 locales (`ar`, `bn`, `de`, `es`, `pt-BR`, `zh-Hans`, `zh-Hant`).
-  5. *TRAP 5 (Zero Native C++ Addons):* 100% pure portable JavaScript runtime.
+  4. *TRAP 4 (Strict 100% i18n Parity):* Historical snapshot was 2,389/2,389 (now 2,480/2,480) across all 7 locales (`ar`, `bn`, `de`, `es`, `pt-BR`, `zh-Hans`, `zh-Hant`).
+  5. *TRAP 5 (Superseded — see commit `2039302`):* Original zero-native-addon ban was superseded by `[DECISION: Pure-JS-First-With-Optional-Desktop-Native-WASM]`.
   6. *TRAP 6 (Study Tape & Answer Cover Invariant):* Concealed/revealed toggle on tap preserved with zero secret-leakage during replay.
+  7. *TRAP 7 (Registry Schema & Windows 32K Argv Limit):* Always resolve Obsidian vault via `reg.data.apps.obsidian.vaultPath` and avoid large CLI argv payloads.
 
 ```mermaid
 flowchart TD

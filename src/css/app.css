@@ -2250,6 +2250,72 @@ body.presenting .gb-tab-bar { display: none !important; }
   background: #fff3e0;
   color: #e65100;
 }
+.status-missing {
+  background: #fde7e9;
+  color: #a4262c;
+}
+.loc-missing {
+  background: rgba(164, 38, 44, 0.12);
+  color: #a4262c;
+}
+.lib-missing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: rgba(0, 120, 212, 0.10);
+  border: 1px solid rgba(0, 120, 212, 0.28);
+}
+.lib-missing-sub {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.lib-progress-wrap {
+  margin-bottom: 12px;
+}
+.lib-progress-label {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-bottom: 5px;
+}
+.lib-progress-track {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--stroke);
+  overflow: hidden;
+}
+.lib-progress-fill {
+  height: 100%;
+  width: 20%;
+  background: var(--accent, #0078d4);
+  transition: width 180ms ease;
+}
+.lib-size-pill {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  margin-left: 4px;
+}
+.lib-row-highlight {
+  background: rgba(0, 120, 212, 0.08);
+}
+.lib-action-muted {
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.lib-suppress-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 14px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
 
 .lib-footer {
   display: flex;
@@ -6011,6 +6077,38 @@ body.presenting #pagestrip { display: none; }
 :root[data-theme="dark"] .panel mark.set-mark { background: rgba(255, 217, 74, .88); color: #1b1a19; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .panel mark.set-mark { background: rgba(255, 217, 74, .88); color: #1b1a19; }
+}
+
+/* Editable Bezier Spline floating HUD pill (stylus / Huion H950P & mouse friendly) */
+.spline-hud {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  z-index: 44;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  box-shadow: var(--shadow-3);
+  font-size: 12px;
+}
+.spline-hud[hidden] { display: none !important; }
+.spline-hud-info {
+  font-weight: 600;
+  color: var(--text-2);
+  padding: 0 6px;
+}
+.spline-hud .btn {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 999px;
 }
 
 /* ===================================================================

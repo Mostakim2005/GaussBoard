@@ -134,15 +134,15 @@
   * `src/js/ui/compression-dialog.js` -> `CompressionDialog`, `qualitySlider`
 
 ### [FEATURE: I18n-Offline] | Aliases: translations, 7 locales, offline, vendored, no CDN, service worker
-> **1-Line Summary:** 100% i18n parity across 7 locales (2,424 keys) with every runtime library vendored locally and zero external CDN leaks.
-* **User Intention (Non-Negotiable):** Non-English users must see every UI string translated and work fully offline on desktop and PWA, with board text measured consistently everywhere.
+> **1-Line Summary:** 100% i18n parity across 7 locales (2,480 keys) with core engines bundled locally, heavy optional libraries resolved from SharedLibraries or downloaded on demand, and zero unexpected CDN calls.
+* **User Intention (Non-Negotiable):** Non-English users must see every UI string translated and work offline on desktop and PWA, with board text measured consistently everywhere.
 * **Visual / UI Behavior:** English sentence is the key via t(); missing translations fall back to English; board fonts bundled via @font-face rather than borrowed from the OS.
 * **Code Anchors (Grep Targets):**
   * `src/js/i18n.js` -> `t`, `loadDictionary`, `LANGUAGES`
   * `src/locales/*.json` -> `keys`, `translations`
-  * `src/vendor/libraries.json` -> `manifestVersion`, `bundledPath`
+  * `src/vendor/libraries.json` -> `manifestVersion`, `sharedRelPath`
   * `scripts/i18n-check.js` -> `checkParity`
-  * `src/sw.js` -> `precache`, `runtimeCache`
+  * `src/sw.js` -> `PRECACHE_ASSETS`, `CACHE_NAME`
 
 ### [FEATURE: Presentation-View-Mode-And-Page-Strip] | Aliases: view mode, page strip, music staff, guitar tab, table repair
 > **1-Line Summary:** Read-only presentation view mode with fading ghost highlighters, thumbnail page strip, manuscript score templates, and automatic table corruption healing.
@@ -222,13 +222,71 @@
   * `src/js/ui/video-dialog.js` & `src/js/ui/subtitles.js` -> `VideoPlayerModal`, `parseSubtitles`
   * `src/js/core/fsrs.js` & `src/js/core/anki.js` -> `repeat`, `syncBoardToAnki`, `exportBoardToApkg`
 
-## 3. Planned Features & App-Merge Wishlist
-*(Per owner directive, detailed feasibility specs for the Xournal++, Rnote, Lean PDF, and LiquidText wishlist items below are maintained inline here rather than split into a separate module file.)*
+### [FEATURE: SharedLibraries-Offload-And-Downloader] | Aliases: shared libraries, downloader, library inspector, PWA bundle limit, CacheStorage
+> **1-Line Summary:** Offloads heavy optional libraries (`Mermaid`, `Chart.js`, `pdf-lib`, `Rough.js`, `3Dmol`, `Nerdamer`, `function-plot`, `Math.js`, `Tesseract.js`) to `%LOCALAPPDATA%\SharedLibraries` (or PWA `CacheStorage`), checks availability on startup and demand, and offers an interactive Downloader modal.
+* **User Intention (Non-Negotiable):** Keep the core board/PWA package lean and fast (~10–15 MB core, relaxed from any brittle hard ceiling) without silently failing when an optional engine is invoked or forcing manual terminal installs.
+* **Visual / UI Behavior:** On startup and when opening optional engines (Mermaid/Chart diagrams, PDF compression, Rough.js), missing libraries trigger the Shared Libraries modal showing ready/missing badges, destination paths (`SharedLibraries` vs `Browser Offline Cache`), live download progress bar, per-library or bulk Download actions, and a `"Don't ask on startup"` toggle. Downloads enforce strict HTTPS CDN allowlists (`cdn.jsdelivr.net`, `raw.githubusercontent.com`, `unpkg.com`).
+* **Code Anchors (Grep Targets):**
+  * `electron/library-manager.cjs` -> `checkLibraryAvailability`, `downloadLibraries`, `resolveSharedLibraryFile`
+  * `src/js/ui/library-inspector.js` -> `checkLibrariesOnStartup`, `promptMissingLibraries`, `showLibraryInspector`
+  * `src/js/core/lib-loader.js` -> `loadScriptLibrary`
+  * `src/js/platform/web-adapter.js` -> `checkLibraries`, `downloadLibraries`
+  * `src/vendor/libraries.json` -> `libraries`
 
-### [WISHLIST: Pane-Aware-Command-Dispatcher] | Aliases: pane commands, Delete routing, Copy routing
-> **1-Line Summary:** Full per-pane Delete/Copy/Select-all/z-order routing for split workspace, beyond the current selection-clearing mitigation.
-* **User Intention:** Commands should act on the pane the user pressed in, not always the primary board.
-* **Target Integration Point:** `src/js/app.js` -> `dispatchCommand`, `src/js/ui/split-workspace.js` -> `activePane`
+### [FEATURE: Pane-Aware-Command-Dispatcher] | Aliases: pane commands, Delete routing, Copy routing, split workspace commands
+> **1-Line Summary:** Routes Delete, Copy, Cut, Duplicate, Paste, Select All, Group/Ungroup, and Z-order commands directly to whichever split-workspace pane currently holds focus.
+* **User Intention (Non-Negotiable):** Pressing Ctrl+C, Ctrl+V, Delete, or Ctrl+A in the left reference pane of Split Workspace must operate on that pane's board instead of leaking actions onto the primary right board.
+* **Visual / UI Behavior:** Clicking or editing inside either split pane targets `App.activePane()` automatically for clipboard, selection, grouping, and layer-order shortcuts.
+* **Code Anchors (Grep Targets):**
+  * `src/js/app.js` -> `activePane`, `command`, `pasteAt`, `groupSelection`, `ungroupSelection`, `copy`, `duplicate`
+  * `src/js/ui/split-workspace.js` -> `SplitStudyWorkspace`, `isLeftFocused`
+
+### [FEATURE: Vertical-Space-Tool-And-Snapping] | Aliases: vertical space, push strokes down, grid snap, 15 degree rotation snap
+> **1-Line Summary:** Horizontal Vertical-Space insertion/contraction divider plus toggleable Grid Snap (`bg.spacing`) and Always-On 15° Rotation Snap (`Alt` bypass) with live degree badge.
+* **User Intention (Non-Negotiable):** Students can open vertical breathing room mid-note without lassoing everything below, and align moved/resized/rotated items accurately onto grid spacing or 15° angles.
+* **Visual / UI Behavior:** Vertical Space tool draws a horizontal guide ribbon and shifts objects below the divider (`bounds.y >= y`) vertically in one Undo batch while automatically expanding/shrinking blank/notebook pages and blocking locked document/PDF sheets. Settings + Canvas toolbar provide Grid Snap and Always-On 15° Rotation Snap toggles, showing an inline angle pill on rotation handles (`Alt` temporarily bypasses).
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/tools.js` -> `startVerticalSpace`, `snapToGrid`, `snapAngle`, `drawVerticalSpace`
+  * `src/js/app.js` -> `DEFAULT_SETTINGS`, `snapToGrid`, `snapRotationAlways`
+
+### [FEATURE: Compass-Drafting-Tool] | Aliases: compass, circular arc, radius guide, geometry tools
+> **1-Line Summary:** Interactive wheel Compass drafting tool in the Ruler menu for exact circles, arcs, and radial drafting with stylus-isolated projection and preserved stroke timestamps (`TRAP 2`).
+* **User Intention (Non-Negotiable):** Engineering and geometry learners can draw clean circles and phasor/polar arcs using a movable center pivot and rotatable radius arm alongside Set Squares and Protractor.
+* **Visual / UI Behavior:** Ruler popover includes Compass (`Alt+C` / menu entry); center handle repositions pivot, rim knob resizes radius with centimeter/pixel scale readout, and stylus strokes snap along the circumference ring while keeping `p.t` timestamps intact.
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/tools.js` -> `compGeom`, `compEdgesAt`, `compProject`, `aimCompArm`, `drawCompass`
+  * `src/js/app.js` -> `openRulerMenu`, `fitTriangle`
+
+### [FEATURE: Sketchy-Shapes-And-Whiteout-Mask] | Aliases: rough.js, sketchy shapes, whiteout eraser, masking pen, TRAP 2
+> **1-Line Summary:** Deterministic `Rough.js` hand-drawn sketchy shapes (`roughSeed` + Zoom LOD) paired with a non-destructive opaque paper-matched Whiteout masking eraser.
+* **User Intention (Non-Negotiable):** Diagrams can switch seamlessly between clean CAD strokes and hand-sketched aesthetic (`Rough.js`) without frame shimmer, while Whiteout lets users mask background PDF ink non-destructively while staying erasable itself.
+* **Visual / UI Behavior:** Shapes menu exposes a Sketchy toggle + Roughness slider (backed by `SharedLibraries` `roughjs@4.6.6` with deterministic pure-JS fallback, hidden cleanly below `camZ < 0.35`, exported in SVG). Eraser popover exposes `Whiteout` (`W`), which paints dynamically against `boardPaint(pageColor)`, omits itself in transparent PNG exports, skips Hold-to-Shape snapping, and splits cleanly under partial Erase while preserving `p.t` (`TRAP 2`).
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/sketchy.js` -> `drawSketchyShapeCanvas`, `shapeRoughSvg`, `ensureRoughLoaded`
+  * `src/js/core/render.js` -> `drawStroke`, `inkStyle`, `boardPaint`
+  * `src/js/core/surface.js` -> `renderTo`, `setTransparentExport`
+  * `src/js/core/erase.js` -> `splitStroke`
+
+### [FEATURE: Editable-Bezier-Splines-With-Tablet-HUD] | Aliases: bezier splines, tangent knots, Huion tablet, spline HUD pill, splineFinishMode
+> **1-Line Summary:** Interactive anchor-knot cubic Bezier splines with adjustable tangent handles and a Huion/stylus-aware floating Finish HUD pill (`auto` / `both` / `pill` modes).
+* **User Intention (Non-Negotiable):** Hardware stylus users (such as Huion H950P) need smooth vector waveforms and curves with pullable handles without accidental double-tap finishes closing or committing a spline prematurely.
+* **Visual / UI Behavior:** Shapes popover adds Bezier Spline (`Q`): tap adds corner knot, drag pulls smooth mirrored tangent handles, live HUD pill offers `Undo Knot`, `Close Loop`, `Finish` (`Enter`/`Escape`), and quick mode cycling (`Auto` uses Pill-Only on `pen` pointers and Double-Click + Pill on `mouse`). Post-commit selection lets users drag individual knots (`sk:*`) and handles (`si:*`/`so:*`) directly on the canvas and export exact cubic `<path>` SVG.
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/splines.js` -> `normalizeKnot`, `splineBounds`, `drawSpline`, `hitSpline`, `splineHandleScreenMap`, `splineSvg`
+  * `src/js/core/tools.js` -> `startSplinePress`, `dragSplineKnot`, `dragSplineHandle`, `finishSplineDraft`, `syncSplineHud`
+
+### [FEATURE: Dual-Circuit-Simulation-With-Ngspice] | Aliases: ngspice-wasm, spice netlist, MNA Live, EEcircuit, TINA
+> **1-Line Summary:** Dual circuit engine combining built-in pure-JS MNA (`IndustrialCircuitSim`) for instant interactive relays/motors with switchable `ngspice-wasm` / analytical SPICE sweep (`SpiceEngine`), `.cir` netlist export, and TI `TINA` launcher.
+* **User Intention:** Preserve all existing industrial control simulation while gaining non-linear SPICE `.tran`/`.ac` analysis, `.cir` export, and TI `TINA` interop while keeping the core PWA lean (`SharedLibraries` offload).
+* **Code Anchors (Grep Targets):** `src/js/core/circuit-sim.js` -> `IndustrialCircuitSim`, `src/js/core/spice-engine.js` -> `SpiceEngine`, `generateSpiceNetlist`, `electron/spice-bridge.cjs`
+
+### [FEATURE: Pentagram-And-RAG-Manager-Interoperability] | Aliases: RAG Manager, 27130, xref_id, gaussboard deep link, anki deduplication, headless cli
+> **1-Line Summary:** Connects `GaussBoard` to central `RAG Manager` (`127.0.0.1:27130`), Obsidian (`:27125`), Mermaid Manager, DeepTutor (`:8001`), and Anki (`:8765`) via canonical `xref_id` sidecars, active `gaussboard://` URI handling, idempotent Anki sync, Practice Engine banks, and `--json` headless CLI export.
+* **User Intention:** Editing a board, card, diagram, or lecture audio transcript updates cross-references across the entire 5-app Pentagram without duplicate Anki cards, broken deep links, or silent overwrite conflicts.
+* **Code Anchors (Grep Targets):** `electron/triarchy-bridge.cjs`, `electron/rag-bridge.cjs`, `electron/cli-export.cjs`, `src/js/core/pentagram-sync.js`, `src/js/core/anki.js`, `src/js/core/markdown-sidecar.js`, `docs/modules/pentagram-audit-and-upgrades.md`
+
+## 3. Planned Features & App-Merge Wishlist
+*(Detailed feasibility specs for the remaining deferred/paused wishlist items below are maintained inline here rather than split into a separate module file.)*
 
 ### [WISHLIST: Live-Collaboration-Seam] | Aliases: real-time collaboration, presence cursors, cloud boards
 > **1-Line Summary:** Future live co-editing built on the operation log without changing the editor model.
@@ -236,103 +294,49 @@
 * **Target Integration Point:** `src/js/core/store.js` -> `checkpoint`, `applyRemote`, `onOp`
 
 ### [WISHLIST: Lean-Linked-Or-Attached-Single-PDF-Lazy-Render] | Aliases: lean pdf, 80MB pdf bloat fix, linked pdf, attached pdf, lazy viewport render, page-locked pdf
-> **1-Line Summary:** Replace upfront 100-page bitmap pre-rendering (~25–80 MB bloat) with a hybrid Linked external PDF or 1× Attached single-PDF asset and lazy on-demand `pdf.js` viewport rendering onto locked page slots.
+> **1-Line Summary:** Replace upfront 100-page bitmap pre-rendering (~25–80 MB bloat) with Attached Single-PDF (`assets/<sha256>.pdf`) or Linked external PDF + lazy on-demand `pdf.js` viewport rendering onto locked page slots.
 * **Problem Solved & Motivation:** Currently `openPdf()` (`src/js/importers/pdf.js`) and `insertDocument()` (`src/js/insert.js`) eagerly rasterize every imported page to JPEG bitmaps (`scale: 2–4.2`), causing 100-page textbooks to bloat to ~25–80+ MB in `assets/` while still blurring past 200% zoom.
 * **Proposed Hybrid Architecture (High Feasibility):**
-  * **Linked External PDF Mode (Default for large PDFs, 0 MB board overhead):** Store `{ pdfPath, pdfSha256, pageRange, fitMode }` in the board document instead of 100 page images. Uses SHA-256 matching to auto-relink if a textbook moves on disk (similar to Xournal++ `.xopp`, but with hash verification).
-  * **Optional 1× Attached Single-PDF Mode (Portable for LAN Sync / Android / PWA):** 1-click toggle stores the single original vector `.pdf` binary once in `assets/<sha256>.pdf` (typically 2–8 MB instead of 80 MB of JPEGs) so the board remains self-contained without per-page bitmap duplication.
-  * **Page-Locked Coordinate Mapping + Lazy `pdf.js` LRU Render:** Imported pages sit in locked/anchored `doc.pages` slots (non-draggable in Lean PDF mode; small `<=10`-page imports and Office decks can retain movable-page-object mode). `pdfjs-dist` renders only currently visible pages (+1–2 buffer neighbors) at live camera zoom (`cam.z * dpr`) into a bounded in-memory LRU cache (~8–12 pages), keeping text vector-crisp up to 800% zoom.
-  * **Invariant Compatibility:** Because board coordinates remain anchored to `pageRects(doc.pages)`, existing strokes with `p.t` audio timestamps (`TRAP 1`, `TRAP 2`), `Study Tape` / `Answer Covers` (`TRAP 6`), `PdfSidebarDrawer` TOC/thumbnails, and `Split Workspace` continue to work without re-timing.
+  * **Attached Single-PDF Mode (Portable Default for LAN Sync / Android / PWA):** Store the single original vector `.pdf` binary once in `assets/<sha256>.pdf` (typically 2–8 MB instead of 80 MB of JPEGs) so `.gaussboard` archives remain 100% self-contained without per-page bitmap duplication.
+  * **Optional Linked External PDF Mode (0 MB board overhead on Desktop):** Store `{ pdfPath, pdfSha256, pageRange, fitMode }` with SHA-256 verification so large local textbooks open with zero archive duplication.
+  * **Page-Locked Coordinate Mapping + Lazy `pdf.js` LRU Render:** Imported pages sit in locked/anchored `doc.pages` slots while `pdfjs-dist` renders visible pages (+1–2 buffer neighbors) at live camera zoom (`cam.z * dpr`) into a bounded in-memory LRU cache (~8–12 pages).
 * **Target Integration Points:**
-  * `src/js/importers/pdf.js` -> `openPdf` (persistent handle + bounded LRU page cache)
-  * `src/js/insert.js` -> `insertDocument`, `layoutPages` (Linked vs. Attached single-PDF import option)
-  * `src/js/ui/pagepicker.js` -> `choosePages` (Lean Document Mode vs. Movable Page Objects selector)
-  * `src/js/core/render.js` -> `drawBackground` / `drawLazyPdfPage`
+  * `src/js/importers/pdf.js` -> `openPdf`
+  * `src/js/insert.js` -> `insertDocument`, `layoutPages`
+  * `src/js/ui/pagepicker.js` -> `choosePages`
+  * `src/js/core/render.js` -> `drawImage`
 
-### [WISHLIST: Vertical-Space-Tool-And-Snapping] | Aliases: vertical space, push strokes down, rnote vertical space, grid snap, 15 degree rotation snap
-> **1-Line Summary:** Rnote-style Vertical Space insertion/contraction bar plus Xournal++-style toggleable Grid Snapping and 15° Rotation Snapping.
-* **User Intention:** Let users open vertical breathing room anywhere mid-note without lassoing an entire lower half of a page, and align objects/rotations cleanly onto grids and standard drafting angles.
-* **Feasibility & Architecture Notes (Very High Feasibility — Pure JS):**
-  * **Vertical Space Tool:** Dragging a horizontal divider line vertically shifts all objects (and optionally page-margin anchors) with `bounds.y >= cursorY` by `dy` via a single batched `Store` `set` operation (`Store.commit`), preserving all stroke `p.t` timestamps (`TRAP 2`), Undo/Redo, and LAN sync.
-  * **Grid & Rotation Snapping:** Snap dragged/resized bounding-box corners to the active grid/graph spacing (`render.js` grid step) and snap rotation handles/shapes to `15°` increments (`45°`, `60°`, `90°`), with configurable tolerance and modifier-key bypass.
-* **Target Integration Points:**
-  * `src/js/core/tools.js` -> `toolStateMachine` (vertical-space divider tool)
-  * `src/js/core/transform.js` -> `moveObject`, `scaleHandles`, `rotate`
-  * `src/js/ui/toolbar.js` -> `ribbon`
-
-### [WISHLIST: Compass-Drafting-Tool] | Aliases: compass, circular arc, sector drafting, xournalpp geometry, radius guide
-> **1-Line Summary:** Xournal++-style interactive wheel Compass drafting tool for exact circles, arcs, filled sectors, and radial measurements alongside existing Set Squares and Protractor.
-* **User Intention:** Extend technical EE/geometry drafting beyond lines and angles (`Set-Squares-And-Protractor-Drafting`) to clean circular constructions, phasor diagrams, and Smith/polar arcs.
-* **Feasibility & Architecture Notes (Very High Feasibility — Pure JS):**
-  * Interactive on-screen compass wheel with center handle, radius scale readout (cm/world units), and angle indicator (`0°–360°`).
-  * Stylus-isolated edge projection (`compProject`) guides circumference arcs/circles and radial segments while preserving real-time `p.t` timestamps (`TRAP 2`), bypassing circuit connector wiring, and avoiding mouse capture (`Stylus-Inks-Mouse-Points`).
-* **Target Integration Points:**
-  * `src/js/core/tools.js` -> `triProject`, `protProject` (add `compProject` & `compEdgesAt`)
-  * `src/js/app.js` -> `openRulerMenu`
-  * `src/js/core/render.js` -> `drawDraftingTools`
-
-### [WISHLIST: RoughJS-Sketchy-Shapes-And-Calligraphic-Pen] | Aliases: rough.js, sketchy shapes, calligraphic pen, modeled brush, rnote styles
-> **1-Line Summary:** Optional `rough.js` (MIT) sketchy hand-drawn shape rendering and a velocity/pressure-modeled Calligraphic Pen inspired by Rnote.
-* **User Intention:** Offer expressive whiteboard diagramming (`rough.js` sketch aesthetics on shapes/cards) and crisp fountain/calligraphic handwriting alongside existing Solid, Neon, Pencil, Rainbow, and Galaxy pens.
-* **Feasibility & Architecture Notes (High Feasibility — Pure JS OSS Reuse):**
-  * **Sketchy Shapes (`roughjs`, MIT, ~10–15 KB):** Vendor `rough.js` in `src/vendor/` + `SharedLibraries` (credit in `THIRD_PARTY_NOTICES.md`) and persist a deterministic `roughSeed` on shape objects so progressive slicing (`Smart Slicing`) and Zoom LOD (`camZ < 0.35`) never shimmer between frames.
-  * **Calligraphic / Modeled Pen:** Compute variable ribbon/elliptical nib width from stylus pressure, velocity, and stroke angle in `ink.js` / `render.js`, storing raw centerline points + `p.t` timestamps untouched (`TRAP 2`) so audio replay and scratch-out erasing (`erase.js`) continue to split cleanly.
-* **Target Integration Points:**
-  * `src/vendor/libraries.json`, `THIRD_PARTY_NOTICES.md`
-  * `src/js/core/ink.js`, `src/js/core/render.js` -> `drawShape`, `drawStroke`
-  * `src/js/ui/palettes.js` -> `PEN_EFFECTS`
-
-### [WISHLIST: Deep-PDF-Text-Select-Highlight-Search-Links] | Aliases: pdf text select, pdf highlight, pdf underline, pdf strikeout, pdf search ctrl+f, pdf hyperlinks, xournalpp pdf tools
-> **1-Line Summary:** Xournal++-style deep PDF text interaction: text selection, copy, highlight/underline/strikeout markups, clickable PDF links, and `Ctrl+F` full-document text search.
+### [WISHLIST: Deep-PDF-Text-Select-Highlight-Search-Links] | Aliases: pdf text select, pdf highlight, pdf underline, pdf strikeout, pdf search, pdf find bar, pdf hyperlinks, xournalpp pdf tools
+> **1-Line Summary:** Xournal++-style deep PDF text interaction: text selection, copy, highlight/underline/strikeout markups, clickable PDF links (`safeExternalUrl`), and full-document Find Bar text search.
 * **User Intention:** Turn imported textbooks and papers from flat background pictures into searchable, selectable, link-navigable study documents without switching apps.
 * **Feasibility & Architecture Notes (Medium Effort — Pairs with Lean PDF Mode):**
-  * **Live `pdfjs-dist` Text & Link Extraction:** Leverage already-vendored `pdf.min.mjs` (`page.getTextContent()` and `page.getAnnotations()`) to build lightweight normalized text runs and link hotspots on visible/active PDF pages without bloated bitmap duplication.
-  * **Markup & Search UX:** Floating selection popup triggers Copy Quote, Highlight, Underline, or Strikethrough stored as `Store` vector markup objects anchored to `docPage` coordinates (so Study Tape, Undo, and LAN Sync all work); `Ctrl+F` / `F3` scans document text runs and glides the camera to matches; external PDF URLs pass strictly through `safeExternalUrl` (`TRAP: Untrusted-Url-And-Path`).
-  * **Note on Heavy Optional Extensions:** If desktop native/WASM acceleration (e.g., MuPDF/QPDF or `Tesseract.js` OCR for scanned PDFs) is later desired for 1,000+ page textbooks or ISO 32000-1 PDF writeback, it aligns with `Pure-JS-First-With-Optional-Desktop-Native-WASM`.
+  * **Live `pdfjs-dist` Text & Link Extraction:** Leverage already-vendored `pdf.min.mjs` (`page.getTextContent()` and `page.getAnnotations()`) to build lightweight normalized text runs and link hotspots on visible PDF pages.
+  * **Markup, Find Bar & Safe Links:** Floating selection popup triggers Copy Quote, Highlight, Underline, or Strikethrough stored as `Store` vector markup objects anchored to `docPage` coordinates; dedicated Document Find Bar (`Alt+F` or drawer search — avoiding collision with `Ctrl+F` board search) glides the camera to matches; external PDF URLs route strictly through `safeExternalUrl` (`main.js`).
 * **Target Integration Points:**
-  * `src/js/importers/pdf.js` -> `openPdf` (text & annotation link extractors)
-  * `src/js/ui/pdf-sidebar.js` -> `PdfSidebarDrawer` + `src/js/ui/search-dialog.js`
+  * `src/js/importers/pdf.js` -> `openPdf`
+  * `src/js/ui/pdf-sidebar.js` -> `PdfSidebarDrawer`
   * `src/js/core/tools.js`, `src/js/core/render.js`
 
-### [WISHLIST: Multi-Layer-System-And-Page-Depth] | Aliases: WISHLIST-Multi-Layer-System, layers, page depth, bezier splines, tangent knots, whiteout eraser
-> **1-Line Summary:** Expanded per-page/board Multi-Layer stack (hide/lock/merge/reorder), Xournal++-style editable Bezier Splines with anchor knots/tangents, and non-destructive Whiteout eraser mode.
-* **User Intention:** Organize dense engineering schematics, PDFs, solution overlays, and recall steps cleanly across layers, draft smooth curved waveforms/splines with editable tangent handles, and mask unwanted background markings non-destructively.
-* **Feasibility & Architecture Notes (Medium Effort):**
-  * **Multi-Layer System:** Add `doc.layers` and `obj.layerId` in `Store`, with per-layer visibility, lock, reorder, and merge operations. Must integrate tightly with `_paintOrder` Smart Slicing (`surface.js`), `TRAP 1` active audio replay partitioning, and `TRAP 6` Study Cover occlusion so hidden answers never leak across layers.
-  * **Editable Bezier Splines:** Click to place polyline knots, drag to pull cubic Bezier tangent handles (live anchor/tangent overlay during editing), and commit smooth multi-segment curves into `Store` (`connectors.js` / `render.js`).
-  * **Whiteout Eraser:** Add an eraser/masking mode that draws opaque paper-matched strokes over fixed backgrounds or PDF layers without mutating underlying pages.
+### [WISHLIST: Multi-Layer-System-And-Page-Depth] | Aliases: WISHLIST-Multi-Layer-System, layers, page depth, PAUSED
+> **1-Line Summary:** **[PAUSED BY OWNER DIRECTIVE]** Per-page/board Multi-Layer stack (`doc.layers` / `obj.layerId` with hide/lock/merge/reorder) — paused due to high invariant risk across Smart Slicing, `TRAP 1`, and `TRAP 6` *(Companion items **Whiteout Eraser** and **Editable Bezier Splines** are already shipped in Section 2)*.
+* **Status & Pause Rationale:** Deliberately paused on 2026-11-25 because introducing `doc.layers` + `obj.layerId` crosscuts `_paintOrder` Smart Slicing (`src/js/core/surface.js`), `TRAP 1` active audio replay partitioning, and `TRAP 6` Study Cover secret-hiding guarantees (`covers.js` / `render.js`), as well as backward compatibility for older `.gaussboard`/`.gazboard` imports. Revisit only with dedicated layer-partition tests covering every invariant.
 * **Target Integration Points:**
   * `src/js/core/store.js` -> `doc.layers`, `Store.applyOp`
   * `src/js/core/surface.js` -> `_paintOrder`, `_paintHeavy`
-  * `src/js/core/tools.js`, `src/js/core/render.js`
 
 ### [WISHLIST: LiquidText-Active-Reading-And-Pinch-Workspace] | Aliases: liquidtext, pinch collapse, pin and tear, text excerpts, margin gutter expansion, pdf-lib, sync scroll
-> **1-Line Summary:** Full LiquidText-inspired active-reading proposal: pinch-to-collapse reading view, text-selection Pin-and-Tear excerpts, non-destructive book margin gutter expansion (`pdf-lib`), and multi-excerpt synthesis workspace.
-* **Current Baseline vs. Proposed Scope:** GaussBoard already ships `isExcerpt` image snips, `excerptSource` coordinates, cyan elastic tether lines, and `cam.glideTo` jump-to-source (`src/js/core/excerpts.js`, `src/js/core/render.js`). This proposal tracks the full LiquidText workflow for future design review:
-  * **Pinch-to-Collapse Document View:** Temporarily fold blank/unannotated stretches between highlighted passages or distant PDF pages in the reader pane so a student can compare equation (1) on page 12 directly above its proof on page 148 without altering the underlying file.
-  * **Text-Selection Pin-and-Tear Excerpts:** Extend `EXCERPT_MIME` (`src/js/core/excerpts.js`) beyond bitmap crops so dragging selected PDF text drops a structured Markdown/KaTeX quote card onto the canvas or Split Workspace with bidirectional `glideTo` + cyan flash highlight back to exact PDF coordinates.
-  * **Book Margin Expansion (`pdf-lib` / Virtual Gutters):** Add printable margin gutters around dense textbooks (via already-vendored `pdf-lib` `setMediaBox`/`setCropBox` or virtual locked marginalia zones) so handwritten derivations sit beside paragraphs without shrinking page text.
-  * **Synthesis Clustering & Ink-to-Text Anchors:** Group torn excerpts into collapsible comparison clusters on the workspace and attach ink annotations directly to PDF text anchors so reflow/zoom preserves context.
+> **1-Line Summary:** Full LiquidText-inspired active-reading proposal: collapsible summary strip/accordion reading view inside Split Workspace, text-selection Pin-and-Tear excerpts, book margin gutter expansion (`pdf-lib` + `SharedLibraries`), and multi-excerpt synthesis workspace.
+* **Current Baseline vs. Proposed Scope:** GaussBoard already ships `isExcerpt` image snips, `excerptSource` coordinates, cyan elastic tether lines, and `cam.glideTo` jump-to-source (`src/js/core/excerpts.js`, `src/js/core/render.js`). Because multi-touch pinch is bound globally to canvas zoom (`camera.js`), any future collapse workflow should trigger via Split Workspace fold toggles rather than competing with 2-finger zoom.
 * **Target Integration Points:**
-  * `src/js/core/excerpts.js` -> `validateExcerptPayload`, `excerptImageObject` (extend for `pdf-text` excerpts)
+  * `src/js/core/excerpts.js` -> `validateExcerptPayload`, `excerptImageObject`
   * `src/js/ui/split-workspace.js` -> `SplitStudyWorkspace`
-  * `src/js/core/compression.js` / `pdf-lib` -> margin gutter expansion helper
-  * `src/js/core/render.js` -> tether & excerpt card rendering
-
-### [FEATURE: Dual-Circuit-Simulation-With-Ngspice] | Aliases: ngspice-wasm, spice netlist, MNA Live, EEcircuit, TINA
-> **1-Line Summary:** Dual circuit engine combining built-in pure-JS MNA (`IndustrialCircuitSim`) for instant interactive relays/motors with switchable `ngspice-wasm` / analytical SPICE sweep (`SpiceEngine`), `.cir` netlist export, and TI `TINA` launcher.
-* **User Intention:** Preserve all existing industrial control simulation while gaining non-linear SPICE `.tran`/`.ac` analysis, `.cir` export, and TI `TINA` interop without bloating the `<15 MB` PWA bundle.
-* **Code Anchors (Grep Targets):** `src/js/core/circuit-sim.js` -> `IndustrialCircuitSim`, `src/js/core/spice-engine.js` -> `SpiceEngine`, `generateSpiceNetlist`, `electron/spice-bridge.cjs` (`[M13-01]`)
-
-### [FEATURE: Pentagram-And-RAG-Manager-Interoperability] | Aliases: RAG Manager, 27130, xref_id, gaussboard deep link, anki deduplication, headless cli
-> **1-Line Summary:** Connects `GaussBoard` to central `RAG Manager` (`127.0.0.1:27130`), Obsidian (`:27125`), Mermaid Manager, DeepTutor (`:8001`), and Anki (`:8765`) via canonical `xref_id` sidecars, active `gaussboard://` URI handling, idempotent Anki sync, Practice Engine banks, and `--json` headless CLI export.
-* **User Intention:** Editing a board, card, diagram, or lecture audio transcript updates cross-references across the entire 5-app Pentagram without duplicate Anki cards, broken deep links, or silent overwrite conflicts.
-* **Code Anchors (Grep Targets):** `electron/triarchy-bridge.cjs`, `electron/rag-bridge.cjs`, `electron/cli-export.cjs`, `src/js/core/pentagram-sync.js`, `src/js/core/anki.js`, `src/js/core/markdown-sidecar.js`, `docs/modules/pentagram-audit-and-upgrades.md`
+  * `src/js/core/compression.js` / `pdf-lib`
+  * `src/js/core/render.js` -> `drawObject`
 
 ## 4. Canonical References & Live Verification
-* **Core Documentation Suite:** `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS_AND_TRAPS.md`, `docs/releases/ANDROID_READINESS.md`
-* **Active Verification Suite:** `node scripts/smoke.js --new-features` (24/24 passing)
-* **Internationalization Suite:** `node scripts/i18n-check.js` (2,424/2,424 across 7 locales)
+* **Core Documentation Suite:** `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS_AND_TRAPS.md`
+* **Active Verification Suite:** `node scripts/smoke.js --new-features` (24/24 in Electron CI), `node --test test/wishlist-features.test.mjs`, `node test/web-pwa.test.js`
+* **Internationalization Suite:** `node scripts/i18n-check.js` (2,480/2,480 across 7 locales)
 * **Android Platform Suite:** `node --test test/android-*.test.js` (82/82 passing)
 * **Core Data Schemas & State:** `src/js/core/store.js` (`Store`, `doc.objects`, `doc.pages`, `doc.audioTracks`)
-* **Platform & Packaging:** `main.js`, `preload.js`, `package.json`
+* **Platform & Packaging:** `main.js`, `preload.js`, `package.json`, `electron/library-manager.cjs`

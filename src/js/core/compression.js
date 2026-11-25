@@ -104,6 +104,8 @@ export async function compressImage(source, options = {}) {
   };
 }
 
+import { loadScriptLibrary } from './lib-loader.js';
+
 /**
  * Compresses and optimizes a PDF document using pdf-lib.
  * Strips unused objects and compresses cross-reference streams.
@@ -111,18 +113,21 @@ export async function compressImage(source, options = {}) {
  * @returns {Promise<{ pdfBytes: Uint8Array, originalSize: number, compressedSize: number, savingsPercent: number }>}
  */
 export async function compressPdfDocument(pdfBytes) {
-  // Dynamically load pdf-lib from vendor if in browser
+  // Dynamically load pdf-lib from SharedLibraries / vendor / cache if in browser
   let PDFLib = typeof window !== 'undefined' ? window.PDFLib : null;
   if (!PDFLib && typeof document !== 'undefined') {
-    await new Promise((resolve, reject) => {
-      if (window.PDFLib) return resolve(window.PDFLib);
-      const s = document.createElement('script');
-      s.src = './vendor/pdf-lib.min.js';
-      s.onload = () => resolve(window.PDFLib);
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-    PDFLib = window.PDFLib;
+    try {
+      PDFLib = await loadScriptLibrary({
+        id: 'pdf-lib',
+        globalName: 'PDFLib',
+        vendorPath: './vendor/pdf-lib.min.js',
+        sharedPath: './shared-lib/pdf-lib/pdf-lib.min.js',
+        downloadUrl: 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+        app: typeof window !== 'undefined' ? window.app : null
+      });
+    } catch {
+      PDFLib = window.PDFLib || null;
+    }
   }
 
   const origSize = pdfBytes.byteLength || pdfBytes.length;

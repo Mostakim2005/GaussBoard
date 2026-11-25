@@ -65,6 +65,7 @@ import { MoleculeViewerModal } from './ui/molecule-viewer.js';
 import { ChemicalSketcherModal } from './ui/chemical-sketcher.js';
 import { FunctionGrapherModal } from './ui/function-grapher.js';
 import { AcademicDictionaryModal } from './ui/academic-dictionary.js';
+import { checkLibrariesOnStartup } from './ui/library-inspector.js';
 
 /** An id GazBoard itself would make: safe as a file name on every system, the phone included. */
 const plainBoardId = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id);
@@ -113,6 +114,11 @@ export const DEFAULT_SETTINGS = {
   brushColor: '#201f1e', brushWidth: 8, brushOpacity: 0.9, brushSoftness: 'medium', brushVelocityThinning: true,
   fountainColor: '#002050', fountainWidth: 4, fountainSlant: 45, fountainFlex: 'normal',
   calligraphyColor: '#1a1a1a', calligraphyWidth: 12, calligraphyAngle: 35, calligraphyFlatness: 4,
+  whiteoutWidth: 28,
+  snapToGrid: false, snapRotationAlways: false,
+  splineFinishMode: 'auto', splineShowFinishPill: true,
+  shapeRough: false, shapeRoughness: 1.4,
+  suppressLibraryPrompt: false,
   textMarkdown: true, noteMarkdown: true, defaultCardStyle: 'canvas', wikilinkDblClick: 'ask', quickActionPopovers: true,
   // My boards' folders: a catalogue on this device, never inside a board (core/folders.js)
   folders: [], boardFolders: {},
@@ -374,6 +380,7 @@ class App {
     // after the board is up, never before: the first thing anyone sees should
     // be their work, not a question
     setTimeout(() => this.startUpdateFlow(), 2500);
+    setTimeout(() => { checkLibrariesOnStartup(this); }, 3400);
     this.setTool('pen');
     this.syncUI();
   }
@@ -1232,9 +1239,12 @@ class App {
   static PLACING = ['note', 'text', 'shape', 'emoji', 'table'];
 
   setTool(tool) {
-    const isInk = ['pen', 'highlighter', 'brush', 'fountain', 'calligraphy'].includes(tool);
+    const isInk = ['pen', 'highlighter', 'brush', 'fountain', 'calligraphy', 'whiteout'].includes(tool);
     if (isInk) this.lastInkTool = tool;
     if (this.tool === tool) return;
+    if (this.tool === 'spline' && tool !== 'spline') {
+      this.interaction?.cancelSplineDraft?.();
+    }
     /*
      * Reaching for a tool that drops something remembers what you were doing
      * before, so backing out can put it back rather than guessing.
@@ -1260,6 +1270,7 @@ class App {
     if (tool !== 'laser') this.surface.laser.length = 0;   // no stale dot left behind
     // panning is a view change, not an edit - it must not throw a selection away
     if (tool !== 'select' && tool !== 'lasso' && tool !== 'pan') this.setSelection([]);
+    this.interaction?.syncSplineHud?.();
     this.syncUI();
     this.surface.invalidate();
   }
@@ -1348,28 +1359,19 @@ class App {
    * mystery sub-groups nobody can see the edges of. Nesting is a thing people
    * ask for and then regret.
    */
-  groupSelection() {
-    const objs = this.selected.filter((o) => !o.locked);
+  groupSelection(pane = this.activePane()) {
+    const objs = [...pane.surface.selection].map((id) => pane.store.get(id)).filter((o) => o && !o.locked);
     if (objs.length < 2) {
       this.toast(t('Select two or more things to group'), 'help');
       return false;
     }
     const gid = uid('g');
-    /*
-     * One name survives a regroup, several do not.
-     *
-     * Regrouping pieces that all came from Solar should still be Solar -
-     * that is the "oops, undo that ungroup" case, and retyping the name would
-     * be a small insult. But folding Solar and Wind together into one group
-     * leaves no honest answer to what it is called, and picking whichever
-     * happened to be first is a guess dressed up as a decision. So it comes
-     * out unnamed, and asks to be told.
-     */
     const names = new Set(objs.map((o) => o.groupName).filter(Boolean));
     const keep = names.size === 1 ? [...names][0] : null;
-    this.store.updateMany(objs.map((o) => o.id), { groupId: gid, groupName: keep }, 'group');
-    this.openGroup = null;
-    this.setSelection(objs.map((o) => o.id));
+    pane.store.updateMany(objs.map((o) => o.id), { groupId: gid, groupName: keep }, 'group');
+    if (pane.side === 'main') this.openGroup = null;
+    pane.setSelection(objs.map((o) => o.id));
+    pane.save?.();
     this.toast(t('{n} items grouped', { n: objs.length }), 'check');
     return true;
   }
@@ -1405,29 +1407,19 @@ class App {
   }
 
   /** Undo the tying, for every group in the selection. */
-  ungroupSelection() {
-    const gids = this.selectedGroups();
+  ungroupSelection(pane = this.activePane()) {
+    const selObjs = [...pane.surface.selection].map((id) => pane.store.get(id)).filter(Boolean);
+    const gids = new Set(selObjs.map((o) => o.groupId).filter(Boolean));
     if (!gids.size) {
       this.toast(t('Nothing grouped is selected'), 'help');
       return false;
     }
     const ids = [];
-    for (const gid of gids) ids.push(...groupMembers(this.store, gid));
-    /*
-     * The name goes with the tie.
-     *
-     * Leaving it behind meant a loose object still quietly remembered it was
-     * once part of Solar, and grouping two of those later brought the old name
-     * back from nowhere - a name nobody typed, on a group nobody called that.
-     * A name describes a grouping; when the grouping ends, so does it.
-     *
-     * null rather than undefined: an undefined value can be dropped entirely
-     * by a clone or a round trip through a file, and a patch that loses its
-     * only key silently does nothing at all.
-     */
-    this.store.updateMany(ids, { groupId: null, groupName: null }, 'ungroup');
-    this.openGroup = null;
-    this.setSelection(ids);
+    for (const gid of gids) ids.push(...groupMembers(pane.store, gid));
+    pane.store.updateMany(ids, { groupId: null, groupName: null }, 'ungroup');
+    if (pane.side === 'main') this.openGroup = null;
+    pane.setSelection(ids);
+    pane.save?.();
     this.toast(gids.size > 1 ? t('{n} groups undone', { n: gids.size }) : t('Group undone'), 'check');
     return true;
   }
@@ -2704,6 +2696,35 @@ class App {
   }
 
   /* ---------------- commands ---------------- */
+  activePane() {
+    if (this.splitWorkspace?.isLeftFocused?.() && this.splitWorkspace.leftStore && this.splitWorkspace.leftSurface) {
+      const sw = this.splitWorkspace;
+      return {
+        side: 'left',
+        store: sw.leftStore,
+        surface: sw.leftSurface,
+        textEditor: sw.leftTextEditor || this.textEditor,
+        save: () => sw.saveLeftBoardDebounced(),
+        setSelection: (ids) => {
+          const sel = sw.leftSurface.selection;
+          sel.clear();
+          for (const id of ids) if (sw.leftStore.has(id)) sel.add(id);
+          sw.leftSurface.invalidate();
+        },
+        sync: () => sw.leftSurface.invalidate()
+      };
+    }
+    return {
+      side: 'main',
+      store: this.store,
+      surface: this.surface,
+      textEditor: this.textEditor,
+      save: null,
+      setSelection: (ids) => this.setSelection(ids),
+      sync: () => { this.syncUI(); this.surface.invalidate(); }
+    };
+  }
+
   command(id, arg = null) {
     if (this.readingMode && [
       'undo', 'edit.undo', 'redo', 'edit.redo', 'edit.delete', 'edit.cut', 'edit.paste',
@@ -2714,49 +2735,49 @@ class App {
       'insert.table', 'insert.curtain', 'insert.tape', 'insert.boardlink', 'insert.diagram',
       'curtain.reveal', 'curtain.coverAll', 'page.add', 'page.duplicate', 'page.delete', 'page.fitContent'
     ].includes(id)) return;
-    const s = this.store, sf = this.surface;
+    const pane = this.activePane();
+    const s = pane.store, sf = pane.surface;
+    const paneSelected = [...sf.selection].map((oid) => s.get(oid)).filter(Boolean);
     switch (id) {
       case 'undo': case 'edit.undo':
-        if (this.splitWorkspace?.isLeftFocused?.()) {
-          this.splitWorkspace.leftTextEditor?.commit?.();
-          this.splitWorkspace.leftStore?.undo();
-          this.splitWorkspace.leftSurface?.repaintAll();
-          this.splitWorkspace.saveLeftBoardDebounced();
-          break;
-        }
-        this.textEditor.commit(); s.undo(); this.pruneSelection(); break;
+        pane.textEditor?.commit?.(); s.undo();
+        if (pane.side === 'left') { sf.repaintAll?.(); pane.save?.(); } else this.pruneSelection();
+        break;
       case 'redo': case 'edit.redo':
-        if (this.splitWorkspace?.isLeftFocused?.()) {
-          this.splitWorkspace.leftTextEditor?.commit?.();
-          this.splitWorkspace.leftStore?.redo();
-          this.splitWorkspace.leftSurface?.repaintAll();
-          this.splitWorkspace.saveLeftBoardDebounced();
-          break;
-        }
-        this.textEditor.commit(); s.redo(); this.pruneSelection(); break;
+        pane.textEditor?.commit?.(); s.redo();
+        if (pane.side === 'left') { sf.repaintAll?.(); pane.save?.(); } else this.pruneSelection();
+        break;
 
       case 'edit.delete': {
-        const free = withAttached(s, this.selected.filter((o) => !o.locked).map((o) => o.id))
-          .filter((id) => !s.get(id)?.locked);
-        const held = this.selection.size - free.length;
-        if (free.length) s.remove(free);
+        const free = withAttached(s, paneSelected.filter((o) => !o.locked).map((o) => o.id))
+          .filter((oid) => !s.get(oid)?.locked);
+        const held = sf.selection.size - free.length;
+        if (free.length) { s.remove(free); pane.save?.(); }
         if (held) this.hintLocked(held);
         sf.selection.clear();
+        pane.sync();
         break;
       }
-      case 'edit.selectAll': this.setSelection(s.doc.order.filter((id) => !s.get(id)?.locked && !ghost(s.get(id)))); this.setTool('select'); break;
-      case 'edit.copy': this.copy(); break;
-      case 'edit.cut': this.copy(); if (sf.selection.size) { s.remove(withAttached(s, [...sf.selection])); sf.selection.clear(); } break;
-      // Every way of asking to paste goes through the one rule. The Edit menu
-      // used to call paste() straight, which knows only about board objects -
-      // so Ctrl+V could hand back objects while something newer sat on the
-      // machine's clipboard, and which of the two answered depended on whether
-      // the menu accelerator or the page saw the key first.
+      case 'edit.selectAll': {
+        pane.setSelection(s.doc.order.filter((oid) => !s.get(oid)?.locked && !ghost(s.get(oid))));
+        this.setTool('select');
+        break;
+      }
+      case 'edit.copy': this.copy(pane); break;
+      case 'edit.cut': {
+        this.copy(pane);
+        const cutIds = withAttached(s, paneSelected.filter((o) => !o.locked).map((o) => o.id))
+          .filter((oid) => !s.get(oid)?.locked);
+        if (cutIds.length) { s.remove(cutIds); pane.save?.(); }
+        sf.selection.clear();
+        pane.sync();
+        break;
+      }
       case 'edit.paste': return this.pasteAt(null);
-      case 'edit.duplicate': this.duplicate(); break;
+      case 'edit.duplicate': this.duplicate(pane); break;
       case 'arrow.straight': case 'arrow.elbow': case 'arrow.curved': this.setArrowRoute(id.slice(6)); break;
-      case 'edit.group': this.groupSelection(); break;
-      case 'edit.ungroup': this.ungroupSelection(); break;
+      case 'edit.group': this.groupSelection(pane); break;
+      case 'edit.ungroup': this.ungroupSelection(pane); break;
       case 'edit.nameGroup': this.nameGroup(); break;
       case 'edit.erasePencil': {
         // sketch in pencil, ink over it, then this: the guide lines go and the ink stays
@@ -2794,10 +2815,10 @@ class App {
       case 'table.addCol': this.resizeTable(1, +1); break;
       case 'table.removeCol': this.resizeTable(1, -1); break;
 
-      case 'order.front': s.reorder([...sf.selection], 'front'); break;
-      case 'order.back': s.reorder([...sf.selection], 'back'); break;
-      case 'order.forward': s.reorder([...sf.selection], 'forward'); break;
-      case 'order.backward': s.reorder([...sf.selection], 'backward'); break;
+      case 'order.front': s.reorder([...sf.selection], 'front'); pane.save?.(); pane.sync(); break;
+      case 'order.back': s.reorder([...sf.selection], 'back'); pane.save?.(); pane.sync(); break;
+      case 'order.forward': s.reorder([...sf.selection], 'forward'); pane.save?.(); pane.sync(); break;
+      case 'order.backward': s.reorder([...sf.selection], 'backward'); pane.save?.(); pane.sync(); break;
 
       case 'zoomIn': case 'view.zoomIn': sf.cam.zoomAt(sf.width / 2, sf.height / 2, 1.2); this.afterCamera(); break;
       case 'zoomOut': case 'view.zoomOut': sf.cam.zoomAt(sf.width / 2, sf.height / 2, 1 / 1.2); this.afterCamera(); break;
@@ -2942,7 +2963,7 @@ class App {
     slider.addEventListener('change', () => this.saveSettings());
     const body = h('div', { class: 'menu ruler-menu' },
       h('h5', {}, t('Shape')),
-      seg([['ruler', t('Ruler')], ['set45', t('Triangle 45°')], ['set60', t('Triangle 30°/60°')], ['protractor', t('Protractor')]], r.kind || 'ruler', (v) => { r.kind = v; s.rulerKind = v; this.fitTriangle(); }),
+      seg([['ruler', t('Ruler')], ['set45', t('Triangle 45°')], ['set60', t('Triangle 30°/60°')], ['protractor', t('Protractor')], ['compass', t('Compass')]], r.kind || 'ruler', (v) => { r.kind = v; s.rulerKind = v; this.fitTriangle(); }),
       h('h5', {}, t('0° points')),
       seg([['right', t('Right →')], ['up', t('Up ↑')]], s.rulerZero === 'up' ? 'up' : 'right', (v) => { s.rulerZero = v; }),
       h('h5', {}, t('See-through')),
@@ -2961,6 +2982,12 @@ class App {
       if (!Number.isFinite(r.protArm)) r.protArm = 60;
       // stand it on a line a little below the middle, so the dome sits in the middle of the window
       r.y = Math.min(v.y + v.h - 40 / z, Math.max(v.y + r.protR + 70 / z, v.y + v.h / 2 + r.protR * 0.45));
+      return;
+    }
+    if (r.kind === 'compass') {
+      const z = this.surface.cam.z;
+      r.compR = Math.max(110 / z, Math.min(v.h * 0.32, v.w * 0.28, 260 / z));
+      if (!Number.isFinite(r.compArm)) r.compArm = 35;
       return;
     }
     if (r.kind !== 'set45' && r.kind !== 'set60') return;
@@ -3350,17 +3377,17 @@ class App {
    * along too, or the copy arrives bare and a cut leaves the writing floating
    * where the page used to be. Kept in board order, so the ink stays on top.
    */
-  withRiders(objs) {
-    const ids = new Set(withAttached(this.store, objs.map((o) => o.id)));
+  withRiders(objs, store = this.store) {
+    const ids = new Set(withAttached(store, objs.map((o) => o.id)));
     // An arrow between two things that are both being copied is part of what
     // is being copied - a copied diagram that lost its arrows is half a copy.
     const gids = new Set();
-    for (const id of ids) { const g = this.store.get(id)?.groupId; if (g) gids.add(g); }
+    for (const id of ids) { const g = store.get(id)?.groupId; if (g) gids.add(g); }
     const inSet = (e) => !!e && ((e.id && ids.has(e.id)) || (e.group && gids.has(e.group)));
-    for (const o of this.store.objects) {
+    for (const o of store.objects) {
       if (o?.type === 'connector' && !ids.has(o.id) && inSet(o.a) && inSet(o.b)) ids.add(o.id);
     }
-    return this.store.doc.order.filter((id) => ids.has(id)).map((id) => this.store.get(id)).filter(Boolean);
+    return store.doc.order.filter((id) => ids.has(id)).map((id) => store.get(id)).filter(Boolean);
   }
 
   /**
@@ -3648,8 +3675,9 @@ class App {
     return copies;
   }
 
-  copy() {
-    const objs = this.withRiders(this.selected);
+  copy(pane = this.activePane()) {
+    const selObjs = [...pane.surface.selection].map((id) => pane.store.get(id)).filter(Boolean);
+    const objs = this.withRiders(selObjs, pane.store);
     if (!objs.length) return;
     this.clipboard = objs.map((o) => structuredClone(o));
     this.clipStamp = this.clipboardStamp();
@@ -3975,12 +4003,14 @@ class App {
     return now != null && now === this.clipStamp;
   }
 
-  duplicate() {
-    const objs = this.withRiders(this.selected);
+  duplicate(pane = this.activePane()) {
+    const selObjs = [...pane.surface.selection].map((id) => pane.store.get(id)).filter(Boolean);
+    const objs = this.withRiders(selObjs, pane.store);
     if (!objs.length) return;
     const copies = this.cloneBatch(objs, 28, 28);
-    this.store.addMany(copies, 'duplicate');
-    this.setSelection(copies.map((o) => o.id));
+    pane.store.addMany(copies, 'duplicate');
+    pane.setSelection(copies.map((o) => o.id));
+    pane.save?.();
   }
 
   /*
@@ -4056,7 +4086,8 @@ class App {
 
   async pasteAt(wp) {
     if (this.readingMode) return;
-    if (this.splitWorkspace?.active && this.splitWorkspace.isPointerOverLeft
+    if (this.splitWorkspace?.active
+        && (this.splitWorkspace.isPointerOverLeft || (!wp && this.splitWorkspace.isLeftFocused?.()))
         && this.splitWorkspace.pasteClipboardToLeft?.()) return;
     if (!wp) wp = this.pastePoint();
     const held = this.clipboard.length;
@@ -6072,8 +6103,18 @@ class App {
 
     // "@" on the board: a link to another board, where the pointer is
     if (e.key === '@' && !mod) { e.preventDefault(); this.command('insert.boardlink'); return; }
+    if (e.key === 'Escape' && this.tool === 'spline' && this.interaction?.splineDraft) {
+      e.preventDefault();
+      this.interaction.cancelSplineDraft();
+      return;
+    }
+    if (e.key === 'Enter' && this.tool === 'spline' && this.interaction?.splineDraft) {
+      e.preventDefault();
+      this.interaction.finishSplineDraft({ closed: false });
+      return;
+    }
 
-    const keyTool = { v: 'select', l: 'lasso', p: 'pen', h: 'highlighter', b: 'brush', f: 'fountain', c: 'calligraphy', e: 'eraser', n: 'note', t: 'text', s: 'shape', x: 'laser', g: 'pan' }[e.key.toLowerCase()];
+    const keyTool = { v: 'select', l: 'lasso', p: 'pen', h: 'highlighter', b: 'brush', f: 'fountain', c: 'calligraphy', e: 'eraser', w: 'whiteout', n: 'note', t: 'text', s: 'shape', q: 'spline', k: 'verticalSpace', x: 'laser', g: 'pan' }[e.key.toLowerCase()];
     if (keyTool) { this.setTool(keyTool); return; }
     if (e.key === '?') this.showShortcuts();
   }

@@ -7,6 +7,8 @@ import { inkPath, inkRuns, strokeWeight, hasPressureVariation, calligraphyPath }
 import { objectRuns, layoutRich, fitRichSize, drawRichLines, needsRich, watchChips } from './richtext.js';
 import { mathEntry, hasMaths } from './maths.js';
 import { drawArrowhead, drawConnector } from './connectors.js';
+import { drawSpline } from './splines.js';
+import { drawSketchyShapeCanvas } from './sketchy.js';
 import { lookupBoard, refLabel, refMissing, currentBoardId, currentBoardName } from './boardrefs.js';
 import { isMarkdown, buildMarkdownSvgDataUri } from './markdown.js';
 
@@ -589,6 +591,9 @@ export function lightInk() {
 export function setDarkBoard(on) { darkBoard = !!on; }
 export function isDarkBoard() { return darkBoard; }
 
+let transparentExport = false;
+export function setTransparentExport(on) { transparentExport = !!on; }
+
 /** The colour to actually paint with, once the theme has had its say. */
 export function inkPaint(color, fallback = DEFAULT_INK) {
   const c = color || fallback;
@@ -609,6 +614,7 @@ export function boardPaint(color) {
  *  Ink
  * =================================================================== */
 function inkStyle(ctx, o) {
+  if (o.effect === 'whiteout') return boardPaint(pageColor);
   if (!o.effect || o.effect === 'none' || o.effect === 'neon' || o.effect === 'pencil') return inkPaint(o.color);
   const pts = o.points;
   const a = pts[0], b = pts[pts.length - 1];
@@ -738,6 +744,7 @@ export function pencilDarkness(o) {
 export function pencilWidth(o) { return strokeDrawWidth({ ...o, effect: 'pencil' }); }
 
 export function drawStroke(ctx, o, camZ = null) {
+  if (o.effect === 'whiteout' && transparentExport) return;
   const pts = o.points;
   if (!pts || !pts.length) return;
 
@@ -1011,28 +1018,37 @@ function polygon(ctx, cx, cy, rx, ry, n, rot) {
 export function drawShape(ctx, o, hideText = false) {
   const { x, y, w, h } = o;
   ctx.save();
-  if (o.fill && o.fill !== 'none') {
-    ctx.fillStyle = o.fill;
-    shapePath(ctx, o.kind, x, y, w, h);
-    ctx.fill(o.kind === 'cloud' ? 'nonzero' : 'nonzero');
-  }
-  if (o.stroke && o.stroke !== 'none') {
-    const outline = inkPaint(o.stroke);
-    ctx.strokeStyle = outline;
-    ctx.lineWidth = o.lineWidth || 3;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    if (o.dash) ctx.setLineDash(o.dash === 'dot' ? [1, ctx.lineWidth * 2.2] : [ctx.lineWidth * 3, ctx.lineWidth * 2.2]);
-    shapePath(ctx, o.kind, x, y, w, h);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    if (o.kind === 'arrow' || o.kind === 'doubleArrow') {
-      const scale = o.arrowScale || 1.0;
-      const size = (o.lineWidth || 3) * 3.6 * scale;
-      ctx.fillStyle = outline;
+  let camZ = 1;
+  try {
+    const m = ctx.getTransform ? ctx.getTransform() : null;
+    camZ = m ? Math.hypot(m.a, m.b) || 1 : 1;
+  } catch {}
+  if (o.rough && camZ >= 0.35 && drawSketchyShapeCanvas(ctx, o, inkPaint(o.stroke), drawArrowhead)) {
+    // Sketchy shapes rendered cleanly; skip standard vector outline
+  } else {
+    if (o.fill && o.fill !== 'none') {
+      ctx.fillStyle = o.fill;
+      shapePath(ctx, o.kind, x, y, w, h);
+      ctx.fill(o.kind === 'cloud' ? 'nonzero' : 'nonzero');
+    }
+    if (o.stroke && o.stroke !== 'none') {
+      const outline = inkPaint(o.stroke);
       ctx.strokeStyle = outline;
-      drawArrowhead(ctx, { x, y }, { x: x + w, y: y + h }, size, o.headStyle || 'filled');
-      if (o.kind === 'doubleArrow') drawArrowhead(ctx, { x: x + w, y: y + h }, { x, y }, size, o.headStyle || 'filled');
+      ctx.lineWidth = o.lineWidth || 3;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      if (o.dash) ctx.setLineDash(o.dash === 'dot' ? [1, ctx.lineWidth * 2.2] : [ctx.lineWidth * 3, ctx.lineWidth * 2.2]);
+      shapePath(ctx, o.kind, x, y, w, h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      if (o.kind === 'arrow' || o.kind === 'doubleArrow') {
+        const scale = o.arrowScale || 1.0;
+        const size = (o.lineWidth || 3) * 3.6 * scale;
+        ctx.fillStyle = outline;
+        ctx.strokeStyle = outline;
+        drawArrowhead(ctx, { x, y }, { x: x + w, y: y + h }, size, o.headStyle || 'filled');
+        if (o.kind === 'doubleArrow') drawArrowhead(ctx, { x: x + w, y: y + h }, { x, y }, size, o.headStyle || 'filled');
+      }
     }
   }
   if (o.text && !hideText) {
@@ -1654,6 +1670,7 @@ export function drawObject(ctx, o, onload, editing = null) {
       case 'table': drawTable(ctx, o, hideCell); break;
       case 'curtain': drawCurtain(ctx, o); break;
       case 'connector': drawConnector(ctx, o, (c) => inkPaint(c)); break;
+      case 'spline': drawSpline(ctx, o, (c) => inkPaint(c)); break;
       case 'boardlink': drawBoardLink(ctx, o, onload); break;
       case 'audio': drawAudioCard(ctx, o); break;
       case 'diagram': drawDiagram(ctx, o, onload); break;

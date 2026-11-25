@@ -2,6 +2,7 @@
 
 import { boundsOf } from './store.js';
 import { bboxOfPoints, rotatePoint } from './util.js';
+import { translateSpline, scaleSpline } from './splines.js';
 
 /*
  * An arrow is moved, scaled and turned through its two ends. An end that
@@ -19,6 +20,10 @@ export function translateObject(o, dx, dy) {
     o.x += dx; o.y += dy;
     return;
   }
+  if (o.type === 'spline') {
+    translateSpline(o, dx, dy);
+    return;
+  }
   if (o.type === 'stroke') {
     for (const p of o.points) { p.x += dx; p.y += dy; }
     o.bbox = bboxOfPoints(o.points);
@@ -28,6 +33,11 @@ export function translateObject(o, dx, dy) {
 export function scaleObject(o, sx, sy, ox, oy) {
   if (o.type === 'connector') {
     eachEnd(o, (e) => { e.x = ox + (e.x - ox) * sx; e.y = oy + (e.y - oy) * sy; });
+    return;
+  }
+  if (o.type === 'spline') {
+    scaleSpline(o, sx, sy, ox, oy);
+    if (o.lineWidth) o.lineWidth = Math.max(0.5, o.lineWidth * Math.sqrt(Math.abs(sx * sy)));
     return;
   }
   if (o.type === 'stroke') {

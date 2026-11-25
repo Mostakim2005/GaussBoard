@@ -18,6 +18,7 @@ const triarchyBridge = require('./electron/triarchy-bridge.cjs');
 const cliExport = require('./electron/cli-export.cjs');
 const spiceBridge = require('./electron/spice-bridge.cjs');
 const ragBridge = require('./electron/rag-bridge.cjs');
+const libraryManager = require('./electron/library-manager.cjs');
 const { safeExternalUrl, isReleaseUrl } = require('./src/js/platform/security.cjs');
 
 const SRC = path.join(__dirname, 'src');
@@ -254,13 +255,22 @@ function registerProtocol() {
       const filePath = path.join(assetsDir(), id);
       return serveAssetWithRange(filePath, request);
     }
+    if (rel.startsWith('/shared-lib/')) {
+      const sharedTarget = libraryManager.resolveSharedLibraryFile(rel.slice('/shared-lib/'.length));
+      if (!sharedTarget) return new Response('Not Found', { status: 404 });
+      return net.fetch(pathToFileURL(sharedTarget).toString());
+    }
     if (rel === '/' || rel === '') rel = '/index.html';
-    const target = path.resolve(SRC, `.${rel}`);
+    let target = path.resolve(SRC, `.${rel}`);
     if (!isPathWithin(SRC, target)) return new Response('Forbidden', { status: 403 });
     try {
       const st = await fsp.stat(target);
       if (!st.isFile()) return new Response('Not Found', { status: 404 });
     } catch {
+      if (rel.startsWith('/vendor/')) {
+        const sharedVendor = libraryManager.resolveSharedLibraryFile(rel.slice('/vendor/'.length));
+        if (sharedVendor) return net.fetch(pathToFileURL(sharedVendor).toString());
+      }
       return new Response('Not Found', { status: 404 });
     }
     return net.fetch(pathToFileURL(target).toString());
@@ -1607,30 +1617,11 @@ function ipc() {
     if (err) { shell.showItemInFolder(dir); return false; }
     return true;
   });
-  handleIpc('libraries:manifest', async () => {
-    const commonPath = path.join(resolveCommonLibrariesDir(), 'libraries.json');
-    const localPath = path.join(SRC, 'vendor', 'libraries.json');
-    let manifest = null;
-    try {
-      if (fs.existsSync(commonPath)) {
-        manifest = JSON.parse(await fsp.readFile(commonPath, 'utf8'));
-      } else if (fs.existsSync(localPath)) {
-        manifest = JSON.parse(await fsp.readFile(localPath, 'utf8'));
-      }
-    } catch (e) {
-      console.warn('Failed reading libraries.json:', e);
-    }
-    if (!manifest) return null;
-    for (const lib of manifest.libraries || []) {
-      const sharedExists = lib.sharedPath && fs.existsSync(lib.sharedPath);
-      const bundledExists = lib.bundledPath && fs.existsSync(path.join(__dirname, lib.bundledPath));
-      lib.sharedExists = !!sharedExists;
-      lib.bundledExists = !!bundledExists;
-      lib.bundledInApp = !!bundledExists;
-      lib.status = (bundledExists || sharedExists) ? 'ready' : 'available';
-    }
-    return manifest;
-  });
+  handleIpc('libraries:manifest', async () => libraryManager.loadMergedManifest(SRC));
+  handleIpc('libraries:check', async () => libraryManager.checkLibraryAvailability(SRC));
+  handleIpc('libraries:download', async (event, ids = []) => libraryManager.downloadLibraries(SRC, ids, (progress) => {
+    if (!event.sender.isDestroyed()) event.sender.send('libraries:downloadProgress', progress);
+  }));
   handleIpc('window:new', async (event, opts = {}) => {
     const senderWin = BrowserWindow.fromWebContents(event.sender);
     const bounds = senderWin ? senderWin.getBounds() : { x: 100, y: 100, width: 1280, height: 800 };

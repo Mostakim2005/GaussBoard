@@ -13,6 +13,8 @@ import { Surface } from './core/surface.js';
 import { t } from './i18n.js';
 import { mathEntry, mathPng, hasMaths, inlineFit } from './core/maths.js';
 import { connectorSvg } from './core/connectors.js';
+import { splineSvg } from './core/splines.js';
+import { shapeRoughSvg } from './core/sketchy.js';
 import { loadZip } from './board-export.js';
 import { calligraphySvgPath, brushRuns, fountainRuns } from './core/ink.js';
 import { isMarkdown, renderMarkdownToHtml } from './core/markdown.js';
@@ -150,7 +152,7 @@ export function buildSvg(app, box, others = []) {
     const parts = [];
     parts.push(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${box.w}" height="${box.h}" viewBox="${box.x} ${box.y} ${box.w} ${box.h}">`);
     parts.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" fill="${doc.background.color || '#fff'}"/>`);
-    parts.push(...svgObjects(app.store.objects, meas));
+    parts.push(...svgObjects(app.store.objects, meas, doc.background?.color || '#ffffff'));
     parts.push(stampSvg(box));
     parts.push('</svg>');
     return parts.join('\n');
@@ -200,7 +202,7 @@ export function buildSvg(app, box, others = []) {
   for (const v of views) parts.push(`<view id="gb-${esc(v.id)}" viewBox="${v.box.x} ${v.box.y} ${v.box.w} ${v.box.h}"/>`);
   parts.push(`<g id="board-${esc(doc.id)}">`);
   parts.push(`<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" fill="${doc.background.color || '#fff'}"/>`);
-  parts.push(...svgObjects(app.store.objects, meas));
+  parts.push(...svgObjects(app.store.objects, meas, doc.background?.color || '#ffffff'));
   parts.push(...links(app.store.objects));
   parts.push(stampSvg(box));
   parts.push('</g>');
@@ -211,7 +213,7 @@ export function buildSvg(app, box, others = []) {
     parts.push(`<rect x="${bb.x}" y="${bb.y}" width="${bb.w}" height="${bb.h}" fill="${src.store.doc.background.color || '#fff'}"/>`);
     useConnectorStore(src.store);
     try {
-      parts.push(...svgObjects(src.store.objects, meas));
+      parts.push(...svgObjects(src.store.objects, meas, src.store.doc.background?.color || '#ffffff'));
       parts.push(...links(src.store.objects));
     } finally { useConnectorStore(app.store); }
     parts.push(stampSvg(bb));
@@ -224,16 +226,17 @@ export function buildSvg(app, box, others = []) {
 let neonSeq = 0;
 
 /** Every object of a board, as SVG elements. */
-function svgObjects(objects, meas) {
+function svgObjects(objects, meas, paperColor = '#ffffff') {
   const parts = [];
   for (const o of objects) {
     if (o.hidden) continue;       // written on a cover that has been lifted
     const b = worldBounds(o);
     const rot = o.rotation ? ` transform="rotate(${(o.rotation * 180) / Math.PI} ${b.x + b.w / 2} ${b.y + b.h / 2})"` : '';
     if (o.type === 'stroke') {
+      const strokeColor = o.effect === 'whiteout' ? (paperColor || '#ffffff') : o.color;
       if (o.tool === 'calligraphy') {
         const d = calligraphySvgPath(o);
-        parts.push(`<path d="${d}" fill="${o.color}"${o.opacity != null && o.opacity < 1 ? ` opacity="${o.opacity}"` : ''}${rot}/>`);
+        parts.push(`<path d="${d}" fill="${strokeColor}"${o.opacity != null && o.opacity < 1 ? ` opacity="${o.opacity}"` : ''}${rot}/>`);
       } else if ((o.tool === 'brush' || o.tool === 'fountain') && o.points?.length >= 2) {
         const runs = o.tool === 'brush'
           ? brushRuns(o.points, o.width, o.softness || 'medium', o.velocityThinning !== false, 1)
@@ -244,7 +247,7 @@ function svgObjects(objects, meas) {
           const segPts = o.points.slice(r.a, r.b + 1);
           if (!segPts.length) continue;
           const d = segPts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-          parts.push(`<path d="${d}" fill="none" stroke="${o.color}" stroke-width="${r.width.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`);
+          parts.push(`<path d="${d}" fill="none" stroke="${strokeColor}" stroke-width="${r.width.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`);
         }
         parts.push(`</g>`);
       } else {
@@ -267,10 +270,12 @@ function svgObjects(objects, meas) {
             + `<path d="${d}" fill="none" stroke="${core}" stroke-width="${+(w * 0.42).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/></g>`);
           continue;
         }
-        parts.push(`<path d="${d}" fill="none" stroke="${o.color}" stroke-width="${pencil ? +pencilWidth(o).toFixed(2) : o.width}" stroke-linecap="round" stroke-linejoin="round"${op != null ? ` opacity="${op}"` : ''}${rot}/>`);
+        parts.push(`<path d="${d}" fill="none" stroke="${strokeColor}" stroke-width="${pencil ? +pencilWidth(o).toFixed(2) : o.width}" stroke-linecap="round" stroke-linejoin="round"${op != null ? ` opacity="${op}"` : ''}${rot}/>`);
       }
     } else if (o.type === 'connector') {
       parts.push(connectorSvg(o));
+    } else if (o.type === 'spline') {
+      parts.push(splineSvg(o, rot));
     } else if (o.type === 'boardlink') {
       // a card for another board goes out as a picture of itself
       const k = 2, cv = document.createElement('canvas');
@@ -383,6 +388,7 @@ function svgArrowHead(from, to, size, style, color, width) {
 }
 
 function shapeSvg(o, rot) {
+  if (o.rough) return shapeRoughSvg(o, rot, svgArrowHead);
   const st = `fill="${o.fill && o.fill !== 'none' ? o.fill : 'none'}" stroke="${o.stroke && o.stroke !== 'none' ? o.stroke : 'none'}" stroke-width="${o.lineWidth || 3}" stroke-linejoin="round" stroke-linecap="round"`;
   const { x, y, w, h } = o;
   const cx = x + w / 2, cy = y + h / 2;
@@ -400,6 +406,7 @@ function shapeSvg(o, rot) {
         (o.kind === 'doubleArrow' ? svgArrowHead({ x: x + w, y: y + h }, { x, y }, size, style, o.stroke, width) : '') + '</g>';
     }
     case 'triangle': return `<polygon points="${cx},${y} ${x + w},${y + h} ${x},${y + h}" ${st}${rot}/>`;
+    case 'rightTriangle': return `<polygon points="${x},${y} ${x + w},${y + h} ${x},${y + h}" ${st}${rot}/>`;
     case 'diamond': return `<polygon points="${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}" ${st}${rot}/>`;
     case 'pentagon': case 'hexagon': case 'octagon': {
       const n = o.kind === 'pentagon' ? 5 : o.kind === 'hexagon' ? 6 : 8;

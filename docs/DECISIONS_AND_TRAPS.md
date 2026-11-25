@@ -3,13 +3,13 @@
 
 ## 1. Architectural Decisions & Pivot History
 
-### [DECISION: Pure-JS-First-With-Optional-Desktop-Native-WASM] | Aliases: Pure-JS-Zero-Native-Deps, no node-gyp, native addon, wasm, Electron, PWA fallback
-> **1-Line Summary:** Default to pure portable JavaScript and vendored WASM for zero-toolchain portability and <15 MB PWA parity, while permitting optional desktop Node/C++ addons or WASM modules where clearly beneficial—always paired with clean PWA fallbacks.
-* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]` *(Originally `Pure-JS-Zero-Native-Deps`; amended after removing `TRAP 5` in `AGENTS.md` commit `2039302` and reconfirmed on 2026-11-25)*
-* **Original User Intention:** Keep builds portable and effortless on Web/PWA/Windows while allowing heavy desktop capabilities (such as `ngspice-wasm`, desktop `SymPy`/FFmpeg bridges, or optional native PDF/engine acceleration) without blocking progress behind an absolute ban on native/WASM modules.
+### [DECISION: Pure-JS-First-With-Optional-Desktop-Native-WASM] | Aliases: Pure-JS-Zero-Native-Deps, no node-gyp, native addon, wasm, Electron, PWA fallback, relaxed PWA budget
+> **1-Line Summary:** Default to pure portable JavaScript and core vendored WASM with a relaxed ~20 MB PWA target (active core ~11 MB after `SharedLibraries` offload), permitting optional desktop native addons or heavy libraries resolved via `SharedLibraries` / on-demand download.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]` *(Amended on 2026-11-25 to relax strict `<15 MB` cap when offloading optional engines to `SharedLibraries` + on-demand download)*
+* **Original User Intention:** Keep builds portable and effortless on Web/PWA/Windows while allowing heavy desktop capabilities (such as `ngspice-wasm`, desktop `SymPy`/FFmpeg bridges, `Mermaid`, `Chart.js`, `pdf-lib`, or `Rough.js`) without blocking progress behind a brittle `<15 MB` ceiling or bundling duplicate vendor payloads.
 * **Options Considered:**
-  * **Option A (Superseded):** Hard ban on all native `node-gyp` addons (`TRAP 5`). Superseded because desktop-only bridges (`cas-sympy.cjs`, `media-bridge.cjs`, `spice-bridge.cjs`) and optional WASM engines (`ngspice-wasm`, `Tesseract` WASM) unlock capabilities that pure JS cannot match alone.
-  * **Option B (Chosen):** **Pure-JS-First + Optional Desktop Native/WASM with PWA Fallbacks.** Keep core canvas/ink (`fitBezier`), op-log (`Store`), MNA circuit sim (`solveMNA`), crypto (`sealMessage`), and standard offline libs (`src/vendor/libraries.json`) in pure portable JS/WASM; allow optional native Node/C++ addons or desktop WASM engines (resolved via `%LOCALAPPDATA%\SharedLibraries` or Electron bridges) so long as Web/PWA retains a clean fallback or graceful notice.
+  * **Option A (Superseded):** Hard ban on all native `node-gyp` addons (`TRAP 5`) or rigid `<15 MB` cap that blocks helpful features. Superseded because desktop bridges (`cas-sympy.cjs`, `media-bridge.cjs`, `spice-bridge.cjs`) and SharedLibraries offload unlock rich STEM/diagram capabilities cleanly.
+  * **Option B (Chosen):** **Pure-JS-First + Relaxed PWA Budget + SharedLibraries Offload.** Keep core canvas/ink (`fitBezier`), op-log (`Store`), MNA circuit sim (`solveMNA`), crypto (`sealMessage`), and essential core offline libs (`KaTeX`, `PDF.js`, `JSZip`, `Mammoth`, `mp4-muxer`) in pure portable JS/WASM; offload heavy optional libraries to `%LOCALAPPDATA%\SharedLibraries` (and browser `CacheStorage` via HTTPS-allowlisted downloader modal).
 * **Visual Pivot Map (What Failed vs. What Works):**
 ```mermaid
 flowchart LR
@@ -18,25 +18,26 @@ flowchart LR
     classDef optNode fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
 
     subgraph Superseded["❌ Rigid Ban (Superseded)"]
-        A1["Hard Pure-JS-Only Ban"] -->|"Blocks heavy STEM / PDF engines"| A2["Caps Desktop Capabilities"]
+        A1["Hard Pure-JS-Only / Strict Cap"] -->|"Blocks heavy STEM / Diagram engines"| A2["Caps Desktop & Feature Growth"]
     end
     subgraph Active["✅ Hybrid Policy (Active)"]
-        B1["Core in Pure JS + Vendored WASM"]:::coreNode -->|"PWA <15 MB & Portable"| B2["Desktop + Web Parity"]:::coreNode
-        B1 -->|"Optional Desktop Addon / SharedLibs"| B3["Native / WASM Boost + PWA Fallback"]:::optNode
+        B1["Core in Pure JS + Essential Vendor"]:::coreNode -->|"Lean Core + SharedLibraries"| B2["Desktop + Web/Android Parity"]:::coreNode
+        B1 -->|"On-Demand Check + Downloader Modal"| B3["Heavy Engines (SharedLibs / CacheStorage)"]:::optNode
     end
     class A1,A2 oldNode
 
     subgraph Legend["Legend (Color Guide)"]
-        L1["Red = Superseded Hard Ban"]:::oldNode
-        L2["Green = Core Portable JS/WASM Baseline"]:::coreNode
-        L3["Blue = Optional Desktop Native/WASM Extension"]:::optNode
+        L1["Red = Superseded Rigid Ban"]:::oldNode
+        L2["Green = Core Portable JS Baseline"]:::coreNode
+        L3["Blue = Optional SharedLibraries / On-Demand"]:::optNode
     end
 ```
-  * *Plain-English Explanation:* Every core editor feature still ships in portable JavaScript/WASM so Web PWA and offline builds never break, while desktop Electron builds can now opt into native C++ addons or heavy WASM engines with graceful fallbacks when absent.
+  * *Plain-English Explanation:* Every core editor feature still ships in portable JavaScript/WASM so Web PWA and offline builds work immediately (~11 MB core), while optional diagram/PDF/STEM libraries live in `SharedLibraries` (or download once on user prompt into browser `CacheStorage`).
 * **Code Anchors (Grep Targets):**
   * `AGENTS.md` -> `Project Tech Stack & Environment`
-  * `src/js/core/ink.js` -> `fitBezier`
-  * `src/vendor/libraries.json` -> `bundledPath`
+  * `src/js/core/ink.js` -> `inkPath`, `inkRuns`, `calligraphyPath`
+  * `src/vendor/libraries.json` -> `sharedRelPath`, `downloadUrl`
+  * `electron/library-manager.cjs` -> `checkLibraryAvailability`, `downloadLibraries`
   * `electron/global-resources.cjs` -> `resolveCommonLibrariesDir`
   * `electron/spice-bridge.cjs` -> `resolveNgspiceWasmPath`
 
@@ -125,7 +126,7 @@ flowchart LR
 * **Code Anchors (Grep Targets):**
   * `src/js/core/connectors.js` -> `routeOrthogonal`
   * `src/js/core/tools.js` -> `holdToShape`
-  * `src/js/core/ink.js` -> `preserveTime`
+  * `src/js/core/ink.js` -> `inkPath`, `inkRuns`
 
 ### [DECISION: Hardening-Audit-Live-Code-Over-Dossiers] | Aliases: v6.9.2 audit, P0 P1, 74 findings, 68 fixed
 > **1-Line Summary:** Audited v6.9.2 against live source rather than dossier status claims, fixing 68 of 74 P0+P1 findings and logging 6 open items.
@@ -250,12 +251,12 @@ flowchart LR
 
 ### [TRAP: Pt-Timestamp-Stripping] | Aliases: p.t, stroke timestamps, audio sync, eraser fragment, t0 t1
 > **1-Line Summary:** Never rebuild stroke points without preserving p.t, or audio replay loses millisecond sync.
-* **Strict Rule:** **NEVER** strip `p.t` in point generators, smoothing passes, curve fitters, or partial-erasure rebuilds in `src/js/core/tools.js` -> `toolStateMachine` and `src/js/core/ink.js` -> `preserveTime`.
+* **Strict Rule:** **NEVER** strip `p.t` in point generators, smoothing passes, curve fitters, or partial-erasure rebuilds in `src/js/core/tools.js` -> `compProject` / `backdateSample`, `src/js/core/erase.js` -> `splitStroke`, and `src/js/core/ink.js` -> `inkPath` / `inkRuns`.
 * **Why This Trap Exists (Plain English):** Replay binary-searches ascending p.t to reveal ink; without it, erased fragments replay at the wrong time or never, and smoothing silently breaks lecture playback.
 * **Protected Code Anchors (Grep Targets):**
-  * `src/js/core/ink.js` -> `preserveTime`
-  * `src/js/core/erase.js` -> `t0`, `t1`
-  * `src/js/core/tools.js` -> `backdateSample`
+  * `src/js/core/ink.js` -> `inkPath`, `inkRuns`
+  * `src/js/core/erase.js` -> `splitStroke`, `t0`, `t1`
+  * `src/js/core/tools.js` -> `backdateSample`, `compProject`
 
 ### [TRAP: Replay-Overlay-Partitioning] | Aliases: scene partitioning, frozen canvas, drawReplaySession, ghost, activeTrackId
 > **1-Line Summary:** Base canvas must exclude active audio strokes; replay strokes live only in the dynamic overlay pass.
@@ -428,16 +429,30 @@ flowchart LR
   * `test/ecosystem-bridges.test.mjs`
 
 ### [DECISION: Dead-Vendor-Repository-Cleanup] | Aliases: vendor cleanup, bundle size, PWA precache, shared libraries offload
-> **1-Line Summary:** Offloaded 14.01 MB of duplicate vendor libraries from `src/vendor/` to `%LOCALAPPDATA%\SharedLibraries` per ECOSYSTEM_INTEGRATION_CONTRACT Section 5.3 to satisfy the <15 MB PWA budget.
-* **Decision Maker:** `[DECIDED BY: HUMAN - Master Contract Directive]`
-* **Original User Intention:** Satisfy Universal Packaging & Fork-Safety bundle limits by purging redundant in-tree vendor dependencies already available in the zero-context global libraries repository.
+> **1-Line Summary:** Offloaded duplicate heavy vendor libraries (`14.01 MB` + another `~3.88 MB` of `mermaid.min.js`, `chart.umd.min.js`, and `pdf-lib.min.js`) from `src/vendor/` to `%LOCALAPPDATA%\SharedLibraries` while keeping essential boot deps in-tree.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner / Master Contract Directive]`
+* **Original User Intention:** Eliminate duplicate in-tree copies of libraries already available in `%LOCALAPPDATA%\SharedLibraries`, while keeping desktop Electron + Browser PWA / Android functional via an explicit missing-library downloader.
 * **Cleanup Details:**
-  * Purged obsolete in-tree files: `tesseract/` (WASM/data), `nerdamer/`, `fontkit.umd.min.js`, `pdf.sandbox.min.mjs`, `pdf_viewer.mjs`, `pdf_viewer.css`, `math.min.js`, `3Dmol-min.js`, and `function-plot.js`.
-  * Preserved active in-tree vendor dependencies required for zero-network bootstrap (`pdf.min.mjs`, `pdf.worker.min.mjs`, `katex/`, `marp/`, `purify.min.js`, `lucide.min.js`, `tesseract.js`).
-  * Replaced in-app references with `electron/global-resources.cjs` dynamic discovery and verified through `test/ecosystem-bridges.test.mjs`.
+  * Purged duplicate in-tree files: `tesseract/` (WASM/data), `nerdamer/`, `fontkit.umd.min.js`, `pdf.sandbox.min.mjs`, `pdf_viewer.mjs`, `pdf_viewer.css`, `math.min.js`, `3Dmol-min.js`, `function-plot.js`, `mermaid.min.js`, `chart.umd.min.js`, and `pdf-lib.min.js`.
+  * Preserved essential zero-network boot dependencies in `src/vendor/` (`pdf.min.mjs`, `pdf.worker.min.mjs`, `katex/`, `jszip.min.js`, `mammoth.browser.min.js`, `mp4-muxer.min.js`, `lucide.min.js`).
+  * Added `electron/library-manager.cjs` (`app://` `/shared-lib/` & `/vendor/` fallback, `libraries:check` / `libraries:download` IPC with strict CDN allowlist and atomic rename), `src/js/core/lib-loader.js`, PWA `CacheStorage` adapter (`web-adapter.js`), and interactive UI modal (`library-inspector.js`).
 * **Code Anchors (Grep Targets):**
-  * `electron/global-resources.cjs` -> `resolveCommonLibrariesDir`
-  * `src/sw.js` -> service worker precache manifest
+  * `electron/library-manager.cjs` -> `resolveSharedLibraryFile`, `checkLibraryAvailability`, `downloadLibraries`
+  * `src/js/core/lib-loader.js` -> `loadScriptLibrary`
+  * `src/js/ui/library-inspector.js` -> `checkLibrariesOnStartup`, `promptMissingLibraries`
+  * `src/sw.js` -> `PRECACHE_ASSETS`
+
+### [DECISION: Tablet-Aware-Spline-HUD-And-Multi-Layer-Pause] | Aliases: bezier splines, Huion H950P, splineFinishMode, multi-layer pause, TRAP 1, TRAP 6
+> **1-Line Summary:** Shipped Huion/stylus-safe Editable Bezier Splines (floating HUD pill + `'auto'` pointer-type guard) and non-destructive Whiteout Eraser immediately, while explicitly PAUSING the Multi-Layer Stack (`doc.layers`) to protect Smart Slicing, `TRAP 1`, and `TRAP 6`.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]` *(2026-11-25)*
+* **Original User Intention:** Gain expressive Bezier curve drafting that works comfortably on graphics tablets (Huion H950P) without accidental double-tap commits, plus opaque paper-matched masking (`whiteout`), without risking regression across scene replay partitioning (`TRAP 1`) or concealed answer covers (`TRAP 6`).
+* **Options Considered:**
+  * **Option A (Paused):** Full `doc.layers` / `obj.layerId` stack (`hide`/`lock`/`merge`/`reorder`). Paused by owner directive because layer z-ordering and occlusion directly intersect `_paintOrder` Smart Slicing, audio replay masking, and backward file compatibility.
+  * **Option B (Chosen):** Implement Whiteout + Editable Bezier Splines cleanly on existing `Store` object schemas (`type: 'spline'`, `effect: 'whiteout'`), pairing tablet-aware `'auto'` mode (HUD pill on `pen`, double-click + pill on `mouse`, toggleable `'auto' | 'both' | 'pill'`).
+* **Code Anchors (Grep Targets):**
+  * `src/js/core/splines.js` -> `normalizeKnot`, `splineHandleScreenMap`, `drawSpline`
+  * `src/js/core/tools.js` -> `startSplinePress`, `finishSplineDraft`, `syncSplineHud`
+  * `src/js/core/render.js` -> `boardPaint`, `inkStyle`, `drawStroke`
 
 ### [DECISION: Upstream-Minimal-MainJS-With-Dual-Circuit-And-Hybrid-CAS] | Aliases: main.js split, ngspice-wasm, solveMNA, SymPy CAS, Pentagram standard
 > **1-Line Summary:** Keep upstream-shared core lines in `main.js` minimal-diff for `fahim9778/GazBoard` cherry-picks while isolating all custom/Pentagram features in `electron/*.cjs` and `src/js/core/*`, keeping hybrid SymPy CAS, and pairing `solveMNA` with switchable `ngspice-wasm`.
