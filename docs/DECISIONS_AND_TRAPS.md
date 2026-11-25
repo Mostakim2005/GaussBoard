@@ -3,27 +3,42 @@
 
 ## 1. Architectural Decisions & Pivot History
 
-### [DECISION: Pure-JS-Zero-Native-Deps] | Aliases: no node-gyp, no C++, Electron, offline vendor
-> **1-Line Summary:** Stayed with pure portable JavaScript and vendored libraries instead of adding any native C++ addon.
-* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]`
-* **Original User Intention:** Lightweight portable Windows app that builds on any machine with no toolchain friction.
+### [DECISION: Pure-JS-First-With-Optional-Desktop-Native-WASM] | Aliases: Pure-JS-Zero-Native-Deps, no node-gyp, native addon, wasm, Electron, PWA fallback
+> **1-Line Summary:** Default to pure portable JavaScript and vendored WASM for zero-toolchain portability and <15 MB PWA parity, while permitting optional desktop Node/C++ addons or WASM modules where clearly beneficial—always paired with clean PWA fallbacks.
+* **Decision Maker:** `[DECIDED BY: HUMAN - Project Owner]` *(Originally `Pure-JS-Zero-Native-Deps`; amended after removing `TRAP 5` in `AGENTS.md` commit `2039302` and reconfirmed on 2026-11-25)*
+* **Original User Intention:** Keep builds portable and effortless on Web/PWA/Windows while allowing heavy desktop capabilities (such as `ngspice-wasm`, desktop `SymPy`/FFmpeg bridges, or optional native PDF/engine acceleration) without blocking progress behind an absolute ban on native/WASM modules.
 * **Options Considered:**
-  * **Option A (Rejected):** Native node-gyp addons for inking, crypto, or PDF engines. Rejected because every missing compiler or arch change breaks the build and violates the offline no-supply-chain promise.
-  * **Option B (Chosen):** Pure JS in `src/js/core/ink.js` -> `fitBezier`, `src/js/core/circuit-sim.js` -> `solveMNA`, `sync/protocol.js` -> `sealMessage` with Node built-in crypto, and 15 vendors under `src/vendor/` resolved via `src/vendor/libraries.json`.
+  * **Option A (Superseded):** Hard ban on all native `node-gyp` addons (`TRAP 5`). Superseded because desktop-only bridges (`cas-sympy.cjs`, `media-bridge.cjs`, `spice-bridge.cjs`) and optional WASM engines (`ngspice-wasm`, `Tesseract` WASM) unlock capabilities that pure JS cannot match alone.
+  * **Option B (Chosen):** **Pure-JS-First + Optional Desktop Native/WASM with PWA Fallbacks.** Keep core canvas/ink (`fitBezier`), op-log (`Store`), MNA circuit sim (`solveMNA`), crypto (`sealMessage`), and standard offline libs (`src/vendor/libraries.json`) in pure portable JS/WASM; allow optional native Node/C++ addons or desktop WASM engines (resolved via `%LOCALAPPDATA%\SharedLibraries` or Electron bridges) so long as Web/PWA retains a clean fallback or graceful notice.
 * **Visual Pivot Map (What Failed vs. What Works):**
 ```mermaid
 flowchart LR
-    subgraph Failed["❌ Old Approach (Failed)"]
-        A1[Native Addon] --> A2[Build breaks, supply chain grows]
+    classDef oldNode fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef coreNode fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef optNode fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+
+    subgraph Superseded["❌ Rigid Ban (Superseded)"]
+        A1["Hard Pure-JS-Only Ban"] -->|"Blocks heavy STEM / PDF engines"| A2["Caps Desktop Capabilities"]
     end
-    subgraph Active["✅ Current Approach (Works)"]
-        B1[Vendored Pure JS] --> B2[Offline, portable, testable]
+    subgraph Active["✅ Hybrid Policy (Active)"]
+        B1["Core in Pure JS + Vendored WASM"]:::coreNode -->|"PWA <15 MB & Portable"| B2["Desktop + Web Parity"]:::coreNode
+        B1 -->|"Optional Desktop Addon / SharedLibs"| B3["Native / WASM Boost + PWA Fallback"]:::optNode
+    end
+    class A1,A2 oldNode
+
+    subgraph Legend["Legend (Color Guide)"]
+        L1["Red = Superseded Hard Ban"]:::oldNode
+        L2["Green = Core Portable JS/WASM Baseline"]:::coreNode
+        L3["Blue = Optional Desktop Native/WASM Extension"]:::optNode
     end
 ```
+  * *Plain-English Explanation:* Every core editor feature still ships in portable JavaScript/WASM so Web PWA and offline builds never break, while desktop Electron builds can now opt into native C++ addons or heavy WASM engines with graceful fallbacks when absent.
 * **Code Anchors (Grep Targets):**
+  * `AGENTS.md` -> `Project Tech Stack & Environment`
   * `src/js/core/ink.js` -> `fitBezier`
   * `src/vendor/libraries.json` -> `bundledPath`
-  * `sync/protocol.js` -> `createPairingCode`
+  * `electron/global-resources.cjs` -> `resolveCommonLibrariesDir`
+  * `electron/spice-bridge.cjs` -> `resolveNgspiceWasmPath`
 
 ### [DECISION: Op-Log-Checkpoint-Seam] | Aliases: checkpoint, applyRemote, onOp, undo stack, collab seam
 > **1-Line Summary:** Kept the editor on an operation log with checkpoint and applyRemote so LAN sync and future collaboration need no editor changes.

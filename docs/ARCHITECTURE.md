@@ -140,7 +140,7 @@ flowchart TB
   * `sync/desktop.js` -> `transferState`, `progress`
 
 ### [SUBSYSTEM: Five-Domain-Engines] | Aliases: circuit sim, grapher, 3Dmol, FSRS, WASM, vendor offline
-> **1-Line Summary:** Pure-JavaScript STEM engines with zero native compilation and 15 vendored libraries resolved via libraries.json.
+> **1-Line Summary:** Pure-JS-first STEM engines (plus optional desktop/SharedLibraries WASM such as `ngspice-wasm`) and vendored offline libraries resolved via `libraries.json`.
 * **How It Works (Plain English):** Circuit MNA solves nodal equations with up to 12 propagation passes, driver nodes mutate in place, and DOL latch uses one contactor delay. Grapher guards domain/asymptote/zoom. FSRS schedules reviews. 3Dmol, function-plot, math.js, nerdamer, tesseract, pdfjs, mermaid, chart.js all load from src/vendor with no CDN.
 * **Data Flow Diagram:**
 ```mermaid
@@ -275,7 +275,7 @@ See SUBSYSTEM sections above: Dual-Runtime-Platform, Document-Model-Op-Log, Inki
   3. Add render case in `src/js/core/render.js` -> `renderObject`
   4. Verify with `node scripts/smoke.js --new-features` and `node scripts/i18n-check.js`
 * **To add a new STEM engine:**
-  1. Keep it pure JS with no node-gyp dependency and check `src/js/core/ink.js` -> `preserveTime` style purity
+  1. Prefer pure JS / vendored WASM (or pair any optional desktop native/WASM addon with a clean PWA fallback per `Pure-JS-First-With-Optional-Desktop-Native-WASM`) and check `src/js/core/ink.js` -> `preserveTime` style purity
   2. Vendor the library under `src/vendor/` and register it in `src/vendor/libraries.json` -> `bundledPath`
   3. Wire the card in `src/js/ui/sidebar-ribbon.js` -> `InsertMenu` with 1-click ribbon pinning
   4. Verify with `node scripts/smoke.js --new-features` and `node scripts/i18n-check.js`

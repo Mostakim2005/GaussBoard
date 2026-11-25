@@ -144,11 +144,6 @@
   * `scripts/i18n-check.js` -> `checkParity`
   * `src/sw.js` -> `precache`, `runtimeCache`
 
-### [FEATURE: WISHLIST-Multi-Layer-System] | Aliases: layers, multi-layer standby, future feature
-> **1-Line Summary:** Multi-layer board system kept intentionally on standby while other features ship safely.
-* **User Intention:** Larger board organization beyond current infinite canvas, without destabilizing shipped behavior.
-* **Target Integration Point:** `src/js/core/store.js` -> `doc.layers`, `src/js/core/render.js` -> `renderLayer`
-
 ### [FEATURE: Presentation-View-Mode-And-Page-Strip] | Aliases: view mode, page strip, music staff, guitar tab, table repair
 > **1-Line Summary:** Read-only presentation view mode with fading ghost highlighters, thumbnail page strip, manuscript score templates, and automatic table corruption healing.
 * **User Intention (Non-Negotiable):** Teachers and students need to walk through boards without accidental edits (`Ctrl+Alt+V`), browse pages via quick sidebar thumbnails, write music notes on standard 5-line staff / 6-line guitar tab, and open legacy or damaged tables without UI lockup.
@@ -228,6 +223,7 @@
   * `src/js/core/fsrs.js` & `src/js/core/anki.js` -> `repeat`, `syncBoardToAnki`, `exportBoardToApkg`
 
 ## 3. Planned Features & App-Merge Wishlist
+*(Per owner directive, detailed feasibility specs for the Xournal++, Rnote, Lean PDF, and LiquidText wishlist items below are maintained inline here rather than split into a separate module file.)*
 
 ### [WISHLIST: Pane-Aware-Command-Dispatcher] | Aliases: pane commands, Delete routing, Copy routing
 > **1-Line Summary:** Full per-pane Delete/Copy/Select-all/z-order routing for split workspace, beyond the current selection-clearing mitigation.
@@ -238,6 +234,90 @@
 > **1-Line Summary:** Future live co-editing built on the operation log without changing the editor model.
 * **User Intention:** Presence and shared editing if ever requested, while keeping offline-first handoff as the default.
 * **Target Integration Point:** `src/js/core/store.js` -> `checkpoint`, `applyRemote`, `onOp`
+
+### [WISHLIST: Lean-Linked-Or-Attached-Single-PDF-Lazy-Render] | Aliases: lean pdf, 80MB pdf bloat fix, linked pdf, attached pdf, lazy viewport render, page-locked pdf
+> **1-Line Summary:** Replace upfront 100-page bitmap pre-rendering (~25–80 MB bloat) with a hybrid Linked external PDF or 1× Attached single-PDF asset and lazy on-demand `pdf.js` viewport rendering onto locked page slots.
+* **Problem Solved & Motivation:** Currently `openPdf()` (`src/js/importers/pdf.js`) and `insertDocument()` (`src/js/insert.js`) eagerly rasterize every imported page to JPEG bitmaps (`scale: 2–4.2`), causing 100-page textbooks to bloat to ~25–80+ MB in `assets/` while still blurring past 200% zoom.
+* **Proposed Hybrid Architecture (High Feasibility):**
+  * **Linked External PDF Mode (Default for large PDFs, 0 MB board overhead):** Store `{ pdfPath, pdfSha256, pageRange, fitMode }` in the board document instead of 100 page images. Uses SHA-256 matching to auto-relink if a textbook moves on disk (similar to Xournal++ `.xopp`, but with hash verification).
+  * **Optional 1× Attached Single-PDF Mode (Portable for LAN Sync / Android / PWA):** 1-click toggle stores the single original vector `.pdf` binary once in `assets/<sha256>.pdf` (typically 2–8 MB instead of 80 MB of JPEGs) so the board remains self-contained without per-page bitmap duplication.
+  * **Page-Locked Coordinate Mapping + Lazy `pdf.js` LRU Render:** Imported pages sit in locked/anchored `doc.pages` slots (non-draggable in Lean PDF mode; small `<=10`-page imports and Office decks can retain movable-page-object mode). `pdfjs-dist` renders only currently visible pages (+1–2 buffer neighbors) at live camera zoom (`cam.z * dpr`) into a bounded in-memory LRU cache (~8–12 pages), keeping text vector-crisp up to 800% zoom.
+  * **Invariant Compatibility:** Because board coordinates remain anchored to `pageRects(doc.pages)`, existing strokes with `p.t` audio timestamps (`TRAP 1`, `TRAP 2`), `Study Tape` / `Answer Covers` (`TRAP 6`), `PdfSidebarDrawer` TOC/thumbnails, and `Split Workspace` continue to work without re-timing.
+* **Target Integration Points:**
+  * `src/js/importers/pdf.js` -> `openPdf` (persistent handle + bounded LRU page cache)
+  * `src/js/insert.js` -> `insertDocument`, `layoutPages` (Linked vs. Attached single-PDF import option)
+  * `src/js/ui/pagepicker.js` -> `choosePages` (Lean Document Mode vs. Movable Page Objects selector)
+  * `src/js/core/render.js` -> `drawBackground` / `drawLazyPdfPage`
+
+### [WISHLIST: Vertical-Space-Tool-And-Snapping] | Aliases: vertical space, push strokes down, rnote vertical space, grid snap, 15 degree rotation snap
+> **1-Line Summary:** Rnote-style Vertical Space insertion/contraction bar plus Xournal++-style toggleable Grid Snapping and 15° Rotation Snapping.
+* **User Intention:** Let users open vertical breathing room anywhere mid-note without lassoing an entire lower half of a page, and align objects/rotations cleanly onto grids and standard drafting angles.
+* **Feasibility & Architecture Notes (Very High Feasibility — Pure JS):**
+  * **Vertical Space Tool:** Dragging a horizontal divider line vertically shifts all objects (and optionally page-margin anchors) with `bounds.y >= cursorY` by `dy` via a single batched `Store` `set` operation (`Store.commit`), preserving all stroke `p.t` timestamps (`TRAP 2`), Undo/Redo, and LAN sync.
+  * **Grid & Rotation Snapping:** Snap dragged/resized bounding-box corners to the active grid/graph spacing (`render.js` grid step) and snap rotation handles/shapes to `15°` increments (`45°`, `60°`, `90°`), with configurable tolerance and modifier-key bypass.
+* **Target Integration Points:**
+  * `src/js/core/tools.js` -> `toolStateMachine` (vertical-space divider tool)
+  * `src/js/core/transform.js` -> `moveObject`, `scaleHandles`, `rotate`
+  * `src/js/ui/toolbar.js` -> `ribbon`
+
+### [WISHLIST: Compass-Drafting-Tool] | Aliases: compass, circular arc, sector drafting, xournalpp geometry, radius guide
+> **1-Line Summary:** Xournal++-style interactive wheel Compass drafting tool for exact circles, arcs, filled sectors, and radial measurements alongside existing Set Squares and Protractor.
+* **User Intention:** Extend technical EE/geometry drafting beyond lines and angles (`Set-Squares-And-Protractor-Drafting`) to clean circular constructions, phasor diagrams, and Smith/polar arcs.
+* **Feasibility & Architecture Notes (Very High Feasibility — Pure JS):**
+  * Interactive on-screen compass wheel with center handle, radius scale readout (cm/world units), and angle indicator (`0°–360°`).
+  * Stylus-isolated edge projection (`compProject`) guides circumference arcs/circles and radial segments while preserving real-time `p.t` timestamps (`TRAP 2`), bypassing circuit connector wiring, and avoiding mouse capture (`Stylus-Inks-Mouse-Points`).
+* **Target Integration Points:**
+  * `src/js/core/tools.js` -> `triProject`, `protProject` (add `compProject` & `compEdgesAt`)
+  * `src/js/app.js` -> `openRulerMenu`
+  * `src/js/core/render.js` -> `drawDraftingTools`
+
+### [WISHLIST: RoughJS-Sketchy-Shapes-And-Calligraphic-Pen] | Aliases: rough.js, sketchy shapes, calligraphic pen, modeled brush, rnote styles
+> **1-Line Summary:** Optional `rough.js` (MIT) sketchy hand-drawn shape rendering and a velocity/pressure-modeled Calligraphic Pen inspired by Rnote.
+* **User Intention:** Offer expressive whiteboard diagramming (`rough.js` sketch aesthetics on shapes/cards) and crisp fountain/calligraphic handwriting alongside existing Solid, Neon, Pencil, Rainbow, and Galaxy pens.
+* **Feasibility & Architecture Notes (High Feasibility — Pure JS OSS Reuse):**
+  * **Sketchy Shapes (`roughjs`, MIT, ~10–15 KB):** Vendor `rough.js` in `src/vendor/` + `SharedLibraries` (credit in `THIRD_PARTY_NOTICES.md`) and persist a deterministic `roughSeed` on shape objects so progressive slicing (`Smart Slicing`) and Zoom LOD (`camZ < 0.35`) never shimmer between frames.
+  * **Calligraphic / Modeled Pen:** Compute variable ribbon/elliptical nib width from stylus pressure, velocity, and stroke angle in `ink.js` / `render.js`, storing raw centerline points + `p.t` timestamps untouched (`TRAP 2`) so audio replay and scratch-out erasing (`erase.js`) continue to split cleanly.
+* **Target Integration Points:**
+  * `src/vendor/libraries.json`, `THIRD_PARTY_NOTICES.md`
+  * `src/js/core/ink.js`, `src/js/core/render.js` -> `drawShape`, `drawStroke`
+  * `src/js/ui/palettes.js` -> `PEN_EFFECTS`
+
+### [WISHLIST: Deep-PDF-Text-Select-Highlight-Search-Links] | Aliases: pdf text select, pdf highlight, pdf underline, pdf strikeout, pdf search ctrl+f, pdf hyperlinks, xournalpp pdf tools
+> **1-Line Summary:** Xournal++-style deep PDF text interaction: text selection, copy, highlight/underline/strikeout markups, clickable PDF links, and `Ctrl+F` full-document text search.
+* **User Intention:** Turn imported textbooks and papers from flat background pictures into searchable, selectable, link-navigable study documents without switching apps.
+* **Feasibility & Architecture Notes (Medium Effort — Pairs with Lean PDF Mode):**
+  * **Live `pdfjs-dist` Text & Link Extraction:** Leverage already-vendored `pdf.min.mjs` (`page.getTextContent()` and `page.getAnnotations()`) to build lightweight normalized text runs and link hotspots on visible/active PDF pages without bloated bitmap duplication.
+  * **Markup & Search UX:** Floating selection popup triggers Copy Quote, Highlight, Underline, or Strikethrough stored as `Store` vector markup objects anchored to `docPage` coordinates (so Study Tape, Undo, and LAN Sync all work); `Ctrl+F` / `F3` scans document text runs and glides the camera to matches; external PDF URLs pass strictly through `safeExternalUrl` (`TRAP: Untrusted-Url-And-Path`).
+  * **Note on Heavy Optional Extensions:** If desktop native/WASM acceleration (e.g., MuPDF/QPDF or `Tesseract.js` OCR for scanned PDFs) is later desired for 1,000+ page textbooks or ISO 32000-1 PDF writeback, it aligns with `Pure-JS-First-With-Optional-Desktop-Native-WASM`.
+* **Target Integration Points:**
+  * `src/js/importers/pdf.js` -> `openPdf` (text & annotation link extractors)
+  * `src/js/ui/pdf-sidebar.js` -> `PdfSidebarDrawer` + `src/js/ui/search-dialog.js`
+  * `src/js/core/tools.js`, `src/js/core/render.js`
+
+### [WISHLIST: Multi-Layer-System-And-Page-Depth] | Aliases: WISHLIST-Multi-Layer-System, layers, page depth, bezier splines, tangent knots, whiteout eraser
+> **1-Line Summary:** Expanded per-page/board Multi-Layer stack (hide/lock/merge/reorder), Xournal++-style editable Bezier Splines with anchor knots/tangents, and non-destructive Whiteout eraser mode.
+* **User Intention:** Organize dense engineering schematics, PDFs, solution overlays, and recall steps cleanly across layers, draft smooth curved waveforms/splines with editable tangent handles, and mask unwanted background markings non-destructively.
+* **Feasibility & Architecture Notes (Medium Effort):**
+  * **Multi-Layer System:** Add `doc.layers` and `obj.layerId` in `Store`, with per-layer visibility, lock, reorder, and merge operations. Must integrate tightly with `_paintOrder` Smart Slicing (`surface.js`), `TRAP 1` active audio replay partitioning, and `TRAP 6` Study Cover occlusion so hidden answers never leak across layers.
+  * **Editable Bezier Splines:** Click to place polyline knots, drag to pull cubic Bezier tangent handles (live anchor/tangent overlay during editing), and commit smooth multi-segment curves into `Store` (`connectors.js` / `render.js`).
+  * **Whiteout Eraser:** Add an eraser/masking mode that draws opaque paper-matched strokes over fixed backgrounds or PDF layers without mutating underlying pages.
+* **Target Integration Points:**
+  * `src/js/core/store.js` -> `doc.layers`, `Store.applyOp`
+  * `src/js/core/surface.js` -> `_paintOrder`, `_paintHeavy`
+  * `src/js/core/tools.js`, `src/js/core/render.js`
+
+### [WISHLIST: LiquidText-Active-Reading-And-Pinch-Workspace] | Aliases: liquidtext, pinch collapse, pin and tear, text excerpts, margin gutter expansion, pdf-lib, sync scroll
+> **1-Line Summary:** Full LiquidText-inspired active-reading proposal: pinch-to-collapse reading view, text-selection Pin-and-Tear excerpts, non-destructive book margin gutter expansion (`pdf-lib`), and multi-excerpt synthesis workspace.
+* **Current Baseline vs. Proposed Scope:** GaussBoard already ships `isExcerpt` image snips, `excerptSource` coordinates, cyan elastic tether lines, and `cam.glideTo` jump-to-source (`src/js/core/excerpts.js`, `src/js/core/render.js`). This proposal tracks the full LiquidText workflow for future design review:
+  * **Pinch-to-Collapse Document View:** Temporarily fold blank/unannotated stretches between highlighted passages or distant PDF pages in the reader pane so a student can compare equation (1) on page 12 directly above its proof on page 148 without altering the underlying file.
+  * **Text-Selection Pin-and-Tear Excerpts:** Extend `EXCERPT_MIME` (`src/js/core/excerpts.js`) beyond bitmap crops so dragging selected PDF text drops a structured Markdown/KaTeX quote card onto the canvas or Split Workspace with bidirectional `glideTo` + cyan flash highlight back to exact PDF coordinates.
+  * **Book Margin Expansion (`pdf-lib` / Virtual Gutters):** Add printable margin gutters around dense textbooks (via already-vendored `pdf-lib` `setMediaBox`/`setCropBox` or virtual locked marginalia zones) so handwritten derivations sit beside paragraphs without shrinking page text.
+  * **Synthesis Clustering & Ink-to-Text Anchors:** Group torn excerpts into collapsible comparison clusters on the workspace and attach ink annotations directly to PDF text anchors so reflow/zoom preserves context.
+* **Target Integration Points:**
+  * `src/js/core/excerpts.js` -> `validateExcerptPayload`, `excerptImageObject` (extend for `pdf-text` excerpts)
+  * `src/js/ui/split-workspace.js` -> `SplitStudyWorkspace`
+  * `src/js/core/compression.js` / `pdf-lib` -> margin gutter expansion helper
+  * `src/js/core/render.js` -> tether & excerpt card rendering
 
 ### [FEATURE: Dual-Circuit-Simulation-With-Ngspice] | Aliases: ngspice-wasm, spice netlist, MNA Live, EEcircuit, TINA
 > **1-Line Summary:** Dual circuit engine combining built-in pure-JS MNA (`IndustrialCircuitSim`) for instant interactive relays/motors with switchable `ngspice-wasm` / analytical SPICE sweep (`SpiceEngine`), `.cir` netlist export, and TI `TINA` launcher.
